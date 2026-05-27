@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// LOKÁ Sistema — Firebase Config & Sync Layer
+// LOKÁ Sistema — Firebase Config com fallback localStorage
 // ═══════════════════════════════════════════════════════════════════
 
 const FIREBASE_CONFIG = {
@@ -12,73 +12,139 @@ const FIREBASE_CONFIG = {
   appId:             "1:633462890390:web:40e9baa2b80e5b709307b7"
 };
 
-// ── Initialize ──────────────────────────────────────────────────────────────
-firebase.initializeApp(FIREBASE_CONFIG);
-const db_ref = firebase.database();
+// ── Detect if Firebase is available ────────────────────────────────
+let _firebaseOk = false;
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    _firebaseOk = true;
+  }
+} catch(e) {
+  console.warn('Firebase init failed, using localStorage fallback:', e.message);
+}
 
-// ── LokaDB: camada de abstração sobre Firebase ──────────────────────────────
+const db_ref = _firebaseOk ? firebase.database() : null;
+
+// ── LokaDB: Firebase com fallback localStorage ──────────────────────
 const LokaDB = {
 
+  _isOnline() {
+    return _firebaseOk && navigator.onLine;
+  },
+
   async load(path) {
-    const snap = await db_ref.ref(path).get();
-    return snap.exists() ? snap.val() : null;
+    if (this._isOnline()) {
+      try {
+        const snap = await db_ref.ref(path).get();
+        return snap.exists() ? snap.val() : null;
+      } catch(e) {
+        console.warn('Firebase load failed, trying localStorage:', e.message);
+      }
+    }
+    // Fallback localStorage
+    const raw = localStorage.getItem('loka_' + path.replace(/\//g,'_'));
+    return raw ? JSON.parse(raw) : null;
   },
 
   async save(path, data) {
-    await db_ref.ref(path).set(data);
+    // Always save to localStorage as backup
+    try {
+      localStorage.setItem('loka_' + path.replace(/\//g,'_'), JSON.stringify(data));
+    } catch(e) {}
+    // Try Firebase
+    if (this._isOnline()) {
+      try {
+        await db_ref.ref(path).set(data);
+      } catch(e) {
+        console.warn('Firebase save failed (saved to localStorage):', e.message);
+      }
+    }
   },
 
   async update(path, data) {
-    await db_ref.ref(path).update(data);
+    if (this._isOnline()) {
+      try { await db_ref.ref(path).update(data); return; } catch(e) {}
+    }
+    // Fallback: load, merge, save
+    const current = await this.load(path) || {};
+    await this.save(path, { ...current, ...data });
   },
 
   async remove(path) {
-    await db_ref.ref(path).remove();
-  },
-
-  async push(path, data) {
-    const ref = await db_ref.ref(path).push(data);
-    return ref.key;
+    try { localStorage.removeItem('loka_' + path.replace(/\//g,'_')); } catch(e) {}
+    if (this._isOnline()) {
+      try { await db_ref.ref(path).remove(); } catch(e) {}
+    }
   },
 
   listen(path, callback) {
-    db_ref.ref(path).on('value', snap => {
-      callback(snap.exists() ? snap.val() : null);
-    });
+    if (this._isOnline()) {
+      try {
+        db_ref.ref(path).on('value', snap => callback(snap.exists() ? snap.val() : null));
+        return;
+      } catch(e) {}
+    }
+    // Fallback: call once with localStorage data
+    this.load(path).then(callback);
   },
 
   unlisten(path) {
-    db_ref.ref(path).off();
+    if (_firebaseOk && db_ref) {
+      try { db_ref.ref(path).off(); } catch(e) {}
+    }
   },
 
-  // ── Passagem de dados entre páginas (substitui localStorage) ──
+  // ── Passagem de dados entre páginas ──
   async setClientPass(data) {
-    await this.save('_pass/client', { ...data, _ts: Date.now() });
+    const payload = { ...data, _ts: Date.now() };
+    localStorage.setItem('loka_contrato_client', JSON.stringify(payload));
+    if (this._isOnline()) {
+      try { await db_ref.ref('_pass/client').set(payload); } catch(e) {}
+    }
   },
 
   async getClientPass() {
-    const data = await this.load('_pass/client');
-    if (!data) return null;
-    // Expira após 5 minutos
-    if (Date.now() - (data._ts || 0) > 300000) {
-      await this.remove('_pass/client');
-      return null;
+    let data = null;
+    // Try localStorage first (faster)
+    try {
+      const raw = localStorage.getItem('loka_contrato_client');
+      if (raw) {
+        data = JSON.parse(raw);
+        localStorage.removeItem('loka_contrato_client');
+      }
+    } catch(e) {}
+    // Try Firebase
+    if (!data && this._isOnline()) {
+      try {
+        const snap = await db_ref.ref('_pass/client').get();
+        if (snap.exists()) {
+          data = snap.val();
+          await db_ref.ref('_pass/client').remove();
+        }
+      } catch(e) {}
     }
-    await this.remove('_pass/client');
+    if (!data) return null;
+    if (Date.now() - (data._ts || 0) > 300000) return null;
     return data;
   }
 };
 
-// ── Toast helper ────────────────────────────────────────────────────────────
+// ── Toast helper ────────────────────────────────────────────────────
 function lokaToast(msg, color = '#0E1B4D') {
   document.querySelectorAll('.loka-toast').forEach(t => t.remove());
   const t = document.createElement('div');
   t.className = 'loka-toast';
-  t.style.cssText = `position:fixed;top:18px;right:18px;background:${color};color:#fff;
-    padding:11px 18px;border-radius:8px;font-family:Montserrat,sans-serif;font-size:12px;
-    font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);max-width:340px;
-    display:flex;align-items:center;gap:8px;`;
+  t.style.cssText = 'position:fixed;top:18px;right:18px;background:'+color+';color:#fff;'
+    +'padding:11px 18px;border-radius:8px;font-family:Montserrat,sans-serif;font-size:12px;'
+    +'font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);max-width:340px;'
+    +'display:flex;align-items:center;gap:8px;';
   t.innerHTML = msg;
   document.body.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 4000);
+  setTimeout(() => { t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 4000);
 }
+
+// ── Status indicator ────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  const mode = _firebaseOk && navigator.onLine ? '🟢 Online' : '🟡 Offline';
+  console.log('LOKÁ Sistema — Modo:', mode);
+});

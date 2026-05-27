@@ -21,6 +21,10 @@
   </script>
 
 <meta charset="UTF-8">
+  <meta name="theme-color" content="#0E1B4D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Frota Ativa – LOKÁ Aluguel de Veículos</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet">
@@ -33,17 +37,17 @@ body{font-family:"Montserrat",sans-serif;background:#f0f2fa;color:var(--dark);}
 .hero-title{font-size:15px;font-weight:800;color:#fff;letter-spacing:.5px;}
 .hero-sub{font-size:10px;color:rgba(255,255,255,.45);margin-top:3px;letter-spacing:.5px;}
 .hero-stripe{height:4px;background:linear-gradient(90deg,var(--blue),#7B9BFF,var(--blue));}
-.toolbar{max-width:1400px;margin:20px auto 16px;padding:0 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.toolbar{max-width:100%;margin:20px auto 16px;padding:0 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 .search-wrap{position:relative;flex:1;min-width:200px;}
 .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;}
 .search-input{width:100%;padding:10px 12px 10px 36px;border:1.5px solid var(--border);border-radius:8px;font-family:"Montserrat",sans-serif;font-size:12px;background:#fff;outline:none;transition:border-color .2s;}
 .search-input:focus{border-color:var(--blue);}
 .filter-sel{padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:"Montserrat",sans-serif;font-size:12px;background:#fff;outline:none;color:var(--dark);cursor:pointer;}
-.stats-bar{max-width:1400px;margin:0 auto 20px;padding:0 20px;display:flex;gap:12px;flex-wrap:wrap;}
+.stats-bar{max-width:100%;margin:0 auto 20px;padding:0 20px;display:flex;gap:12px;flex-wrap:wrap;}
 .stat{background:#fff;border-radius:8px;padding:12px 18px;box-shadow:0 1px 6px rgba(14,27,77,.07);border-left:3px solid var(--blue);flex:1;min-width:120px;}
 .stat-val{font-size:22px;font-weight:800;color:var(--dark);}
 .stat-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-top:2px;}
-.grid{max-width:1400px;margin:0 auto;padding:0 20px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.grid{max-width:100%;margin:0 auto;padding:0 20px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
 .card{background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(14,27,77,.07);overflow:hidden;transition:box-shadow .2s;border-top:3px solid var(--border);}
 .card:hover{box-shadow:0 4px 20px rgba(14,27,77,.13);}
 .card.saveiro-bau{border-top-color:#8b5cf6;}
@@ -78,6 +82,26 @@ body{font-family:"Montserrat",sans-serif;background:#f0f2fa;color:var(--dark);}
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
+
+<style>
+/* ═══════ MOBILE OVERRIDES ═══════ */
+@media (max-width: 768px) {
+  .hero { flex-direction: column !important; gap: 8px; padding: 12px 14px !important; }
+  .hero img { height: 32px !important; }
+  .toolbar { flex-direction: column !important; padding: 10px 12px !important; gap: 8px !important; }
+  .search-wrap, .filter-sel { width: 100% !important; }
+  .stats-bar { padding: 0 12px !important; gap: 8px !important; }
+  .stat { min-width: 80px; padding: 10px 12px !important; }
+  .stat-val { font-size: 18px !important; }
+  .grid { padding: 0 12px 24px !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .card-modelo { font-size: 12px !important; }
+  .price-val { font-size: 11px !important; }
+  .prices { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 400px) {
+  .grid { grid-template-columns: 1fr !important; }
+}
+</style>
 </head>
 <body>
 

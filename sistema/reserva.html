@@ -21,6 +21,10 @@
   </script>
 
 <meta charset="UTF-8">
+  <meta name="theme-color" content="#0E1B4D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reserva de Veículo – LOKÁ</title>
 <meta property="og:title" content="LOKÁ – Reserve seu Carro">
@@ -193,6 +197,22 @@ body{font-family:"Barlow",sans-serif;background:#f4f6fd;color:var(--ink);min-hei
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
+
+<style>
+/* ═══════ MOBILE OVERRIDES ═══════ */
+@media (max-width: 768px) {
+  .hero-inner { flex-direction: column !important; text-align: center !important; padding: 14px !important; }
+  .steps { overflow-x: auto; }
+  .step { min-width: 70px; padding: 10px 4px !important; font-size: 9px !important; }
+  .card { margin: 10px !important; border-radius: 10px !important; }
+  .card-body { padding: 14px !important; }
+  .card-foot { padding: 12px 14px !important; }
+  .grid2, .grid3 { grid-template-columns: 1fr !important; }
+  .veiculo-grid { grid-template-columns: 1fr 1fr !important; }
+  .btn { font-size: 12px !important; }
+  .panel { padding: 12px !important; }
+}
+</style>
 </head>
 <body>
 

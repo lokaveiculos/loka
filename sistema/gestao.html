@@ -21,6 +21,10 @@
   </script>
 
 <meta charset="UTF-8">
+  <meta name="theme-color" content="#0E1B4D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Sistema de Gestão</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -90,6 +94,7 @@ body{font-family:"Montserrat",sans-serif;background:#0E1B4D;color:var(--text);mi
 .table-header h3{font-size:13px;font-weight:700;color:var(--dark);}
 .table-header span{font-size:11px;color:var(--muted);}
 table{width:100%;border-collapse:collapse;}
+.table-card > div[style*="overflow"]{-webkit-overflow-scrolling:touch;}
 th{background:#f8f9fe;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);}
 td{padding:10px 14px;border-bottom:1px solid #f0f2fa;font-size:11.5px;color:var(--text);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
@@ -102,7 +107,7 @@ tr:hover td{background:#fafbff;}
 .badge-purple{background:#ede9fe;color:var(--purple);}
 .badge-gray{background:#f0f2fa;color:var(--muted);}
 .action-btns{display:flex;gap:5px;}
-.icon-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:all .15s;}
+.icon-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:all .15s;}
 .icon-btn:hover{border-color:var(--blue);background:var(--light);}
 .icon-btn.green:hover{border-color:var(--green);background:#e8f5ef;}
 .icon-btn.red:hover{border-color:var(--red);background:#fdecea;}
@@ -228,6 +233,69 @@ tr:hover td{background:#fafbff;}
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
+
+<style>
+/* ═══════ MOBILE OVERRIDES ═══════ */
+@media (max-width: 768px) {
+  /* Sidebar → bottom nav */
+  .shell { grid-template-columns: 1fr !important; }
+  .sidebar {
+    position: fixed !important; bottom: 0; left: 0; right: 0;
+    height: auto !important; flex-direction: row !important;
+    z-index: 200; border-top: 1px solid rgba(255,255,255,.1);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .sidebar-logo, .sidebar-footer { display: none !important; }
+  .nav {
+    display: flex !important; flex-direction: row !important;
+    padding: 0 !important; overflow-x: auto; flex: 1;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-section { display: none !important; }
+  .nav-item {
+    flex-direction: column !important; gap: 2px !important;
+    padding: 8px 10px !important; min-width: 64px;
+    border-left: none !important; border-top: 3px solid transparent;
+    font-size: 9px !important; text-align: center;
+    white-space: nowrap;
+  }
+  .nav-item.active { border-top-color: var(--blue) !important; border-left: none !important; }
+  .nav-item svg { width: 18px !important; height: 18px !important; }
+  /* Main content */
+  .main { padding-bottom: 65px !important; }
+  .content { padding: 14px 12px 70px !important; }
+  .topbar { padding: 12px 14px !important; }
+  .topbar h2 { font-size: 14px !important; }
+  .btn { font-size: 10px !important; padding: 7px 10px !important; }
+  /* Stats grid */
+  .stats { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; margin-bottom: 14px !important; }
+  .stat-value { font-size: 20px !important; }
+  /* Tables */
+  table { font-size: 11px !important; }
+  th, td { padding: 7px 8px !important; }
+  /* Modals */
+  .modal { margin: 8px !important; max-height: 95vh !important; }
+  .modal.wide, .modal.medium, .modal.narrow { max-width: 100% !important; }
+  .form-grid.col2, .form-grid.col3 { grid-template-columns: 1fr !important; }
+  /* Vehicle grid */
+  .veiculo-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  /* Signatures */
+  .signatures { grid-template-columns: 1fr !important; gap: 16px !important; }
+  /* Alugueis ativos */
+  .aluguel-ativo-card { grid-template-columns: 1fr !important; }
+  /* Action bar */
+  .topbar-actions { gap: 6px !important; }
+  /* User bar */
+  #lokaUserBar { padding: 4px 12px !important; font-size: 9px !important; }
+}
+@media (max-width: 480px) {
+  .stats { grid-template-columns: 1fr 1fr !important; }
+  .veiculo-grid { grid-template-columns: 1fr !important; }
+  /* Hide less important table columns */
+  th:nth-child(3), td:nth-child(3) { display: none; }
+}
+</style>
 </head>
 <body>
 <div class="shell">
@@ -828,46 +896,45 @@ let _dbLoaded = false;
 
 async function initDB() {
   try {
-    lokaToast('🔄 Sincronizando dados...', '#2B4BF2');
+    if (navigator.onLine && typeof LokaDB !== 'undefined') {
+      lokaToast('🔄 Sincronizando...', '#2B4BF2');
+    }
     const remote = await LokaDB.load('loka_db');
-    if (remote && remote.clients) {
+    if (remote && remote.clients && Array.isArray(remote.clients) && remote.clients.length > 0) {
       db = remote;
-      // Force fleet update if outdated
-      if (!db.veiculos || db.veiculos.length < 100) {
-        db.veiculos = FROTA_SEED;
-      }
+      if (!db.veiculos || db.veiculos.length < 100) db.veiculos = getVeiculosSeed();
       if (!db.contratos)  db.contratos  = [];
       if (!db.vistorias)  db.vistorias  = [];
+      if (!db.ativos)     db.ativos     = [];
     } else {
-      // First time: seed with initial data
-      if(!false) {
-  db = {
-    clients: CLIENTS_SEED.map((c,i) => ({...c, id:'c'+i, email:'', cep:'', nasc:'', cnh:'', cnhCat:'', cnhVal:'', obs:'', status:'ativo', motivoBloq:'', docs:{}})),
-    veiculos: [{"id": "vf0", "marca": "VW", "modelo": "Amarok", "placa": "RHI1I58", "cor": "Branca", "ano": "2021", "km": "", "diaria": 600.0, "diaria_km_livre": 750.0, "mensal": 8000.0, "mensal_km_livre": 10000.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf1", "marca": "FIAT", "modelo": "Argo", "placa": "SIL2E59", "cor": "Cinza", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf2", "marca": "CITROËN", "modelo": "C3", "placa": "RVV7E29", "cor": "Branca", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf3", "marca": "FIAT", "modelo": "Fiorino", "placa": "RCY8H74", "cor": "Branca", "ano": "2021", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf4", "marca": "FIAT", "modelo": "Fiorino", "placa": "RDK5G66", "cor": "Branca", "ano": "2021", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf5", "marca": "FIAT", "modelo": "Fiorino", "placa": "SYO1G57", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf6", "marca": "VW", "modelo": "Gol", "placa": "SCO5B72", "cor": "Branca", "ano": "2022", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf7", "marca": "VW", "modelo": "Gol", "placa": "EQQ2J61", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf8", "marca": "VW", "modelo": "Gol", "placa": "GIR7I93", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf9", "marca": "VW", "modelo": "Gol", "placa": "FOY3F87", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf10", "marca": "VW", "modelo": "Gol", "placa": "DFT8I72", "cor": "Branca", "ano": "2022", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf11", "marca": "VW", "modelo": "Gol", "placa": "RUE0E26", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf12", "marca": "HYUNDAI", "modelo": "HB20", "placa": "SJC3A29", "cor": "Prata", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf13", "marca": "RENAULT", "modelo": "Kwid", "placa": "STD4J70", "cor": "Prata", "ano": "2025", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf14", "marca": "FIAT", "modelo": "Mobi", "placa": "RUZ9J78", "cor": "Prata", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf15", "marca": "FIAT", "modelo": "Mobi", "placa": "RVO7C13", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf16", "marca": "FIAT", "modelo": "Mobi", "placa": "SHJ0I58", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf17", "marca": "FIAT", "modelo": "Mobi", "placa": "SHS2E71", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf18", "marca": "FIAT", "modelo": "Mobi", "placa": "SHV7B26", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf19", "marca": "FIAT", "modelo": "Mobi", "placa": "SHW9F83", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf20", "marca": "FIAT", "modelo": "Mobi", "placa": "SHW9G84", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf21", "marca": "FIAT", "modelo": "Mobi", "placa": "SHG3D40", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf22", "marca": "CHEVROLET", "modelo": "Onix LT", "placa": "SIO9A51", "cor": "Branca", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf23", "marca": "CHEVROLET", "modelo": "Onix Plus AT", "placa": "RUQ2J15", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf24", "marca": "CHEVROLET", "modelo": "Onix Plus AT", "placa": "RVC9A19", "cor": "Prata", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf25", "marca": "CHEVROLET", "modelo": "Onix Plus AT", "placa": "SJA7D13", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf26", "marca": "CHEVROLET", "modelo": "Onix Plus MT", "placa": "RUV5G98", "cor": "Branca", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf27", "marca": "PEUGEOT", "modelo": "Peugeot 208 Active", "placa": "RVN9D70", "cor": "Preto", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf28", "marca": "PEUGEOT", "modelo": "Peugeot 208 Like", "placa": "SIA6F77", "cor": "Cinza", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf29", "marca": "VW", "modelo": "Polo", "placa": "STF4F32", "cor": "Cinza", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf30", "marca": "VW", "modelo": "Polo", "placa": "FYQ2B92", "cor": "Branca", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf31", "marca": "FORD", "modelo": "Ranger XLT 2026 BRA", "placa": "TGZ6D54", "cor": "Branca", "ano": "2025", "km": "", "diaria": 750.0, "diaria_km_livre": 900.0, "mensal": 10000.0, "mensal_km_livre": 12000.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf32", "marca": "FORD", "modelo": "Ranger XLT 2026 PRE", "placa": "TGZ1E73", "cor": "Preto", "ano": "2025", "km": "", "diaria": 750.0, "diaria_km_livre": 900.0, "mensal": 10000.0, "mensal_km_livre": 12000.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf33", "marca": "JEEP", "modelo": "Renegade", "placa": "RVI0D04", "cor": "Cinza", "ano": "2023", "km": "", "diaria": 250.0, "diaria_km_livre": 300.0, "mensal": 4000.0, "mensal_km_livre": 4500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf34", "marca": "VW", "modelo": "Saveiro", "placa": "FDZ9G34", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf35", "marca": "VW", "modelo": "Saveiro", "placa": "GCI9I23", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf36", "marca": "VW", "modelo": "Saveiro", "placa": "GDE1E83", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf37", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FLR6J14", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf38", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD8J06", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf39", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD9I55", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf40", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD9I60", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf41", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD9I71", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf42", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT1A74", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf43", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT2A32", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf44", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT2A34", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf45", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT2A51", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf46", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHF6F29", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf47", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHF6F23", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf48", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHF6F28", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf49", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHG1J02", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf50", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHH1C11", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf51", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHH6B15", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf52", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHU8B53", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf53", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHU8B66", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf54", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G39", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf55", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G42", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf56", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G45", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf57", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G46", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf58", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G48", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf59", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G51", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf60", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G52", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf61", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EJD9E52", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf62", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EUB9I42", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf63", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EXN2A36", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf64", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCC6E35", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf65", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FTI3F81", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf66", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FVJ7F62", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf67", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GBW2B46", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf68", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GCQ2G23", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf69", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GEZ8H54", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf70", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GJO0D71", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf71", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GJU9H02", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf72", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RMP0A86", "cor": "Vermelho", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf73", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RND5I98", "cor": "Vermelho", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf74", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RPR1G73", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf75", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RTE3J75", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf76", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RTE3J85", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf77", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RTE3J91", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf78", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUE5E24", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf79", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUE5F30", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf80", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUE5F40", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf81", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUI8I24", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf82", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUJ4A55", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf83", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUL7A99", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf84", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUP3D82", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf85", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUP8F63", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf86", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUT7D45", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf87", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUX8G52", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf88", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SDF3C81", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf89", "marca": "VW", "modelo": "Saveiro Baú", "placa": "QNH1995", "cor": "Branca", "ano": "2018", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf90", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCQ8B73", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf91", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EBL7E41", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf92", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EKU9D72", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf93", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCH1I73", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf94", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCN9G63", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf95", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EUE8G81", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf96", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EVT1C72", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf97", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SWO4I55", "cor": "Branca", "ano": "2025", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf98", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SWH3A72", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf99", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RML9D09", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf100", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EYA5J14", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf101", "marca": "CHEVROLET", "modelo": "Spin", "placa": "SEV0J14", "cor": "Branca", "ano": "2024", "km": "", "diaria": 250.0, "diaria_km_livre": 300.0, "mensal": 4000.0, "mensal_km_livre": 4500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf102", "marca": "FIAT", "modelo": "Strada", "placa": "RNU7E72", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf103", "marca": "FIAT", "modelo": "Strada", "placa": "RVO5A91", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf104", "marca": "FIAT", "modelo": "Fastback", "placa": "SKT3B92", "cor": "Cinza", "ano": "2025", "km": "", "diaria": 250.0, "diaria_km_livre": 300.0, "mensal": 4000.0, "mensal_km_livre": 4500.0, "franquia": "100", "status": "disponivel", "obs": ""}],
-    ativos: [],
-    vistorias: [],
-    contratos: []
-  };
+      // Primeira vez — seed inicial
+      db = {
+        clients:   CLIENTS_SEED.map((cl,i) => ({...cl, id:'c'+i, email:'', cep:'', nasc:'',
+                   cnh:'', cnhCat:'', cnhVal:'', obs:'', status:'ativo', motivoBloq:'', docs:{}})),
+        veiculos:  getVeiculosSeed(),
+        ativos:    [],
+        vistorias: [],
+        contratos: []
+      };
       saveDB();
     }
   } catch(e) {
-    console.warn('Firebase load error, using seed:', e);
-    db = { clients:[], veiculos:FROTA_SEED, ativos:[], vistorias:[], contratos:[] };
-    db.clients = CLIENTS_SEED.map((cl,i) => ({...cl, id:'c'+i, email:'', cep:'', nasc:'', cnh:'', cnhCat:'', cnhVal:'', obs:'', status:'ativo', motivoBloq:'', docs:{}}));
+    console.error('initDB error:', e);
+    // Emergency fallback — empty db
+    if (!db) {
+      db = { clients:[], veiculos:getVeiculosSeed(), ativos:[], vistorias:[], contratos:[] };
+    }
   }
   _dbLoaded = true;
   updateStats();
   renderDashboard();
-  renderClients();
 }
-
-// Extract FROTA_SEED from existing veiculos array for re-seeding
-const FROTA_SEED_IDX = 0; // placeholder — actual data is in db init below
 
 
 function saveDB() {
-  // Save to Firebase (async, non-blocking)
-  LokaDB.save('loka_db', db).catch(e => console.warn('Firebase save error:', e));
+  if (!db) return;
+  // Save to Firebase + localStorage (async, non-blocking)
+  LokaDB.save('loka_db', db).catch(e => console.warn('Save error:', e));
 }
 
 // ── PAGES ──
@@ -1807,7 +1874,11 @@ async function processarImport(input) {
 }
 
 // ── INIT ──
-renderDashboard();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDB);
+} else {
+  initDB();
+}
 </script>
 </body>
 </html>

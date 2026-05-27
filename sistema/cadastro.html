@@ -21,6 +21,10 @@
   </script>
 
 <meta charset="UTF-8">
+  <meta name="theme-color" content="#0E1B4D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cadastro – LOKÁ Aluguel de Carros</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -94,6 +98,23 @@ body{font-family:"Montserrat",sans-serif;background:linear-gradient(135deg,#0E1B
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <script src="firebase-config.js"></script>
+
+<style>
+/* ═══════ MOBILE OVERRIDES ═══════ */
+@media (max-width: 768px) {
+  .card { margin: 10px !important; border-radius: 10px !important; }
+  .card-body { padding: 16px !important; }
+  .col2, .col3 { grid-template-columns: 1fr !important; }
+  .perm-grid { grid-template-columns: 1fr 1fr !important; }
+  .role-chips { gap: 6px !important; }
+  .role-chip { padding: 6px 10px !important; font-size: 10px !important; }
+  .tabs { margin: 12px auto 0 !important; }
+  .tab-btn { font-size: 11px !important; padding: 8px !important; }
+  .steps { overflow-x: auto; }
+  .stp { min-width: 60px; font-size: 9px !important; padding: 8px 4px !important; }
+  .doc-box { padding: 10px !important; }
+}
+</style>
 </head>
 <body>
 <div class="hero">
