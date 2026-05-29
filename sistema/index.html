@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-  <meta name="theme-color" content="#0E1B4D">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="mobile-web-app-capable" content="yes">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#0E1B4D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <title>LOKÁ – Acesso ao Sistema</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -22,8 +22,7 @@ body{
   box-shadow:0 24px 60px rgba(0,0,0,.4);overflow:hidden;
 }
 .card-header{
-  background:#0E1B4D;padding:28px 28px 24px;text-align:center;
-  position:relative;
+  background:#0E1B4D;padding:28px 28px 24px;text-align:center;position:relative;
 }
 .card-header::before{
   content:"";position:absolute;inset:0;
@@ -34,56 +33,39 @@ body{
   font-size:13px;font-weight:800;color:rgba(255,255,255,.7);
   letter-spacing:2px;text-transform:uppercase;position:relative;z-index:1;
 }
-.stripe{height:3px;background:linear-gradient(90deg,#2B4BF2,#7B9BFF,#2B4BF2);}
+.stripe{height:3px;background:linear-gradient(90deg,#2B4BF2,#7B9BFF,#2B4BF2);animation:stripe 3s linear infinite;background-size:200%;}
+@keyframes stripe{0%{background-position:0%}100%{background-position:200%}}
 .card-body{padding:28px;}
 .form-group{margin-bottom:18px;}
-.form-label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;
-  letter-spacing:.8px;color:#5a607a;margin-bottom:6px;}
+.form-label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#5a607a;margin-bottom:6px;}
 .form-input{
-  width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:8px;
-  font-family:"Montserrat",sans-serif;font-size:14px;color:#1a1a2e;
+  width:100%;padding:13px 14px;border:1.5px solid #e2e8f0;border-radius:8px;
+  font-family:"Montserrat",sans-serif;font-size:15px;color:#1a1a2e;
   outline:none;transition:border-color .2s,box-shadow .2s;background:#f8fafc;
 }
 .form-input:focus{border-color:#2B4BF2;box-shadow:0 0 0 3px rgba(43,75,242,.1);background:#fff;}
+.form-input::placeholder{color:#c0c8e8;}
 .input-wrap{position:relative;}
 .eye-btn{
   position:absolute;right:12px;top:50%;transform:translateY(-50%);
   border:none;background:none;cursor:pointer;color:#9ca3af;padding:4px;
+  -webkit-tap-highlight-color:transparent;
 }
 .btn-login{
-  width:100%;padding:13px;background:#0E1B4D;color:#fff;border:none;
+  width:100%;padding:14px;background:#0E1B4D;color:#fff;border:none;
   border-radius:8px;font-family:"Montserrat",sans-serif;font-weight:800;
-  font-size:14px;letter-spacing:.5px;cursor:pointer;
-  transition:all .2s;margin-top:4px;
+  font-size:14px;letter-spacing:.5px;cursor:pointer;transition:all .2s;
+  -webkit-tap-highlight-color:transparent;
 }
-.btn-login:hover{background:#1a2f6a;transform:translateY(-1px);
-  box-shadow:0 6px 20px rgba(14,27,77,.4);}
-.btn-login:active{transform:translateY(0);}
+.btn-login:hover{background:#1a2f6a;}
+.btn-login:active{transform:scale(.98);}
 .error-msg{
   display:none;background:#fdecea;border:1px solid #f5c6c6;border-radius:6px;
   padding:10px 14px;font-size:12px;color:#c0392b;font-weight:600;
   margin-bottom:16px;text-align:center;
 }
-.footer-text{
-  text-align:center;font-size:10px;color:#9ca3af;margin-top:20px;
-  letter-spacing:.3px;
-}
 .loading{display:none;text-align:center;padding:8px;font-size:12px;color:#5a607a;}
-</style>
-
-<style>
-/* ═══════ MOBILE OVERRIDES ═══════ */
-@media (max-width: 768px) {
-  body { padding: 14px !important; gap: 20px !important; }
-  .logo-wrap img { height: 48px !important; }
-  .grid { grid-template-columns: 1fr 1fr !important; max-width: 100% !important; gap: 10px !important; }
-  .card { padding: 14px 10px !important; border-radius: 10px !important; }
-  .card-icon { font-size: 22px !important; }
-  .card-title { font-size: 11px !important; }
-  .card-sub { font-size: 9px !important; display: none; }
-  .card.destaque { padding: 14px !important; }
-  .card.destaque .card-title { font-size: 13px !important; }
-}
+.footer-text{text-align:center;font-size:10px;color:#9ca3af;margin-top:20px;letter-spacing:.3px;}
 </style>
 </head>
 <body>
@@ -98,19 +80,16 @@ body{
     <div class="form-group">
       <label class="form-label">Usuário</label>
       <input class="form-input" id="inputUser" type="text"
-        placeholder="seu@email.com ou usuário"
-        autocomplete="username" autocapitalize="none">
+        placeholder="seu usuário" autocomplete="username" autocapitalize="none">
     </div>
     <div class="form-group">
       <label class="form-label">Senha</label>
       <div class="input-wrap">
         <input class="form-input" id="inputPass" type="password"
-          placeholder="••••••••" autocomplete="current-password"
-          style="padding-right:44px;">
-        <button class="eye-btn" type="button" onclick="togglePass()" id="eyeBtn">
+          placeholder="••••••••" autocomplete="current-password" style="padding-right:44px;">
+        <button class="eye-btn" type="button" onclick="togglePass()">
           <svg id="eyeIcon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
       </div>
@@ -122,85 +101,55 @@ body{
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════════════
-// USUÁRIOS DO SISTEMA — cadastre aqui login e senha
-// Para adicionar usuário: copie um bloco e altere os valores
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// USUÁRIOS — edite aqui para adicionar/remover
+// ══════════════════════════════════════════════
 const USERS = [
-  {
-    usuario: "rogel",
-    senha:   "Loka@2024",
-    nome:    "Rogel de Oliveira Carneiro",
-    perfil:  "master"
-  },
-  {
-    usuario: "admin",
-    senha:   "Loka@admin",
-    nome:    "Administrador",
-    perfil:  "admin"
-  },
-  {
-    usuario: "equipe",
-    senha:   "Loka@2026",
-    nome:    "Equipe LOKÁ",
-    perfil:  "operador"
-  }
-  // Para adicionar mais usuários, copie o bloco acima e ajuste:
-  // { usuario: "nome", senha: "senha", nome: "Nome Completo", perfil: "operador" }
+  { usuario: "rogel",  senha: "Loka@2024",  nome: "Rogel de Oliveira Carneiro", perfil: "master"   },
+  { usuario: "admin",  senha: "Loka@admin", nome: "Administrador",              perfil: "admin"    },
+  { usuario: "equipe", senha: "Loka@2026",  nome: "Equipe LOKÁ",                perfil: "operador" }
 ];
 
-// ── Token de sessão (expira em 8 horas) ──────────────────────────
-const SESSION_KEY = 'loka_session';
+const SESSION_KEY  = 'loka_session';
 const SESSION_HOURS = 8;
 
-function makeToken(user) {
-  return btoa(JSON.stringify({
-    u: user.usuario,
-    n: user.nome,
-    p: user.perfil,
-    exp: Date.now() + SESSION_HOURS * 3600000
-  }));
-}
-
-// Se já logado, redireciona direto
+// Se já logado → vai direto pro painel
 (function checkSession() {
-  const raw = sessionStorage.getItem(SESSION_KEY);
-  if (!raw) return;
   try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return;
     const s = JSON.parse(atob(raw));
-    if (s.exp > Date.now()) {
-      window.location.href = 'sistema/gestao.html';
-    }
+    if (s.exp > Date.now()) window.location.replace('sistema/gestao.html');
   } catch(e) { sessionStorage.removeItem(SESSION_KEY); }
 })();
 
 function doLogin() {
-  const u = document.getElementById('inputUser').value.trim().toLowerCase();
-  const p = document.getElementById('inputPass').value;
+  const u   = document.getElementById('inputUser').value.trim().toLowerCase();
+  const p   = document.getElementById('inputPass').value;
   const err = document.getElementById('errMsg');
   const btn = document.getElementById('btnLogin');
   const loading = document.getElementById('loading');
 
-  err.style.display = 'none';
-  btn.style.display = 'none';
+  err.style.display    = 'none';
+  btn.style.display    = 'none';
   loading.style.display = 'block';
 
-  // Simula delay mínimo para evitar brute force timing
   setTimeout(() => {
-    const found = USERS.find(user =>
-      user.usuario.toLowerCase() === u && user.senha === p
-    );
-
+    const found = USERS.find(user => user.usuario.toLowerCase() === u && user.senha === p);
     if (found) {
-      sessionStorage.setItem(SESSION_KEY, makeToken(found));
+      const token = btoa(JSON.stringify({
+        u: found.usuario, n: found.nome, p: found.perfil,
+        exp: Date.now() + SESSION_HOURS * 3600000
+      }));
+      sessionStorage.setItem(SESSION_KEY, token);
       sessionStorage.setItem('loka_user', JSON.stringify({
         nome: found.nome, perfil: found.perfil, usuario: found.usuario
       }));
-      window.location.href = 'sistema/gestao.html';
+      window.location.replace('sistema/gestao.html');
     } else {
       loading.style.display = 'none';
-      btn.style.display = 'block';
-      err.style.display = 'block';
+      btn.style.display     = 'block';
+      err.style.display     = 'block';
       document.getElementById('inputPass').value = '';
       document.getElementById('inputPass').focus();
     }
@@ -208,18 +157,15 @@ function doLogin() {
 }
 
 function togglePass() {
-  const input = document.getElementById('inputPass');
-  const isPass = input.type === 'password';
-  input.type = isPass ? 'text' : 'password';
+  const el = document.getElementById('inputPass');
+  const isPass = el.type === 'password';
+  el.type = isPass ? 'text' : 'password';
   document.getElementById('eyeIcon').innerHTML = isPass
     ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>'
     : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
 }
 
-// Enter para logar
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
+document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>
 </body>
 </html>
