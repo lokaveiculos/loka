@@ -6,16 +6,16 @@
   (function lokaAuthGuard() {
     const SESSION_KEY = 'loka_session';
     const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) { window.location.replace('../index.html'); return; }
+    if (!raw) { window.location.replace('index.html'); return; }
     try {
       const s = JSON.parse(atob(raw));
       if (s.exp <= Date.now()) {
         sessionStorage.removeItem(SESSION_KEY);
-        window.location.replace('../index.html');
+        window.location.replace('index.html');
       }
     } catch(e) {
       sessionStorage.removeItem(SESSION_KEY);
-      window.location.replace('../index.html');
+      window.location.replace('index.html');
     }
   })();
   </script>
@@ -693,7 +693,7 @@ if (document.readyState === 'loading') {
   function lokaLogout(){
     sessionStorage.removeItem('loka_session');
     sessionStorage.removeItem('loka_user');
-    window.location.replace('../index.html');
+    window.location.replace('index.html');
   }
   </script>
 
