@@ -339,6 +339,11 @@ tr:hover td{background:#fafbff;}
       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
       Contratos Salvos
     </div>
+    <div class="nav-section">Documentos</div>
+    <div class="nav-item" onclick="showPage('formularios')" data-page="formularios">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Formulários
+    </div>
     <div class="nav-section">Links</div>
     <div class="nav-item" onclick="openReservaLink()">
       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
@@ -502,6 +507,94 @@ tr:hover td{background:#fafbff;}
           <tbody id="contratosTable"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ══ FORMULÁRIOS ══ -->
+  <div class="tab-panel" id="page-formularios">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:4px;">
+
+      <!-- Contrato Diária -->
+      <div style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(14,27,77,.08);overflow:hidden;border-top:3px solid #2B4BF2;">
+        <div style="padding:18px 18px 12px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:40px;height:40px;background:#EEF1FD;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div>
+              <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:13px;color:#0E1B4D;">Contrato por Diária</div>
+              <div style="font-size:11px;color:#5a607a;margin-top:2px;">Locação de curto prazo</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#5a607a;line-height:1.5;margin-bottom:14px;">Contrato padrão para locações por diária. Inclui cláusulas de seguro, franquia e responsabilidades.</p>
+        </div>
+        <div style="padding:0 18px 16px;display:flex;gap:8px;">
+          <button onclick="window.open('contrato-diaria.html','_blank')" style="flex:1;padding:9px;background:#2B4BF2;color:#fff;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Abrir</button>
+          <button onclick="openContractModalFor(-1,'diaria')" style="flex:1;padding:9px;background:#EEF1FD;color:#2B4BF2;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Gerar com Cliente</button>
+        </div>
+      </div>
+
+      <!-- Contrato Mensal -->
+      <div style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(14,27,77,.08);overflow:hidden;border-top:3px solid #0d7a3e;">
+        <div style="padding:18px 18px 12px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:40px;height:40px;background:#e8f5ef;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+            </div>
+            <div>
+              <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:13px;color:#0E1B4D;">Contrato Mensal</div>
+              <div style="font-size:11px;color:#5a607a;margin-top:2px;">Locação de longo prazo</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#5a607a;line-height:1.5;margin-bottom:14px;">Contrato para locações mensais com múltiplos veículos. Cláusulas específicas para contratos de longo prazo.</p>
+        </div>
+        <div style="padding:0 18px 16px;display:flex;gap:8px;">
+          <button onclick="window.open('contrato-mensal.html','_blank')" style="flex:1;padding:9px;background:#0d7a3e;color:#fff;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Abrir</button>
+          <button onclick="openContractModalFor(-1,'mensal')" style="flex:1;padding:9px;background:#e8f5ef;color:#0d7a3e;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Gerar com Cliente</button>
+        </div>
+      </div>
+
+      <!-- Recibo de Reserva -->
+      <div style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(14,27,77,.08);overflow:hidden;border-top:3px solid #b45309;">
+        <div style="padding:18px 18px 12px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:40px;height:40px;background:#fef3cd;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#b45309" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            </div>
+            <div>
+              <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:13px;color:#0E1B4D;">Recibo de Reserva</div>
+              <div style="font-size:11px;color:#5a607a;margin-top:2px;">Confirmação de reserva</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#5a607a;line-height:1.5;margin-bottom:14px;">Documento de confirmação de reserva com dados do cliente, veículo, período e valor pago.</p>
+        </div>
+        <div style="padding:0 18px 16px;display:flex;gap:8px;">
+          <button onclick="window.open('recibo-reserva.html','_blank')" style="flex:1;padding:9px;background:#b45309;color:#fff;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Abrir</button>
+          <button onclick="openContractModalFor(-1,'reserva')" style="flex:1;padding:9px;background:#fef3cd;color:#b45309;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Gerar com Cliente</button>
+        </div>
+      </div>
+
+      <!-- Checklist de Vistoria -->
+      <div style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(14,27,77,.08);overflow:hidden;border-top:3px solid #7c3aed;">
+        <div style="padding:18px 18px 12px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:40px;height:40px;background:#ede9fe;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            </div>
+            <div>
+              <div style="font-family:Montserrat,sans-serif;font-weight:800;font-size:13px;color:#0E1B4D;">Checklist de Vistoria</div>
+              <div style="font-size:11px;color:#5a607a;margin-top:2px;">Inspeção do veículo</div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#5a607a;line-height:1.5;margin-bottom:14px;">Formulário de vistoria com fotos, diagrama do veículo, acessórios e assinatura digital.</p>
+        </div>
+        <div style="padding:0 18px 16px;display:flex;gap:8px;">
+          <button onclick="window.open('checklist.html','_blank')" style="flex:1;padding:9px;background:#7c3aed;color:#fff;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Abrir</button>
+          <button onclick="openChecklistModal()" style="flex:1;padding:9px;background:#ede9fe;color:#7c3aed;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Com Cliente Ativo</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -957,7 +1050,8 @@ const pageMeta = {
   ativos:     {title:'Aluguéis Ativos', primary:'Registrar Aluguel', secondary:null},
   veiculos:   {title:'Veículos', primary:'Cadastrar Veículo', secondary:null},
   historico:  {title:'Histórico de Aluguéis', primary:null, secondary:null},
-  contratos:  {title:'Contratos Salvos', primary:null, secondary:null},
+  contratos:   {title:'Contratos Salvos', primary:null, secondary:null},
+  formularios:  {title:'Formulários', primary:null, secondary:null},
 };
 
 function showPage(page) {
@@ -1130,7 +1224,7 @@ function openClientModal(idx) {
     <div class="hist-info">
       <div class="hist-veiculo">${h.veiculo||'Veículo'} ${h.placa?'· '+h.placa:''}</div>
       <div class="hist-dates">${xlDate(h.retirada)} → ${xlDate(h.devolucao)}</div>
-      ${h.obs?`<div class="hist-obs">${h.obs}</div>`:''}
+      " + (h.obs ? '<div class="hist-obs">' + h.obs + '</div>' : '') + "
     </div>
     <div class="hist-valor">${h.valor?fmtBRL(h.valor):''}</div></div>
   `).join(''):'<div class="empty-state" style="padding:24px;"><p>Sem registros</p></div>';
@@ -1284,9 +1378,9 @@ function ativoCard(a, mini=false) {
     <div class="aa-right">
       <div class="aa-valor">${a.valor?fmtBRL(a.valor):'—'}</div>
       <div class="aa-dias">${diasTxt}</div>
-      ${!mini?`<div style="margin-top:8px;display:flex;gap:6px;">
-        <button class="icon-btn red" title="Encerrar" onclick="encerrarAluguel('${a.id}')"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-      </div>`:''}
+      " + (!mini ? '<div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="icon-btn red" title="Encerrar" onclick="encerrarAluguel(\'${a.id}\')"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>' : '') + "
     </div>
   </div>`;
 }
@@ -1373,7 +1467,8 @@ function renderHistory() {
 let contractClientIdx=null;
 let selectedContract=null;
 
-function openContractModalFor(idx) {
+function openContractModalFor(idx, tipoOverride) {
+  if (tipoOverride) selectedContract = tipoOverride;
   contractClientIdx=idx;
   selectedContract=null;
   document.querySelectorAll('.contract-opt').forEach(o=>o.classList.remove('selected'));
@@ -1577,137 +1672,52 @@ function saveChecklist() {
 }
 
 function printChecklist() {
-  const nome=editClientIdx>=0?db.clients[editClientIdx].nome:'—';
-  const vId=document.getElementById('ckVeiculo').value;
-  const v=db.veiculos.find(x=>x.id===vId)||{marca:'',modelo:'',placa:''};
-  const tipo=document.getElementById('ckTipo').value==='saida'?'SAÍDA':'RETORNO';
-  const km=document.getElementById('ckKm').value||'—';
-  const comb=document.getElementById('ckComb').value;
-  const obs=document.getElementById('ckObs').value;
-  const items=CHECKLIST_ITEMS.map((item,i)=>{
-    const ok=document.getElementById('ci'+i)?.classList.contains('checked');
-    return `<tr><td>${item}</td><td style="text-align:center;font-size:16px;color:${ok?'#0d7a3e':'#c0392b'}">${ok?'✓':'✗'}</td></tr>`;
+  const nome = editClientIdx >= 0 ? db.clients[editClientIdx].nome : '—';
+  const vId  = document.getElementById('ckVeiculo').value;
+  const v    = db.veiculos.find(x => x.id === vId) || {marca:'',modelo:'',placa:''};
+  const tipo = document.getElementById('ckTipo').value === 'saida' ? 'SAÍDA' : 'RETORNO';
+  const km   = document.getElementById('ckKm').value || '—';
+  const comb = document.getElementById('ckComb').value;
+  const obs  = document.getElementById('ckObs').value;
+  const items = CHECKLIST_ITEMS.map((item, i) => {
+    const ok = document.getElementById('ci' + i)?.classList.contains('checked');
+    const cor = ok ? '#0d7a3e' : '#c0392b';
+    const ico = ok ? '✓' : '✗';
+    return '<tr><td>' + item + '</td><td style="text-align:center;font-size:16px;color:' + cor + '">' + ico + '</td></tr>';
   }).join('');
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Checklist Vistoria</title>
-  <style>body{font-family:Arial,sans-serif;padding:24px;max-width:700px;margin:0 auto;}
-  h1{font-size:18px;color:#0E1B4D;} h2{font-size:14px;color:#5a607a;margin-bottom:16px;}
-  .info{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:20px;font-size:12px;}
-  .info span{font-weight:700;color:#0E1B4D;} table{width:100%;border-collapse:collapse;font-size:12px;}
-  th{background:#0E1B4D;color:#fff;padding:8px;text-align:left;} td{padding:7px 8px;border-bottom:1px solid #eee;}
-  .sig{display:flex;justify-content:space-between;margin-top:40px;gap:40px;}
-  .sig-line{flex:1;border-bottom:1px solid #333;padding-top:48px;font-size:11px;text-align:center;}
-  @media print{button{display:none;}}</style></head><body>
-  <h1>LOKÁ ALUGUEL DE VEÍCULOS — Checklist de Vistoria (${tipo})</h1>
-  <h2>CNPJ 39.911.638/0001-10 · Rua Juarez Távora, 346, Feira de Santana-BA</h2>
-  <div class="info">
-    <div>Cliente: <span>${nome}</span></div>
-    <div>Veículo: <span>${v.marca} ${v.modelo}</span></div>
-    <div>Placa: <span>${v.placa||'—'}</span></div>
-    <div>KM: <span>${km}</span></div>
-    <div>Combustível: <span>${comb}</span></div>
-    <div>Data: <span>${new Date().toLocaleDateString('pt-BR')}</span></div>
-  </div>
-  <table><thead><tr><th>Item</th><th style="width:80px;text-align:center;">Estado</th></tr></thead>
-  <tbody>${items}</tbody></table>
-  ${obs?`<p style="margin-top:16px;font-size:12px;"><strong>Observações:</strong> ${obs}</p>`:''}
-  <div class="sig">
-    <div class="sig-line">Assinatura do Locatário</div>
-    <div class="sig-line">Assinatura da LOKÁ</div>
-  </div>
-  <script>window.print();<\/script>
-  <!-- User bar -->
-  <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;
-    border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;
-    display:flex;align-items:center;justify-content:space-between;z-index:9999;
-    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
-    <span id="lokaUserName">LOKÁ Sistema</span>
-    <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
-      color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;
-      font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;">
-      Sair
-    </button>
-  </div>
-  <script>
-  (function showUser(){
-    const u = sessionStorage.getItem('loka_user');
-    if(u) {
-      const d = JSON.parse(u);
-      document.getElementById('lokaUserName').textContent = d.nome + ' · ' + d.perfil.toUpperCase();
-    }
-  })();
-  function lokaLogout(){
-    sessionStorage.removeItem('loka_session');
-    sessionStorage.removeItem('loka_user');
-    window.location.replace('index.html');
-  }
-  </script>
-
-</body></html>`);
+  const obsHtml = obs ? '<p style="margin-top:16px;font-size:12px;"><strong>Observações:</strong> ' + obs + '</p>' : '';
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Checklist Vistoria</title>'
+    + '<style>body{font-family:Arial,sans-serif;padding:24px;max-width:700px;margin:0 auto;}'
+    + 'h1{font-size:18px;color:#0E1B4D;}h2{font-size:14px;color:#5a607a;margin-bottom:16px;}'
+    + '.info{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:20px;font-size:12px;}'
+    + '.info span{font-weight:700;color:#0E1B4D;}table{width:100%;border-collapse:collapse;font-size:12px;}'
+    + 'th{background:#0E1B4D;color:#fff;padding:8px;text-align:left;}td{padding:7px 8px;border-bottom:1px solid #eee;}'
+    + '.sig{display:flex;justify-content:space-between;margin-top:40px;gap:40px;}'
+    + '.sig-line{flex:1;border-bottom:1px solid #333;padding-top:48px;font-size:11px;text-align:center;}'
+    + '@media print{button{display:none;}}</style></head><body>'
+    + '<h1>LOKÁ ALUGUEL DE VE\u00cdCULOS — Checklist de Vistoria (' + tipo + ')</h1>'
+    + '<h2>CNPJ 39.911.638/0001-10 · Feira de Santana-BA</h2>'
+    + '<div class="info">'
+    + '<div>Cliente: <span>' + nome + '</span></div>'
+    + '<div>Ve\u00edculo: <span>' + v.marca + ' ' + v.modelo + '</span></div>'
+    + '<div>Placa: <span>' + (v.placa||'—') + '</span></div>'
+    + '<div>KM: <span>' + km + '</span></div>'
+    + '<div>Combust\u00edvel: <span>' + comb + '</span></div>'
+    + '<div>Data: <span>' + new Date().toLocaleDateString('pt-BR') + '</span></div>'
+    + '</div>'
+    + '<table><thead><tr><th>Item</th><th style="width:80px;text-align:center;">Estado</th></tr></thead>'
+    + '<tbody>' + items + '</tbody></table>'
+    + obsHtml
+    + '<div class="sig">'
+    + '<div class="sig-line">Assinatura do Locat\u00e1rio</div>'
+    + '<div class="sig-line">Assinatura da LOK\u00c1</div>'
+    + '</div>'
+    + '<\/script></body></html>';
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); w.print(); }
 }
 
 
-/* ── CEP AUTO-FILL (ViaCEP) ── */
-async function buscarCEP() {
-  const cep = document.getElementById('fCep').value.replace(/\D/g,'');
-  if (cep.length !== 8) return;
-  try {
-    const r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
-    const d = await r.json();
-    if (d.erro) { toast('⚠️ CEP não encontrado','#b45309'); return; }
-    const end = document.getElementById('fEnd');
-    if (end && !end.value) {
-      end.value = [d.logradouro, d.bairro, d.localidade + '-' + d.uf].filter(Boolean).join(', ');
-    } else if (end && end.value) {
-      // Only fill city/state if address already typed
-      if (!end.value.includes(d.localidade)) end.value += ', ' + d.localidade + '-' + d.uf;
-    }
-    toast('✓ CEP encontrado: ' + d.localidade + '-' + d.uf, '#0d7a3e');
-  } catch(e) { toast('⚠️ Erro ao buscar CEP','#b45309'); }
-}
-
-/* ── CPF AUTO-FILL (ReceitaWS) ── */
-async function buscarCPF() {
-  const cpf = document.getElementById('fCpf').value.replace(/\D/g,'');
-  if (cpf.length !== 11) return;
-  toast('🔍 Consultando CPF...','#2B4BF2');
-  try {
-    // ReceitaWS API (public, free for CPF queries)
-    const r = await fetch('https://api.cnpja.com/rfb/cpf?cpf=' + cpf, {
-      headers: { 'Authorization': 'guest' }
-    });
-    if (r.ok) {
-      const d = await r.json();
-      if (d.nome && !document.getElementById('fNome').value) {
-        document.getElementById('fNome').value = d.nome;
-        document.getElementById('modalClientTitle').textContent = d.nome;
-        toast('✓ CPF encontrado: ' + d.nome, '#0d7a3e');
-        return;
-      }
-    }
-  } catch(e) {}
-  // Fallback: BrasilAPI for CNPJ
-  if (cpf.length === 14) {
-    try {
-      const r2 = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + cpf);
-      if (r2.ok) {
-        const d2 = await r2.json();
-        if (d2.razao_social) {
-          document.getElementById('fNome').value = d2.razao_social;
-          if (d2.logradouro) document.getElementById('fEnd').value = [d2.logradouro, d2.numero, d2.bairro, d2.municipio+'-'+d2.uf].filter(Boolean).join(', ');
-          if (d2.cep) document.getElementById('fCep').value = d2.cep;
-          if (d2.ddd_telefone_1) document.getElementById('fTel').value = d2.ddd_telefone_1;
-          toast('✓ CNPJ encontrado: ' + d2.razao_social, '#0d7a3e');
-          return;
-        }
-      }
-    } catch(e2) {}
-  }
-  toast('ℹ️ Dados não encontrados — preencha manualmente', '#5a607a');
-}
-
-
-/* ── RESERVA / RECIBO LINK ── */
 function openReciboFor(idx) {
   const cl = idx >= 0 ? db.clients[idx] : {};
   const clientData = {nome:cl.nome||'',cpf:cl.cpf||'',tel:cl.telefone||'',end:cl.endereco||'',email:cl.email||''};
