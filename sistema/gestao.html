@@ -144,6 +144,7 @@ tr:hover td{background:#fafbff;}
 .check-obs{width:100%;margin-top:4px;border:none;border-bottom:1px solid var(--border);background:transparent;font-size:10px;font-family:"Montserrat",sans-serif;color:var(--muted);outline:none;padding:2px 0;}
 
 /* TAB PANELS */
+@keyframes spin{to{transform:rotate(360deg)}}
 .tab-panel{display:none;}
 .tab-panel.active{display:block;}
 
@@ -385,6 +386,12 @@ tr:hover td{background:#fafbff;}
     </div>
   </div>
   <div class="content">
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" style="position:fixed;inset:0;background:#f0f2fa;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px;">
+    <div style="width:40px;height:40px;border:3px solid #C5CCF5;border-top-color:#2B4BF2;border-radius:50%;animation:spin .8s linear infinite;"></div>
+    <div style="font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:#5a607a;letter-spacing:.5px;">Carregando sistema...</div>
+  </div>
 
   <!-- ══ DASHBOARD ══ -->
   <div class="tab-panel active" id="page-dashboard">
@@ -1027,13 +1034,11 @@ async function initDB() {
     }
   }
   _dbLoaded = true;
-  updateStats();
-  renderDashboard();
-  // Set dashboard as active nav item on load
-  document.querySelectorAll('.nav-item').forEach(n => {
-    const nc = n.getAttribute('onclick') || '';
-    if (nc.includes("'dashboard'")) n.classList.add('active');
-  });
+  // Hide loading overlay
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+  // Activate dashboard
+  showPage('dashboard');
 }
 
 
@@ -1081,17 +1086,24 @@ function showPage(page) {
       pb.style.display = 'none';
     }
   }
-  // Guard: only render if db is ready
-  if (!db) { console.warn('DB not ready yet'); return; }
+  // Render page content
   const renders = {
     clientes:  renderClients,
     veiculos:  renderVeiculos,
     ativos:    renderAtivos,
     historico: renderHistory,
     contratos: renderContratos,
+    formularios: null,
     dashboard: renderDashboard,
   };
-  if (renders[page]) renders[page]();
+  if (renders[page]) {
+    if (!db) {
+      // DB not ready yet - retry after short delay
+      setTimeout(() => { if (renders[page] && db) renders[page](); }, 500);
+    } else {
+      renders[page]();
+    }
+  }
 }
 
 function topbarPrimary() {
