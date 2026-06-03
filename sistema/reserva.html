@@ -1,24 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <!-- Auth Guard -->
-  <script>
-  (function lokaAuthGuard() {
-    const SESSION_KEY = 'loka_session';
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) { window.location.replace('index.html'); return; }
-    try {
-      const s = JSON.parse(atob(raw));
-      if (s.exp <= Date.now()) {
-        sessionStorage.removeItem(SESSION_KEY);
-        window.location.replace('index.html');
-      }
-    } catch(e) {
-      sessionStorage.removeItem(SESSION_KEY);
-      window.location.replace('index.html');
-    }
-  })();
-  </script>
 
 <meta charset="UTF-8">
   <meta name="theme-color" content="#0E1B4D">
@@ -563,34 +545,6 @@ const minDT = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())
 document.getElementById('dtRet').min = minDT;
 document.getElementById('dtDev').min = minDT;
 </script>
-
-
-  <!-- User bar -->
-  <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;
-    border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;
-    display:flex;align-items:center;justify-content:space-between;z-index:9999;
-    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
-    <span id="lokaUserName">LOKÁ Sistema</span>
-    <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
-      color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;
-      font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;">
-      Sair
-    </button>
-  </div>
-  <script>
-  (function showUser(){
-    const u = sessionStorage.getItem('loka_user');
-    if(u) {
-      const d = JSON.parse(u);
-      document.getElementById('lokaUserName').textContent = d.nome + ' · ' + d.perfil.toUpperCase();
-    }
-  })();
-  function lokaLogout(){
-    sessionStorage.removeItem('loka_session');
-    sessionStorage.removeItem('loka_user');
-    window.location.replace('index.html');
-  }
-  </script>
 
 </body>
 </html>

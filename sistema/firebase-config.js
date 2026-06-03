@@ -148,3 +148,33 @@ window.addEventListener('load', () => {
   const mode = _firebaseOk && navigator.onLine ? '🟢 Online' : '🟡 Offline';
   console.log('LOKÁ Sistema — Modo:', mode);
 });
+
+// ── Connection status banner ─────────────────────────────────────
+window.addEventListener('load', function() {
+  const online = _firebaseOk && navigator.onLine;
+  // Only show offline banner in gestao
+  if (window.location.pathname.includes('gestao')) {
+    if (!online) {
+      const banner = document.createElement('div');
+      banner.id = 'offline-banner';
+      banner.style.cssText = 'position:fixed;bottom:48px;left:0;right:0;background:#b45309;color:#fff;text-align:center;padding:6px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;z-index:1000;letter-spacing:.5px;';
+      banner.textContent = '🟡 Modo offline — dados salvos localmente';
+      document.body.appendChild(banner);
+    }
+  }
+});
+
+// ── Reconnect: sync localStorage to Firebase when back online ────
+window.addEventListener('online', async function() {
+  if (!_firebaseOk) return;
+  try {
+    const raw = localStorage.getItem('loka_loka_db');
+    if (raw) {
+      const data = JSON.parse(raw);
+      await db_ref.ref('loka_db').set(data);
+      console.log('✅ Dados sincronizados com Firebase após reconexão');
+      const banner = document.getElementById('offline-banner');
+      if (banner) banner.remove();
+    }
+  } catch(e) { console.warn('Sync error:', e); }
+});
