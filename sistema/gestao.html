@@ -1003,49 +1003,73 @@ let db = null;
 let _dbLoaded = false;
 
 async function initDB() {
+  // Step 1: Load from localStorage immediately (instant, no network)
   try {
-    if (navigator.onLine && typeof LokaDB !== 'undefined') {
-      lokaToast('🔄 Sincronizando...', '#2B4BF2');
-    }
-    const remote = await LokaDB.load('loka_db');
-    if (remote && remote.clients && Array.isArray(remote.clients) && remote.clients.length > 0) {
-      db = remote;
+    const local = localStorage.getItem('loka_loka_db');
+    if (local) {
+      db = JSON.parse(local);
       if (!db.veiculos || db.veiculos.length < 100) db.veiculos = getVeiculosSeed();
       if (!db.contratos)  db.contratos  = [];
       if (!db.vistorias)  db.vistorias  = [];
       if (!db.ativos)     db.ativos     = [];
-    } else {
-      // Primeira vez — seed inicial
-      db = {
-        clients:   CLIENTS_SEED.map((cl,i) => ({...cl, id:'c'+i, email:'', cep:'', nasc:'',
-                   cnh:'', cnhCat:'', cnhVal:'', obs:'', status:'ativo', motivoBloq:'', docs:{}})),
-        veiculos:  getVeiculosSeed(),
-        ativos:    [],
-        vistorias: [],
-        contratos: []
-      };
-      saveDB();
     }
-  } catch(e) {
-    console.error('initDB error:', e);
-    // Emergency fallback — empty db
-    if (!db) {
-      db = { clients:[], veiculos:getVeiculosSeed(), ativos:[], vistorias:[], contratos:[] };
-    }
+  } catch(e) {}
+
+  // If no localStorage data, use seed
+  if (!db) {
+    db = {
+      clients:   CLIENTS_SEED.map((cl,i) => ({...cl, id:'c'+i, email:'', cep:'', nasc:'',
+                 cnh:'', cnhCat:'', cnhVal:'', obs:'', status:'ativo', motivoBloq:'', docs:{}})),
+      veiculos:  getVeiculosSeed(),
+      ativos:    [], vistorias: [], contratos: []
+    };
+    saveDB();
   }
+
+  // Show system immediately with localStorage data
   _dbLoaded = true;
-  // Hide loading overlay
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) overlay.style.display = 'none';
-  // Activate dashboard
   showPage('dashboard');
+
+  // Step 2: Sync with Firebase in background (non-blocking)
+  if (navigator.onLine && typeof LokaDB !== 'undefined') {
+    setTimeout(async () => {
+      try {
+        const remote = await Promise.race([
+          LokaDB.load('loka_db'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        ]);
+        if (remote && remote.clients && Array.isArray(remote.clients) && remote.clients.length > 0) {
+          db = remote;
+          if (!db.veiculos || db.veiculos.length < 100) db.veiculos = getVeiculosSeed();
+          if (!db.contratos)  db.contratos  = [];
+          if (!db.vistorias)  db.vistorias  = [];
+          if (!db.ativos)     db.ativos     = [];
+          saveDB();
+          // Refresh current panel
+          const active = document.querySelector('.tab-panel.active');
+          if (active) {
+            const page = active.id.replace('page-', '');
+            showPage(page);
+          }
+        }
+      } catch(e) {
+        console.warn('Firebase sync failed (offline mode):', e.message);
+      }
+    }, 100);
+  }
 }
 
 
 function saveDB() {
   if (!db) return;
-  // Save to Firebase + localStorage (async, non-blocking)
-  LokaDB.save('loka_db', db).catch(e => console.warn('Save error:', e));
+  // Always save to localStorage first (instant)
+  try { localStorage.setItem('loka_loka_db', JSON.stringify(db)); } catch(e) {}
+  // Then sync to Firebase in background
+  if (typeof LokaDB !== 'undefined') {
+    LokaDB.save('loka_db', db).catch(e => console.warn('Firebase save:', e));
+  }
 }
 
 // ── PAGES ──
