@@ -1,7 +1,30 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <!-- Auth Guard -->
+  <script>
+  (function lokaAuthGuard() {
+    const SESSION_KEY = 'loka_session';
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) { window.location.replace('index.html'); return; }
+    try {
+      const s = JSON.parse(atob(raw));
+      if (s.exp <= Date.now()) {
+        sessionStorage.removeItem(SESSION_KEY);
+        window.location.replace('index.html');
+      }
+    } catch(e) {
+      sessionStorage.removeItem(SESSION_KEY);
+      window.location.replace('index.html');
+    }
+  })();
+  </script>
+
 <meta charset="UTF-8">
+  <meta name="theme-color" content="#0E1B4D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contrato de Locação – LOKÁ</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -25,7 +48,7 @@
     background: #e8ecf8;
     color: var(--text);
     min-height: 100vh;
-    padding: 24px 16px 40px;
+    padding: max(12px, env(safe-area-inset-top)) 12px 40px;
   }
 
   /* ── Action Bar ── */
@@ -65,7 +88,7 @@
 
   /* ── Contract Page ── */
   .contract {
-    max-width: 860px;
+    max-width: min(860px, 100%);
     margin: 0 auto;
     background: #fff;
     border-radius: 12px;
@@ -514,6 +537,43 @@
     /* Color preservation */
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
+</style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
+<style>
+/* ═══════ MOBILE OVERRIDES ═══════ */
+@media (max-width: 768px) {
+  /* Contract max-width */
+  .contract { max-width: 100% !important; border-radius: 0 !important; margin: 0 !important; }
+  .contract-body { padding: 16px !important; }
+  .contract-header { padding: 14px 16px !important; flex-wrap: wrap; gap: 10px; }
+  .logo-wrap img { height: 36px !important; }
+  .header-title h1 { font-size: 11px !important; }
+  .action-bar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+  .btn { flex: 1; min-width: 120px; }
+  /* Field grids */
+  .field-grid.col-2, .field-grid.col-3 { grid-template-columns: 1fr !important; }
+  .locatario-row { grid-template-columns: 1fr !important; }
+  .photo-box { display: none !important; }
+  /* Tables */
+  .data-table { font-size: 11px !important; }
+  .data-table th { padding: 6px 4px !important; font-size: 8px !important; letter-spacing: 0 !important; }
+  .data-table td input { padding: 5px 4px !important; font-size: 11px !important; }
+  /* Signatures */
+  .signatures { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .sig-canvas-wrap canvas { height: 90px !important; }
+  .sig-fixed-wrap { height: 90px !important; }
+  /* Section titles */
+  .section-title { font-size: 9px !important; }
+  /* Clauses */
+  .clause { font-size: 12px !important; }
+  /* Mobile sig actions */
+  .sig-actions { flex-wrap: wrap; }
+  .sig-btn-qr { width: 100% !important; }
+}
 </style>
 </head>
 <body>
@@ -1038,17 +1098,14 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 
-/* ── AUTO-FILL: lê localStorage (passado pelo painel de gestão) ── */
-function runAutoFill() {
+
+/* ── AUTO-FILL: Firebase pass (substitui localStorage) ── */
+async function runAutoFill() {
   let data = null;
 
-  // 1. Tenta localStorage (método principal para file://)
+  // 1. Tenta Firebase pass (principal)
   try {
-    const stored = localStorage.getItem('loka_contrato_client');
-    if (stored) {
-      data = JSON.parse(stored);
-      localStorage.removeItem('loka_contrato_client');
-    }
+    data = await LokaDB.getClientPass();
   } catch(e) {}
 
   // 2. Fallback: URL hash
@@ -1070,10 +1127,9 @@ function runAutoFill() {
     email: data.email || '',
   });
 
-  showToast('✓ Dados de <strong>' + data.nome + '</strong> carregados!', '#0d7a3e');
+  lokaToast('✓ Dados de <strong>' + data.nome + '</strong> carregados!', '#0d7a3e');
 }
 
-// Executa assim que o DOM estiver pronto
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', runAutoFill);
 } else {
@@ -1081,6 +1137,34 @@ if (document.readyState === 'loading') {
 }
 
 </script>
+
+
+  <!-- User bar -->
+  <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;
+    border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;
+    display:flex;align-items:center;justify-content:space-between;z-index:9999;
+    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
+    <span id="lokaUserName">LOKÁ Sistema</span>
+    <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
+      color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;
+      font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;">
+      Sair
+    </button>
+  </div>
+  <script>
+  (function showUser(){
+    const u = sessionStorage.getItem('loka_user');
+    if(u) {
+      const d = JSON.parse(u);
+      document.getElementById('lokaUserName').textContent = d.nome + ' · ' + d.perfil.toUpperCase();
+    }
+  })();
+  function lokaLogout(){
+    sessionStorage.removeItem('loka_session');
+    sessionStorage.removeItem('loka_user');
+    window.location.replace('index.html');
+  }
+  </script>
 
 </body>
 </html>
