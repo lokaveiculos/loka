@@ -1,30 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <!-- Auth Guard -->
-  <script>
-  (function lokaAuthGuard() {
-    const SESSION_KEY = 'loka_session';
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) { window.location.replace('index.html'); return; }
-    try {
-      const s = JSON.parse(atob(raw));
-      if (s.exp <= Date.now()) {
-        sessionStorage.removeItem(SESSION_KEY);
-        window.location.replace('index.html');
-      }
-    } catch(e) {
-      sessionStorage.removeItem(SESSION_KEY);
-      window.location.replace('index.html');
-    }
-  })();
-  </script>
-
 <meta charset="UTF-8">
-  <meta name="theme-color" content="#0E1B4D">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cadastro – LOKÁ Aluguel de Carros</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -93,27 +70,6 @@ body{font-family:"Montserrat",sans-serif;background:linear-gradient(135deg,#0E1B
 .perm-item.on .perm-check::after{content:"checkmark";color:#fff;font-size:10px;font-weight:800;}
 .perm-label{font-size:11px;font-weight:600;color:var(--dark);}
 @media(max-width:480px){.col2,.col3{grid-template-columns:1fr;}.perm-grid{grid-template-columns:1fr;}.card-body{padding:18px 16px 8px;}.card-foot{padding:12px 16px 20px;}}
-</style>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <script src="firebase-config.js"></script>
-
-<style>
-/* ═══════ MOBILE OVERRIDES ═══════ */
-@media (max-width: 768px) {
-  .card { margin: 10px !important; border-radius: 10px !important; }
-  .card-body { padding: 16px !important; }
-  .col2, .col3 { grid-template-columns: 1fr !important; }
-  .perm-grid { grid-template-columns: 1fr 1fr !important; }
-  .role-chips { gap: 6px !important; }
-  .role-chip { padding: 6px 10px !important; font-size: 10px !important; }
-  .tabs { margin: 12px auto 0 !important; }
-  .tab-btn { font-size: 11px !important; padding: 8px !important; }
-  .steps { overflow-x: auto; }
-  .stp { min-width: 60px; font-size: 9px !important; padding: 8px 4px !important; }
-  .doc-box { padding: 10px !important; }
-}
 </style>
 </head>
 <body>
@@ -341,20 +297,14 @@ function togglePerm(p, el) {
   el.querySelector(".perm-check").textContent = activePerms.has(p) ? "✓" : "";
 }
 
-// Users cached locally after Firebase load
-let _usersCache = null;
-
-async function getUsers() {
-  if (_usersCache) return _usersCache;
-  try {
-    const raw = await LokaDB.load('loka_users');
-    _usersCache = raw ? Object.values(raw) : [];
-  } catch(e) { _usersCache = []; }
-  if (!_usersCache.find(u => u.cpf === MASTER.cpf))
-    _usersCache.unshift({...MASTER, perms: ALL_PERMS, createdAt: new Date().toISOString()});
-  return _usersCache;
+function getUsers() {
+  const raw = localStorage.getItem("loka_users");
+  const users = raw ? JSON.parse(raw) : [];
+  if (!users.find(u => u.cpf === MASTER.cpf))
+    users.unshift({...MASTER, perms: ALL_PERMS, createdAt: new Date().toISOString()});
+  return users;
 }
-async function salvarUsuario() {
+function salvarUsuario() {
   const nome  = document.getElementById("uNome").value.trim();
   const cpf   = document.getElementById("uCpf").value.replace(/\D/g,"");
   const tel   = document.getElementById("uTel").value.trim();
@@ -364,18 +314,17 @@ async function salvarUsuario() {
   if (!nome||!cpf||!tel||!senha) { alert("Preencha os campos obrigatórios."); return; }
   if (senha !== s2) { alert("As senhas não coincidem."); return; }
   if (senha.length < 8) { alert("Senha precisa ter pelo menos 8 caracteres."); return; }
-  const users = await getUsers();
+  const users = getUsers();
   if (users.find(u => u.cpf === cpf)) { alert("CPF já cadastrado."); return; }
   users.push({nome, cpf, tel, email, role: currentRole, perms: [...activePerms], createdAt: new Date().toISOString()});
-  _usersCache = users;
-  LokaDB.save('loka_users', Object.fromEntries(users.map((u,i) => [i, u]))).catch(console.warn);
+  localStorage.setItem("loka_users", JSON.stringify(users));
   ["uNome","uCpf","uTel","uEmail","uSenha","uSenha2"].forEach(id => document.getElementById(id).value="");
   toast("✓ Usuário " + nome + " cadastrado!", "#0d7a3e");
   renderUsers();
 }
 const ROLE_LABEL = {master:"👑 Master",admin:"🔧 Admin",operador:"📋 Operador",financeiro:"💰 Financeiro",vistoriador:"🔍 Vistoriador"};
-async function renderUsers() {
-  const users = await getUsers();
+function renderUsers() {
+  const users = getUsers();
   document.getElementById("usersList").innerHTML = users.map((u,i) =>
     `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ${u.cpf===MASTER.cpf?"#7c3aed":"var(--border)"};border-radius:8px;margin-bottom:8px;background:${u.cpf===MASTER.cpf?"#faf7ff":"var(--field)"}">
       <div style="width:36px;height:36px;border-radius:50%;background:${u.cpf===MASTER.cpf?"#7c3aed":"var(--blue)"};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -387,11 +336,10 @@ async function renderUsers() {
       ${u.cpf!==MASTER.cpf?`<button onclick="removerUsuario(${i})" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:18px;">×</button>`:"<span style='font-size:9px;color:#7c3aed;font-weight:700;'>MASTER</span>"}</div>`).join("")
     || "<p style='font-size:11px;color:var(--muted);text-align:center;padding:16px;'>Nenhum usuário cadastrado.</p>";
 }
-async function removerUsuario(idx) {
+function removerUsuario(idx) {
   if(!confirm("Remover este usuário?")) return;
-  const users = await getUsers(); users.splice(idx,1);
-  _usersCache = users;
-  LokaDB.save('loka_users', Object.fromEntries(users.map((u,i) => [i, u]))).catch(console.warn); renderUsers();
+  const users = getUsers(); users.splice(idx,1);
+  localStorage.setItem("loka_users", JSON.stringify(users)); renderUsers();
 }
 
 // CEP
@@ -471,32 +419,4 @@ function toast(msg,color="#0E1B4D") {
   t.style.cssText="position:fixed;top:16px;right:16px;background:"+color+";color:#fff;padding:10px 16px;border-radius:8px;font-size:11px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3);";
   t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
 }
-</script>
-  <!-- User bar -->
-  <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;
-    border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;
-    display:flex;align-items:center;justify-content:space-between;z-index:9999;
-    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
-    <span id="lokaUserName">LOKÁ Sistema</span>
-    <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
-      color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;
-      font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;">
-      Sair
-    </button>
-  </div>
-  <script>
-  (function showUser(){
-    const u = sessionStorage.getItem('loka_user');
-    if(u) {
-      const d = JSON.parse(u);
-      document.getElementById('lokaUserName').textContent = d.nome + ' · ' + d.perfil.toUpperCase();
-    }
-  })();
-  function lokaLogout(){
-    sessionStorage.removeItem('loka_session');
-    sessionStorage.removeItem('loka_user');
-    window.location.replace('index.html');
-  }
-  </script>
-
-</body></html>
+</script></body></html>
