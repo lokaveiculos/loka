@@ -1350,7 +1350,8 @@ function ativoCard(a, mini=false) {
       <div class="aa-valor">${a.valor?fmtBRL(a.valor):'—'}</div>
       <div class="aa-dias">${diasTxt}</div>
       " + (!mini ? '<div style="margin-top:8px;display:flex;gap:6px;">
-        <button class="icon-btn red" title="Encerrar" onclick="encerrarAluguel(\'${a.id}\')"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <button class="icon-btn blue" title="Prorrogar" onclick="openProrrogacaoModal('${a.id}')" style="border-color:#2B4BF2;margin-right:3px;"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
+            <button class="icon-btn red" title="Encerrar" onclick="openEncerramentoModal('${a.id}')"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>' : '') + "
     </div>
   </div>`;
@@ -1897,6 +1898,275 @@ async function processarImport(input) {
   input.value = '';
 }
 
+
+
+/* ══════════════════════════════════════════════════════════════════
+   PRORROGAÇÃO E ENCERRAMENTO DE LOCAÇÃO
+══════════════════════════════════════════════════════════════════ */
+
+function openProrrogacaoModal(ativoId) {
+  const ativo = db.ativos.find(a => a.id === ativoId);
+  if (!ativo) return;
+  const veiculo = db.veiculos.find(v => v.id === ativo.veiculoId) || {};
+
+  // Calculate daily/monthly rate from veiculo
+  const diaria = parseFloat(veiculo.diaria) || 0;
+  const mensal = parseFloat(veiculo.mensal) || 0;
+  const tipo   = ativo.tipo || 'diaria';
+
+  const modal = document.createElement('div');
+  modal.id = 'modalProrrogacao';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(7,16,46,.8);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;width:100%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;">
+      <div style="background:#0E1B4D;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:14px;color:#fff;">📅 Prorrogar Locação</span>
+        <button onclick="document.getElementById('modalProrrogacao').remove()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <div style="background:#f0f2fa;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;">
+          <strong>${ativo.clienteNome}</strong> · ${ativo.veiculoNome} ${ativo.placa ? '· '+ativo.placa : ''}<br>
+          <span style="color:#5a607a;">Devolução atual: ${ativo.devolucao ? new Date(ativo.devolucao+'T00:00').toLocaleDateString('pt-BR') : '—'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Nova data devolução</label>
+            <input type="date" id="prorNovaDev" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;" onchange="calcProrrogacao('${ativoId}','${tipo}',${diaria},${mensal})">
+          </div>
+          <div>
+            <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Tipo</label>
+            <select id="prorTipo" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;" onchange="calcProrrogacao('${ativoId}','${tipo}',${diaria},${mensal})">
+              <option value="diaria" ${tipo==='diaria'?'selected':''}>Por Diária (R$ ${diaria.toLocaleString('pt-BR')})</option>
+              <option value="mensal" ${tipo==='mensal'?'selected':''}>Mensal (R$ ${mensal.toLocaleString('pt-BR')})</option>
+            </select>
+          </div>
+        </div>
+        <div id="prorCalcResult" style="display:none;background:#e8f5ef;border:1.5px solid #0d7a3e;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+          <div id="prorCalcText" style="font-size:13px;color:#0d7a3e;font-weight:700;"></div>
+        </div>
+        <div>
+          <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Observações</label>
+          <input type="text" id="prorObs" placeholder="Motivo da prorrogação..." style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;">
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid #C5CCF5;display:flex;gap:10px;background:#fafbff;border-radius:0 0 14px 14px;">
+        <button onclick="document.getElementById('modalProrrogacao').remove()" style="padding:10px 16px;background:#fff;color:#5a607a;border:1.5px solid #C5CCF5;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Cancelar</button>
+        <button onclick="confirmarProrrogacao('${ativoId}')" style="flex:1;padding:10px;background:#2B4BF2;color:#fff;border:none;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:800;font-size:11px;cursor:pointer;">✓ Confirmar Prorrogação</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function calcProrrogacao(ativoId, tipoOriginal, diaria, mensal) {
+  const ativo   = db.ativos.find(a => a.id === ativoId);
+  const novaDev = document.getElementById('prorNovaDev').value;
+  const tipo    = document.getElementById('prorTipo').value;
+  const result  = document.getElementById('prorCalcResult');
+  const text    = document.getElementById('prorCalcText');
+  if (!novaDev || !ativo || !ativo.devolucao) { result.style.display='none'; return; }
+
+  const devAtual = new Date(ativo.devolucao + 'T00:00');
+  const devNova  = new Date(novaDev + 'T00:00');
+  const diffMs   = devNova - devAtual;
+  if (diffMs <= 0) { text.textContent = '⚠️ Nova data deve ser posterior à data atual'; result.style.background='#fdecea'; result.style.borderColor='#c0392b'; text.style.color='#c0392b'; result.style.display='block'; return; }
+
+  const diffDias  = Math.ceil(diffMs / 86400000);
+  let valor = 0, descricao = '';
+  if (tipo === 'diaria') {
+    valor = diaria * diffDias;
+    descricao = diffDias + ' diária(s) × R$ ' + diaria.toLocaleString('pt-BR') + ' = ';
+  } else {
+    const meses = Math.ceil(diffDias / 30);
+    valor = mensal * meses;
+    descricao = meses + ' mês(es) × R$ ' + mensal.toLocaleString('pt-BR') + ' = ';
+  }
+  text.textContent = '📅 Prorrogação de ' + diffDias + ' dia(s) — ' + descricao + 'R$ ' + valor.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  result.style.background  = '#e8f5ef';
+  result.style.borderColor = '#0d7a3e';
+  text.style.color = '#0d7a3e';
+  result.style.display = 'block';
+}
+
+function confirmarProrrogacao(ativoId) {
+  const novaDev = document.getElementById('prorNovaDev').value;
+  const tipo    = document.getElementById('prorTipo').value;
+  const obs     = document.getElementById('prorObs').value;
+  if (!novaDev) { alert('Informe a nova data de devolução.'); return; }
+
+  const idx = db.ativos.findIndex(a => a.id === ativoId);
+  if (idx < 0) return;
+  db.ativos[idx].devolucao    = novaDev;
+  db.ativos[idx].tipo         = tipo;
+  db.ativos[idx].prorrogacoes = (db.ativos[idx].prorrogacoes || 0) + 1;
+  if (obs) db.ativos[idx].obs = (db.ativos[idx].obs ? db.ativos[idx].obs + ' | ' : '') + 'Prorrogação: ' + obs;
+
+  saveDB();
+  renderAtivos();
+  toast('✅ Locação prorrogada até ' + new Date(novaDev+'T00:00').toLocaleDateString('pt-BR'), '#0d7a3e');
+  document.getElementById('modalProrrogacao').remove();
+}
+
+/* ── ENCERRAMENTO ── */
+function openEncerramentoModal(ativoId) {
+  const ativo   = db.ativos.find(a => a.id === ativoId);
+  if (!ativo) return;
+  const veiculo = db.veiculos.find(v => v.id === ativo.veiculoId) || {};
+  const diaria  = parseFloat(veiculo.diaria) || 0;
+  const mensal  = parseFloat(veiculo.mensal) || 0;
+  const tipo    = ativo.tipo || 'diaria';
+  const hoje    = new Date().toISOString().split('T')[0];
+
+  // Calculate days used and value
+  const retDt  = ativo.retirada  ? new Date(ativo.retirada+'T00:00')  : null;
+  const devDt  = new Date(hoje+'T00:00');
+  const diasUsados = retDt ? Math.ceil((devDt - retDt) / 86400000) : 0;
+  let valorAuto = 0;
+  if (tipo === 'diaria') valorAuto = diaria * diasUsados;
+  else valorAuto = mensal * Math.ceil(diasUsados / 30);
+
+  const valorStr = ativo.valor || ('R$ ' + valorAuto.toLocaleString('pt-BR', {minimumFractionDigits:2}));
+
+  const modal = document.createElement('div');
+  modal.id = 'modalEncerramento';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(7,16,46,.8);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;width:100%;max-width:480px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden;">
+      <div style="background:#c0392b;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:14px;color:#fff;">🔴 Encerrar Locação</span>
+        <button onclick="document.getElementById('modalEncerramento').remove()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <div style="background:#fdecea;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;">
+          <strong>${ativo.clienteNome}</strong> · ${ativo.veiculoNome} ${ativo.placa?'· '+ativo.placa:''}<br>
+          <span style="color:#5a607a;">Retirada: ${ativo.retirada?new Date(ativo.retirada+'T00:00').toLocaleDateString('pt-BR'):'—'} · Dias usados: ${diasUsados}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Data de devolução</label>
+            <input type="date" id="encDev" value="${hoje}" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;" onchange="calcEncerramento('${ativoId}',${diaria},${mensal},'${ativo.retirada||''}')">
+          </div>
+          <div>
+            <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">KM Devolução</label>
+            <input type="number" id="encKm" placeholder="KM atual" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;">
+          </div>
+        </div>
+        <div id="encCalcResult" style="background:#EEF1FD;border:1.5px solid #C5CCF5;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+          <div style="font-size:12px;color:#0E1B4D;">
+            <strong>Valor calculado:</strong>
+            <span id="encValorCalc" style="font-size:16px;font-weight:800;color:#0d7a3e;float:right;">R$ ${valorAuto.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+          </div>
+          <div style="font-size:11px;color:#5a607a;margin-top:4px;" id="encCalcDesc">
+            ${diasUsados} dia(s) × R$ ${diaria.toLocaleString('pt-BR')} (diária)
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Valor Final (R$)</label>
+            <input type="text" id="encValor" value="${valorAuto.toLocaleString('pt-BR',{minimumFractionDigits:2})}" oninput="maskBRL(this)" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;font-weight:700;color:#0d7a3e;">
+          </div>
+          <div>
+            <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Desconto / Multa (R$)</label>
+            <input type="text" id="encDesconto" value="0,00" oninput="maskBRL(this);calcEncerramento('${ativoId}',${diaria},${mensal},'${ativo.retirada||''}')" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a607a;display:block;margin-bottom:4px;">Condição na devolução</label>
+          <select id="encCondicao" style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;margin-bottom:8px;">
+            <option value="ok">✅ Normal — sem avarias</option>
+            <option value="avaria_leve">⚠️ Avaria leve</option>
+            <option value="avaria_grave">🔴 Avaria grave</option>
+            <option value="multa">🚨 Multa de trânsito</option>
+          </select>
+          <input type="text" id="encObs" placeholder="Observações do encerramento..." style="width:100%;border:1.5px solid #C5CCF5;border-radius:6px;padding:8px 10px;font-family:Montserrat,sans-serif;font-size:13px;outline:none;">
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid #C5CCF5;display:flex;gap:10px;background:#fafbff;">
+        <button onclick="document.getElementById('modalEncerramento').remove()" style="padding:10px 16px;background:#fff;color:#5a607a;border:1.5px solid #C5CCF5;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;">Cancelar</button>
+        <button onclick="confirmarEncerramento('${ativoId}')" style="flex:1;padding:10px;background:#c0392b;color:#fff;border:none;border-radius:8px;font-family:Montserrat,sans-serif;font-weight:800;font-size:11px;cursor:pointer;">🔴 Encerrar Locação</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function calcEncerramento(ativoId, diaria, mensal, retirada) {
+  const devDate = document.getElementById('encDev').value;
+  if (!devDate || !retirada) return;
+  const ret    = new Date(retirada + 'T00:00');
+  const dev    = new Date(devDate  + 'T00:00');
+  const dias   = Math.max(1, Math.ceil((dev - ret) / 86400000));
+  const tipo   = dias >= 28 ? 'mensal' : 'diaria';
+  let valor, desc;
+  if (tipo === 'mensal') { const m=Math.ceil(dias/30); valor=mensal*m; desc=m+'mês(es) × R$'+mensal.toLocaleString('pt-BR'); }
+  else { valor=diaria*dias; desc=dias+' dia(s) × R$'+diaria.toLocaleString('pt-BR'); }
+  const descontoEl = document.getElementById('encDesconto');
+  const desconto = descontoEl ? parseFloat((descontoEl.value||'0').replace(/\./g,'').replace(',','.')) : 0;
+  const valorFinal = Math.max(0, valor - desconto);
+  const calcEl = document.getElementById('encValorCalc');
+  const descEl = document.getElementById('encCalcDesc');
+  const valorEl = document.getElementById('encValor');
+  if (calcEl) calcEl.textContent = 'R$ ' + valorFinal.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  if (descEl) descEl.textContent = desc + (desconto ? ' - desconto R$'+desconto.toLocaleString('pt-BR') : '');
+  if (valorEl) valorEl.value = valorFinal.toLocaleString('pt-BR',{minimumFractionDigits:2});
+}
+
+function confirmarEncerramento(ativoId) {
+  const devDate   = document.getElementById('encDev').value;
+  const km        = document.getElementById('encKm').value;
+  const valor     = document.getElementById('encValor').value;
+  const condicao  = document.getElementById('encCondicao').value;
+  const obs       = document.getElementById('encObs').value;
+  if (!devDate) { alert('Informe a data de devolução.'); return; }
+
+  const idx = db.ativos.findIndex(a => a.id === ativoId);
+  if (idx < 0) return;
+  const ativo = db.ativos[idx];
+
+  // Move to historico
+  if (!db.historico) db.historico = [];
+  db.historico.push({
+    ...ativo,
+    devolvido:  devDate,
+    kmDev:      km,
+    valorFinal: valor,
+    condicao:   condicao,
+    obs:        obs,
+    encerradoEm: new Date().toISOString(),
+  });
+
+  // Update vehicle status
+  const vIdx = db.veiculos.findIndex(v => v.id === ativo.veiculoId);
+  if (vIdx >= 0) {
+    db.veiculos[vIdx].status = 'disponivel';
+    if (km) db.veiculos[vIdx].km = km;
+  }
+
+  // Remove from ativos
+  db.ativos.splice(idx, 1);
+  saveDB();
+  renderAtivos();
+  renderDashboard();
+  toast('✅ Locação encerrada. Veículo disponível novamente.', '#0d7a3e');
+  document.getElementById('modalEncerramento').remove();
+}
+
+// ── USER BAR ──
+(function showUser() {
+  try {
+    const u = sessionStorage.getItem('loka_user');
+    if (u) {
+      const d = JSON.parse(u);
+      const el = document.getElementById('lokaUserName');
+      if (el) el.textContent = d.nome + ' · ' + (d.perfil||'').toUpperCase();
+    }
+  } catch(e) {}
+})();
+
+function lokaLogout() {
+  sessionStorage.removeItem('loka_session');
+  sessionStorage.removeItem('loka_user');
+  window.location.replace('index.html');
+}
+
 // ── INIT ──
 // Load localStorage SYNCHRONOUSLY - no waiting, no hanging
 (function startSystem() {
@@ -1948,5 +2218,11 @@ async function processarImport(input) {
   }, 2000);
 })();
 </script>
+  <!-- User Bar -->
+  <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;display:flex;align-items:center;justify-content:space-between;z-index:9999;font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
+    <span id="lokaUserName">LOKÁ Sistema</span>
+    <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;">Sair</button>
+  </div>
+
 </body>
 </html>
