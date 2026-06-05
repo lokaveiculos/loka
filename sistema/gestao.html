@@ -181,6 +181,48 @@ tr:hover td{background:#f8f9fe;}
   .stats{grid-template-columns:1fr 1fr;}
   .veiculo-grid-cards{grid-template-columns:1fr;}
 }
+
+
+/* ── GLOBAL SEARCH ── */
+.global-search-wrap { position: relative; flex: 1; max-width: 340px; }
+.global-search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid var(--border); border-radius: 7px; font-family: Montserrat,sans-serif; font-size: 12px; outline: none; background: var(--field); transition: border-color .2s; }
+.global-search-input:focus { border-color: var(--blue); background: #fff; }
+.global-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.global-search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border-radius: 8px; box-shadow: 0 8px 32px rgba(14,27,77,.15); border: 1px solid var(--border); z-index: 999; max-height: 320px; overflow-y: auto; display: none; }
+.global-search-results.open { display: block; }
+.gsr-section { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 8px 12px 4px; }
+.gsr-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 12px; transition: background .1s; }
+.gsr-item:hover { background: var(--field); }
+.gsr-item-title { font-weight: 700; color: var(--dark); }
+.gsr-item-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.gsr-badge { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.gsr-empty { padding: 20px; text-align: center; color: var(--muted); font-size: 12px; }
+
+
+/* ── PAGINATION ── */
+.pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid var(--border); background: #fafbff; border-radius: 0 0 10px 10px; }
+.page-info { font-size: 11px; color: var(--muted); font-weight: 600; }
+.page-btns { display: flex; gap: 4px; }
+.page-btn { width: 30px; height: 30px; border: 1.5px solid var(--border); border-radius: 5px; background: #fff; font-family: Montserrat,sans-serif; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.page-btn:hover { border-color: var(--blue); color: var(--blue); }
+.page-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.page-btn:disabled { opacity: .35; cursor: default; }
+
+/* ── VALIDATION ── */
+.fi.error { border-color: #c0392b !important; background: #fdecea !important; }
+.fi.ok    { border-color: #0d7a3e !important; }
+.field-error { font-size: 9px; color: #c0392b; font-weight: 700; margin-top: 2px; display: none; }
+.fi.error + .field-error { display: block; }
+
+/* ── MANUTENÇÃO ── */
+.veiculo-card.manutencao { border-top-color: #7c3aed; }
+.badge-purple { background: #ede9fe; color: #7c3aed; }
+
+/* ── PAGAMENTOS ── */
+.pagto-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: 800; letter-spacing: .3px; cursor: pointer; }
+.pagto-pago    { background: #e8f5ef; color: #0d7a3e; }
+.pagto-parcial { background: #fef3cd; color: #b45309; }
+.pagto-pendente{ background: #fdecea; color: #c0392b; }
 </style>
 </head>
 <body>
@@ -197,6 +239,10 @@ tr:hover td{background:#f8f9fe;}
     <div class="nav-item" onclick="showPanel('veiculos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Veículos</div>
     <div class="nav-item" onclick="window.open('frota.html','_blank')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v5"/><polyline points="9 17 9 11 15 11 15 17"/></svg>Frota Ativa ↗</div>
     <div class="nav-sec">Documentos</div>
+    <div class="nav-item" onclick="gerarRelatorioMensal()" style="color:rgba(255,255,255,.5);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      Relatório Mensal
+    </div>
     <div class="nav-item" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
     <div class="nav-item" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
     <div class="nav-item" onclick="showPanel('historico')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Histórico</div>
@@ -216,10 +262,23 @@ tr:hover td{background:#f8f9fe;}
 <div class="main">
   <div class="topbar">
     <h2 id="pageTitle">Dashboard</h2>
-    <div class="topbar-actions">
+    <div class="topbar-actions" style="flex:1;gap:12px;">
+
+        <div class="global-search-wrap" id="globalSearchWrap">
+          <svg class="global-search-icon" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="global-search-input" id="globalSearchInput" type="text" placeholder="Buscar clientes, veículos, aluguéis..." oninput="globalSearch(this.value)" onfocus="globalSearch(this.value)" autocomplete="off">
+          <div class="global-search-results" id="globalSearchResults"></div>
+        </div>
       <span class="user-pill" id="userPill">Carregando...</span>
       <button class="btn btn-primary" id="btnNew" onclick="newAction()" style="display:none">+ Novo</button>
     </div>
+  </div>
+
+  <!-- ALERT BANNER -->
+  <div id="alertBanner" style="display:none;background:#7f1d1d;padding:10px 20px;display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fca5a5" stroke-width="2" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span id="alertText" style="font-size:12px;font-weight:700;color:#fca5a5;flex:1;"></span>
+    <button onclick="document.getElementById('alertBanner').style.display='none'" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fca5a5;border-radius:5px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:Montserrat,sans-serif;">✕ Fechar</button>
   </div>
 
   <div class="content">
@@ -232,6 +291,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="stat" style="border-left-color:var(--green)"><div class="stat-value" id="sDisponiveis">0</div><div class="stat-label">Disponíveis</div></div>
         <div class="stat" style="border-left-color:var(--red)"><div class="stat-value" id="sVencendo">0</div><div class="stat-label">Vencendo</div></div>
         <div class="stat"><div class="stat-value" id="sVeiculos">0</div><div class="stat-label">Veículos</div></div>
+        <div class="stat" style="border-left-color:#7c3aed"><div class="stat-value" id="sManutencao">0</div><div class="stat-label">Em Manutenção</div></div>
       </div>
       <div id="dashAtivos"></div>
     </div>
@@ -241,7 +301,7 @@ tr:hover td{background:#f8f9fe;}
       <div class="toolbar">
         <div class="search-wrap">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input class="search-input" id="searchClientes" type="text" placeholder="Buscar nome, CPF, telefone..." oninput="renderClientes()">
+          <input class="search-input" id="searchClientes" type="text" placeholder="Buscar nome, CPF, telefone..." oninput="_paginaClientes=1;renderClientes()">
         </div>
         <select class="filter-select" id="filterClientes" onchange="renderClientes()">
           <option value="">Todos</option>
@@ -255,6 +315,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="table-scroll"><table><thead><tr>
           <th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Aluguéis</th><th>Status</th><th>Ações</th>
         </tr></thead><tbody id="clientesTable"></tbody></table></div>
+      <div id="paginacaoClientes"></div>
       </div>
     </div>
 
@@ -354,6 +415,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="table-scroll"><table><thead><tr>
           <th>Cliente</th><th>Veículo</th><th>Placa</th><th>Retirada</th><th>Devolvido</th><th>Valor</th><th>Condição</th>
         </tr></thead><tbody id="historicoTable"></tbody></table></div>
+      <div id="paginacaoHistorico"></div>
       </div>
     </div>
 
@@ -364,6 +426,7 @@ tr:hover td{background:#f8f9fe;}
 <!-- USER BAR -->
 <div class="user-bar">
   <span id="userBarName">LOKÁ Sistema</span>
+  <span style="font-size:9px;color:rgba(255,255,255,.2);letter-spacing:.3px;">01.01 · build 05/06/2026 00:23 UTC</span>
   <button class="logout-btn" onclick="lokaLogout()">⏻ Sair</button>
 </div>
 
@@ -373,9 +436,9 @@ tr:hover td{background:#f8f9fe;}
     <div class="modal-head"><h3 id="modalClienteTitulo">Novo Cliente</h3><button class="modal-close" onclick="closeModal('modalCliente')">✕</button></div>
     <div class="modal-body">
       <div class="form-grid g2">
-        <div class="fg" style="grid-column:1/-1"><label class="fl">Nome Completo *</label><input class="fi" id="cNome" placeholder="Nome completo"></div>
-        <div class="fg"><label class="fl">CPF / CNPJ *</label><input class="fi" id="cCpf" placeholder="000.000.000-00"></div>
-        <div class="fg"><label class="fl">Telefone *</label><input class="fi" id="cTel" type="tel" placeholder="(75) 90000-0000"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Nome Completo *</label><input class="fi" id="cNome" placeholder="Nome completo"><span class="field-error"></span></div>
+        <div class="fg"><label class="fl">CPF / CNPJ *</label><input class="fi" id="cCpf" placeholder="000.000.000-00" oninput="maskCPF(this)" maxlength="14"><span class="field-error"></span></div>
+        <div class="fg"><label class="fl">Telefone *</label><input class="fi" id="cTel" type="tel" placeholder="(75) 90000-0000" oninput="maskTel(this)" maxlength="15"><span class="field-error"></span></div>
         <div class="fg"><label class="fl">E-mail</label><input class="fi" id="cEmail" type="email" placeholder="email@exemplo.com"></div>
         <div class="fg"><label class="fl">Endereço</label><input class="fi" id="cEnd" placeholder="Rua, número, bairro, cidade"></div>
         <div class="fg"><label class="fl">CEP</label><input class="fi" id="cCep" placeholder="00000-000" onblur="buscaCep()"></div>
@@ -533,7 +596,8 @@ function loadDB() {
   if (!db.historico) db.historico = [];
   if (!db.contratos) db.contratos = [];
   populateFormClienteSel();
-  renderDashboard();
+  try { renderDashboard(); } catch(e) { console.error('renderDashboard:', e); }
+  checkAlertas();
 }
 
 function saveDB() {
@@ -541,6 +605,210 @@ function saveDB() {
   try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
   if (typeof LokaDB !== 'undefined' && navigator.onLine) {
     LokaDB.save('loka_db', db).catch(function() {});
+  }
+}
+
+
+
+
+
+// ══ E4 — PAGINAÇÃO ══════════════════════════════════════════════════════════
+var _paginaClientes  = 1;
+var _paginaHistorico = 1;
+var PAGE_SIZE = 20;
+
+function paginate(list, page) {
+  var total = list.length;
+  var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  page = Math.min(Math.max(1, page), pages);
+  return { items: list.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE), page: page, pages: pages, total: total };
+}
+
+function renderPagination(containerId, page, pages, total, onPage) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  var start = (page-1)*PAGE_SIZE + 1;
+  var end   = Math.min(page*PAGE_SIZE, total);
+  var html  = '<div class="pagination">' +
+    '<span class="page-info">Exibindo ' + start + '–' + end + ' de ' + total + '</span>' +
+    '<div class="page-btns">' +
+    '<button class="page-btn" onclick="(' + onPage + ')(' + (page-1) + ')" ' + (page<=1?'disabled':'') + '>‹</button>';
+  var s = Math.max(1, page-2), e = Math.min(pages, s+4);
+  for (var i=s; i<=e; i++) {
+    html += '<button class="page-btn' + (i===page?' active':'') + '" onclick="(' + onPage + ')(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="page-btn" onclick="(' + onPage + ')(' + (page+1) + ')" ' + (page>=pages?'disabled':'') + '>›</button>' +
+    '</div></div>';
+  el.innerHTML = html;
+}
+
+// ══ E3 — BUSCA GLOBAL ═══════════════════════════════════════════════════════
+function globalSearch(q) {
+  var results = document.getElementById('globalSearchResults');
+  if (!results || !db) return;
+  q = q.trim().toLowerCase();
+  if (q.length < 2) { results.classList.remove('open'); return; }
+
+  var html = '';
+
+  // Clientes
+  var cls = db.clients.filter(function(c) {
+    return c.nome.toLowerCase().includes(q) || (c.cpf||'').includes(q) || (c.telefone||'').includes(q);
+  }).slice(0,4);
+  if (cls.length) {
+    html += '<div class="gsr-section">👤 Clientes</div>';
+    cls.forEach(function(c) {
+      var idx = db.clients.indexOf(c);
+      html += '<div class="gsr-item" onclick="globalSearchGo('cliente',' + idx + ')">' +
+        '<div class="gsr-badge" style="background:#EEF1FD;">👤</div>' +
+        '<div><div class="gsr-item-title">' + c.nome + '</div>' +
+        '<div class="gsr-item-sub">' + (c.cpf||'') + ' · ' + (c.telefone||'') + '</div></div></div>';
+    });
+  }
+
+  // Veículos
+  var vcs = db.veiculos.filter(function(v) {
+    return (v.marca+v.modelo+v.placa).toLowerCase().includes(q);
+  }).slice(0,4);
+  if (vcs.length) {
+    html += '<div class="gsr-section">🚗 Veículos</div>';
+    vcs.forEach(function(v) {
+      var st = v.status||'disponivel';
+      var badge = st==='disponivel'?'badge-green':st==='alugado'?'badge-amber':'badge-red';
+      html += '<div class="gsr-item" onclick="globalSearchGo('veiculo',null)">' +
+        '<div class="gsr-badge" style="background:#f0f2fa;">🚗</div>' +
+        '<div><div class="gsr-item-title">' + v.marca + ' ' + v.modelo + '</div>' +
+        '<div class="gsr-item-sub">' + v.placa + ' · <span class="badge ' + badge + '">' + st + '</span></div></div></div>';
+    });
+  }
+
+  // Aluguéis ativos
+  var ats = db.ativos.filter(function(a) {
+    return (a.clienteNome+a.veiculoNome+a.placa||'').toLowerCase().includes(q);
+  }).slice(0,3);
+  if (ats.length) {
+    html += '<div class="gsr-section">✅ Aluguéis Ativos</div>';
+    ats.forEach(function(a) {
+      html += '<div class="gsr-item" onclick="globalSearchGo('ativo',null)">' +
+        '<div class="gsr-badge" style="background:#e8f5ef;">📋</div>' +
+        '<div><div class="gsr-item-title">' + a.clienteNome + '</div>' +
+        '<div class="gsr-item-sub">' + a.veiculoNome + ' · dev. ' + fmtDate(a.devolucao) + '</div></div></div>';
+    });
+  }
+
+  if (!html) html = '<div class="gsr-empty">Nenhum resultado para "<strong>' + q + '</strong>"</div>';
+  results.innerHTML = html;
+  results.classList.add('open');
+}
+
+function globalSearchGo(type, idx) {
+  document.getElementById('globalSearchResults').classList.remove('open');
+  document.getElementById('globalSearchInput').value = '';
+  if (type === 'cliente') { showPanel('clientes'); if (idx !== null) setTimeout(function(){ openModalCliente(idx); }, 200); }
+  if (type === 'veiculo') showPanel('veiculos');
+  if (type === 'ativo')   showPanel('ativos');
+}
+
+// Close on outside click
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('globalSearchWrap').contains(e.target)) {
+    var r = document.getElementById('globalSearchResults');
+    if (r) r.classList.remove('open');
+  }
+});
+
+// ══ E2 — MÁSCARAS ══════════════════════════════════════════════════════════
+function maskCPF(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,11);
+  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/,'$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/,'$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/,'$1.$2');
+  el.value = v;
+}
+function maskTel(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,11);
+  if (v.length === 11) v = v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');
+  else if (v.length === 10) v = v.replace(/(\d{2})(\d{4})(\d{4})/,'($1) $2-$3');
+  el.value = v;
+}
+function maskPlaca(el) {
+  var v = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,7);
+  if (v.length > 3) v = v.slice(0,3) + '-' + v.slice(3);
+  el.value = v;
+}
+function maskBRL(el) {
+  var v = el.value.replace(/\D/g,'');
+  if (!v) { el.value = ''; return; }
+  v = (parseInt(v,10)/100).toFixed(2);
+  el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+
+// ══ E1 — VALIDAÇÃO VISUAL ════════════════════════════════════════════════════
+function validateField(el, condition, msg) {
+  var errEl = el.nextElementSibling;
+  if (!condition) {
+    el.classList.add('error'); el.classList.remove('ok');
+    if (errEl && errEl.classList.contains('field-error')) errEl.textContent = msg;
+    return false;
+  }
+  el.classList.remove('error'); el.classList.add('ok');
+  if (errEl && errEl.classList.contains('field-error')) errEl.textContent = '';
+  return true;
+}
+function showFormError(id, msg) {
+  var el = document.getElementById(id);
+  if (!el) return false;
+  el.classList.add('error');
+  var errEl = el.nextElementSibling;
+  if (errEl && errEl.classList.contains('field-error')) errEl.textContent = msg;
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+  el.focus();
+  return false;
+}
+function clearFormErrors(fields) {
+  fields.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('error','ok'); }
+  });
+}
+
+// ── ALERT BANNER ───────────────────────────────────────────────────────
+function checkAlertas() {
+  if (!db || !db.ativos || !db.ativos.length) return;
+  var hoje    = new Date(); hoje.setHours(0,0,0,0);
+  var vencidos = db.ativos.filter(function(a) {
+    if (!a.devolucao) return false;
+    var dev = new Date(a.devolucao + 'T00:00');
+    return dev < hoje;
+  });
+  var venceHoje = db.ativos.filter(function(a) {
+    if (!a.devolucao) return false;
+    var dev = new Date(a.devolucao + 'T00:00');
+    return dev.toDateString() === hoje.toDateString();
+  });
+  var vence3 = db.ativos.filter(function(a) {
+    if (!a.devolucao) return false;
+    var dev = new Date(a.devolucao + 'T00:00');
+    var diff = Math.ceil((dev - hoje) / 86400000);
+    return diff > 0 && diff <= 3;
+  });
+
+  var partes = [];
+  if (vencidos.length)  partes.push(vencidos.length  + ' locação(ões) VENCIDA(S)');
+  if (venceHoje.length) partes.push(venceHoje.length + ' devolução(ões) para HOJE');
+  if (vence3.length)    partes.push(vence3.length    + ' vencendo nos próximos 3 dias');
+
+  var banner = document.getElementById('alertBanner');
+  var text   = document.getElementById('alertText');
+  if (partes.length && banner && text) {
+    text.textContent = '⚠️ Atenção: ' + partes.join(' · ');
+    banner.style.display = 'flex';
+    // Red for vencidos, amber for upcoming
+    banner.style.background = vencidos.length ? '#7f1d1d' : '#78350f';
+    text.style.color = vencidos.length ? '#fca5a5' : '#fde68a';
+  } else if (banner) {
+    banner.style.display = 'none';
   }
 }
 
@@ -579,7 +847,10 @@ function showPanel(name) {
   // Update title
   document.getElementById('pageTitle').textContent = panelTitles[name] || name;
   // Render
-  if (db && panelRenders[name]) panelRenders[name]();
+  if (db && panelRenders[name]) {
+    try { panelRenders[name](); }
+    catch(e) { console.error('Render error in', name, ':', e); }
+  }
 }
 
 // ── MODALS ─────────────────────────────────────────────────────────────
@@ -620,6 +891,8 @@ function renderDashboard() {
   document.getElementById('sAtivos').textContent     = db.ativos.length;
   document.getElementById('sVeiculos').textContent   = db.veiculos.length;
   document.getElementById('sDisponiveis').textContent= db.veiculos.filter(function(v){return v.status==='disponivel';}).length;
+  var manutEl = document.getElementById('sManutencao');
+  if (manutEl) manutEl.textContent = db.veiculos.filter(function(v){return v.status==='manutencao';}).length;
   document.getElementById('sVencendo').textContent   = db.ativos.filter(function(a){var d=daysLeft(a.devolucao);return d!==null&&d<=3&&d>=0;}).length;
   var cont = document.getElementById('dashAtivos');
   if (!db.ativos.length) { cont.innerHTML='<p style="color:var(--muted);font-size:12px;margin-top:8px;">Nenhum aluguel ativo no momento.</p>'; return; }
@@ -638,8 +911,10 @@ function renderClientes() {
     if (f==='bloq' && c.status !== 'bloqueado') return false;
     return true;
   });
+  var pg   = paginate(list, _paginaClientes);
+  _paginaClientes = pg.page;
   document.getElementById('clientesCount').textContent = list.length + ' cliente(s)';
-  document.getElementById('clientesTable').innerHTML = list.length ? list.map(function(c, i) {
+  document.getElementById('clientesTable').innerHTML = pg.items.length ? pg.items.map(function(c, i) {
     var idx = db.clients.indexOf(c);
     return '<tr>' +
       '<td><strong>' + c.nome + '</strong></td>' +
@@ -649,10 +924,12 @@ function renderClientes() {
       '<td><span class="badge ' + (c.status==='bloqueado'?'badge-red':'badge-green') + '">' + (c.status||'ativo') + '</span></td>' +
       '<td><div class="td-actions">' +
         '<button class="icon-btn" title="Editar" onclick="openModalCliente(' + idx + ')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
+        '<button class="icon-btn" title="Histórico" onclick="verHistoricoCliente(' + idx + ')" style="font-size:12px;">📋</button>' +
         '<button class="icon-btn" title="Contrato" onclick="selecionarClienteContrato(' + idx + ')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></button>' +
       '</div></td>' +
       '</tr>';
   }).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);">Nenhum cliente encontrado.</td></tr>';
+  renderPagination('paginacaoClientes', pg.page, pg.pages, pg.total, 'function(p){_paginaClientes=p;renderClientes();}');
 }
 
 function openModalCliente(idx) {
@@ -674,8 +951,9 @@ function openModalCliente(idx) {
 }
 
 function salvarCliente() {
+  clearFormErrors(['cNome','cCpf','cTel']);
   var nome = document.getElementById('cNome').value.trim();
-  if (!nome) { alert('Informe o nome do cliente.'); return; }
+  if (!nome) return showFormError('cNome','Nome é obrigatório');
   var c = {
     id:        _curCliente >= 0 ? db.clients[_curCliente].id : 'c' + Date.now(),
     nome:      nome,
@@ -760,6 +1038,7 @@ function ativoCardHTML(a) {
     '</div>' +
     '<div class="ativo-foot">' +
       '<div class="ativo-days">' + daysStr + '</div>' +
+      pagtoBadgeHTML(a) +
       '<div class="ativo-actions">' +
         '<button class="icon-btn" title="Prorrogar" onclick="openProrrogacao('' + a.id + '')" style="border-color:#2B4BF2;"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>' +
         '<button class="icon-btn" title="Encerrar" onclick="openEncerramento('' + a.id + '')" style="border-color:#c0392b;"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></button>' +
@@ -798,7 +1077,7 @@ function openModalAluguel(idx) {
 function salvarAluguel() {
   var cIdx = parseInt(document.getElementById('aCliente').value);
   var vIdx = parseInt(document.getElementById('aVeiculo').value);
-  if (isNaN(cIdx)||isNaN(vIdx)) { alert('Selecione cliente e veículo.'); return; }
+  if (isNaN(cIdx)||isNaN(vIdx)) { toast('⚠️ Selecione cliente e veículo','#b45309'); return; }
   var cl = db.clients[cIdx];
   var v  = db.veiculos[vIdx];
   var a  = {
@@ -823,6 +1102,7 @@ function salvarAluguel() {
   db.clients[cIdx].alugueis = (db.clients[cIdx].alugueis||0) + 1;
   saveDB(); renderAtivos(); renderDashboard();
   closeModal('modalAluguel');
+  checkAlertas();
   toast('✓ Aluguel registrado!', '#0d7a3e');
 }
 
@@ -838,15 +1118,22 @@ function renderVeiculos() {
   });
   document.getElementById('veiculosGrid').innerHTML = list.length ? list.map(function(v) {
     var st = v.status || 'disponivel';
+    var stLabel = {disponivel:'Disponível', alugado:'Alugado', manutencao:'Em Manutenção'};
+    var stBadge = {disponivel:'badge-green', alugado:'badge-amber', manutencao:'badge-purple'};
+    var stBtn = st==='manutencao'
+      ? '<button class="btn btn-outline" style="margin-top:8px;font-size:10px;padding:5px 10px;color:#7c3aed;border-color:#7c3aed;width:100%;" onclick="openRetornoManut(''+v.id+'')">✅ Dar Baixa na Manutenção</button>'
+      : st==='disponivel'
+        ? '<button class="btn btn-outline" style="margin-top:8px;font-size:10px;padding:5px 10px;width:100%;" onclick="openManutencao(''+v.id+'')">🔧 Enviar para Manutenção</button>'
+        : '';
     return '<div class="veiculo-card ' + st + '">' +
       '<div class="veiculo-modelo">' + v.marca + ' ' + v.modelo + '</div>' +
       '<div class="veiculo-info">' + v.ano + ' · ' + v.cor + '</div>' +
       '<span class="veiculo-placa">' + v.placa + '</span>' +
-      '<span class="badge ' + (st==='disponivel'?'badge-green':'badge-amber') + '" style="margin-left:6px;">' + st + '</span>' +
+      '<span class="badge ' + (stBadge[st]||'badge-gray') + '" style="margin-left:6px;">' + (stLabel[st]||st) + '</span>' +
       '<div class="veiculo-prices">' +
         '<div class="vp-box"><div class="vp-label">Diária</div><div class="vp-value">R$ ' + (v.diaria||0).toLocaleString('pt-BR') + '</div></div>' +
         '<div class="vp-box"><div class="vp-label">Mensal</div><div class="vp-value" style="color:var(--green)">R$ ' + (v.mensal||0).toLocaleString('pt-BR') + '</div></div>' +
-      '</div></div>';
+      '</div>' + stBtn + '</div>';
   }).join('') :
     '<div class="empty-state"><p>Nenhum veículo encontrado.</p></div>';
 }
@@ -1052,6 +1339,7 @@ function confirmarEncerramento() {
   db.ativos.splice(idx,1);
   saveDB(); renderAtivos(); renderDashboard();
   closeModal('modalEncerramento');
+  checkAlertas();
   toast('✅ Locação encerrada. Veículo disponível.', '#0d7a3e');
 }
 
@@ -1096,6 +1384,273 @@ function newAction() {
   if (p==='clientes') openModalCliente(-1);
   if (p==='ativos')   openModalAluguel(-1);
 }
+
+// ══ B2 — MANUTENÇÃO ═════════════════════════════════════════════════════════
+var _manutVeiculoId = null;
+
+function openManutencao(vId) {
+  _manutVeiculoId = vId;
+  var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
+  document.getElementById('manutVeiculoInfo').textContent = v.marca+' '+v.modelo+' · '+v.placa;
+  document.getElementById('manutRetorno').value = '';
+  ['manutMotivo','manutOficina','manutCusto','manutKm','manutObs'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+  openModal('modalManutencao');
+}
+function confirmarManutencao() {
+  var motivo = document.getElementById('manutMotivo').value.trim();
+  if (!motivo) { toast('⚠️ Informe o motivo da manutenção','#b45309'); return; }
+  var idx = db.veiculos.findIndex(function(v){return v.id===_manutVeiculoId;});
+  if (idx<0) return;
+  db.veiculos[idx].status = 'manutencao';
+  if (!db.veiculos[idx].manutencoes) db.veiculos[idx].manutencoes = [];
+  db.veiculos[idx].manutencoes.push({
+    motivo: motivo,
+    oficina: document.getElementById('manutOficina').value,
+    retorno: document.getElementById('manutRetorno').value,
+    custo:   document.getElementById('manutCusto').value,
+    km:      document.getElementById('manutKm').value,
+    obs:     document.getElementById('manutObs').value,
+    inicio:  new Date().toISOString(), status: 'em andamento'
+  });
+  saveDB(); renderVeiculos(); renderDashboard(); checkAlertas();
+  closeModal('modalManutencao');
+  toast('🔧 Veículo enviado para manutenção', '#7c3aed');
+}
+function openRetornoManut(vId) {
+  _manutVeiculoId = vId;
+  var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
+  var lastManut = (v.manutencoes||[]).slice(-1)[0] || {};
+  document.getElementById('retornoVeiculoInfo').innerHTML =
+    v.marca+' '+v.modelo+' · '+v.placa+'<br><span style="color:var(--muted);font-weight:400;">Motivo: '+lastManut.motivo+'</span>';
+  ['retornoKm','retornoCusto','retornoServicos'].forEach(function(id){document.getElementById(id).value='';});
+  openModal('modalRetornoManut');
+}
+function confirmarRetornoManut() {
+  var idx = db.veiculos.findIndex(function(v){return v.id===_manutVeiculoId;});
+  if (idx<0) return;
+  db.veiculos[idx].status = 'disponivel';
+  var manut = (db.veiculos[idx].manutencoes||[]);
+  if (manut.length) {
+    manut[manut.length-1].fim       = new Date().toISOString();
+    manut[manut.length-1].status    = 'concluida';
+    manut[manut.length-1].custoReal = document.getElementById('retornoCusto').value;
+    manut[manut.length-1].servicos  = document.getElementById('retornoServicos').value;
+  }
+  if (document.getElementById('retornoKm').value) db.veiculos[idx].km = document.getElementById('retornoKm').value;
+  saveDB(); renderVeiculos(); renderDashboard(); checkAlertas();
+  closeModal('modalRetornoManut');
+  toast('✅ Veículo liberado e disponível!', '#0d7a3e');
+}
+
+// ══ B3 — PAGAMENTOS ═════════════════════════════════════════════════════════
+var _pagtoAtivoId = null;
+
+function pagtoBadgeHTML(a) {
+  var pg   = a.pagamento || {};
+  var st   = pg.status || 'pendente';
+  var lbls = {pago:'✅ Pago', parcial:'⚠️ Parcial', pendente:'❌ Pendente'};
+  return '<span class="pagto-badge pagto-'+st+'" onclick="openPagamento(''+a.id+'')" title="Registrar pagamento">'+lbls[st]+'</span>';
+}
+function openPagamento(id) {
+  _pagtoAtivoId = id;
+  var a  = db.ativos.find(function(x){return x.id===id;}) || {};
+  var pg = a.pagamento || {};
+  document.getElementById('pagtoAtivoInfo').innerHTML =
+    '<strong>'+a.clienteNome+'</strong> · '+a.veiculoNome+
+    '<br><span style="color:var(--muted)">Valor: '+(a.valor||'—')+'</span>';
+  document.getElementById('pagtoStatus').value    = pg.status || 'pendente';
+  document.getElementById('pagtoValorPago').value = pg.valorPago || '';
+  document.getElementById('pagtoForma').value     = pg.forma || 'pix';
+  document.getElementById('pagtoDt').value        = pg.data || new Date().toISOString().split('T')[0];
+  document.getElementById('pagtoObs').value       = pg.obs || '';
+  openModal('modalPagamento');
+}
+function confirmarPagamento() {
+  var idx = db.ativos.findIndex(function(x){return x.id===_pagtoAtivoId;});
+  if (idx<0) return;
+  db.ativos[idx].pagamento = {
+    status:    document.getElementById('pagtoStatus').value,
+    valorPago: document.getElementById('pagtoValorPago').value,
+    forma:     document.getElementById('pagtoForma').value,
+    data:      document.getElementById('pagtoDt').value,
+    obs:       document.getElementById('pagtoObs').value,
+    atualizadoEm: new Date().toISOString()
+  };
+  saveDB(); renderAtivos();
+  closeModal('modalPagamento');
+  toast('💳 Pagamento registrado!', '#0d7a3e');
+}
+
+// ══ B4 — RELATÓRIO MENSAL ═══════════════════════════════════════════════════
+function gerarRelatorioMensal() {
+  if (!db) return;
+  var agora = new Date(), mes = agora.getMonth(), ano = agora.getFullYear();
+  var nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][mes];
+  var encMes = (db.historico||[]).filter(function(h) {
+    if (!h.encerradoEm) return false;
+    var d = new Date(h.encerradoEm);
+    return d.getMonth()===mes && d.getFullYear()===ano;
+  });
+  var receitaHist = encMes.reduce(function(acc,h) {
+    var v = parseFloat((h.valorFinal||h.valor||'0').replace(/[^\d,.-]/g,'').replace(',','.'));
+    return acc+(isNaN(v)?0:v);
+  }, 0);
+  var ativMes = db.ativos.filter(function(a) {
+    if (!a.geradoEm) return false;
+    var d = new Date(a.geradoEm);
+    return d.getMonth()===mes && d.getFullYear()===ano;
+  });
+  var veicCount = {};
+  encMes.concat(ativMes).forEach(function(a) { var k=(a.veiculoNome||'—')+' '+(a.placa||''); veicCount[k]=(veicCount[k]||0)+1; });
+  var topVeic = Object.entries(veicCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var cliCount = {};
+  encMes.concat(ativMes).forEach(function(a) { var k=a.clienteNome||'—'; cliCount[k]=(cliCount[k]||0)+1; });
+  var topCli = Object.entries(cliCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório '+nomeMes+' '+ano+'</title>'
+    +'<style>@page{margin:15mm}body{font-family:Montserrat,sans-serif;color:#0E1B4D;font-size:12px}'
+    +'h1{font-size:20px;font-weight:900;margin-bottom:4px}h2{font-size:13px;font-weight:800;color:#2B4BF2;margin:20px 0 8px;border-bottom:2px solid #EEF1FD;padding-bottom:4px}'
+    +'.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}'
+    +'.card{background:#f8f9fe;border-radius:8px;padding:12px;border-left:3px solid #2B4BF2}'
+    +'.card-val{font-size:22px;font-weight:900}.card-label{font-size:9px;font-weight:700;text-transform:uppercase;color:#5a607a;margin-top:2px}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#0E1B4D;color:#fff;padding:8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}'
+    +'@media print{button{display:none}}</style></head><body>'
+    +'<h1>LOKÁ Aluguel de Veículos</h1>'
+    +'<p style="color:#5a607a;margin-bottom:20px">Relatório Mensal — '+nomeMes+' '+ano+'</p>'
+    +'<div class="grid">'
+      +'<div class="card"><div class="card-val">'+encMes.length+'</div><div class="card-label">Encerrados</div></div>'
+      +'<div class="card"><div class="card-val">'+ativMes.length+'</div><div class="card-label">Novos aluguéis</div></div>'
+      +'<div class="card" style="border-color:#0d7a3e"><div class="card-val" style="color:#0d7a3e">R$ '+receitaHist.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div><div class="card-label">Receita</div></div>'
+      +'<div class="card"><div class="card-val">'+db.ativos.length+'</div><div class="card-label">Ativos agora</div></div>'
+    +'</div>'
+    +(topVeic.length ? '<h2>Veículos mais utilizados</h2><table><thead><tr><th>Veículo</th><th>Locações</th></tr></thead><tbody>'
+      +topVeic.map(function(v){return '<tr><td>'+v[0]+'</td><td>'+v[1]+'</td></tr>';}).join('')+'</tbody></table>' : '')
+    +(topCli.length ? '<h2>Clientes mais ativos</h2><table><thead><tr><th>Cliente</th><th>Locações</th></tr></thead><tbody>'
+      +topCli.map(function(v){return '<tr><td>'+v[0]+'</td><td>'+v[1]+'</td></tr>';}).join('')+'</tbody></table>' : '')
+    +'<p style="margin-top:24px;font-size:9px;color:#aaa">LOKÁ · CNPJ 39.911.638/0001-10 · Gerado em '+new Date().toLocaleString('pt-BR')+'</p>'
+    +'<br><button onclick="window.print()" style="padding:10px 20px;background:#0E1B4D;color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-weight:700;cursor:pointer;">🖨️ Imprimir / PDF</button>'
+    +'</body></html>';
+  var w = window.open('','_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
+// ══ B5 — HISTÓRICO POR CLIENTE ══════════════════════════════════════════════
+function verHistoricoCliente(idx) {
+  var cl = db.clients[idx]; if (!cl) return;
+  var ativos = db.ativos.filter(function(a){return a.clienteNome===cl.nome||a.clienteId===cl.id;});
+  var hist   = (db.historico||[]).filter(function(h){return h.clienteNome===cl.nome||h.clienteId===cl.id;});
+  var todos  = ativos.concat(hist).sort(function(a,b){return new Date(b.geradoEm||b.encerradoEm||0)-new Date(a.geradoEm||a.encerradoEm||0);});
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Histórico — '+cl.nome+'</title>'
+    +'<style>@page{margin:12mm}body{font-family:Montserrat,sans-serif;color:#0E1B4D;font-size:12px}'
+    +'h1{font-size:18px;font-weight:900;margin-bottom:2px}h2{font-size:11px;color:#5a607a;margin-bottom:16px}'
+    +'.info{background:#f0f2fa;border-radius:8px;padding:12px 16px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:11px}'
+    +'.info b{font-weight:700;color:#2B4BF2}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#0E1B4D;color:#fff;padding:8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #eee}'
+    +'@media print{button{display:none}}</style></head><body>'
+    +'<h1>'+cl.nome+'</h1><h2>Histórico Completo de Locações</h2>'
+    +'<div class="info">'
+      +'<div>CPF/CNPJ: <b>'+(cl.cpf||'—')+'</b></div>'
+      +'<div>Telefone: <b>'+(cl.telefone||'—')+'</b></div>'
+      +'<div>Total: <b>'+todos.length+' locações</b></div>'
+      +'<div>Status: <b>'+(cl.status||'ativo')+'</b></div>'
+    +'</div>'
+    +'<table><thead><tr><th>Veículo</th><th>Placa</th><th>Tipo</th><th>Retirada</th><th>Devolução</th><th>Valor</th><th>Situação</th></tr></thead>'
+    +'<tbody>'+todos.map(function(a) {
+      var isAtivo = a.status==='ativo';
+      var sit = isAtivo ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;">Ativo</span>'
+                        : '<span style="background:#f0f2fa;color:#5a607a;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;">Encerrado</span>';
+      return '<tr><td>'+(a.veiculoNome||'—')+'</td><td>'+(a.placa||'—')+'</td>'
+        +'<td>'+(a.tipo==='mensal'?'Mensal':'Diária')+'</td>'
+        +'<td>'+(a.retirada?new Date(a.retirada+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'
+        +'<td>'+((a.devolvido||a.devolucao)?new Date((a.devolvido||a.devolucao)+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'
+        +'<td>'+(a.valorFinal||a.valor||'—')+'</td><td>'+sit+'</td></tr>';
+    }).join('')+'</tbody></table>'
+    +'<p style="margin-top:16px;font-size:9px;color:#aaa">Gerado em '+new Date().toLocaleString('pt-BR')+' · LOKÁ</p>'
+    +'<br><button onclick="window.print()" style="padding:10px 20px;background:#0E1B4D;color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-weight:700;cursor:pointer;">🖨️ Imprimir</button>'
+    +'</body></html>';
+  var w = window.open('','_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
+// ══ VEÍCULO CARD COM MANUTENÇÃO ═════════════════════════════════════════════
+
 </script>
+<!-- MODAL: MANUTENÇÃO -->
+<div class="modal-bg" id="modalManutencao">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head" style="background:#7c3aed;"><h3>🔧 Enviar para Manutenção</h3><button class="modal-close" onclick="closeModal('modalManutencao')">✕</button></div>
+    <div class="modal-body">
+      <div id="manutVeiculoInfo" style="background:#f0f2fa;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;font-weight:700;"></div>
+      <div class="form-grid g2">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Motivo *</label><input class="fi" id="manutMotivo" placeholder="Ex: Troca de óleo, revisão geral..."></div>
+        <div class="fg"><label class="fl">Oficina</label><input class="fi" id="manutOficina" placeholder="Nome da oficina"></div>
+        <div class="fg"><label class="fl">Previsão de retorno</label><input class="fi" id="manutRetorno" type="date"></div>
+        <div class="fg"><label class="fl">Custo estimado (R$)</label><input class="fi" id="manutCusto" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg"><label class="fl">KM atual</label><input class="fi" id="manutKm" type="number" placeholder="000000"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="manutObs" placeholder="Detalhes adicionais..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalManutencao')">Cancelar</button>
+      <button class="btn" style="background:#7c3aed;color:#fff;" onclick="confirmarManutencao()">🔧 Enviar para Manutenção</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: RETORNO MANUTENÇÃO -->
+<div class="modal-bg" id="modalRetornoManut">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head" style="background:#0d7a3e;"><h3>✅ Retorno da Manutenção</h3><button class="modal-close" onclick="closeModal('modalRetornoManut')">✕</button></div>
+    <div class="modal-body">
+      <div id="retornoVeiculoInfo" style="background:#e8f5ef;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;font-weight:700;"></div>
+      <div class="form-grid g2">
+        <div class="fg"><label class="fl">KM após manutenção</label><input class="fi" id="retornoKm" type="number" placeholder="000000"></div>
+        <div class="fg"><label class="fl">Custo real (R$)</label><input class="fi" id="retornoCusto" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Serviços realizados</label><input class="fi" id="retornoServicos" placeholder="Ex: Troca de óleo, filtros, alinhamento..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalRetornoManut')">Cancelar</button>
+      <button class="btn btn-green" onclick="confirmarRetornoManut()">✅ Liberar Veículo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PAGAMENTO -->
+<div class="modal-bg" id="modalPagamento">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head" style="background:#0d7a3e;"><h3>💳 Registrar Pagamento</h3><button class="modal-close" onclick="closeModal('modalPagamento')">✕</button></div>
+    <div class="modal-body">
+      <div id="pagtoAtivoInfo" style="background:#e8f5ef;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;"></div>
+      <div class="form-grid g2">
+        <div class="fg"><label class="fl">Status do Pagamento</label>
+          <select class="fs" id="pagtoStatus">
+            <option value="pago">✅ Pago (total)</option>
+            <option value="parcial">⚠️ Pago parcialmente</option>
+            <option value="pendente">❌ Pendente</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Valor pago (R$)</label><input class="fi" id="pagtoValorPago" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg"><label class="fl">Forma de pagamento</label>
+          <select class="fs" id="pagtoForma">
+            <option value="pix">PIX</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao_deb">Cartão Débito</option>
+            <option value="cartao_cred">Cartão Crédito</option>
+            <option value="transferencia">Transferência</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Data do pagamento</label><input class="fi" id="pagtoDt" type="date"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="pagtoObs" placeholder="Recibo, número de transação..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalPagamento')">Cancelar</button>
+      <button class="btn btn-green" onclick="confirmarPagamento()">💳 Salvar Pagamento</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
