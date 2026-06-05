@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<meta name="theme-color" content="#0E1B4D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>LOKÁ – Gestão</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+/* AUTH GUARD */
+</style>
+<script>
+(function lokaAuthGuard(){
+  var raw=sessionStorage.getItem('loka_session');
+  if(!raw){window.location.replace('index.html');return;}
+  try{var s=JSON.parse(atob(raw));if(s.exp<=Date.now()){sessionStorage.removeItem('loka_session');window.location.replace('index.html');}}
+  catch(e){sessionStorage.removeItem('loka_session');window.location.replace('index.html');}
+})();
+</script>
+<style>
+:root{--blue:#2B4BF2;--dark:#0E1B4D;--green:#0d7a3e;--red:#c0392b;--amber:#b45309;--muted:#5a607a;--border:#C5CCF5;--light:#EEF1FD;--field:#F7F8FF;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Montserrat",sans-serif;background:#f0f2fa;color:var(--dark);font-size:13px;overflow-x:hidden;}
+/* SHELL */
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+/* SIDEBAR */
+.sidebar{background:var(--dark);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:100;}
+.sidebar-logo{padding:18px 16px 12px;border-bottom:1px solid rgba(255,255,255,.07);}
+.sidebar-logo img{height:34px;display:block;}
+.nav{flex:1;padding:8px 0;}
+.nav-sec{font-size:8px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.25);padding:12px 16px 4px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:10px 16px;font-size:11px;font-weight:600;color:rgba(255,255,255,.55);cursor:pointer;border-left:3px solid transparent;transition:all .15s;user-select:none;}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+.nav-item.active{background:rgba(43,75,242,.2);color:#fff;border-left-color:var(--blue);}
+.nav-item svg{flex-shrink:0;opacity:.7;}
+.nav-item.active svg{opacity:1;}
+.sidebar-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.07);font-size:9px;color:rgba(255,255,255,.2);line-height:1.6;}
+/* SIDEBAR BACKUP BTNS */
+.bkp-row{display:flex;gap:6px;padding:8px 16px 0;}
+.bkp-btn{flex:1;padding:6px;border-radius:5px;font-family:Montserrat,sans-serif;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;}
+/* MAIN */
+.main{display:flex;flex-direction:column;min-height:100vh;}
+/* TOPBAR */
+.topbar{background:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;gap:12px;}
+.topbar h2{font-size:15px;font-weight:800;color:var(--dark);}
+.topbar-actions{display:flex;gap:8px;align-items:center;}
+.user-pill{font-size:10px;font-weight:700;color:var(--muted);background:var(--light);border-radius:20px;padding:4px 12px;}
+/* CONTENT */
+.content{padding:20px;flex:1;}
+/* PANELS */
+.panel{display:none;}
+.panel.active{display:block;}
+/* TOOLBAR */
+.toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.search-wrap{position:relative;flex:1;min-width:180px;}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;}
+.search-input{width:100%;padding:9px 10px 9px 34px;border:1.5px solid var(--border);border-radius:7px;font-family:Montserrat,sans-serif;font-size:12px;outline:none;background:#fff;}
+.search-input:focus{border-color:var(--blue);}
+.filter-select{padding:9px 10px;border:1.5px solid var(--border);border-radius:7px;font-family:Montserrat,sans-serif;font-size:12px;outline:none;background:#fff;cursor:pointer;}
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;}
+.stat{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:3px solid var(--blue);}
+.stat-value{font-size:24px;font-weight:800;color:var(--dark);}
+.stat-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-top:2px;}
+/* TABLE CARD */
+.table-card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
+.table-head{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+.table-head h3{font-size:12px;font-weight:800;color:var(--dark);}
+.table-head span{font-size:10px;color:var(--muted);}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:#f8f9fe;padding:9px 12px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid #f5f6fa;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f8f9fe;}
+.td-actions{display:flex;gap:5px;}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;border-radius:7px;border:none;font-family:Montserrat,sans-serif;font-weight:700;font-size:11px;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.4px;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:#1f3bd4;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-outline{background:#fff;color:var(--muted);border:1.5px solid var(--border);}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);}
+.icon-btn{width:28px;height:28px;border-radius:5px;border:1.5px solid var(--border);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.icon-btn:hover{border-color:var(--blue);}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.3px;}
+.badge-green{background:#e8f5ef;color:var(--green);}
+.badge-blue{background:var(--light);color:var(--blue);}
+.badge-amber{background:#fef3cd;color:var(--amber);}
+.badge-red{background:#fdecea;color:var(--red);}
+.badge-gray{background:#f0f2fa;color:var(--muted);}
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(7,16,46,.75);z-index:500;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);}
+.modal-head{padding:16px 20px;display:flex;justify-content:space-between;align-items:center;background:var(--dark);border-radius:14px 14px 0 0;position:sticky;top:0;z-index:1;}
+.modal-head h3{font-size:14px;font-weight:800;color:#fff;}
+.modal-close{border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.modal-body{padding:20px;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;background:#fafbff;border-radius:0 0 14px 14px;}
+/* FORM */
+.form-grid{display:grid;gap:12px 14px;}
+.g2{grid-template-columns:1fr 1fr;}
+.g3{grid-template-columns:1fr 1fr 1fr;}
+.fg{display:flex;flex-direction:column;gap:3px;}
+.fl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.fi,.fs{border:1.5px solid var(--border);border-radius:7px;padding:9px 11px;font-family:Montserrat,sans-serif;font-size:12px;color:var(--dark);outline:none;background:var(--field);width:100%;transition:border-color .2s;}
+.fi:focus,.fs:focus{border-color:var(--blue);background:#fff;}
+.fi::placeholder{color:#c0c8e8;}
+.sec-label{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--blue);border-bottom:1.5px solid var(--border);padding-bottom:4px;margin-bottom:10px;margin-top:14px;}
+/* ALUGUEIS ATIVOS CARDS */
+.ativos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.ativo-card{background:#fff;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,.08);overflow:hidden;border-top:3px solid var(--border);}
+.ativo-card.urgente{border-top-color:var(--amber);}
+.ativo-card.vencido{border-top-color:var(--red);}
+.ativo-head{padding:12px 14px 8px;}
+.ativo-cliente{font-size:13px;font-weight:800;color:var(--dark);}
+.ativo-veiculo{font-size:11px;color:var(--muted);margin-top:2px;}
+.ativo-dates{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 14px;background:#f8f9fe;}
+.ativo-date-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.ativo-date-val{font-size:12px;font-weight:700;color:var(--dark);margin-top:2px;}
+.ativo-foot{padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f0f2f8;}
+.ativo-days{font-size:12px;font-weight:700;}
+.ativo-actions{display:flex;gap:5px;}
+/* VEICULO GRID */
+.veiculo-grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+.veiculo-card{background:#fff;border-radius:9px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:14px;border-top:3px solid var(--border);}
+.veiculo-card.alugado{border-top-color:var(--amber);}
+.veiculo-card.disponivel{border-top-color:var(--green);}
+.veiculo-modelo{font-size:13px;font-weight:800;color:var(--dark);}
+.veiculo-info{font-size:10px;color:var(--muted);margin-top:2px;}
+.veiculo-placa{font-size:11px;font-weight:700;background:#f0f2fa;color:var(--muted);padding:2px 7px;border-radius:4px;letter-spacing:1px;display:inline-block;margin-top:5px;}
+.veiculo-prices{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:10px;}
+.vp-box{background:var(--field);border-radius:5px;padding:6px 8px;}
+.vp-label{font-size:8px;font-weight:700;text-transform:uppercase;color:var(--muted);}
+.vp-value{font-size:12px;font-weight:800;color:var(--blue);margin-top:1px;}
+/* FORMULARIOS GRID */
+.form-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
+.form-card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.08);overflow:hidden;}
+.form-card-head{padding:16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
+.form-card-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.form-card-title{font-size:13px;font-weight:800;color:var(--dark);}
+.form-card-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.form-card-body{padding:12px 16px;font-size:11px;color:var(--muted);line-height:1.5;}
+.form-card-foot{padding:10px 16px;display:flex;gap:8px;}
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty-state svg{opacity:.2;margin:0 auto 12px;display:block;}
+.empty-state p{font-size:13px;font-weight:700;margin-bottom:4px;}
+.empty-state small{font-size:11px;}
+/* TOAST */
+.loka-toast{position:fixed;top:16px;right:16px;background:var(--dark);color:#fff;padding:10px 16px;border-radius:8px;font-size:11px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3);max-width:320px;}
+/* USER BAR */
+.user-bar{position:fixed;bottom:0;left:220px;right:0;background:var(--dark);border-top:1px solid rgba(255,255,255,.08);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;z-index:99;font-size:10px;color:rgba(255,255,255,.35);}
+.logout-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;font-size:9px;font-weight:700;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;}
+.logout-btn:hover{background:rgba(192,57,43,.4);border-color:rgba(192,57,43,.6);color:#fff;}
+/* MOBILE */
+@media(max-width:768px){
+  .shell{grid-template-columns:1fr;}
+  .sidebar{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;flex-direction:row;z-index:200;border-top:1px solid rgba(255,255,255,.1);overflow-x:auto;overflow-y:hidden;}
+  .sidebar-logo,.sidebar-footer,.nav-sec,.bkp-row{display:none!important;}
+  .nav{display:flex!important;flex-direction:row;padding:0;overflow-x:auto;scrollbar-width:none;}
+  .nav::-webkit-scrollbar{display:none;}
+  .nav-item{flex-direction:column;gap:2px;padding:7px 10px;min-width:60px;border-left:none;border-top:3px solid transparent;font-size:8px;text-align:center;flex-shrink:0;}
+  .nav-item.active{border-top-color:var(--blue);border-left-color:transparent;}
+  .nav-item svg{width:18px!important;height:18px!important;}
+  .main{padding-bottom:60px;}
+  .content{padding:12px 10px 70px;}
+  .stats{grid-template-columns:1fr 1fr;}
+  .user-bar{left:0;bottom:58px;}
+  .ativos-grid{grid-template-columns:1fr;}
+  .veiculo-grid-cards{grid-template-columns:1fr 1fr;}
+  .form-grid.g2,.form-grid.g3{grid-template-columns:1fr;}
+}
+@media(max-width:400px){
+  .stats{grid-template-columns:1fr 1fr;}
+  .veiculo-grid-cards{grid-template-columns:1fr;}
+}
+
+
+/* ── GLOBAL SEARCH ── */
+.global-search-wrap { position: relative; flex: 1; max-width: 340px; }
+.global-search-input { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid var(--border); border-radius: 7px; font-family: Montserrat,sans-serif; font-size: 12px; outline: none; background: var(--field); transition: border-color .2s; }
+.global-search-input:focus { border-color: var(--blue); background: #fff; }
+.global-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.global-search-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border-radius: 8px; box-shadow: 0 8px 32px rgba(14,27,77,.15); border: 1px solid var(--border); z-index: 999; max-height: 320px; overflow-y: auto; display: none; }
+.global-search-results.open { display: block; }
+.gsr-section { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 8px 12px 4px; }
+.gsr-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 12px; transition: background .1s; }
+.gsr-item:hover { background: var(--field); }
+.gsr-item-title { font-weight: 700; color: var(--dark); }
+.gsr-item-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.gsr-badge { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.gsr-empty { padding: 20px; text-align: center; color: var(--muted); font-size: 12px; }
+
+
+/* ── PAGINATION ── */
+.pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid var(--border); background: #fafbff; border-radius: 0 0 10px 10px; }
+.page-info { font-size: 11px; color: var(--muted); font-weight: 600; }
+.page-btns { display: flex; gap: 4px; }
+.page-btn { width: 30px; height: 30px; border: 1.5px solid var(--border); border-radius: 5px; background: #fff; font-family: Montserrat,sans-serif; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.page-btn:hover { border-color: var(--blue); color: var(--blue); }
+.page-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.page-btn:disabled { opacity: .35; cursor: default; }
+
+/* ── VALIDATION ── */
+.fi.error { border-color: #c0392b !important; background: #fdecea !important; }
+.fi.ok    { border-color: #0d7a3e !important; }
+.field-error { font-size: 9px; color: #c0392b; font-weight: 700; margin-top: 2px; display: none; }
+.fi.error + .field-error { display: block; }
+
+/* ── MANUTENÇÃO ── */
+.veiculo-card.manutencao { border-top-color: #7c3aed; }
+.badge-purple { background: #ede9fe; color: #7c3aed; }
+
+/* ── PAGAMENTOS ── */
+.pagto-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: 800; letter-spacing: .3px; cursor: pointer; }
+.pagto-pago    { background: #e8f5ef; color: #0d7a3e; }
+.pagto-parcial { background: #fef3cd; color: #b45309; }
+.pagto-pendente{ background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo"><img src="data:image/png;base64,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" alt="LOKÁ"></div>
+  <nav class="nav">
+    <div class="nav-sec">Principal</div>
+    <div class="nav-item active" onclick="showPanel('dashboard')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+    <div class="nav-item" onclick="showPanel('clientes')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Clientes</div>
+    <div class="nav-item" onclick="showPanel('ativos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Aluguéis Ativos</div>
+    <div class="nav-item" onclick="showPanel('veiculos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Veículos</div>
+    <div class="nav-item" onclick="window.open('frota.html','_blank')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v5"/><polyline points="9 17 9 11 15 11 15 17"/></svg>Frota Ativa ↗</div>
+    <div class="nav-sec">Documentos</div>
+    <div class="nav-item" onclick="gerarRelatorioMensal()" style="color:rgba(255,255,255,.5);">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      Relatório Mensal
+    </div>
+    <div class="nav-item" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
+    <div class="nav-item" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
+    <div class="nav-item" onclick="showPanel('historico')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Histórico</div>
+    <div class="nav-sec">Links</div>
+    <div class="nav-item" onclick="window.open('reserva.html','_blank')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>Link Reserva ↗</div>
+    <div class="nav-item" onclick="window.open('cadastro.html','_blank')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0114 0"/><line x1="12" y1="14" x2="12" y2="21"/><line x1="9" y1="17" x2="15" y2="17"/></svg>Cadastro ↗</div>
+  </nav>
+  <div class="bkp-row">
+    <button class="bkp-btn" onclick="exportDB()" style="background:rgba(13,122,62,.3);border:1px solid rgba(13,122,62,.5);color:#6effa8;">⬇ Backup</button>
+    <button class="bkp-btn" onclick="document.getElementById('importFile').click()" style="background:rgba(43,75,242,.3);border:1px solid rgba(43,75,242,.5);color:#a8bfff;">⬆ Restaurar</button>
+  </div>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importDB(this)">
+  <div class="sidebar-footer">LOKÁ Aluguel de Veículos<br>CNPJ 39.911.638/0001-10<br>Feira de Santana-BA</div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="pageTitle">Dashboard</h2>
+    <div class="topbar-actions" style="flex:1;gap:12px;">
+
+        <div class="global-search-wrap" id="globalSearchWrap">
+          <svg class="global-search-icon" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="global-search-input" id="globalSearchInput" type="text" placeholder="Buscar clientes, veículos, aluguéis..." oninput="globalSearch(this.value)" onfocus="globalSearch(this.value)" autocomplete="off">
+          <div class="global-search-results" id="globalSearchResults"></div>
+        </div>
+      <span class="user-pill" id="userPill">Carregando...</span>
+      <button class="btn btn-primary" id="btnNew" onclick="newAction()" style="display:none">+ Novo</button>
+    </div>
+  </div>
+
+  <!-- ALERT BANNER -->
+  <div id="alertBanner" style="display:none;background:#7f1d1d;padding:10px 20px;display:none;align-items:center;gap:12px;flex-wrap:wrap;">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fca5a5" stroke-width="2" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span id="alertText" style="font-size:12px;font-weight:700;color:#fca5a5;flex:1;"></span>
+    <button onclick="document.getElementById('alertBanner').style.display='none'" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fca5a5;border-radius:5px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:Montserrat,sans-serif;">✕ Fechar</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="stats">
+        <div class="stat"><div class="stat-value" id="sClientes">0</div><div class="stat-label">Clientes</div></div>
+        <div class="stat" style="border-left-color:var(--amber)"><div class="stat-value" id="sAtivos">0</div><div class="stat-label">Aluguéis Ativos</div></div>
+        <div class="stat" style="border-left-color:var(--green)"><div class="stat-value" id="sDisponiveis">0</div><div class="stat-label">Disponíveis</div></div>
+        <div class="stat" style="border-left-color:var(--red)"><div class="stat-value" id="sVencendo">0</div><div class="stat-label">Vencendo</div></div>
+        <div class="stat"><div class="stat-value" id="sVeiculos">0</div><div class="stat-label">Veículos</div></div>
+        <div class="stat" style="border-left-color:#7c3aed"><div class="stat-value" id="sManutencao">0</div><div class="stat-label">Em Manutenção</div></div>
+      </div>
+      <div id="dashAtivos"></div>
+    </div>
+
+    <!-- ══ CLIENTES ══ -->
+    <div class="panel" id="panel-clientes">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="searchClientes" type="text" placeholder="Buscar nome, CPF, telefone..." oninput="_paginaClientes=1;renderClientes()">
+        </div>
+        <select class="filter-select" id="filterClientes" onchange="renderClientes()">
+          <option value="">Todos</option>
+          <option value="freq">Frequentes (3+)</option>
+          <option value="bloq">Bloqueados</option>
+        </select>
+        <button class="btn btn-primary" onclick="openModalCliente(-1)">+ Novo Cliente</button>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><h3>Clientes Cadastrados</h3><span id="clientesCount"></span></div>
+        <div class="table-scroll"><table><thead><tr>
+          <th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Aluguéis</th><th>Status</th><th>Ações</th>
+        </tr></thead><tbody id="clientesTable"></tbody></table></div>
+      <div id="paginacaoClientes"></div>
+      </div>
+    </div>
+
+    <!-- ══ ALUGUÉIS ATIVOS ══ -->
+    <div class="panel" id="panel-ativos">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="searchAtivos" type="text" placeholder="Buscar cliente ou veículo..." oninput="renderAtivos()">
+        </div>
+        <button class="btn btn-primary" onclick="openModalAluguel(-1)">+ Registrar Aluguel</button>
+      </div>
+      <div class="ativos-grid" id="ativosGrid"></div>
+    </div>
+
+    <!-- ══ VEÍCULOS ══ -->
+    <div class="panel" id="panel-veiculos">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="searchVeiculos" type="text" placeholder="Buscar modelo ou placa..." oninput="renderVeiculos()">
+        </div>
+        <select class="filter-select" id="filterVeiculos" onchange="renderVeiculos()">
+          <option value="">Todos</option>
+          <option value="disponivel">Disponíveis</option>
+          <option value="alugado">Alugados</option>
+        </select>
+      </div>
+      <div class="veiculo-grid-cards" id="veiculosGrid"></div>
+    </div>
+
+    <!-- ══ FORMULÁRIOS ══ -->
+    <div class="panel" id="panel-formularios">
+      <div class="form-cards">
+        <div class="form-card">
+          <div class="form-card-head"><div class="form-card-icon" style="background:#EEF1FD"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div><div class="form-card-title">Contrato Diária</div><div class="form-card-sub">Locação por diária</div></div></div>
+          <div class="form-card-body">Contrato padrão para locações por diária. Inclui cláusulas de seguro e responsabilidades.</div>
+          <div class="form-card-foot"><button class="btn btn-primary" onclick="window.open('contrato-diaria.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('diaria')">Com Cliente</button></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-head"><div class="form-card-icon" style="background:#e8f5ef"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div><div class="form-card-title">Contrato Mensal</div><div class="form-card-sub">Locação mensal / longo prazo</div></div></div>
+          <div class="form-card-body">Contrato para locações mensais com múltiplos veículos.</div>
+          <div class="form-card-foot"><button class="btn btn-green" onclick="window.open('contrato-mensal.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('mensal')">Com Cliente</button></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-head"><div class="form-card-icon" style="background:#fef3cd"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#b45309" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><div class="form-card-title">Recibo de Reserva</div><div class="form-card-sub">Confirmação de reserva</div></div></div>
+          <div class="form-card-body">Documento de confirmação de reserva com dados e valores.</div>
+          <div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('recibo-reserva.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('reserva')">Com Cliente</button></div>
+        </div>
+        <div class="form-card">
+          <div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div><div><div class="form-card-title">Checklist Vistoria</div><div class="form-card-sub">Inspeção do veículo</div></div></div>
+          <div class="form-card-body">Formulário de vistoria com fotos, diagrama e assinatura digital.</div>
+          <div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('checklist.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirChecklistComCliente()">Com Cliente</button></div>
+        </div>
+      </div>
+
+      <!-- Selecionar cliente para formulário -->
+      <div style="margin-top:20px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div class="sec-label" style="margin-top:0;">Gerar Formulário com Cliente</div>
+        <div class="form-grid g2" style="margin-top:10px;">
+          <div class="fg"><label class="fl">Cliente</label>
+            <select class="fs" id="formClienteSel"><option value="">— Selecione o cliente —</option></select>
+          </div>
+          <div class="fg"><label class="fl">Tipo</label>
+            <select class="fs" id="formTipo">
+              <option value="diaria">Contrato Diária</option>
+              <option value="mensal">Contrato Mensal</option>
+              <option value="reserva">Recibo de Reserva</option>
+              <option value="checklist">Checklist Vistoria</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:12px;" onclick="gerarFormularioSelecionado()">Gerar Formulário</button>
+      </div>
+    </div>
+
+    <!-- ══ CONTRATOS GERADOS ══ -->
+    <div class="panel" id="panel-contratos">
+      <div class="table-card">
+        <div class="table-head"><h3>Contratos Gerados</h3><span id="contratosCount"></span></div>
+        <div class="table-scroll"><table><thead><tr>
+          <th>Cliente</th><th>Veículo</th><th>Tipo</th><th>Retirada</th><th>Devolução</th><th>Valor</th><th>Gerado em</th>
+        </tr></thead><tbody id="contratosTable"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ══ HISTÓRICO ══ -->
+    <div class="panel" id="panel-historico">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="searchHistorico" type="text" placeholder="Buscar no histórico..." oninput="renderHistorico()">
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><h3>Histórico de Locações</h3><span id="historicoCount"></span></div>
+        <div class="table-scroll"><table><thead><tr>
+          <th>Cliente</th><th>Veículo</th><th>Placa</th><th>Retirada</th><th>Devolvido</th><th>Valor</th><th>Condição</th>
+        </tr></thead><tbody id="historicoTable"></tbody></table></div>
+      <div id="paginacaoHistorico"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- USER BAR -->
+<div class="user-bar">
+  <span id="userBarName">LOKÁ Sistema</span>
+  <span style="font-size:9px;color:rgba(255,255,255,.2);letter-spacing:.3px;">01.01 · build 05/06/2026 00:23 UTC</span>
+  <button class="logout-btn" onclick="lokaLogout()">⏻ Sair</button>
+</div>
+
+<!-- MODAL: CLIENTE -->
+<div class="modal-bg" id="modalCliente">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalClienteTitulo">Novo Cliente</h3><button class="modal-close" onclick="closeModal('modalCliente')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid g2">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Nome Completo *</label><input class="fi" id="cNome" placeholder="Nome completo"><span class="field-error"></span></div>
+        <div class="fg"><label class="fl">CPF / CNPJ *</label><input class="fi" id="cCpf" placeholder="000.000.000-00" oninput="maskCPF(this)" maxlength="14"><span class="field-error"></span></div>
+        <div class="fg"><label class="fl">Telefone *</label><input class="fi" id="cTel" type="tel" placeholder="(75) 90000-0000" oninput="maskTel(this)" maxlength="15"><span class="field-error"></span></div>
+        <div class="fg"><label class="fl">E-mail</label><input class="fi" id="cEmail" type="email" placeholder="email@exemplo.com"></div>
+        <div class="fg"><label class="fl">Endereço</label><input class="fi" id="cEnd" placeholder="Rua, número, bairro, cidade"></div>
+        <div class="fg"><label class="fl">CEP</label><input class="fi" id="cCep" placeholder="00000-000" onblur="buscaCep()"></div>
+        <div class="fg"><label class="fl">CNH Nº</label><input class="fi" id="cCnh" placeholder="00000000000"></div>
+        <div class="fg"><label class="fl">Categoria CNH</label><select class="fs" id="cCnhCat"><option value="">Selecione</option><option>A</option><option>B</option><option>AB</option><option>C</option><option>D</option><option>E</option></select></div>
+        <div class="fg"><label class="fl">Status</label><select class="fs" id="cStatus"><option value="ativo">Ativo</option><option value="bloqueado">Bloqueado</option></select></div>
+        <div class="fg"><label class="fl">Obs</label><input class="fi" id="cObs" placeholder="Observações"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalCliente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarCliente()">Salvar Cliente</button>
+      <button class="btn btn-outline" id="btnGerarContrato" style="display:none" onclick="abrirModalContrato()">Gerar Contrato</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ALUGUEL -->
+<div class="modal-bg" id="modalAluguel">
+  <div class="modal">
+    <div class="modal-head"><h3>Registrar Aluguel</h3><button class="modal-close" onclick="closeModal('modalAluguel')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid g2">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Cliente *</label><select class="fs" id="aCliente"></select></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Veículo *</label><select class="fs" id="aVeiculo"></select></div>
+        <div class="fg"><label class="fl">Tipo</label><select class="fs" id="aTipo"><option value="diaria">Por Diária</option><option value="mensal">Mensal</option></select></div>
+        <div class="fg"><label class="fl">Retirada *</label><input class="fi" id="aRetirada" type="date"></div>
+        <div class="fg"><label class="fl">Devolução *</label><input class="fi" id="aDevolucao" type="date"></div>
+        <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="aValor" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg"><label class="fl">Caução (R$)</label><input class="fi" id="aCaucao" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg"><label class="fl">KM Saída</label><input class="fi" id="aKm" placeholder="000000" type="number"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Obs</label><input class="fi" id="aObs" placeholder="Observações"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalAluguel')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarAluguel()">Registrar Aluguel</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PRORROGAÇÃO -->
+<div class="modal-bg" id="modalProrrogacao">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head" style="background:#2B4BF2;"><h3>📅 Prorrogar Locação</h3><button class="modal-close" onclick="closeModal('modalProrrogacao')">✕</button></div>
+    <div class="modal-body">
+      <div id="prorInfo" style="background:#f0f2fa;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;"></div>
+      <div class="form-grid g2">
+        <div class="fg"><label class="fl">Nova Data Devolução *</label><input class="fi" id="prorNovaDev" type="date" oninput="calcProrrogacao()"></div>
+        <div class="fg"><label class="fl">Tipo</label><select class="fs" id="prorTipo" onchange="calcProrrogacao()"><option value="diaria">Por Diária</option><option value="mensal">Mensal</option></select></div>
+      </div>
+      <div id="prorResult" style="display:none;background:#e8f5ef;border:1.5px solid #0d7a3e;border-radius:8px;padding:12px;margin-top:12px;font-size:13px;font-weight:700;color:#0d7a3e;"></div>
+      <div class="fg" style="margin-top:12px;"><label class="fl">Observação</label><input class="fi" id="prorObs" placeholder="Motivo da prorrogação..."></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalProrrogacao')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarProrrogacao()">Confirmar Prorrogação</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ENCERRAMENTO -->
+<div class="modal-bg" id="modalEncerramento">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head" style="background:#c0392b;"><h3>🔴 Encerrar Locação</h3><button class="modal-close" onclick="closeModal('modalEncerramento')">✕</button></div>
+    <div class="modal-body">
+      <div id="encInfo" style="background:#fdecea;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;"></div>
+      <div class="form-grid g2">
+        <div class="fg"><label class="fl">Data Devolução Real *</label><input class="fi" id="encDev" type="date" oninput="calcEncerramento()"></div>
+        <div class="fg"><label class="fl">KM Devolução</label><input class="fi" id="encKm" placeholder="000000" type="number"></div>
+        <div class="fg"><label class="fl">Valor Total (R$)</label><input class="fi" id="encValor" placeholder="0,00"></div>
+        <div class="fg"><label class="fl">Desconto / Multa (R$)</label><input class="fi" id="encDesconto" placeholder="0,00" oninput="calcEncerramento()"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Condição na Devolução</label>
+          <select class="fs" id="encCondicao"><option value="ok">✅ Normal</option><option value="avaria_leve">⚠️ Avaria leve</option><option value="avaria_grave">🔴 Avaria grave</option><option value="multa">🚨 Multa de trânsito</option></select>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="encObs" placeholder="Observações do encerramento..."></div>
+      </div>
+      <div id="encResult" style="display:none;margin-top:12px;background:#EEF1FD;border-radius:8px;padding:12px;font-size:12px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalEncerramento')">Cancelar</button>
+      <button class="btn" style="background:#c0392b;color:#fff;flex:1;" onclick="confirmarEncerramento()">Encerrar Locação</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CONTRATO -->
+<div class="modal-bg" id="modalContrato">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-head"><h3>Gerar Contrato</h3><button class="modal-close" onclick="closeModal('modalContrato')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Escolha o tipo de contrato para gerar com os dados de <strong id="contratoClienteNome"></strong>:</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="btn btn-primary" style="justify-content:flex-start;gap:10px;" onclick="abrirContrato('diaria')">📄 Contrato por Diária</button>
+        <button class="btn btn-green" style="justify-content:flex-start;gap:10px;" onclick="abrirContrato('mensal')">📄 Contrato Mensal</button>
+        <button class="btn btn-outline" style="justify-content:flex-start;gap:10px;" onclick="abrirContrato('reserva')">🧾 Recibo de Reserva</button>
+        <button class="btn btn-outline" style="justify-content:flex-start;gap:10px;" onclick="abrirContrato('checklist')">✅ Checklist Vistoria</button>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-outline" onclick="closeModal('modalContrato')">Fechar</button></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// LOKÁ GESTÃO — JavaScript Principal
+// Arquivo limpo, reconstruído do zero
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── SEEDS ──────────────────────────────────────────────────────────────
+var VEICULOS_SEED = [{"id": "vf0", "marca": "VW", "modelo": "Amarok", "placa": "RHI1I58", "cor": "Branca", "ano": "2021", "km": "", "diaria": 600.0, "diaria_km_livre": 750.0, "mensal": 8000.0, "mensal_km_livre": 10000.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf1", "marca": "FIAT", "modelo": "Argo", "placa": "SIL2E59", "cor": "Cinza", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf2", "marca": "CITROËN", "modelo": "C3", "placa": "RVV7E29", "cor": "Branca", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf3", "marca": "FIAT", "modelo": "Fiorino", "placa": "RCY8H74", "cor": "Branca", "ano": "2021", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf4", "marca": "FIAT", "modelo": "Fiorino", "placa": "RDK5G66", "cor": "Branca", "ano": "2021", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf5", "marca": "FIAT", "modelo": "Fiorino", "placa": "SYO1G57", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf6", "marca": "VW", "modelo": "Gol", "placa": "SCO5B72", "cor": "Branca", "ano": "2022", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf7", "marca": "VW", "modelo": "Gol", "placa": "EQQ2J61", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf8", "marca": "VW", "modelo": "Gol", "placa": "GIR7I93", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf9", "marca": "VW", "modelo": "Gol", "placa": "FOY3F87", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf10", "marca": "VW", "modelo": "Gol", "placa": "DFT8I72", "cor": "Branca", "ano": "2022", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf11", "marca": "VW", "modelo": "Gol", "placa": "RUE0E26", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf12", "marca": "HYUNDAI", "modelo": "HB20", "placa": "SJC3A29", "cor": "Prata", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf13", "marca": "RENAULT", "modelo": "Kwid", "placa": "STD4J70", "cor": "Prata", "ano": "2025", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf14", "marca": "FIAT", "modelo": "Mobi", "placa": "RUZ9J78", "cor": "Prata", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf15", "marca": "FIAT", "modelo": "Mobi", "placa": "RVO7C13", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf16", "marca": "FIAT", "modelo": "Mobi", "placa": "SHJ0I58", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf17", "marca": "FIAT", "modelo": "Mobi", "placa": "SHS2E71", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf18", "marca": "FIAT", "modelo": "Mobi", "placa": "SHV7B26", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf19", "marca": "FIAT", "modelo": "Mobi", "placa": "SHW9F83", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf20", "marca": "FIAT", "modelo": "Mobi", "placa": "SHW9G84", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf21", "marca": "FIAT", "modelo": "Mobi", "placa": "SHG3D40", "cor": "Branca", "ano": "2023", "km": "", "diaria": 135.0, "diaria_km_livre": 150.0, "mensal": 2600.0, "mensal_km_livre": 2700.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf22", "marca": "CHEVROLET", "modelo": "Onix LT", "placa": "SIO9A51", "cor": "Branca", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf23", "marca": "CHEVROLET", "modelo": "Onix Plus AT", "placa": "RUQ2J15", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf24", "marca": "CHEVROLET", "modelo": "Onix Plus AT", "placa": "RVC9A19", "cor": "Prata", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf25", "marca": "CHEVROLET", "modelo": "Onix Plus AT", "placa": "SJA7D13", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf26", "marca": "CHEVROLET", "modelo": "Onix Plus MT", "placa": "RUV5G98", "cor": "Branca", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf27", "marca": "PEUGEOT", "modelo": "Peugeot 208 Active", "placa": "RVN9D70", "cor": "Preto", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3200.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf28", "marca": "PEUGEOT", "modelo": "Peugeot 208 Like", "placa": "SIA6F77", "cor": "Cinza", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf29", "marca": "VW", "modelo": "Polo", "placa": "STF4F32", "cor": "Cinza", "ano": "2024", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf30", "marca": "VW", "modelo": "Polo", "placa": "FYQ2B92", "cor": "Branca", "ano": "2023", "km": "", "diaria": 150.0, "diaria_km_livre": 165.0, "mensal": 2700.0, "mensal_km_livre": 2800.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf31", "marca": "FORD", "modelo": "Ranger XLT 2026 BRA", "placa": "TGZ6D54", "cor": "Branca", "ano": "2025", "km": "", "diaria": 750.0, "diaria_km_livre": 900.0, "mensal": 10000.0, "mensal_km_livre": 12000.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf32", "marca": "FORD", "modelo": "Ranger XLT 2026 PRE", "placa": "TGZ1E73", "cor": "Preto", "ano": "2025", "km": "", "diaria": 750.0, "diaria_km_livre": 900.0, "mensal": 10000.0, "mensal_km_livre": 12000.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf33", "marca": "JEEP", "modelo": "Renegade", "placa": "RVI0D04", "cor": "Cinza", "ano": "2023", "km": "", "diaria": 250.0, "diaria_km_livre": 300.0, "mensal": 4000.0, "mensal_km_livre": 4500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf34", "marca": "VW", "modelo": "Saveiro", "placa": "FDZ9G34", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf35", "marca": "VW", "modelo": "Saveiro", "placa": "GCI9I23", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf36", "marca": "VW", "modelo": "Saveiro", "placa": "GDE1E83", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf37", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FLR6J14", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf38", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD8J06", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf39", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD9I55", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf40", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD9I60", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf41", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVD9I71", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf42", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT1A74", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf43", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT2A32", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf44", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT2A34", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf45", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RVT2A51", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf46", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHF6F29", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf47", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHF6F23", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf48", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHF6F28", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf49", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHG1J02", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf50", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHH1C11", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf51", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHH6B15", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf52", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHU8B53", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf53", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SHU8B66", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf54", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G39", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf55", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G42", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf56", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G45", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf57", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G46", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf58", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G48", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf59", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G51", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf60", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SIC2G52", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf61", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EJD9E52", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf62", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EUB9I42", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf63", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EXN2A36", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf64", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCC6E35", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf65", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FTI3F81", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf66", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FVJ7F62", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf67", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GBW2B46", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf68", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GCQ2G23", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf69", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GEZ8H54", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf70", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GJO0D71", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf71", "marca": "VW", "modelo": "Saveiro Baú", "placa": "GJU9H02", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf72", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RMP0A86", "cor": "Vermelho", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf73", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RND5I98", "cor": "Vermelho", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf74", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RPR1G73", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf75", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RTE3J75", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf76", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RTE3J85", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf77", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RTE3J91", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf78", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUE5E24", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf79", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUE5F30", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf80", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUE5F40", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf81", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUI8I24", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf82", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUJ4A55", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf83", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUL7A99", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf84", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUP3D82", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf85", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUP8F63", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf86", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUT7D45", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf87", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RUX8G52", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf88", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SDF3C81", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf89", "marca": "VW", "modelo": "Saveiro Baú", "placa": "QNH1995", "cor": "Branca", "ano": "2018", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf90", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCQ8B73", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf91", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EBL7E41", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf92", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EKU9D72", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf93", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCH1I73", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf94", "marca": "VW", "modelo": "Saveiro Baú", "placa": "FCN9G63", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf95", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EUE8G81", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf96", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EVT1C72", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf97", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SWO4I55", "cor": "Branca", "ano": "2025", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf98", "marca": "VW", "modelo": "Saveiro Baú", "placa": "SWH3A72", "cor": "Branca", "ano": "2024", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf99", "marca": "VW", "modelo": "Saveiro Baú", "placa": "RML9D09", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf100", "marca": "VW", "modelo": "Saveiro Baú", "placa": "EYA5J14", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf101", "marca": "CHEVROLET", "modelo": "Spin", "placa": "SEV0J14", "cor": "Branca", "ano": "2024", "km": "", "diaria": 250.0, "diaria_km_livre": 300.0, "mensal": 4000.0, "mensal_km_livre": 4500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf102", "marca": "FIAT", "modelo": "Strada", "placa": "RNU7E72", "cor": "Branca", "ano": "2022", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf103", "marca": "FIAT", "modelo": "Strada", "placa": "RVO5A91", "cor": "Branca", "ano": "2023", "km": "", "diaria": 180.0, "diaria_km_livre": 200.0, "mensal": 3350.0, "mensal_km_livre": 3500.0, "franquia": "100", "status": "disponivel", "obs": ""}, {"id": "vf104", "marca": "FIAT", "modelo": "Fastback", "placa": "SKT3B92", "cor": "Cinza", "ano": "2025", "km": "", "diaria": 250.0, "diaria_km_livre": 300.0, "mensal": 4000.0, "mensal_km_livre": 4500.0, "franquia": "100", "status": "disponivel", "obs": ""}];
+var CLIENTS_SEED  = [{"nome": "Ana Claudia De Jesus Dias", "cpf": "055839655-09", "endereco": "RURAL BOCA DE VARZEA, IRARÁ-BA", "telefone": "54 99118-6006", "email": "", "alugueis": 1, "ultimo_veiculo": "MOBI", "ultima_placa": "RUZ9J78"}, {"nome": "Antonio Jose Pereira De Souza", "cpf": "939576105-91", "endereco": "AV. MARIO VENTURA, 13, NOVA ESPERANÇA, FSA", "telefone": "75 98186-0666", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "Bruno Menezes De Lima", "cpf": "038021585-39", "endereco": "RUA 25, LOT ELZA AZEVEDO, 11, TOMBA", "telefone": "75 99261-6388", "email": "", "alugueis": 2, "ultimo_veiculo": "SPIN", "ultima_placa": "RVS9D71"}, {"nome": "Caique Moreira Ribeiro", "cpf": "068181695-38", "endereco": "CAM 4, 16, CONJUNTO FEIRA V, FSA", "telefone": "75 99143-5862", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "Carlos Eduardo Lisboa Alves", "cpf": "073969555-05", "endereco": "RUA PARAMONTE, 62, SOBRADINHO, FSA", "telefone": "75 98158-3525", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "SHP2B83"}, {"nome": "Cayque Lima Costa", "cpf": "061208625-95", "endereco": "AV. ANTÔNIO RIBEIRO MARQUES, N°300, JARDIM BRASIL", "telefone": "75 99278-6146", "email": "", "alugueis": 1, "ultimo_veiculo": "FORD KA", "ultima_placa": "QXU3C31"}, {"nome": "Cleber Moreira Silva", "cpf": "031538475-17", "endereco": "RUA IBITUTANE, 957, MANGABEIRA, FSA", "telefone": "16 99797-3319", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX", "ultima_placa": "RUE7I86"}, {"nome": "Daniel Costa", "cpf": "075322325-22", "endereco": "RUA DAS POMBAS, 53, QUEIMADINHA", "telefone": "71 99414-2920", "email": "", "alugueis": 2, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "Daniel Merces Silva", "cpf": "042027745-58", "endereco": "RUA IBAIARA, 377, MANGABEIRA, FSA", "telefone": "75 98263-2772", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX", "ultima_placa": "RVH8H82"}, {"nome": "Ecelenza Moveis Planejados", "cpf": "48651637/0001-74", "endereco": "AV GETULIO VARGAS, 3588", "telefone": "", "email": "", "alugueis": 1, "ultimo_veiculo": "S10", "ultima_placa": "RLZ8C08"}, {"nome": "Edvaldo Dos Santos Silva", "cpf": "962761775-04", "endereco": "RUA ATLETICO, 165, PARQUE IPÊ", "telefone": "75 99259-3594", "email": "", "alugueis": 1, "ultimo_veiculo": "C3", "ultima_placa": "RVV7E29"}, {"nome": "Emerson Dayube Rocha Ferreira", "cpf": "027593345-89", "endereco": "RUA DR. MARCARIO CERQUEIRA, AP 301, MUCHILA I", "telefone": "75 99969-4870", "email": "", "alugueis": 1, "ultimo_veiculo": "SPIN", "ultima_placa": "RVS9D71"}, {"nome": "Fabio Paixão Da Silva", "cpf": "072233345-50", "endereco": "", "telefone": "75 98113-9997", "email": "", "alugueis": 1, "ultimo_veiculo": "MOBI", "ultima_placa": "RUZ9J78"}, {"nome": "Fabricio Dos Santos Bittencourt", "cpf": "799443105-49", "endereco": "RUA PALMEIRIM 45, COND.LUIZ HUMBERTO PRISCO VIA", "telefone": "75 99700-6450", "email": "", "alugueis": 1, "ultimo_veiculo": "ONIX LT", "ultima_placa": ""}, {"nome": "Gpc", "cpf": "", "endereco": "INHAMBUPE", "telefone": "", "email": "", "alugueis": 3, "ultimo_veiculo": "MOBI", "ultima_placa": "SHJ0I58"}, {"nome": "Honorato Amon Mm De Almeida", "cpf": "995327005-87", "endereco": "RUA OURO CLARO, 383", "telefone": "", "email": "", "alugueis": 1, "ultimo_veiculo": "GOL", "ultima_placa": "RNR2F30"}, {"nome": "Jackeline Carneiro", "cpf": "001581295-20", "endereco": "R C, CAMINHO 15, 02 - FEIRA IV", "telefone": "75 98199-3737", "email": "", "alugueis": 1, "ultimo_veiculo": "KA SEDAN", "ultima_placa": "QXU3C31"}, {"nome": "Jeferson Marques Do Nascimento", "cpf": "011681195-10", "endereco": "RUA F, 06, MANGABEIRA, FEIRA DE SANTANA-BA", "telefone": "75 99189-6500", "email": "", "alugueis": 4, "ultimo_veiculo": "ÔNIX PLUS LT", "ultima_placa": "RVJ2D94"}, {"nome": "Jefferson Santana Neves", "cpf": "", "endereco": "", "telefone": "", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "Jose Carneiro De Oliveira Neto", "cpf": "043512975-9", "endereco": "AV. ARTEMIA PIRES FREITAS, AP 403, BL 41", "telefone": "75 99189-9322", "email": "", "alugueis": 1, "ultimo_veiculo": "SPIN", "ultima_placa": "RVS9D71"}, {"nome": "Jose Da Paz Ribeiro Lima", "cpf": "231605275-49", "endereco": "RUA RUBENS FRANCISCO DIAS, CD RESERVA PAPAGAIO 84", "telefone": "75 99113-4546", "email": "", "alugueis": 1, "ultimo_veiculo": "TCROSS", "ultima_placa": "FFQ7C42"}, {"nome": "Jose Pinto Do Carmo", "cpf": "023104125-03", "endereco": "FZ.ESCUTA, 9999, LIMOEIRO II", "telefone": "75 99157-2341", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "SHP2B83"}, {"nome": "Jose Roberto Carneiro Da Silva", "cpf": "039403345-02", "endereco": "AV. TRANSNORDESTINA CJ FEIRA IV, CM 29B, AP 02", "telefone": "75 99179-4024", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "José Claudio Correia Da Silva", "cpf": "623045772-04", "endereco": "ET DO FRANCES, 9999, CS 44, PAPAGAIO", "telefone": "75 98196-0237", "email": "", "alugueis": 1, "ultimo_veiculo": "SPIN", "ultima_placa": "RVS9D71"}, {"nome": "José Givaldo Lima Melo Neto", "cpf": "014420895-47", "endereco": "AV ARTEMIA PIRES, CONDOMINIO MAYA, CS 44", "telefone": "75 99133-6534", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "RUK4I43"}, {"nome": "Juliana Mendonça De Souza", "cpf": "010735295-84", "endereco": "R. CASTELÃO, 201, PARQUE IPE, FSA", "telefone": "75 98252-2532", "email": "", "alugueis": 1, "ultimo_veiculo": "SPIN", "ultima_placa": "RVS9D71"}, {"nome": "Julio Cesar Daltro Barreiros", "cpf": "114797875-15", "endereco": "RUA SÃO COSME E DAMIÃO, 642, COND VELLE D MONAC", "telefone": "75 99123-2273", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20S", "ultima_placa": "SHO1J60"}, {"nome": "Junior Pereira Rodrigues", "cpf": "019620395-36", "endereco": "CA 37, CJ FEIRA VII, 36, TOMBA, FSA", "telefone": "75 99840-3279", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "Leonardo Araujo Batista De Jesus", "cpf": "016775595-19", "endereco": "RUA CONCORDIA, 1267 - CASEB", "telefone": "75 98834-4710", "email": "", "alugueis": 2, "ultimo_veiculo": "HB20", "ultima_placa": "SHP2B83"}, {"nome": "Luana Silva Loredo", "cpf": "063208013-28", "endereco": "AV FRANCISCO FRAGA MAIA, 4700, AP403, SAN. TOWER", "telefone": "98 98471-7872", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX PLUS LTZ", "ultima_placa": "RUQ0G09"}, {"nome": "Luciano Evangelista Brito", "cpf": "004737975-54", "endereco": "RUA C, CAM 15, 21, FEIRA IV, FSA", "telefone": "75 98114-4906", "email": "", "alugueis": 1, "ultimo_veiculo": "C3", "ultima_placa": "RVV7E29"}, {"nome": "Luis Carlos De Oliveira Santos", "cpf": "001854525-470", "endereco": "RUA DAS POMBAS, 53, KALILANDIA, FSA", "telefone": "75 99242-5120", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "STF4F32"}, {"nome": "Marcelo Pereira Da Paixão", "cpf": "806668335-91", "endereco": "R. RUBENS FRANCISCO DIAS, 177, CND VERDE VILE", "telefone": "75 98229-5564", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX LT", "ultima_placa": "RVJ2D94"}, {"nome": "Marcus Vinicius Macedo Carvalho", "cpf": "052878265-75", "endereco": "ESTRADA DO FRANCÊS, 085, PAPAGAIO, FSA", "telefone": "75 98287-9263", "email": "", "alugueis": 1, "ultimo_veiculo": "FORD KA", "ultima_placa": "QXU3C31"}, {"nome": "Mario Sergio Souza Brandão", "cpf": "919933185-34", "endereco": "AV.MARIA QUITÉRIA, 834-BRASILIA, FSA", "telefone": "75 98256-6582", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX", "ultima_placa": "RUE7I86"}, {"nome": "Marivan Ribeiro Da Silva", "cpf": "803056524-00", "endereco": "RUA MARIA CELESTINA FRAGA, 75, PQ GRAJAU, SP", "telefone": "11 96205-5706", "email": "", "alugueis": 1, "ultimo_veiculo": "C3", "ultima_placa": "RVV7E29"}, {"nome": "Markus Victor Barnabe Souza", "cpf": "032983045-73", "endereco": "RUA NOSSA SENHORA DAS GRAÇAS, 56, CEP:44056-537", "telefone": "75 99816-7929", "email": "", "alugueis": 1, "ultimo_veiculo": "C3", "ultima_placa": "RVV7E29"}, {"nome": "Matheus Santos Silva", "cpf": "084242245-58", "endereco": "RUA MAMBURE, 410, CONCEIÇÃO 2, FSA", "telefone": "75 99886-0426", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX LT", "ultima_placa": "RVJ2D94"}, {"nome": "Mauricio Silva De Jesus", "cpf": "671632705-34", "endereco": "RUA IRÃ, 118, 1º ANDAR, CASEB, FSA", "telefone": "75 99113-2963", "email": "", "alugueis": 2, "ultimo_veiculo": "ÔNIX PLUS", "ultima_placa": "RUQ0G09"}, {"nome": "Natalia Borges Lemos", "cpf": "063219065-57", "endereco": "R ITAUEIRA, 36, PQ GETULIO VARGAS", "telefone": "75 99210-2123", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "FYP2B92"}, {"nome": "Novo Começo Ltda", "cpf": "65938467/0001-22", "endereco": "RUA CARLOS VALADARES, 1196", "telefone": "75 99877-2538", "email": "", "alugueis": 1, "ultimo_veiculo": "NOVO COMEÇO LTDA", "ultima_placa": ""}, {"nome": "Paulo Filemon Marques De Miranda", "cpf": "344910075-00", "endereco": "RUA JOSÉ DE FREITAS MOREIRA, 83, SOBRADINHO, FSA", "telefone": "71 99143-1678", "email": "", "alugueis": 1, "ultimo_veiculo": "C3", "ultima_placa": "RVV7E29"}, {"nome": "Paulo Henrique De Lima Conceição", "cpf": "069915065-59", "endereco": "AV.GRACINDO DE FREITAS MEDEIROS 800, MANGABEIRA", "telefone": "75 98131-2676", "email": "", "alugueis": 1, "ultimo_veiculo": "ONIX", "ultima_placa": "RVH8H82"}, {"nome": "Paulo Jose Sobral Ferreira", "cpf": "606520045-04", "endereco": "AV SUBAÉ, 1260, TOMBA", "telefone": "75 99226-3787", "email": "", "alugueis": 1, "ultimo_veiculo": "STRADA", "ultima_placa": "RUM2A59"}, {"nome": "Rafaela Torres Da Silva", "cpf": "063334725-65", "endereco": "PARQUE FLORENÇA, BLO. 07, AP 207, LAGOA SALGADA", "telefone": "75 98120-6239", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX", "ultima_placa": "RUE7I86"}, {"nome": "Raimundo De Jesus Souza", "cpf": "571187955-34", "endereco": "BR 116, RJS IMPLEMENTOS RODOVIARIOS", "telefone": "75 98809-7181", "email": "", "alugueis": 1, "ultimo_veiculo": "KA SEDAN", "ultima_placa": "QXU3C31"}, {"nome": "Ranieri Da Silva", "cpf": "081603705-12", "endereco": "AV.ALIOMAR BALEEIRO, 119, RES SÃO JARDIM, SALVADOR", "telefone": "71 99238-0058", "email": "", "alugueis": 2, "ultimo_veiculo": "ÔNIX LT", "ultima_placa": "RVJ2D94"}, {"nome": "Rodrigo Oliveira Da Silva", "cpf": "029501415-60", "endereco": "RUA F, FEIRA X, 28A, MUCHILA-FSA", "telefone": "75 98370-8555", "email": "", "alugueis": 1, "ultimo_veiculo": "TCROSS", "ultima_placa": "FFQ7C42"}, {"nome": "Rodrigo Osório Pereira", "cpf": "009708525-17", "endereco": "RUA MAZAGÃO, 400, CS 02", "telefone": "75 98853-8990", "email": "", "alugueis": 1, "ultimo_veiculo": "ARGO", "ultima_placa": "RUX6G02"}, {"nome": "Rodrigo Santana Da Silva", "cpf": "003229995-88", "endereco": "R. SITIO NOVO, 156, CS 41, CD ADÉLIA MENESSES", "telefone": "75 99191-6292", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "SHP2B83"}, {"nome": "Rogerio Lima Cunha", "cpf": "617727715-20", "endereco": "RUA JUVENTINO PITOMBO, 863, SOBRADINHO, FSA", "telefone": "75 99235-6262", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX LT", "ultima_placa": "RVJ2D94"}, {"nome": "Romagdo De Oliveira Bastos Santos", "cpf": "004251575-04", "endereco": "AV. MARIA QUITERIA CD RUA 02 DE AGOSTO, 999-B, MAN", "telefone": "75 99100-6509", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "RUK1I43"}, {"nome": "Ronaldo Bruno Xavier Primo", "cpf": "917633983-15", "endereco": "AV.FRANCISCO FRAGA MAIA 4700B, SANTANA TOWER 2", "telefone": "75 99298-9663", "email": "", "alugueis": 1, "ultimo_veiculo": "MOBI", "ultima_placa": "RPM7A67"}, {"nome": "Sinalvo Da Silva Oliveira", "cpf": "006534455-39", "endereco": "RUA LAURO PASSOS, 254, CASA 2, CRUZ DAS ALMAS", "telefone": "75 99274-9335", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "RUK4I43"}, {"nome": "Tadeu Souza Pinheiro", "cpf": "056069575-66", "endereco": "", "telefone": "", "email": "", "alugueis": 1, "ultimo_veiculo": "PEUGOT 2008", "ultima_placa": "RUF5J92"}, {"nome": "Tatiana Maria Da Silva", "cpf": "976633015-87", "endereco": "RUA PEDRO SUZART, 488", "telefone": "75 99826-2917", "email": "", "alugueis": 3, "ultimo_veiculo": "T-CROSS", "ultima_placa": "FFQ7C42"}, {"nome": "Tendencia Distribuidora", "cpf": "09040724/0001-33", "endereco": "", "telefone": "75", "email": "", "alugueis": 1, "ultimo_veiculo": "MOBI", "ultima_placa": "RVO7C13"}, {"nome": "Thaiz Rodrigues Do Monte", "cpf": "777408075-91", "endereco": "RUA DO COMERCIAL, 02, COND. PARQUE DAS ARARAS", "telefone": "75 99108-2390", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "SHP2B83"}, {"nome": "Thassio Rodrigues", "cpf": "071269155-35", "endereco": "CAM 08, FEIRA IV, CALUMBI, FSA", "telefone": "75 98165-0564", "email": "", "alugueis": 1, "ultimo_veiculo": "HB20", "ultima_placa": "SHP2B83"}, {"nome": "Thiago Verissimo Saldanha Chaves", "cpf": "012817225-88", "endereco": "RUA B, RES. PARQUE DIAMANTE, 56, SIM, FSA", "telefone": "75 99260-6385", "email": "", "alugueis": 2, "ultimo_veiculo": "RENEGADE", "ultima_placa": "RVI0DO04"}, {"nome": "Vagner Dos Santos", "cpf": "055812617-09", "endereco": "RUA AURIFLAMA, MANGABEIRA, FSA", "telefone": "75 98878-4919", "email": "", "alugueis": 1, "ultimo_veiculo": "ONIX AT", "ultima_placa": "RUQ0G09"}, {"nome": "Wellyngton Barbosa Portugal", "cpf": "004661595-44", "endereco": "AV JOAO DURVAL CARNEIRO, 1878 - CAPUCHINHOS", "telefone": "75 99138-7345", "email": "", "alugueis": 1, "ultimo_veiculo": "POLO", "ultima_placa": "FYP2B92"}, {"nome": "Wildes Pereira Marques", "cpf": "", "endereco": "", "telefone": "", "email": "", "alugueis": 1, "ultimo_veiculo": "SPIN", "ultima_placa": "RVS9D71"}, {"nome": "Wilson Da Silva Miranda", "cpf": "005610185-61", "endereco": "RUA JOSE DOMINGOS SERVO, 50, SIM, FSA", "telefone": "75 98844-4639", "email": "", "alugueis": 1, "ultimo_veiculo": "ÔNIX", "ultima_placa": "RVH8H82"}];
+
+// ── STATE ──────────────────────────────────────────────────────────────
+var db           = null;
+var _curCliente  = -1;  // index do cliente selecionado
+var _curAtivo    = null; // id do ativo selecionado
+var _prorAtivo   = null;
+var _encAtivo    = null;
+
+// ── INIT ───────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function() {
+  // User bar
+  try {
+    var u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
+    document.getElementById('userBarName').textContent = (u.nome || 'LOKÁ') + ' · ' + (u.perfil || '').toUpperCase();
+    document.getElementById('userPill').textContent    = u.nome || 'Usuário';
+  } catch(e) {}
+
+  // Load data
+  loadDB();
+
+  // Show dashboard
+  showPanel('dashboard');
+});
+
+function loadDB() {
+  var local = null;
+  try { local = JSON.parse(localStorage.getItem('loka_db') || 'null'); } catch(e) {}
+  if (local && local.clients && local.clients.length > 0) {
+    db = local;
+  } else {
+    db = {
+      clients:   CLIENTS_SEED.map(function(c, i) {
+        return Object.assign({}, c, {id:'c'+i, email:c.email||'', status:'ativo', obs:'', cnh:'', cnhCat:'', cnhVal:'', docs:{}});
+      }),
+      veiculos:  VEICULOS_SEED.map(function(v) { return Object.assign({}, v, {status:'disponivel'}); }),
+      ativos:    [],
+      historico: [],
+      contratos: []
+    };
+    saveDB();
+  }
+  if (!db.veiculos || db.veiculos.length < 100) db.veiculos = VEICULOS_SEED.slice();
+  if (!db.historico) db.historico = [];
+  if (!db.contratos) db.contratos = [];
+  populateFormClienteSel();
+  try { renderDashboard(); } catch(e) { console.error('renderDashboard:', e); }
+  checkAlertas();
+}
+
+function saveDB() {
+  if (!db) return;
+  try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+  // Sync to Firebase in background
+  if (typeof firebase !== 'undefined' && _firebaseOk && navigator.onLine) {
+    try { firebase.database().ref('loka_db').set(db); } catch(e) {}
+  }
+}
+
+
+
+
+
+// ══ E4 — PAGINAÇÃO ══════════════════════════════════════════════════════════
+var _paginaClientes  = 1;
+var _paginaHistorico = 1;
+var PAGE_SIZE = 20;
+
+function paginate(list, page) {
+  var total = list.length;
+  var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  page = Math.min(Math.max(1, page), pages);
+  return { items: list.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE), page: page, pages: pages, total: total };
+}
+
+function renderPagination(containerId, page, pages, total, onPage) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  var start = (page-1)*PAGE_SIZE + 1;
+  var end   = Math.min(page*PAGE_SIZE, total);
+  var html  = '<div class="pagination">' +
+    '<span class="page-info">Exibindo ' + start + '–' + end + ' de ' + total + '</span>' +
+    '<div class="page-btns">' +
+    '<button class="page-btn" onclick="(' + onPage + ')(' + (page-1) + ')" ' + (page<=1?'disabled':'') + '>‹</button>';
+  var s = Math.max(1, page-2), e = Math.min(pages, s+4);
+  for (var i=s; i<=e; i++) {
+    html += '<button class="page-btn' + (i===page?' active':'') + '" onclick="(' + onPage + ')(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="page-btn" onclick="(' + onPage + ')(' + (page+1) + ')" ' + (page>=pages?'disabled':'') + '>›</button>' +
+    '</div></div>';
+  el.innerHTML = html;
+}
+
+// ══ E3 — BUSCA GLOBAL ═══════════════════════════════════════════════════════
+function globalSearch(q) {
+  var results = document.getElementById('globalSearchResults');
+  if (!results || !db) return;
+  q = q.trim().toLowerCase();
+  if (q.length < 2) { results.classList.remove('open'); return; }
+
+  var html = '';
+
+  // Clientes
+  var cls = db.clients.filter(function(c) {
+    return c.nome.toLowerCase().includes(q) || (c.cpf||'').includes(q) || (c.telefone||'').includes(q);
+  }).slice(0,4);
+  if (cls.length) {
+    html += '<div class="gsr-section">👤 Clientes</div>';
+    cls.forEach(function(c) {
+      var idx = db.clients.indexOf(c);
+      html += '<div class="gsr-item" onclick="globalSearchGo('cliente',' + idx + ')">' +
+        '<div class="gsr-badge" style="background:#EEF1FD;">👤</div>' +
+        '<div><div class="gsr-item-title">' + c.nome + '</div>' +
+        '<div class="gsr-item-sub">' + (c.cpf||'') + ' · ' + (c.telefone||'') + '</div></div></div>';
+    });
+  }
+
+  // Veículos
+  var vcs = db.veiculos.filter(function(v) {
+    return (v.marca+v.modelo+v.placa).toLowerCase().includes(q);
+  }).slice(0,4);
+  if (vcs.length) {
+    html += '<div class="gsr-section">🚗 Veículos</div>';
+    vcs.forEach(function(v) {
+      var st = v.status||'disponivel';
+      var badge = st==='disponivel'?'badge-green':st==='alugado'?'badge-amber':'badge-red';
+      html += '<div class="gsr-item" onclick="globalSearchGo('veiculo',null)">' +
+        '<div class="gsr-badge" style="background:#f0f2fa;">🚗</div>' +
+        '<div><div class="gsr-item-title">' + v.marca + ' ' + v.modelo + '</div>' +
+        '<div class="gsr-item-sub">' + v.placa + ' · <span class="badge ' + badge + '">' + st + '</span></div></div></div>';
+    });
+  }
+
+  // Aluguéis ativos
+  var ats = db.ativos.filter(function(a) {
+    return (a.clienteNome+a.veiculoNome+a.placa||'').toLowerCase().includes(q);
+  }).slice(0,3);
+  if (ats.length) {
+    html += '<div class="gsr-section">✅ Aluguéis Ativos</div>';
+    ats.forEach(function(a) {
+      html += '<div class="gsr-item" onclick="globalSearchGo('ativo',null)">' +
+        '<div class="gsr-badge" style="background:#e8f5ef;">📋</div>' +
+        '<div><div class="gsr-item-title">' + a.clienteNome + '</div>' +
+        '<div class="gsr-item-sub">' + a.veiculoNome + ' · dev. ' + fmtDate(a.devolucao) + '</div></div></div>';
+    });
+  }
+
+  if (!html) html = '<div class="gsr-empty">Nenhum resultado para "<strong>' + q + '</strong>"</div>';
+  results.innerHTML = html;
+  results.classList.add('open');
+}
+
+function globalSearchGo(type, idx) {
+  document.getElementById('globalSearchResults').classList.remove('open');
+  document.getElementById('globalSearchInput').value = '';
+  if (type === 'cliente') { showPanel('clientes'); if (idx !== null) setTimeout(function(){ openModalCliente(idx); }, 200); }
+  if (type === 'veiculo') showPanel('veiculos');
+  if (type === 'ativo')   showPanel('ativos');
+}
+
+// Close on outside click
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('globalSearchWrap').contains(e.target)) {
+    var r = document.getElementById('globalSearchResults');
+    if (r) r.classList.remove('open');
+  }
+});
+
+// ══ E2 — MÁSCARAS ══════════════════════════════════════════════════════════
+function maskCPF(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,11);
+  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/,'$1.$2.$3-$4');
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/,'$1.$2.$3');
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/,'$1.$2');
+  el.value = v;
+}
+function maskTel(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,11);
+  if (v.length === 11) v = v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');
+  else if (v.length === 10) v = v.replace(/(\d{2})(\d{4})(\d{4})/,'($1) $2-$3');
+  el.value = v;
+}
+function maskPlaca(el) {
+  var v = el.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,7);
+  if (v.length > 3) v = v.slice(0,3) + '-' + v.slice(3);
+  el.value = v;
+}
+function maskBRL(el) {
+  var v = el.value.replace(/\D/g,'');
+  if (!v) { el.value = ''; return; }
+  v = (parseInt(v,10)/100).toFixed(2);
+  el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+
+// ══ E1 — VALIDAÇÃO VISUAL ════════════════════════════════════════════════════
+function validateField(el, condition, msg) {
+  var errEl = el.nextElementSibling;
+  if (!condition) {
+    el.classList.add('error'); el.classList.remove('ok');
+    if (errEl && errEl.classList.contains('field-error')) errEl.textContent = msg;
+    return false;
+  }
+  el.classList.remove('error'); el.classList.add('ok');
+  if (errEl && errEl.classList.contains('field-error')) errEl.textContent = '';
+  return true;
+}
+function showFormError(id, msg) {
+  var el = document.getElementById(id);
+  if (!el) return false;
+  el.classList.add('error');
+  var errEl = el.nextElementSibling;
+  if (errEl && errEl.classList.contains('field-error')) errEl.textContent = msg;
+  el.scrollIntoView({behavior:'smooth', block:'center'});
+  el.focus();
+  return false;
+}
+function clearFormErrors(fields) {
+  fields.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('error','ok'); }
+  });
+}
+
+// ── ALERT BANNER ───────────────────────────────────────────────────────
+function checkAlertas() {
+  if (!db || !db.ativos || !db.ativos.length) return;
+  var hoje    = new Date(); hoje.setHours(0,0,0,0);
+  var vencidos = db.ativos.filter(function(a) {
+    if (!a.devolucao) return false;
+    var dev = new Date(a.devolucao + 'T00:00');
+    return dev < hoje;
+  });
+  var venceHoje = db.ativos.filter(function(a) {
+    if (!a.devolucao) return false;
+    var dev = new Date(a.devolucao + 'T00:00');
+    return dev.toDateString() === hoje.toDateString();
+  });
+  var vence3 = db.ativos.filter(function(a) {
+    if (!a.devolucao) return false;
+    var dev = new Date(a.devolucao + 'T00:00');
+    var diff = Math.ceil((dev - hoje) / 86400000);
+    return diff > 0 && diff <= 3;
+  });
+
+  var partes = [];
+  if (vencidos.length)  partes.push(vencidos.length  + ' locação(ões) VENCIDA(S)');
+  if (venceHoje.length) partes.push(venceHoje.length + ' devolução(ões) para HOJE');
+  if (vence3.length)    partes.push(vence3.length    + ' vencendo nos próximos 3 dias');
+
+  var banner = document.getElementById('alertBanner');
+  var text   = document.getElementById('alertText');
+  if (partes.length && banner && text) {
+    text.textContent = '⚠️ Atenção: ' + partes.join(' · ');
+    banner.style.display = 'flex';
+    // Red for vencidos, amber for upcoming
+    banner.style.background = vencidos.length ? '#7f1d1d' : '#78350f';
+    text.style.color = vencidos.length ? '#fca5a5' : '#fde68a';
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────
+var panelRenders = {
+  dashboard:  renderDashboard,
+  clientes:   renderClientes,
+  ativos:     renderAtivos,
+  veiculos:   renderVeiculos,
+  formularios:renderFormularios,
+  contratos:  renderContratos,
+  historico:  renderHistorico,
+};
+var panelTitles = {
+  dashboard:  'Dashboard',
+  clientes:   'Clientes',
+  ativos:     'Aluguéis Ativos',
+  veiculos:   'Veículos',
+  formularios:'Formulários',
+  contratos:  'Contratos Gerados',
+  historico:  'Histórico de Locações',
+};
+
+function showPanel(name) {
+  // Hide all panels
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  // Show target
+  var panel = document.getElementById('panel-' + name);
+  if (!panel) { console.warn('Panel not found:', name); return; }
+  panel.classList.add('active');
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(function(n) {
+    var oc = n.getAttribute('onclick') || '';
+    n.classList.toggle('active', oc === "showPanel('" + name + "')");
+  });
+  // Update title
+  document.getElementById('pageTitle').textContent = panelTitles[name] || name;
+  // Render
+  if (db && panelRenders[name]) {
+    try { panelRenders[name](); }
+    catch(e) { console.error('Render error in', name, ':', e); }
+  }
+}
+
+// ── MODALS ─────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Close modal on backdrop click
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal-bg')) e.target.classList.remove('open');
+});
+
+// ── TOAST ──────────────────────────────────────────────────────────────
+function toast(msg, color) {
+  var t = document.createElement('div');
+  t.className = 'loka-toast';
+  t.style.background = color || '#0E1B4D';
+  t.innerHTML = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.style.opacity='0'; setTimeout(function(){t.remove();},300); }, 3500);
+}
+
+// ── LOGOUT ─────────────────────────────────────────────────────────────
+function lokaLogout() {
+  sessionStorage.removeItem('loka_session');
+  sessionStorage.removeItem('loka_user');
+  window.location.replace('index.html');
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────
+function fmtDate(s) { if (!s) return '—'; return new Date(s + 'T00:00').toLocaleDateString('pt-BR'); }
+function fmtBRL(n)  { if (!n && n !== 0) return '—'; var v=parseFloat(String(n).replace(/[^\d,.-]/g,'').replace(',','.')); return isNaN(v)?'—':'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+function daysLeft(dev) { if (!dev) return null; return Math.round((new Date(dev+'T00:00') - new Date()) / 86400000); }
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────
+function renderDashboard() {
+  if (!db) return;
+  document.getElementById('sClientes').textContent   = db.clients.length;
+  document.getElementById('sAtivos').textContent     = db.ativos.length;
+  document.getElementById('sVeiculos').textContent   = db.veiculos.length;
+  document.getElementById('sDisponiveis').textContent= db.veiculos.filter(function(v){return v.status==='disponivel';}).length;
+  var manutEl = document.getElementById('sManutencao');
+  if (manutEl) manutEl.textContent = db.veiculos.filter(function(v){return v.status==='manutencao';}).length;
+  document.getElementById('sVencendo').textContent   = db.ativos.filter(function(a){var d=daysLeft(a.devolucao);return d!==null&&d<=3&&d>=0;}).length;
+  var cont = document.getElementById('dashAtivos');
+  if (!db.ativos.length) { cont.innerHTML='<p style="color:var(--muted);font-size:12px;margin-top:8px;">Nenhum aluguel ativo no momento.</p>'; return; }
+  cont.innerHTML = '<h3 style="font-size:12px;font-weight:800;margin-bottom:12px;color:var(--dark);">Aluguéis Ativos</h3>' +
+    '<div class="ativos-grid">' + db.ativos.slice(0,6).map(function(a){ return ativoCardHTML(a); }).join('') + '</div>';
+}
+
+// ── CLIENTES ───────────────────────────────────────────────────────────
+function renderClientes() {
+  if (!db) return;
+  var q = (document.getElementById('searchClientes').value || '').toLowerCase();
+  var f = document.getElementById('filterClientes').value;
+  var list = db.clients.filter(function(c) {
+    if (q && !(c.nome.toLowerCase().includes(q)||(c.cpf||'').includes(q)||(c.telefone||'').includes(q))) return false;
+    if (f==='freq' && (c.alugueis||0) < 3) return false;
+    if (f==='bloq' && c.status !== 'bloqueado') return false;
+    return true;
+  });
+  var pg   = paginate(list, _paginaClientes);
+  _paginaClientes = pg.page;
+  document.getElementById('clientesCount').textContent = list.length + ' cliente(s)';
+  document.getElementById('clientesTable').innerHTML = pg.items.length ? pg.items.map(function(c, i) {
+    var idx = db.clients.indexOf(c);
+    return '<tr>' +
+      '<td><strong>' + c.nome + '</strong></td>' +
+      '<td style="font-size:11px;">' + (c.cpf||'—') + '</td>' +
+      '<td style="font-size:11px;">' + (c.telefone||'—') + '</td>' +
+      '<td><span class="badge badge-blue">' + (c.alugueis||0) + '</span></td>' +
+      '<td><span class="badge ' + (c.status==='bloqueado'?'badge-red':'badge-green') + '">' + (c.status||'ativo') + '</span></td>' +
+      '<td><div class="td-actions">' +
+        '<button class="icon-btn" title="Editar" onclick="openModalCliente(' + idx + ')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
+        '<button class="icon-btn" title="Histórico" onclick="verHistoricoCliente(' + idx + ')" style="font-size:12px;">📋</button>' +
+        '<button class="icon-btn" title="Contrato" onclick="selecionarClienteContrato(' + idx + ')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></button>' +
+      '</div></td>' +
+      '</tr>';
+  }).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);">Nenhum cliente encontrado.</td></tr>';
+  renderPagination('paginacaoClientes', pg.page, pg.pages, pg.total, 'function(p){_paginaClientes=p;renderClientes();}');
+}
+
+function openModalCliente(idx) {
+  _curCliente = idx;
+  var c = idx >= 0 ? db.clients[idx] : {};
+  document.getElementById('modalClienteTitulo').textContent = idx >= 0 ? 'Editar Cliente' : 'Novo Cliente';
+  document.getElementById('cNome').value    = c.nome    || '';
+  document.getElementById('cCpf').value     = c.cpf     || '';
+  document.getElementById('cTel').value     = c.telefone|| '';
+  document.getElementById('cEmail').value   = c.email   || '';
+  document.getElementById('cEnd').value     = c.endereco|| '';
+  document.getElementById('cCep').value     = c.cep     || '';
+  document.getElementById('cCnh').value     = c.cnh     || '';
+  document.getElementById('cCnhCat').value  = c.cnhCat  || '';
+  document.getElementById('cStatus').value  = c.status  || 'ativo';
+  document.getElementById('cObs').value     = c.obs     || '';
+  document.getElementById('btnGerarContrato').style.display = idx >= 0 ? 'flex' : 'none';
+  openModal('modalCliente');
+}
+
+function salvarCliente() {
+  clearFormErrors(['cNome','cCpf','cTel']);
+  var nome = document.getElementById('cNome').value.trim();
+  if (!nome) return showFormError('cNome','Nome é obrigatório');
+  var c = {
+    id:        _curCliente >= 0 ? db.clients[_curCliente].id : 'c' + Date.now(),
+    nome:      nome,
+    cpf:       document.getElementById('cCpf').value.trim(),
+    telefone:  document.getElementById('cTel').value.trim(),
+    email:     document.getElementById('cEmail').value.trim(),
+    endereco:  document.getElementById('cEnd').value.trim(),
+    cep:       document.getElementById('cCep').value.trim(),
+    cnh:       document.getElementById('cCnh').value.trim(),
+    cnhCat:    document.getElementById('cCnhCat').value,
+    status:    document.getElementById('cStatus').value,
+    obs:       document.getElementById('cObs').value.trim(),
+    alugueis:  _curCliente >= 0 ? (db.clients[_curCliente].alugueis || 0) : 0,
+  };
+  if (_curCliente >= 0) db.clients[_curCliente] = c;
+  else db.clients.push(c);
+  saveDB(); renderClientes(); populateFormClienteSel();
+  closeModal('modalCliente');
+  toast('✓ Cliente salvo!', '#0d7a3e');
+}
+
+async function buscaCep() {
+  var cep = document.getElementById('cCep').value.replace(/\D/g,'');
+  if (cep.length !== 8) return;
+  try {
+    var r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
+    var d = await r.json();
+    if (!d.erro) {
+      var end = document.getElementById('cEnd');
+      if (!end.value) end.value = [d.logradouro,d.bairro,d.localidade+'-'+d.uf].filter(Boolean).join(', ');
+      toast('✓ CEP: ' + d.localidade, '#0d7a3e');
+    }
+  } catch(e) {}
+}
+
+function selecionarClienteContrato(idx) {
+  _curCliente = idx;
+  var c = db.clients[idx];
+  document.getElementById('contratoClienteNome').textContent = c.nome;
+  openModal('modalContrato');
+}
+
+function abrirModalContrato() {
+  closeModal('modalCliente');
+  if (_curCliente < 0) return;
+  document.getElementById('contratoClienteNome').textContent = db.clients[_curCliente].nome;
+  openModal('modalContrato');
+}
+
+function abrirContrato(tipo) {
+  closeModal('modalContrato');
+  var files = { diaria:'contrato-diaria.html', mensal:'contrato-mensal.html', reserva:'recibo-reserva.html', checklist:'checklist.html' };
+  var cl = _curCliente >= 0 ? db.clients[_curCliente] : {};
+  var data = {nome:cl.nome||'',cpf:cl.cpf||'',tel:cl.telefone||'',end:cl.endereco||'',email:cl.email||''};
+  try { localStorage.setItem('loka_contrato_client', JSON.stringify(data)); } catch(e) {}
+  if (typeof LokaDB !== 'undefined') LokaDB.setClientPass(data).catch(function(){});
+  window.open(files[tipo] || files.diaria, '_blank');
+  // Register contract
+  if (!db.contratos) db.contratos = [];
+  db.contratos.unshift({id:'ct'+Date.now(), clienteNome:cl.nome||'', tipo:tipo, geradoEm:new Date().toISOString()});
+  saveDB();
+}
+
+// ── ALUGUÉIS ATIVOS ────────────────────────────────────────────────────
+function ativoCardHTML(a) {
+  var days = daysLeft(a.devolucao);
+  var urgente = days !== null && days <= 3 && days >= 0;
+  var vencido = days !== null && days < 0;
+  var cls = urgente||vencido ? (vencido?'vencido':'urgente') : '';
+  var daysStr = days === null ? '—' : days === 0 ? '<span style="color:var(--red);font-weight:800">Hoje!</span>' :
+    days < 0 ? '<span style="color:var(--red)">Vencido ' + Math.abs(days) + 'd</span>' :
+    '<span style="color:' + (days<=3?'var(--amber)':'var(--green)') + '">' + days + ' dia(s)</span>';
+  return '<div class="ativo-card ' + cls + '">' +
+    '<div class="ativo-head">' +
+      '<div class="ativo-cliente">' + (a.clienteNome||'—') + '</div>' +
+      '<div class="ativo-veiculo">' + (a.veiculoNome||'—') + (a.placa?' · '+a.placa:'') +
+        ' <span class="badge ' + (a.tipo==='mensal'?'badge-blue':'badge-green') + '">' + (a.tipo==='mensal'?'Mensal':'Diária') + '</span></div>' +
+    '</div>' +
+    '<div class="ativo-dates">' +
+      '<div><div class="ativo-date-label">Retirada</div><div class="ativo-date-val">' + fmtDate(a.retirada) + '</div></div>' +
+      '<div><div class="ativo-date-label">Devolução</div><div class="ativo-date-val">' + fmtDate(a.devolucao) + '</div></div>' +
+    '</div>' +
+    '<div class="ativo-foot">' +
+      '<div class="ativo-days">' + daysStr + '</div>' +
+      pagtoBadgeHTML(a) +
+      '<div class="ativo-actions">' +
+        '<button class="icon-btn" title="Prorrogar" onclick="openProrrogacao('' + a.id + '')" style="border-color:#2B4BF2;"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>' +
+        '<button class="icon-btn" title="Encerrar" onclick="openEncerramento('' + a.id + '')" style="border-color:#c0392b;"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderAtivos() {
+  if (!db) return;
+  var q = (document.getElementById('searchAtivos').value || '').toLowerCase();
+  var list = db.ativos.filter(function(a) {
+    return !q || (a.clienteNome+a.veiculoNome).toLowerCase().includes(q);
+  });
+  var grid = document.getElementById('ativosGrid');
+  grid.innerHTML = list.length ? list.map(ativoCardHTML).join('') :
+    '<div class="empty-state"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9 11l3 3L22 4"/></svg><p>Nenhum aluguel ativo</p><small>Registre aluguéis para acompanhar aqui.</small></div>';
+}
+
+function openModalAluguel(idx) {
+  // Populate selects
+  var cSel = document.getElementById('aCliente');
+  cSel.innerHTML = '<option value="">— Selecione —</option>' +
+    db.clients.map(function(c,i){return '<option value="'+i+'">'+c.nome+'</option>';}).join('');
+  var vSel = document.getElementById('aVeiculo');
+  vSel.innerHTML = '<option value="">— Selecione —</option>' +
+    db.veiculos.filter(function(v){return v.status==='disponivel';}).map(function(v,i){
+      return '<option value="'+db.veiculos.indexOf(v)+'">'+v.marca+' '+v.modelo+' · '+v.placa+'</option>';
+    }).join('');
+  // Clear fields
+  ['aRetirada','aDevolucao','aValor','aCaucao','aKm','aObs'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('aRetirada').value = new Date().toISOString().split('T')[0];
+  openModal('modalAluguel');
+}
+
+function salvarAluguel() {
+  var cIdx = parseInt(document.getElementById('aCliente').value);
+  var vIdx = parseInt(document.getElementById('aVeiculo').value);
+  if (isNaN(cIdx)||isNaN(vIdx)) { toast('⚠️ Selecione cliente e veículo','#b45309'); return; }
+  var cl = db.clients[cIdx];
+  var v  = db.veiculos[vIdx];
+  var retirada  = document.getElementById('aRetirada').value;
+  var devolucao = document.getElementById('aDevolucao').value;
+  if (!retirada || !devolucao) { toast('⚠️ Informe as datas de retirada e devolução', '#b45309'); return; }
+  if (devolucao <= retirada)   { toast('⚠️ Devolução deve ser após a retirada', '#b45309'); return; }
+  var a  = {
+    id:          'a'+Date.now(),
+    clienteId:   cl.id,
+    veiculoId:   v.id,
+    clienteNome: cl.nome,
+    veiculoNome: v.marca+' '+v.modelo,
+    placa:        v.placa,
+    tipo:         document.getElementById('aTipo').value,
+    retirada:     retirada,
+    devolucao:    devolucao,
+    valor:        document.getElementById('aValor').value,
+    caucao:       document.getElementById('aCaucao').value,
+    km:           document.getElementById('aKm').value,
+    obs:          document.getElementById('aObs').value,
+    geradoEm:     new Date().toISOString(),
+    status:       'ativo',
+  };
+  db.ativos.push(a);
+  db.veiculos[vIdx].status = 'alugado';
+  db.clients[cIdx].alugueis = (db.clients[cIdx].alugueis||0) + 1;
+  saveDB(); renderAtivos(); renderDashboard();
+  closeModal('modalAluguel');
+  checkAlertas();
+  toast('✓ Aluguel registrado!', '#0d7a3e');
+}
+
+// ── VEÍCULOS ───────────────────────────────────────────────────────────
+function renderVeiculos() {
+  if (!db) return;
+  var q = (document.getElementById('searchVeiculos').value || '').toLowerCase();
+  var f = document.getElementById('filterVeiculos').value;
+  var list = db.veiculos.filter(function(v) {
+    if (q && !(v.marca+v.modelo+v.placa).toLowerCase().includes(q)) return false;
+    if (f && v.status !== f) return false;
+    return true;
+  });
+  document.getElementById('veiculosGrid').innerHTML = list.length ? list.map(function(v) {
+    var st = v.status || 'disponivel';
+    var stLabel = {disponivel:'Disponível', alugado:'Alugado', manutencao:'Em Manutenção'};
+    var stBadge = {disponivel:'badge-green', alugado:'badge-amber', manutencao:'badge-purple'};
+    var stBtn = st==='manutencao'
+      ? '<button class="btn btn-outline" style="margin-top:8px;font-size:10px;padding:5px 10px;color:#7c3aed;border-color:#7c3aed;width:100%;" onclick="openRetornoManut(''+v.id+'')">✅ Dar Baixa na Manutenção</button>'
+      : st==='disponivel'
+        ? '<button class="btn btn-outline" style="margin-top:8px;font-size:10px;padding:5px 10px;width:100%;" onclick="openManutencao(''+v.id+'')">🔧 Enviar para Manutenção</button>'
+        : '';
+    return '<div class="veiculo-card ' + st + '">' +
+      '<div class="veiculo-modelo">' + v.marca + ' ' + v.modelo + '</div>' +
+      '<div class="veiculo-info">' + v.ano + ' · ' + v.cor + '</div>' +
+      '<span class="veiculo-placa">' + v.placa + '</span>' +
+      '<span class="badge ' + (stBadge[st]||'badge-gray') + '" style="margin-left:6px;">' + (stLabel[st]||st) + '</span>' +
+      '<div class="veiculo-prices">' +
+        '<div class="vp-box"><div class="vp-label">Diária</div><div class="vp-value">R$ ' + (v.diaria||0).toLocaleString('pt-BR') + '</div></div>' +
+        '<div class="vp-box"><div class="vp-label">Mensal</div><div class="vp-value" style="color:var(--green)">R$ ' + (v.mensal||0).toLocaleString('pt-BR') + '</div></div>' +
+      '</div>' + stBtn + '</div>';
+  }).join('') :
+    '<div class="empty-state"><p>Nenhum veículo encontrado.</p></div>';
+}
+
+// ── FORMULÁRIOS ────────────────────────────────────────────────────────
+function populateFormClienteSel() {
+  if (!db) return;
+  var sel = document.getElementById('formClienteSel');
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Selecione o cliente —</option>' +
+    db.clients.map(function(c,i){return '<option value="'+i+'">'+c.nome+'</option>';}).join('');
+  sel.value = cur;
+}
+
+function renderFormularios() {
+  populateFormClienteSel();
+}
+
+function gerarFormularioSelecionado() {
+  var cIdx = parseInt(document.getElementById('formClienteSel').value);
+  var tipo = document.getElementById('formTipo').value;
+  if (!isNaN(cIdx) && cIdx >= 0) {
+    _curCliente = cIdx;
+    abrirContrato(tipo);
+  } else {
+    var files = { diaria:'contrato-diaria.html', mensal:'contrato-mensal.html', reserva:'recibo-reserva.html', checklist:'checklist.html' };
+    window.open(files[tipo] || files.diaria, '_blank');
+  }
+}
+
+function abrirContratoComCliente(tipo) {
+  if (_curCliente < 0) { toast('Selecione um cliente primeiro.', '#b45309'); return; }
+  abrirContrato(tipo);
+}
+
+function abrirChecklistComCliente() {
+  abrirContratoComCliente('checklist');
+}
+
+// ── CONTRATOS ──────────────────────────────────────────────────────────
+function renderContratos() {
+  if (!db) return;
+  var list = (db.contratos || []).slice().reverse();
+  document.getElementById('contratosCount').textContent = list.length + ' contrato(s)';
+  var tipos = {diaria:'Por Diária', mensal:'Mensal', reserva:'Reserva', checklist:'Checklist'};
+  document.getElementById('contratosTable').innerHTML = list.length ? list.map(function(ct) {
+    return '<tr>' +
+      '<td><strong>' + (ct.clienteNome||'—') + '</strong></td>' +
+      '<td>' + (ct.veiculoNome||'—') + '</td>' +
+      '<td><span class="badge badge-blue">' + (tipos[ct.tipo]||ct.tipo||'—') + '</span></td>' +
+      '<td>' + fmtDate(ct.retirada) + '</td>' +
+      '<td>' + fmtDate(ct.devolucao) + '</td>' +
+      '<td>' + fmtBRL(ct.valor) + '</td>' +
+      '<td style="font-size:10px;color:var(--muted);">' + (ct.geradoEm ? new Date(ct.geradoEm).toLocaleString('pt-BR') : '—') + '</td>' +
+      '</tr>';
+  }).join('') : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);">Nenhum contrato gerado.</td></tr>';
+}
+
+// ── HISTÓRICO ──────────────────────────────────────────────────────────
+function renderHistorico() {
+  if (!db) return;
+  var q = (document.getElementById('searchHistorico').value || '').toLowerCase();
+  var list = (db.historico || []).filter(function(h) {
+    return !q || (h.clienteNome+h.veiculoNome).toLowerCase().includes(q);
+  }).slice().reverse();
+  document.getElementById('historicoCount').textContent = list.length + ' registro(s)';
+  var conds = {ok:'✅ Normal', avaria_leve:'⚠️ Leve', avaria_grave:'🔴 Grave', multa:'🚨 Multa'};
+  document.getElementById('historicoTable').innerHTML = list.length ? list.map(function(h) {
+    return '<tr>' +
+      '<td><strong>' + (h.clienteNome||'—') + '</strong></td>' +
+      '<td>' + (h.veiculoNome||'—') + '</td>' +
+      '<td>' + (h.placa||'—') + '</td>' +
+      '<td>' + fmtDate(h.retirada) + '</td>' +
+      '<td>' + fmtDate(h.devolvido||h.devolucao) + '</td>' +
+      '<td style="font-weight:700;color:var(--green)">' + fmtBRL(h.valorFinal||h.valor) + '</td>' +
+      '<td>' + (conds[h.condicao]||'—') + '</td>' +
+      '</tr>';
+  }).join('') : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);">Nenhum histórico.</td></tr>';
+}
+
+// ── PRORROGAÇÃO ────────────────────────────────────────────────────────
+function openProrrogacao(id) {
+  _prorAtivo = id;
+  var a = db.ativos.find(function(x){return x.id===id;});
+  if (!a) return;
+  var v = db.veiculos.find(function(x){return x.id===a.veiculoId;}) || {};
+  document.getElementById('prorInfo').innerHTML =
+    '<strong>' + a.clienteNome + '</strong> · ' + a.veiculoNome + (a.placa?' · '+a.placa:'') +
+    '<br><span style="color:var(--muted)">Devolução atual: ' + fmtDate(a.devolucao) + '</span>';
+  document.getElementById('prorTipo').value = a.tipo || 'diaria';
+  document.getElementById('prorNovaDev').value = '';
+  document.getElementById('prorObs').value = '';
+  document.getElementById('prorResult').style.display = 'none';
+  openModal('modalProrrogacao');
+}
+
+function calcProrrogacao() {
+  var a = db.ativos.find(function(x){return x.id===_prorAtivo;});
+  if (!a) return;
+  var v = db.veiculos.find(function(x){return x.id===a.veiculoId;}) || {};
+  var novaDev = document.getElementById('prorNovaDev').value;
+  var tipo    = document.getElementById('prorTipo').value;
+  var result  = document.getElementById('prorResult');
+  if (!novaDev || !a.devolucao) { result.style.display='none'; return; }
+  var devAtual = new Date(a.devolucao+'T00:00');
+  var devNova  = new Date(novaDev+'T00:00');
+  var diffDias = Math.ceil((devNova - devAtual) / 86400000);
+  if (diffDias <= 0) { result.textContent='⚠️ Nova data deve ser posterior à atual.'; result.style.color='var(--red)'; result.style.display='block'; return; }
+  var valor = 0, desc = '';
+  if (tipo==='diaria') { valor = (parseFloat(v.diaria)||0) * diffDias; desc = diffDias+'d × R$'+(v.diaria||0); }
+  else { var m=Math.ceil(diffDias/30); valor=(parseFloat(v.mensal)||0)*m; desc=m+'mês × R$'+(v.mensal||0); }
+  result.style.color = 'var(--green)';
+  result.textContent = '📅 +' + diffDias + ' dia(s) — ' + desc + ' = R$ ' + valor.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  result.style.display = 'block';
+}
+
+function confirmarProrrogacao() {
+  var novaDev = document.getElementById('prorNovaDev').value;
+  var tipo    = document.getElementById('prorTipo').value;
+  var obs     = document.getElementById('prorObs').value;
+  if (!novaDev) { toast('⚠️ Informe a nova data de devolução', '#b45309'); return; }
+  var idx = db.ativos.findIndex(function(x){return x.id===_prorAtivo;});
+  if (idx < 0) return;
+  db.ativos[idx].devolucao = novaDev;
+  db.ativos[idx].tipo      = tipo;
+  if (obs) db.ativos[idx].obs = (db.ativos[idx].obs?db.ativos[idx].obs+' | ':'') + 'Prorrogação: '+obs;
+  saveDB(); renderAtivos(); renderDashboard();
+  closeModal('modalProrrogacao');
+  toast('✅ Prorrogado até ' + fmtDate(novaDev), '#0d7a3e');
+}
+
+// ── ENCERRAMENTO ───────────────────────────────────────────────────────
+function openEncerramento(id) {
+  _encAtivo = id;
+  var a = db.ativos.find(function(x){return x.id===id;});
+  if (!a) return;
+  var v = db.veiculos.find(function(x){return x.id===a.veiculoId;}) || {};
+  var hoje = new Date().toISOString().split('T')[0];
+  document.getElementById('encInfo').innerHTML =
+    '<strong>' + a.clienteNome + '</strong> · ' + a.veiculoNome + (a.placa?' · '+a.placa:'') +
+    '<br><span style="color:var(--muted)">Retirada: ' + fmtDate(a.retirada) + ' · Devolução prevista: ' + fmtDate(a.devolucao) + '</span>';
+  document.getElementById('encDev').value       = hoje;
+  document.getElementById('encKm').value        = '';
+  document.getElementById('encDesconto').value  = '';
+  document.getElementById('encObs').value       = '';
+  document.getElementById('encCondicao').value  = 'ok';
+  // Auto-calc
+  var diaria = parseFloat(v.diaria) || 0;
+  var mensal = parseFloat(v.mensal) || 0;
+  var tipo   = a.tipo || 'diaria';
+  var ret    = a.retirada ? new Date(a.retirada+'T00:00') : new Date();
+  var dev    = new Date(hoje+'T00:00');
+  var dias   = Math.max(1, Math.ceil((dev-ret)/86400000));
+  var valor  = tipo==='mensal' ? mensal*Math.ceil(dias/30) : diaria*dias;
+  document.getElementById('encValor').value = valor.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('encResult').textContent = dias + ' dia(s) × R$ '+(tipo==='mensal'?mensal:diaria).toLocaleString('pt-BR') + ' = R$ '+valor.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('encResult').style.display = 'block';
+  openModal('modalEncerramento');
+}
+
+function calcEncerramento() {
+  var a = db.ativos.find(function(x){return x.id===_encAtivo;});
+  if (!a) return;
+  var v       = db.veiculos.find(function(x){return x.id===a.veiculoId;}) || {};
+  var devDate = document.getElementById('encDev').value;
+  var descStr = (document.getElementById('encDesconto').value||'0').replace(/\./g,'').replace(',','.');
+  var desconto = parseFloat(descStr) || 0;
+  if (!devDate || !a.retirada) return;
+  var ret  = new Date(a.retirada+'T00:00');
+  var dev  = new Date(devDate+'T00:00');
+  var dias = Math.max(1, Math.ceil((dev-ret)/86400000));
+  var tipo = a.tipo || 'diaria';
+  var diaria = parseFloat(v.diaria)||0, mensal=parseFloat(v.mensal)||0;
+  var bruto  = tipo==='mensal' ? mensal*Math.ceil(dias/30) : diaria*dias;
+  var final  = Math.max(0, bruto - desconto);
+  document.getElementById('encValor').value = final.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('encResult').textContent = dias+'d × R$'+(tipo==='mensal'?mensal:diaria).toLocaleString('pt-BR') + (desconto?' - desconto R$'+desconto.toLocaleString('pt-BR'):'') + ' = R$ '+final.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('encResult').style.display = 'block';
+}
+
+function confirmarEncerramento() {
+  var devDate  = document.getElementById('encDev').value;
+  var km       = document.getElementById('encKm').value;
+  var valorStr = document.getElementById('encValor').value.replace(/\./g,'').replace(',','.');
+  var condicao = document.getElementById('encCondicao').value;
+  var obs      = document.getElementById('encObs').value;
+  if (!devDate) { toast('⚠️ Informe a data de devolução', '#b45309'); return; }
+  var idx = db.ativos.findIndex(function(x){return x.id===_encAtivo;});
+  if (idx < 0) return;
+  var a = db.ativos[idx];
+  // Move to historico
+  if (!db.historico) db.historico = [];
+  db.historico.push(Object.assign({}, a, {
+    devolvido: devDate, kmDev: km,
+    valorFinal: 'R$ '+parseFloat(valorStr||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),
+    condicao: condicao, obs: obs, encerradoEm: new Date().toISOString()
+  }));
+  // Free vehicle
+  var vIdx = db.veiculos.findIndex(function(v){return v.id===a.veiculoId;});
+  if (vIdx >= 0) { db.veiculos[vIdx].status='disponivel'; if(km) db.veiculos[vIdx].km=km; }
+  // Remove from ativos
+  db.ativos.splice(idx,1);
+  saveDB(); renderAtivos(); renderDashboard();
+  closeModal('modalEncerramento');
+  checkAlertas();
+  toast('✅ Locação encerrada. Veículo disponível.', '#0d7a3e');
+}
+
+// ── BACKUP / RESTORE ───────────────────────────────────────────────────
+function exportDB() {
+  if (!db) return;
+  var blob = new Blob([JSON.stringify({versao:'1.0',exportadoEm:new Date().toISOString(),dados:db},null,2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'backup_loka_' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('✓ Backup exportado!', '#0d7a3e');
+}
+
+function importDB(input) {
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var backup = JSON.parse(e.target.result);
+      var dados = backup.dados || backup;
+      if (!dados.clients) { toast('❌ Arquivo inválido', '#c0392b'); return; }
+      db = dados;
+      if (!db.historico) db.historico = [];
+      if (!db.contratos) db.contratos = [];
+      saveDB();
+      renderDashboard();
+      populateFormClienteSel();
+      toast('✓ Backup restaurado!', '#0d7a3e');
+    } catch(err) { toast('❌ Erro: ' + err.message, '#c0392b'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ── TOPBAR NEW ACTION ──────────────────────────────────────────────────
+function newAction() {
+  var active = document.querySelector('.panel.active');
+  if (!active) return;
+  var p = active.id.replace('panel-','');
+  if (p==='clientes') openModalCliente(-1);
+  if (p==='ativos')   openModalAluguel(-1);
+}
+
+// ══ B2 — MANUTENÇÃO ═════════════════════════════════════════════════════════
+var _manutVeiculoId = null;
+
+function openManutencao(vId) {
+  _manutVeiculoId = vId;
+  var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
+  document.getElementById('manutVeiculoInfo').textContent = v.marca+' '+v.modelo+' · '+v.placa;
+  document.getElementById('manutRetorno').value = '';
+  ['manutMotivo','manutOficina','manutCusto','manutKm','manutObs'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+  openModal('modalManutencao');
+}
+function confirmarManutencao() {
+  var motivo = document.getElementById('manutMotivo').value.trim();
+  if (!motivo) { toast('⚠️ Informe o motivo da manutenção','#b45309'); return; }
+  var idx = db.veiculos.findIndex(function(v){return v.id===_manutVeiculoId;});
+  if (idx<0) return;
+  db.veiculos[idx].status = 'manutencao';
+  if (!db.veiculos[idx].manutencoes) db.veiculos[idx].manutencoes = [];
+  db.veiculos[idx].manutencoes.push({
+    motivo: motivo,
+    oficina: document.getElementById('manutOficina').value,
+    retorno: document.getElementById('manutRetorno').value,
+    custo:   document.getElementById('manutCusto').value,
+    km:      document.getElementById('manutKm').value,
+    obs:     document.getElementById('manutObs').value,
+    inicio:  new Date().toISOString(), status: 'em andamento'
+  });
+  saveDB(); renderVeiculos(); renderDashboard(); checkAlertas();
+  closeModal('modalManutencao');
+  toast('🔧 Veículo enviado para manutenção', '#7c3aed');
+}
+function openRetornoManut(vId) {
+  _manutVeiculoId = vId;
+  var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
+  var lastManut = (v.manutencoes||[]).slice(-1)[0] || {};
+  document.getElementById('retornoVeiculoInfo').innerHTML =
+    v.marca+' '+v.modelo+' · '+v.placa+'<br><span style="color:var(--muted);font-weight:400;">Motivo: '+lastManut.motivo+'</span>';
+  ['retornoKm','retornoCusto','retornoServicos'].forEach(function(id){document.getElementById(id).value='';});
+  openModal('modalRetornoManut');
+}
+function confirmarRetornoManut() {
+  var idx = db.veiculos.findIndex(function(v){return v.id===_manutVeiculoId;});
+  if (idx<0) return;
+  db.veiculos[idx].status = 'disponivel';
+  var manut = (db.veiculos[idx].manutencoes||[]);
+  if (manut.length) {
+    manut[manut.length-1].fim       = new Date().toISOString();
+    manut[manut.length-1].status    = 'concluida';
+    manut[manut.length-1].custoReal = document.getElementById('retornoCusto').value;
+    manut[manut.length-1].servicos  = document.getElementById('retornoServicos').value;
+  }
+  if (document.getElementById('retornoKm').value) db.veiculos[idx].km = document.getElementById('retornoKm').value;
+  saveDB(); renderVeiculos(); renderDashboard(); checkAlertas();
+  closeModal('modalRetornoManut');
+  toast('✅ Veículo liberado e disponível!', '#0d7a3e');
+}
+
+// ══ B3 — PAGAMENTOS ═════════════════════════════════════════════════════════
+var _pagtoAtivoId = null;
+
+function pagtoBadgeHTML(a) {
+  var pg   = a.pagamento || {};
+  var st   = pg.status || 'pendente';
+  var lbls = {pago:'✅ Pago', parcial:'⚠️ Parcial', pendente:'❌ Pendente'};
+  return '<span class="pagto-badge pagto-'+st+'" onclick="openPagamento(''+a.id+'')" title="Registrar pagamento">'+lbls[st]+'</span>';
+}
+function openPagamento(id) {
+  _pagtoAtivoId = id;
+  var a  = db.ativos.find(function(x){return x.id===id;}) || {};
+  var pg = a.pagamento || {};
+  document.getElementById('pagtoAtivoInfo').innerHTML =
+    '<strong>'+a.clienteNome+'</strong> · '+a.veiculoNome+
+    '<br><span style="color:var(--muted)">Valor: '+(a.valor||'—')+'</span>';
+  document.getElementById('pagtoStatus').value    = pg.status || 'pendente';
+  document.getElementById('pagtoValorPago').value = pg.valorPago || '';
+  document.getElementById('pagtoForma').value     = pg.forma || 'pix';
+  document.getElementById('pagtoDt').value        = pg.data || new Date().toISOString().split('T')[0];
+  document.getElementById('pagtoObs').value       = pg.obs || '';
+  openModal('modalPagamento');
+}
+function confirmarPagamento() {
+  var idx = db.ativos.findIndex(function(x){return x.id===_pagtoAtivoId;});
+  if (idx<0) return;
+  db.ativos[idx].pagamento = {
+    status:    document.getElementById('pagtoStatus').value,
+    valorPago: document.getElementById('pagtoValorPago').value,
+    forma:     document.getElementById('pagtoForma').value,
+    data:      document.getElementById('pagtoDt').value,
+    obs:       document.getElementById('pagtoObs').value,
+    atualizadoEm: new Date().toISOString()
+  };
+  saveDB(); renderAtivos();
+  closeModal('modalPagamento');
+  toast('💳 Pagamento registrado!', '#0d7a3e');
+}
+
+// ══ B4 — RELATÓRIO MENSAL ═══════════════════════════════════════════════════
+function gerarRelatorioMensal() {
+  if (!db) return;
+  var agora = new Date(), mes = agora.getMonth(), ano = agora.getFullYear();
+  var nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][mes];
+  var encMes = (db.historico||[]).filter(function(h) {
+    if (!h.encerradoEm) return false;
+    var d = new Date(h.encerradoEm);
+    return d.getMonth()===mes && d.getFullYear()===ano;
+  });
+  var receitaHist = encMes.reduce(function(acc,h) {
+    var v = parseFloat((h.valorFinal||h.valor||'0').replace(/[^\d,.-]/g,'').replace(',','.'));
+    return acc+(isNaN(v)?0:v);
+  }, 0);
+  var ativMes = db.ativos.filter(function(a) {
+    if (!a.geradoEm) return false;
+    var d = new Date(a.geradoEm);
+    return d.getMonth()===mes && d.getFullYear()===ano;
+  });
+  var veicCount = {};
+  encMes.concat(ativMes).forEach(function(a) { var k=(a.veiculoNome||'—')+' '+(a.placa||''); veicCount[k]=(veicCount[k]||0)+1; });
+  var topVeic = Object.entries(veicCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var cliCount = {};
+  encMes.concat(ativMes).forEach(function(a) { var k=a.clienteNome||'—'; cliCount[k]=(cliCount[k]||0)+1; });
+  var topCli = Object.entries(cliCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório '+nomeMes+' '+ano+'</title>'
+    +'<style>@page{margin:15mm}body{font-family:Montserrat,sans-serif;color:#0E1B4D;font-size:12px}'
+    +'h1{font-size:20px;font-weight:900;margin-bottom:4px}h2{font-size:13px;font-weight:800;color:#2B4BF2;margin:20px 0 8px;border-bottom:2px solid #EEF1FD;padding-bottom:4px}'
+    +'.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}'
+    +'.card{background:#f8f9fe;border-radius:8px;padding:12px;border-left:3px solid #2B4BF2}'
+    +'.card-val{font-size:22px;font-weight:900}.card-label{font-size:9px;font-weight:700;text-transform:uppercase;color:#5a607a;margin-top:2px}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#0E1B4D;color:#fff;padding:8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}'
+    +'@media print{button{display:none}}</style></head><body>'
+    +'<h1>LOKÁ Aluguel de Veículos</h1>'
+    +'<p style="color:#5a607a;margin-bottom:20px">Relatório Mensal — '+nomeMes+' '+ano+'</p>'
+    +'<div class="grid">'
+      +'<div class="card"><div class="card-val">'+encMes.length+'</div><div class="card-label">Encerrados</div></div>'
+      +'<div class="card"><div class="card-val">'+ativMes.length+'</div><div class="card-label">Novos aluguéis</div></div>'
+      +'<div class="card" style="border-color:#0d7a3e"><div class="card-val" style="color:#0d7a3e">R$ '+receitaHist.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div><div class="card-label">Receita</div></div>'
+      +'<div class="card"><div class="card-val">'+db.ativos.length+'</div><div class="card-label">Ativos agora</div></div>'
+    +'</div>'
+    +(topVeic.length ? '<h2>Veículos mais utilizados</h2><table><thead><tr><th>Veículo</th><th>Locações</th></tr></thead><tbody>'
+      +topVeic.map(function(v){return '<tr><td>'+v[0]+'</td><td>'+v[1]+'</td></tr>';}).join('')+'</tbody></table>' : '')
+    +(topCli.length ? '<h2>Clientes mais ativos</h2><table><thead><tr><th>Cliente</th><th>Locações</th></tr></thead><tbody>'
+      +topCli.map(function(v){return '<tr><td>'+v[0]+'</td><td>'+v[1]+'</td></tr>';}).join('')+'</tbody></table>' : '')
+    +'<p style="margin-top:24px;font-size:9px;color:#aaa">LOKÁ · CNPJ 39.911.638/0001-10 · Gerado em '+new Date().toLocaleString('pt-BR')+'</p>'
+    +'<br><button onclick="window.print()" style="padding:10px 20px;background:#0E1B4D;color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-weight:700;cursor:pointer;">🖨️ Imprimir / PDF</button>'
+    +'</body></html>';
+  var w = window.open('','_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
+// ══ B5 — HISTÓRICO POR CLIENTE ══════════════════════════════════════════════
+function verHistoricoCliente(idx) {
+  var cl = db.clients[idx]; if (!cl) return;
+  var ativos = db.ativos.filter(function(a){return a.clienteNome===cl.nome||a.clienteId===cl.id;});
+  var hist   = (db.historico||[]).filter(function(h){return h.clienteNome===cl.nome||h.clienteId===cl.id;});
+  var todos  = ativos.concat(hist).sort(function(a,b){return new Date(b.geradoEm||b.encerradoEm||0)-new Date(a.geradoEm||a.encerradoEm||0);});
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Histórico — '+cl.nome+'</title>'
+    +'<style>@page{margin:12mm}body{font-family:Montserrat,sans-serif;color:#0E1B4D;font-size:12px}'
+    +'h1{font-size:18px;font-weight:900;margin-bottom:2px}h2{font-size:11px;color:#5a607a;margin-bottom:16px}'
+    +'.info{background:#f0f2fa;border-radius:8px;padding:12px 16px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:11px}'
+    +'.info b{font-weight:700;color:#2B4BF2}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#0E1B4D;color:#fff;padding:8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #eee}'
+    +'@media print{button{display:none}}</style></head><body>'
+    +'<h1>'+cl.nome+'</h1><h2>Histórico Completo de Locações</h2>'
+    +'<div class="info">'
+      +'<div>CPF/CNPJ: <b>'+(cl.cpf||'—')+'</b></div>'
+      +'<div>Telefone: <b>'+(cl.telefone||'—')+'</b></div>'
+      +'<div>Total: <b>'+todos.length+' locações</b></div>'
+      +'<div>Status: <b>'+(cl.status||'ativo')+'</b></div>'
+    +'</div>'
+    +'<table><thead><tr><th>Veículo</th><th>Placa</th><th>Tipo</th><th>Retirada</th><th>Devolução</th><th>Valor</th><th>Situação</th></tr></thead>'
+    +'<tbody>'+todos.map(function(a) {
+      var isAtivo = a.status==='ativo';
+      var sit = isAtivo ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;">Ativo</span>'
+                        : '<span style="background:#f0f2fa;color:#5a607a;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;">Encerrado</span>';
+      return '<tr><td>'+(a.veiculoNome||'—')+'</td><td>'+(a.placa||'—')+'</td>'
+        +'<td>'+(a.tipo==='mensal'?'Mensal':'Diária')+'</td>'
+        +'<td>'+(a.retirada?new Date(a.retirada+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'
+        +'<td>'+((a.devolvido||a.devolucao)?new Date((a.devolvido||a.devolucao)+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'
+        +'<td>'+(a.valorFinal||a.valor||'—')+'</td><td>'+sit+'</td></tr>';
+    }).join('')+'</tbody></table>'
+    +'<p style="margin-top:16px;font-size:9px;color:#aaa">Gerado em '+new Date().toLocaleString('pt-BR')+' · LOKÁ</p>'
+    +'<br><button onclick="window.print()" style="padding:10px 20px;background:#0E1B4D;color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-weight:700;cursor:pointer;">🖨️ Imprimir</button>'
+    +'</body></html>';
+  var w = window.open('','_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
+// ══ VEÍCULO CARD COM MANUTENÇÃO ═════════════════════════════════════════════
+
+</script>
+<!-- MODAL: MANUTENÇÃO -->
+<div class="modal-bg" id="modalManutencao">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head" style="background:#7c3aed;"><h3>🔧 Enviar para Manutenção</h3><button class="modal-close" onclick="closeModal('modalManutencao')">✕</button></div>
+    <div class="modal-body">
+      <div id="manutVeiculoInfo" style="background:#f0f2fa;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;font-weight:700;"></div>
+      <div class="form-grid g2">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Motivo *</label><input class="fi" id="manutMotivo" placeholder="Ex: Troca de óleo, revisão geral..."></div>
+        <div class="fg"><label class="fl">Oficina</label><input class="fi" id="manutOficina" placeholder="Nome da oficina"></div>
+        <div class="fg"><label class="fl">Previsão de retorno</label><input class="fi" id="manutRetorno" type="date"></div>
+        <div class="fg"><label class="fl">Custo estimado (R$)</label><input class="fi" id="manutCusto" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg"><label class="fl">KM atual</label><input class="fi" id="manutKm" type="number" placeholder="000000"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="manutObs" placeholder="Detalhes adicionais..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalManutencao')">Cancelar</button>
+      <button class="btn" style="background:#7c3aed;color:#fff;" onclick="confirmarManutencao()">🔧 Enviar para Manutenção</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: RETORNO MANUTENÇÃO -->
+<div class="modal-bg" id="modalRetornoManut">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head" style="background:#0d7a3e;"><h3>✅ Retorno da Manutenção</h3><button class="modal-close" onclick="closeModal('modalRetornoManut')">✕</button></div>
+    <div class="modal-body">
+      <div id="retornoVeiculoInfo" style="background:#e8f5ef;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;font-weight:700;"></div>
+      <div class="form-grid g2">
+        <div class="fg"><label class="fl">KM após manutenção</label><input class="fi" id="retornoKm" type="number" placeholder="000000"></div>
+        <div class="fg"><label class="fl">Custo real (R$)</label><input class="fi" id="retornoCusto" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Serviços realizados</label><input class="fi" id="retornoServicos" placeholder="Ex: Troca de óleo, filtros, alinhamento..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalRetornoManut')">Cancelar</button>
+      <button class="btn btn-green" onclick="confirmarRetornoManut()">✅ Liberar Veículo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PAGAMENTO -->
+<div class="modal-bg" id="modalPagamento">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head" style="background:#0d7a3e;"><h3>💳 Registrar Pagamento</h3><button class="modal-close" onclick="closeModal('modalPagamento')">✕</button></div>
+    <div class="modal-body">
+      <div id="pagtoAtivoInfo" style="background:#e8f5ef;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;"></div>
+      <div class="form-grid g2">
+        <div class="fg"><label class="fl">Status do Pagamento</label>
+          <select class="fs" id="pagtoStatus">
+            <option value="pago">✅ Pago (total)</option>
+            <option value="parcial">⚠️ Pago parcialmente</option>
+            <option value="pendente">❌ Pendente</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Valor pago (R$)</label><input class="fi" id="pagtoValorPago" placeholder="0,00" oninput="maskBRL(this)"></div>
+        <div class="fg"><label class="fl">Forma de pagamento</label>
+          <select class="fs" id="pagtoForma">
+            <option value="pix">PIX</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao_deb">Cartão Débito</option>
+            <option value="cartao_cred">Cartão Crédito</option>
+            <option value="transferencia">Transferência</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Data do pagamento</label><input class="fi" id="pagtoDt" type="date"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="pagtoObs" placeholder="Recibo, número de transação..."></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modalPagamento')">Cancelar</button>
+      <button class="btn btn-green" onclick="confirmarPagamento()">💳 Salvar Pagamento</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
