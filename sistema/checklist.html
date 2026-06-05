@@ -595,7 +595,7 @@ function clearForm(){
 // ── Auto-fill via localStorage (integração com loka_gestao) ──
 (function(){
   let data=null;
-  try{const s=if(s){data=JSON.parse(s);}}catch(e){}
+  try{const s=localStorage.getItem('loka_contrato_client');if(s){data=JSON.parse(s);localStorage.removeItem('loka_contrato_client');}}catch(e){}
   if(!data){
     const hash=window.location.hash;
     if(hash.startsWith("#data=")){try{data=JSON.parse(decodeURIComponent(hash.replace("#data=","")));}catch(e){}}
