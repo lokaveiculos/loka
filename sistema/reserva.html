@@ -264,7 +264,39 @@ body{font-family:"Barlow",sans-serif;background:#f4f6fd;color:var(--ink);min-hei
       <h2>Escolha o Veículo</h2>
     </div>
     <div class="card-body">
-      <div class="veiculo-grid" id="veiculoGrid"></div>
+      <!-- Toggle frota/manual -->
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="btnFrota"  onclick="setModoVeiculo('frota')"  style="flex:1;padding:9px;border-radius:7px;border:2px solid var(--azul);background:var(--azul);color:#fff;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">🚗 Escolher da Frota</button>
+        <button id="btnManual" onclick="setModoVeiculo('manual')" style="flex:1;padding:9px;border-radius:7px;border:2px solid #dde;background:#fff;color:#888;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✏️ Informar Manualmente</button>
+      </div>
+
+      <!-- Grade da frota (padrão) -->
+      <div id="modoFrota">
+        <div class="veiculo-grid" id="veiculoGrid"></div>
+      </div>
+
+      <!-- Entrada manual -->
+      <div id="modoManual" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#888;display:block;margin-bottom:4px">VEÍCULO *</label>
+            <input id="veiculoManual" type="text" placeholder="Ex: Toyota Hilux, Jeep Compass..." style="width:100%;padding:10px 12px;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box" oninput="atualizarVeiculoManual()">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#888;display:block;margin-bottom:4px">PLACA (opcional)</label>
+            <input id="placaManual" type="text" placeholder="AAA-0000 ou ABC1D23" style="width:100%;padding:10px 12px;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;text-transform:uppercase">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#888;display:block;margin-bottom:4px">VALOR DIÁRIA (R$)</label>
+            <input id="diáriaManual" type="text" placeholder="0,00" style="width:100%;padding:10px 12px;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box" oninput="maskBRLInput(this);atualizarVeiculoManual()">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#888;display:block;margin-bottom:4px">VALOR MENSAL (R$)</label>
+            <input id="mensalManual" type="text" placeholder="0,00" style="width:100%;padding:10px 12px;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box" oninput="maskBRLInput(this);atualizarVeiculoManual()">
+          </div>
+        </div>
+        <div id="previewManual" style="display:none;margin-top:12px;background:#f0f4ff;border-radius:8px;padding:12px;font-size:13px;font-weight:700;color:#0E1B4D"></div>
+      </div>
     </div>
   </div>
   <div class="btn-row">
@@ -393,6 +425,53 @@ let tipo = 'diaria';
 let veiculo = null;
 let _reservaData = null;
 
+// ── Modo veículo manual ──
+var _modoVeiculo = 'frota';
+
+function setModoVeiculo(modo) {
+  _modoVeiculo = modo;
+  var btnFrota  = document.getElementById('btnFrota');
+  var btnManual = document.getElementById('btnManual');
+  var divFrota  = document.getElementById('modoFrota');
+  var divManual = document.getElementById('modoManual');
+  if (modo === 'frota') {
+    btnFrota.style.background = 'var(--azul)'; btnFrota.style.color = '#fff'; btnFrota.style.borderColor = 'var(--azul)';
+    btnManual.style.background = '#fff'; btnManual.style.color = '#888'; btnManual.style.borderColor = '#dde';
+    divFrota.style.display = 'block'; divManual.style.display = 'none';
+    veiculo = null; renderVeiculos();
+  } else {
+    btnManual.style.background = 'var(--azul)'; btnManual.style.color = '#fff'; btnManual.style.borderColor = 'var(--azul)';
+    btnFrota.style.background = '#fff'; btnFrota.style.color = '#888'; btnFrota.style.borderColor = '#dde';
+    divFrota.style.display = 'none'; divManual.style.display = 'block';
+    veiculo = null; atualizarVeiculoManual();
+  }
+}
+
+function maskBRLInput(el) {
+  var v = el.value.replace(/\D/g,'');
+  if (!v) { el.value = ''; return; }
+  v = (parseInt(v,10)/100).toFixed(2);
+  el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+
+function parseBRL(s) {
+  return parseFloat((s||'0').replace(/\./g,'').replace(',','.')) || 0;
+}
+
+function atualizarVeiculoManual() {
+  var nome   = (document.getElementById('veiculoManual').value||'').trim();
+  var diaria = parseBRL(document.getElementById('diáriaManual').value);
+  var mensal = parseBRL(document.getElementById('mensalManual').value);
+  var placa  = (document.getElementById('placaManual').value||'').trim();
+  if (!nome) { veiculo = null; document.getElementById('previewManual').style.display='none'; return; }
+  veiculo = { id:'manual', nome: nome+(placa?' ('+placa+')':''), diaria: diaria, mensal: mensal, icon:'🚗', info:'Informado manualmente' };
+  var prev = document.getElementById('previewManual');
+  prev.style.display = 'block';
+  prev.innerHTML = '🚗 <strong>'+veiculo.nome+'</strong>' +
+    (diaria ? ' · Diária: R$ '+diaria.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '') +
+    (mensal ? ' · Mensal: R$ '+mensal.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '');
+}
+
 // ── Render veículos ──
 function renderVeiculos() {
   document.getElementById('veiculoGrid').innerHTML = FROTA.map(v => {
@@ -503,6 +582,9 @@ function enviar() {
   _reservaData = {
     nome, cpf, tel, email, cnh,
     veiculo: veiculo ? veiculo.nome : '',
+    valorDiaria: veiculo ? veiculo.diaria : 0,
+    valorMensal: veiculo ? veiculo.mensal : 0,
+    modoVeiculo: _modoVeiculo,
     tipo: tipo==='diaria' ? 'Por Diária' : 'Mensal',
     retirada: document.getElementById('dtRet').value,
     devolucao: document.getElementById('dtDev').value,
