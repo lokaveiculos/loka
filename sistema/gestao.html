@@ -1327,7 +1327,7 @@ function renderReservas() {
   var stCls  = {pendente:'ba', confirmado:'bg', cancelado:'br'};
   var stLbl  = {pendente:'⏳ Pendente', confirmado:'✅ Confirmado', cancelado:'❌ Cancelado'};
 
-  tbody.innerHTML = list.map(function(r) {
+  tbody.innerHTML = list.map(function(r, n) {
     var st = r.status || 'pendente';
     var dt = r.criadoEm ? new Date(r.criadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
     var rid = encodeURIComponent(JSON.stringify(r));
@@ -1342,23 +1342,23 @@ function renderReservas() {
       '<td style="font-size:11px;font-weight:700;color:var(--green)">'+(r.valor||'—')+'</td>'+
       '<td><span class="badge '+(stCls[st]||'bm')+'">'+( stLbl[st]||st)+'</span></td>'+
       '<td><div class="td-actions">'+
-        '<button class="icon-btn" title="Ver Recibo" onclick="abrirReciboReserva(''+r.id+'')">🧾</button>'+
-        (st!=='confirmado' ? '<button class="icon-btn" title="Confirmar" onclick="setStatusReserva(''+r.id+'','confirmado')" style="border-color:var(--green);color:var(--green)">✅</button>' : '')+
-        (st!=='cancelado'  ? '<button class="icon-btn" title="Cancelar" onclick="setStatusReserva(''+r.id+'','cancelado')"  style="border-color:var(--red);color:var(--red)">✕</button>'   : '')+
-        '<button class="icon-btn" title="WhatsApp" onclick="abrirWhatsAppReserva(''+r.id+'')">💬</button>'+
+        '<button class="icon-btn" title="Ver Recibo" onclick="abrirReciboReserva('+n+')">🧾</button>'+
+        (st!=='confirmado' ? '<button class="icon-btn" title="Confirmar" onclick="setStatusReserva('+n+',\'confirmado\')" style="border-color:var(--green);color:var(--green)">✅</button>' : '')+
+        (st!=='cancelado'  ? '<button class="icon-btn" title="Cancelar" onclick="setStatusReserva('+n+',\'cancelado\')" style="border-color:var(--red);color:var(--red)">✕</button>'  : '')+
+        '<button class="icon-btn" title="WhatsApp" onclick="abrirWhatsAppReserva('+n+')">💬</button>'+
       '</div></td></tr>';
   }).join('');
 }
 
-function abrirReciboReserva(id) {
-  var r = _reservasCache.find(function(x){return x.id===id;});
+function abrirReciboReserva(n) {
+  var r = _reservasCache[n];
   if (!r) return;
   var p = encodeURIComponent(JSON.stringify(r));
   window.open('recibo-reserva.html#reserva='+p, '_blank');
 }
 
-function abrirWhatsAppReserva(id) {
-  var r = _reservasCache.find(function(x){return x.id===id;});
+function abrirWhatsAppReserva(n) {
+  var r = _reservasCache[n];
   if (!r) return;
   var msg = encodeURIComponent(
     '🚗 *LOKÁ – Confirmação de Reserva*\n\n'+
@@ -1374,14 +1374,14 @@ function abrirWhatsAppReserva(id) {
   window.open('https://wa.me/'+tel+'?text='+msg, '_blank');
 }
 
-function setStatusReserva(id, status) {
-  var idx = _reservasCache.findIndex(function(x){return x.id===id;});
-  if (idx < 0) return;
-  _reservasCache[idx].status = status;
+function setStatusReserva(n, status) {
+  var r = _reservasCache[n];
+  if (!r) return;
+  r.status = status;
   // Atualiza no Firebase
   try {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-      firebase.database().ref('reservas/'+id+'/status').set(status);
+      firebase.database().ref('reservas/'+r.id+'/status').set(status);
     }
   } catch(e) {}
   renderReservas();
