@@ -283,7 +283,7 @@
         </div>
         <div class="field-group">
           <span class="field-label">Telefone</span>
-          <input class="field-input" type="text" placeholder="(75) 00000-0000">
+          <input class="field-input" id="recTel" type="text" placeholder="(75) 00000-0000">
         </div>
       </div>
       <div class="field-grid col-full">
@@ -331,7 +331,7 @@
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#3D5AFE" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M8 7V5a2 2 0 00-4 0v2M2 12h20"/></svg>
             Veículo Reservado
           </span>
-          <input type="text" placeholder="Marca, Modelo, Placa, Cor">
+          <input type="text" id="recVeiculo" placeholder="Marca, Modelo, Placa, Cor">
         </div>
       </div>
     </div>
@@ -743,16 +743,22 @@ function registrarReserva() {
   var btn = document.getElementById('btnRegistrar');
   var msg = document.getElementById('registrarMsg');
 
-  // Coletar campos do recibo
-  var nome      = (document.getElementById('locatarioNome')  && document.getElementById('locatarioNome').value)  || '';
-  var retirada  = (document.getElementById('dtRetirada')     && document.getElementById('dtRetirada').value)     || '';
-  var devolucao = (document.getElementById('dtDevolucao')    && document.getElementById('dtDevolucao').value)    || '';
-  var valor     = (document.getElementById('valorReserva')   && document.getElementById('valorReserva').value)   || '';
-  var valorPago = (document.getElementById('valorPago')      && document.getElementById('valorPago').value)      || '';
-  var sigNome   = (document.getElementById('sigNome')        && document.getElementById('sigNome').value)        || '';
+  // Helper para ler campo pelo id
+  function campo(id) { var e=document.getElementById(id); return e?e.value.trim():''; }
+  // Extrai só a data de um datetime-local (2024-06-15T10:30 → 2024-06-15)
+  function soData(v) { return v?v.split('T')[0]:''; }
+
+  var nome      = campo('locatarioNome');
+  var tel       = campo('recTel');
+  var veiculo   = campo('recVeiculo');
+  var retirada  = soData(campo('dtRetirada'));
+  var devolucao = soData(campo('dtDevolucao'));
+  var valor     = campo('valorReserva');
+  var valorPago = campo('valorPago');
+  var sigNome   = campo('sigNome');
 
   // Validação mínima
-  if (!nome.trim()) {
+  if (!nome) {
     msg.textContent = '⚠️ Informe o nome do locatário antes de registrar.';
     msg.style.background = '#fef3cd'; msg.style.color = '#b45309';
     msg.style.display = 'flex'; return;
@@ -760,12 +766,12 @@ function registrarReserva() {
 
   var reserva = {
     id:        'rv' + Date.now(),
-    nome:      nome.trim(),
-    tel:       '',
+    nome:      nome,
+    tel:       tel,
     cpf:       '',
     email:     '',
-    veiculo:   '',
-    tipo:      'Não especificado',
+    veiculo:   veiculo,
+    tipo:      'Recibo',
     retirada:  retirada,
     devolucao: devolucao,
     valor:     valor ? 'R$ ' + valor : '—',

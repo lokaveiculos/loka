@@ -1292,6 +1292,12 @@ function carregarReservasFirebase() {
   } catch(e) { renderReservas(); }
 }
 
+function fmtRes(v) {
+  if (!v) return '—';
+  var d = v.includes('T') ? new Date(v) : new Date(v + 'T00:00');
+  return isNaN(d) ? v : d.toLocaleDateString('pt-BR');
+}
+
 function renderReservas() {
   var q  = (document.getElementById('qReservas') && document.getElementById('qReservas').value || '').toLowerCase();
   var f  = document.getElementById('fReservas') && document.getElementById('fReservas').value || '';
@@ -1336,8 +1342,8 @@ function renderReservas() {
       '<td style="font-size:10px">'+(r.tel||'—')+'<br><span style="color:var(--muted)">'+(r.cpf||'')+'</span></td>'+
       '<td style="font-size:11px">'+(r.veiculo||'—')+'</td>'+
       '<td><span class="badge bb">'+(r.tipo||'—')+'</span></td>'+
-      '<td style="font-size:11px;white-space:nowrap">'+(r.retirada?new Date(r.retirada+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'+
-      '<td style="font-size:11px;white-space:nowrap">'+(r.devolucao?new Date(r.devolucao+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'+
+      '<td style="font-size:11px;white-space:nowrap">'+fmtRes(r.retirada)+'</td>'+
+      '<td style="font-size:11px;white-space:nowrap">'+fmtRes(r.devolucao)+'</td>'+
       '<td style="font-size:11px;font-weight:700;color:var(--green)">'+(r.valor||'—')+'</td>'+
       '<td><span class="badge '+(stCls[st]||'bm')+'">'+( stLbl[st]||st)+'</span></td>'+
       '<td><div class="td-actions">'+
@@ -1346,6 +1352,7 @@ function renderReservas() {
         (st!=='cancelado'  ? '<button class="icon-btn" title="Cancelar" onclick="setStatusReserva('+n+',\'cancelado\')" style="border-color:var(--red);color:var(--red)">✕</button>'  : '')+
         '<button class="icon-btn" title="WhatsApp" onclick="abrirWhatsAppReserva('+n+')">💬</button>'+
         '<button class="icon-btn" title="Criar/Vincular Cliente" onclick="criarClienteDeReserva('+n+')" style="border-color:var(--blue);color:var(--blue)">👤+</button>'+
+        '<button class="icon-btn" title="Editar Reserva" onclick="abrirEditarReserva('+n+')" style="border-color:#f59e0b;color:#f59e0b">✏️</button>'+
       '</div></td></tr>';
   }).join('');
 }
@@ -1437,6 +1444,74 @@ function criarClienteDeReserva(n) {
   var bc = document.getElementById('btnContrato'); if (bc) bc.style.display = 'none';
   openM('mCliente');
   toast('👤 Dados da reserva pré-preenchidos', '#2B4BF2');
+}
+
+
+// ── EDITAR E EXCLUIR RESERVAS ─────────────────────────────────────────────────
+var _editReservaIdx = -1;
+
+function abrirEditarReserva(n) {
+  _editReservaIdx = n;
+  var r = _reservasCache[n];
+  if (!r) return;
+  function set(id, v) { var e=document.getElementById(id); if(e) e.value=v||''; }
+  set('erNome',     r.nome);
+  set('erTel',      r.tel);
+  set('erCpf',      r.cpf);
+  set('erVeiculo',  r.veiculo);
+  set('erRetirada', r.retirada ? r.retirada.split('T')[0] : '');
+  set('erDevolucao',r.devolucao ? r.devolucao.split('T')[0] : '');
+  set('erValor',    r.valor);
+  set('erValorPago',r.valorPago);
+  set('erObs',      r.obs);
+  var st = document.getElementById('erStatus'); if(st) st.value = r.status||'pendente';
+  var tp = document.getElementById('erTipo');   if(tp) tp.value = r.tipo||'Não especificado';
+  openM('mEditarReserva');
+}
+
+function salvarEdicaoReserva() {
+  var n = _editReservaIdx;
+  if (n < 0 || !_reservasCache[n]) return;
+  var r = _reservasCache[n];
+  function get(id) { var e=document.getElementById(id); return e?e.value.trim():''; }
+  r.nome     = get('erNome');
+  r.tel      = get('erTel');
+  r.cpf      = get('erCpf');
+  r.veiculo  = get('erVeiculo');
+  r.tipo     = document.getElementById('erTipo').value;
+  r.status   = document.getElementById('erStatus').value;
+  r.retirada = get('erRetirada');
+  r.devolucao= get('erDevolucao');
+  r.valor    = get('erValor');
+  r.valorPago= get('erValorPago');
+  r.obs      = get('erObs');
+  r.editadoEm = new Date().toISOString();
+  // Salvar no Firebase
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('reservas/' + r.id).set(r);
+    }
+  } catch(e) {}
+  _reservasCache[n] = r;
+  closeM('mEditarReserva');
+  renderReservas();
+  toast('💾 Reserva atualizada!', '#2B4BF2');
+}
+
+function excluirReserva(n) {
+  var r = _reservasCache[n];
+  if (!r) return;
+  if (!confirm('Excluir a reserva de "' + r.nome + '"? Esta ação não pode ser desfeita.')) return;
+  // Remover do Firebase
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('reservas/' + r.id).remove();
+    }
+  } catch(e) {}
+  _reservasCache.splice(n, 1);
+  closeM('mEditarReserva');
+  renderReservas();
+  toast('🗑 Reserva excluída.', '#c0392b');
 }
 
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
@@ -1752,5 +1827,30 @@ function importDB(input) {
 }
 
 </script>
+<!-- MODAL: EDITAR RESERVA -->
+<div class="modal-bg" id="mEditarReserva"><div class="modal" style="max-width:500px">
+  <div class="modal-head" style="background:#2B4BF2"><h3>✏️ Editar Reserva</h3><button class="modal-close" onclick="closeM('mEditarReserva')">✕</button></div>
+  <div class="modal-body">
+    <div class="g2">
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Nome *</label><input class="fi" id="erNome" placeholder="Nome do cliente"></div>
+      <div class="fg"><label class="fl">Telefone</label><input class="fi" id="erTel" placeholder="(75) 90000-0000"></div>
+      <div class="fg"><label class="fl">CPF / CNPJ</label><input class="fi" id="erCpf" placeholder="000.000.000-00"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Veículo</label><input class="fi" id="erVeiculo" placeholder="Marca, Modelo, Placa..."></div>
+      <div class="fg"><label class="fl">Tipo</label><select class="fs" id="erTipo"><option value="Diária">Por Diária</option><option value="Mensal">Mensal</option><option value="Recibo">Recibo</option><option value="Não especificado">Não especificado</option></select></div>
+      <div class="fg"><label class="fl">Status</label><select class="fs" id="erStatus"><option value="pendente">⏳ Pendente</option><option value="confirmado">✅ Confirmado</option><option value="cancelado">❌ Cancelado</option></select></div>
+      <div class="fg"><label class="fl">Data de Retirada</label><input class="fi" id="erRetirada" type="date"></div>
+      <div class="fg"><label class="fl">Data de Devolução</label><input class="fi" id="erDevolucao" type="date"></div>
+      <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="erValor" placeholder="R$ 0,00"></div>
+      <div class="fg"><label class="fl">Valor Pago (R$)</label><input class="fi" id="erValorPago" placeholder="R$ 0,00"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="erObs" placeholder="Observações..."></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mEditarReserva')">Cancelar</button>
+    <button class="btn" style="background:#c0392b;color:#fff" onclick="excluirReserva(_editReservaIdx)">🗑 Excluir</button>
+    <button class="btn btn-blue" onclick="salvarEdicaoReserva()">💾 Salvar</button>
+  </div>
+</div></div>
+
 </body>
 </html>
