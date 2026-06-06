@@ -1,23 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <!-- Auth Guard -->
+  <!-- Sem auth guard — página pública -->
   <script>
-  (function lokaAuthGuard() {
-    const SESSION_KEY = 'loka_session';
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) { window.location.replace('index.html'); return; }
-    try {
-      const s = JSON.parse(atob(raw));
-      if (s.exp <= Date.now()) {
-        sessionStorage.removeItem(SESSION_KEY);
-        window.location.replace('index.html');
-      }
-    } catch(e) {
-      sessionStorage.removeItem(SESSION_KEY);
-      window.location.replace('index.html');
-    }
-  })();
+  // Tenta identificar usuário logado (opcional)
+  try {
+    var _s = sessionStorage.getItem('loka_session');
+    if (_s) { var _d = JSON.parse(atob(_s)); if (_d.exp > Date.now()) window._lokaUser = _d; }
+  } catch(e) {}
   </script>
 
 <meta charset="UTF-8">
@@ -229,6 +219,11 @@
 <body>
 
 <div class="action-bar">
+  <button class="btn" id="btnRegistrar" onclick="registrarReserva()" style="background:#0d7a3e;color:#fff;display:inline-flex;align-items:center;gap:6px">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Registrar Reserva
+  </button>
+  <div id="registrarMsg" style="display:none;font-size:11px;font-weight:700;padding:6px 12px;border-radius:6px;align-self:center"></div>
   <button class="btn btn-print" onclick="window.print()">
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
     Imprimir
@@ -741,6 +736,83 @@ function preencherCamposReserva(r) {
     if (el && textFields[id]) el.textContent = textFields[id];
   });
   if (typeof showToast === 'function') showToast('✓ Reserva de <strong>'+(r.nome||'')+'</strong> carregada!', '#0d7a3e');
+}
+
+// ── REGISTRAR RESERVA NO SISTEMA ─────────────────────────────────────────────
+function registrarReserva() {
+  var btn = document.getElementById('btnRegistrar');
+  var msg = document.getElementById('registrarMsg');
+
+  // Coletar campos do recibo
+  var nome      = (document.getElementById('locatarioNome')  && document.getElementById('locatarioNome').value)  || '';
+  var retirada  = (document.getElementById('dtRetirada')     && document.getElementById('dtRetirada').value)     || '';
+  var devolucao = (document.getElementById('dtDevolucao')    && document.getElementById('dtDevolucao').value)    || '';
+  var valor     = (document.getElementById('valorReserva')   && document.getElementById('valorReserva').value)   || '';
+  var valorPago = (document.getElementById('valorPago')      && document.getElementById('valorPago').value)      || '';
+  var sigNome   = (document.getElementById('sigNome')        && document.getElementById('sigNome').value)        || '';
+
+  // Validação mínima
+  if (!nome.trim()) {
+    msg.textContent = '⚠️ Informe o nome do locatário antes de registrar.';
+    msg.style.background = '#fef3cd'; msg.style.color = '#b45309';
+    msg.style.display = 'flex'; return;
+  }
+
+  var reserva = {
+    id:        'rv' + Date.now(),
+    nome:      nome.trim(),
+    tel:       '',
+    cpf:       '',
+    email:     '',
+    veiculo:   '',
+    tipo:      'Não especificado',
+    retirada:  retirada,
+    devolucao: devolucao,
+    valor:     valor ? 'R$ ' + valor : '—',
+    valorPago: valorPago,
+    obs:       sigNome ? 'Assinado por: ' + sigNome : '',
+    origem:    'recibo',
+    status:    'pendente',
+    criadoEm:  new Date().toISOString(),
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('reservas/' + reserva.id).set(reserva)
+        .then(function() {
+          btn.textContent = '✅ Registrado!';
+          btn.style.background = '#0d7a3e';
+          msg.textContent = '✅ Reserva registrada! Acesse o painel de Reservas no sistema para gerenciar.';
+          msg.style.background = '#e8f5ef'; msg.style.color = '#0d7a3e';
+          msg.style.display = 'flex';
+        })
+        .catch(function(e) {
+          btn.disabled = false; btn.textContent = 'Registrar Reserva';
+          msg.textContent = '❌ Erro ao salvar: ' + e.message;
+          msg.style.background = '#fdecea'; msg.style.color = '#c0392b';
+          msg.style.display = 'flex';
+        });
+    } else {
+      // Fallback: salvar no localStorage como pendente
+      try {
+        var pending = JSON.parse(localStorage.getItem('loka_reservas_pendentes') || '[]');
+        pending.push(reserva);
+        localStorage.setItem('loka_reservas_pendentes', JSON.stringify(pending));
+      } catch(e2) {}
+      btn.textContent = '✅ Salvo localmente';
+      msg.textContent = '⚠️ Firebase indisponível. Reserva salva localmente — sincronize quando conectado.';
+      msg.style.background = '#fef3cd'; msg.style.color = '#b45309';
+      msg.style.display = 'flex';
+    }
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Registrar Reserva';
+    msg.textContent = '❌ Erro: ' + e.message;
+    msg.style.background = '#fdecea'; msg.style.color = '#c0392b';
+    msg.style.display = 'flex';
+  }
 }
 </script>
 
