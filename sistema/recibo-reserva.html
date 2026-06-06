@@ -646,9 +646,28 @@ async function runAutoFill() {
     if (hash.startsWith('#client=')) {
       try { data = JSON.parse(decodeURIComponent(hash.replace('#client=', ''))); } catch(e) {}
     }
+    // Leitura de reserva vinda do painel de gestão
+    if (hash.startsWith('#reserva=')) {
+      try {
+        const reserva = JSON.parse(decodeURIComponent(hash.replace('#reserva=', '')));
+        data = {
+          nome:  reserva.nome  || '',
+          cpf:   reserva.cpf   || '',
+          tel:   reserva.tel   || '',
+          email: reserva.email || '',
+          cnh:   reserva.cnh   || '',
+        };
+        // Preenche campos específicos da reserva (veículo, datas, valor)
+        _reservaFromPanel = reserva;
+      } catch(e) {}
+    }
   }
 
-  if (!data || !data.nome) return;
+  if (!data || !data.nome) {
+    // Tenta preencher dados da reserva do hash mesmo sem dados de cliente
+    if (_reservaFromPanel) preencherCamposReserva(_reservaFromPanel);
+    return;
+  }
 
   fillFields({
     nome:  data.nome  || '',
@@ -695,7 +714,35 @@ if (document.readyState === 'loading') {
     sessionStorage.removeItem('loka_user');
     window.location.replace('index.html');
   }
-  </script>
+  
+// ── DADOS DA RESERVA DO PAINEL ────────────────────────────────────────────
+var _reservaFromPanel = null;
+
+function preencherCamposReserva(r) {
+  if (!r) return;
+  // Tenta preencher campos visíveis do recibo com dados da reserva
+  var campos = {
+    'dNome': r.nome, 'dCpf': r.cpf, 'dTel': r.tel,
+    'dEmail': r.email, 'dCnh': r.cnh,
+  };
+  Object.keys(campos).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && campos[id]) el.value = campos[id];
+  });
+  // Campos de texto visíveis no recibo impresso
+  var textFields = {
+    'rNome': r.nome, 'rCpf': r.cpf, 'rTel': r.tel,
+    'rVeiculo': r.veiculo, 'rTipo': r.tipo,
+    'rRetirada': r.retirada, 'rDevolucao': r.devolucao,
+    'rValor': r.valor,
+  };
+  Object.keys(textFields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && textFields[id]) el.textContent = textFields[id];
+  });
+  if (typeof showToast === 'function') showToast('✓ Reserva de <strong>'+(r.nome||'')+'</strong> carregada!', '#0d7a3e');
+}
+</script>
 
 </body>
 </html>

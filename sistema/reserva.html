@@ -526,6 +526,20 @@ function enviar() {
     '\n_Enviado pelo formulário LOKÁ_'
   );
 
+  // ── Salva no Firebase para o painel de Reservas ──────────────────────
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      var reservaRecord = Object.assign({}, _reservaData, {
+        id:        'rv' + Date.now(),
+        status:    'pendente',
+        criadoEm:  new Date().toISOString(),
+        dataFmt:   new Date().toLocaleString('pt-BR'),
+      });
+      firebase.database().ref('reservas/' + reservaRecord.id).set(reservaRecord);
+    }
+  } catch(e) { console.warn('Reserva não sincronizada:', e); }
+  // ─────────────────────────────────────────────────────────────────────
+
   document.getElementById('waBtn').href = 'https://wa.me/'+CONFIG.whatsapp+'?text='+msg;
   goTo(5);
   setTimeout(() => window.open(document.getElementById('waBtn').href, '_blank'), 800);

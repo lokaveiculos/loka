@@ -375,9 +375,31 @@ tr:hover td{background:#f8f9fe;}
 
     <!-- ══ RESERVAS ══ -->
     <div class="panel" id="panel-reserva" style="display:none">
-      <div style="background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div>
-          <div style="font-size:12px;font-weight:800;color:var(--dark)">📋 Formulário Público de Reserva</div>
+      <div class="toolbar">
+        <div class="search-box" style="flex:1;min-width:180px;">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="filter-input" id="qReservas" type="text" placeholder="Buscar nome ou veículo..." oninput="renderReservas()">
+        </div>
+        <select class="filter-sel" id="fReservas" onchange="renderReservas()">
+          <option value="">Todos</option>
+          <option value="pendente">⏳ Pendentes</option>
+          <option value="confirmado">✅ Confirmados</option>
+          <option value="cancelado">❌ Cancelados</option>
+        </select>
+        <button class="btn btn-outline" onclick="copiarLinkReserva()" title="Copiar link público">📋 Copiar Link</button>
+        <button class="btn btn-outline" onclick="window.open('reserva.html','_blank')" title="Ver formulário público">↗ Formulário</button>
+        <button class="btn btn-outline" onclick="carregarReservasFirebase()" title="Sincronizar">🔄 Atualizar</button>
+      </div>
+      <div class="stats" id="resStats" style="margin-bottom:14px"></div>
+      <div class="table-card">
+        <div class="table-head"><h3>Pedidos de Reserva</h3><span id="resCount"></span></div>
+        <div class="table-scroll"><table><thead><tr>
+          <th>Data</th><th>Cliente</th><th>Contato</th><th>Veículo</th><th>Tipo</th>
+          <th>Retirada</th><th>Devolução</th><th>Valor Est.</th><th>Status</th><th>Ações</th>
+        </tr></thead><tbody id="resTable"></tbody></table></div>
+      </div>
+    </div>
+
           <div style="font-size:10px;color:var(--muted);margin-top:2px">Link para compartilhar com clientes</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
@@ -423,15 +445,18 @@ tr:hover td{background:#f8f9fe;}
   <div class="modal-body">
     <div class="g2">
       <div class="fg" style="grid-column:1/-1"><label class="fl">Nome Completo *</label><input class="fi" id="cNome" placeholder="Nome completo"><span class="field-err"></span></div>
-      <div class="fg"><label class="fl">CPF / CNPJ</label><input class="fi" id="cCpf" placeholder="000.000.000-00" oninput="maskCPF(this)" maxlength="14"></div>
+      <div class="fg"><label class="fl">CPF / CNPJ</label><input class="fi" id="cCpf" placeholder="000.000.000-00 ou CNPJ" oninput="maskCPF(this)" maxlength="18"></div>
       <div class="fg"><label class="fl">Telefone</label><input class="fi" id="cTel" type="tel" placeholder="(75) 90000-0000" oninput="maskTel(this)" maxlength="15"></div>
       <div class="fg"><label class="fl">E-mail</label><input class="fi" id="cEmail" type="email" placeholder="email@exemplo.com"></div>
-      <div class="fg"><label class="fl">Endereço</label><input class="fi" id="cEnd" placeholder="Rua, número, bairro"></div>
-      <div class="fg"><label class="fl">CEP</label><input class="fi" id="cCep" placeholder="00000-000" onblur="buscaCep()"></div>
+      <div class="fg"><label class="fl">CEP</label><input class="fi" id="cCep" placeholder="00000-000" oninput="maskCEP(this)" maxlength="9"></div>
+      <div class="fg"><label class="fl">Endereço (Rua e Nº)</label><input class="fi" id="cEnd" placeholder="Preenchido pelo CEP ou manual"></div>
+      <div class="fg"><label class="fl">Bairro</label><input class="fi" id="cBairro" placeholder="Preenchido pelo CEP"></div>
+      <div class="fg"><label class="fl">Cidade</label><input class="fi" id="cCidade" placeholder="Preenchida pelo CEP"></div>
+      <div class="fg"><label class="fl">UF</label><input class="fi" id="cUF" placeholder="BA" maxlength="2" style="text-transform:uppercase"></div>
       <div class="fg"><label class="fl">CNH Nº</label><input class="fi" id="cCnh" placeholder="00000000000"></div>
       <div class="fg"><label class="fl">Categoria CNH</label><select class="fs" id="cCnhCat"><option value="">Selecione</option><option>A</option><option>B</option><option>AB</option><option>C</option><option>D</option><option>E</option></select></div>
       <div class="fg"><label class="fl">Status</label><select class="fs" id="cStatus"><option value="ativo">Ativo</option><option value="bloqueado">Bloqueado</option></select></div>
-      <div class="fg"><label class="fl">Obs</label><input class="fi" id="cObs" placeholder="Observações"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="cObs" placeholder="Observações adicionais..."></div>
     </div>
   </div>
   <div class="modal-foot">
@@ -738,11 +763,31 @@ function closeM(id) { var el = document.getElementById(id); if (el) el.classList
 
 // ── MÁSCARAS ───────────────────────────────────────────────────
 function maskCPF(el) {
-  var v = el.value.replace(/\D/g,'').slice(0,11);
-  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/,'$1.$2.$3-$4');
-  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/,'$1.$2.$3');
-  else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/,'$1.$2');
+  // Auto-detecta CPF (11 dígitos) ou CNPJ (14 dígitos)
+  var v = el.value.replace(/\D/g,'').slice(0,14);
+  if (v.length > 11) {
+    // CNPJ: 00.000.000/0000-00
+    v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2})/, '$1.$2.$3/$4-$5')
+         .replace(/(\d{2})(\d{3})(\d{3})(\d{1,4})$/, '$1.$2.$3/$4')
+         .replace(/(\d{2})(\d{3})(\d{1,3})$/, '$1.$2.$3')
+         .replace(/(\d{2})(\d{1,3})$/, '$1.$2');
+  } else {
+    // CPF: 000.000.000-00
+    if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+    else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+    else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  }
   el.value = v;
+  // Atualiza maxlength dinamicamente
+  var digits = el.value.replace(/\D/g,'').length;
+  el.setAttribute('maxlength', digits > 11 ? '18' : '14');
+}
+
+function maskCEP(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,8);
+  if (v.length > 5) v = v.replace(/(\d{5})(\d{1,3})/, '$1-$2');
+  el.value = v;
+  if (v.replace(/\D/g,'').length === 8) buscaCep();
 }
 function maskTel(el) {
   var v = el.value.replace(/\D/g,'').slice(0,11);
@@ -869,7 +914,9 @@ function renderClientes() {
   if (!p.items.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Nenhum cliente encontrado.</td></tr>'; return; }
   tbody.innerHTML = p.items.map(function(c) {
     var idx = db.clients.indexOf(c);
-    return '<tr><td><strong>'+c.nome+'</strong></td>'+
+    return '<tr><td><strong>'+c.nome+'</strong>'+
+        (c.cidade?'<br><span style="font-size:9px;color:var(--muted)">'+c.cidade+(c.uf?' – '+c.uf:'')+'</span>':'')+
+        '</td>'+
       '<td style="font-size:11px">'+(c.cpf||'—')+'</td>'+
       '<td style="font-size:11px">'+(c.telefone||'—')+'</td>'+
       '<td><span class="badge bb">'+(c.alugueis||0)+'</span></td>'+
@@ -887,10 +934,14 @@ function openCliente(idx) {
   _curCli = idx;
   var c = idx >= 0 ? db.clients[idx] : {};
   document.getElementById('mClienteTitulo').textContent = idx >= 0 ? 'Editar Cliente' : 'Novo Cliente';
-  ['cNome','cCpf','cTel','cEmail','cEnd','cCep','cCnh','cObs'].forEach(function(id){
-    var map = {cNome:'nome',cCpf:'cpf',cTel:'telefone',cEmail:'email',cEnd:'endereco',cCep:'cep',cCnh:'cnh',cObs:'obs'};
+  var fieldMap = {
+    cNome:'nome', cCpf:'cpf', cTel:'telefone', cEmail:'email',
+    cCep:'cep', cEnd:'endereco', cBairro:'bairro', cCidade:'cidade', cUF:'uf',
+    cCnh:'cnh', cObs:'obs'
+  };
+  Object.keys(fieldMap).forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) el.value = c[map[id]] || '';
+    if (el) el.value = c[fieldMap[id]] || '';
   });
   var cs = document.getElementById('cStatus'); if(cs) cs.value = c.status||'ativo';
   var cc = document.getElementById('cCnhCat'); if(cc) cc.value = c.cnhCat||'';
@@ -907,8 +958,11 @@ function salvarCliente() {
     cpf:      (document.getElementById('cCpf').value||'').trim(),
     telefone: (document.getElementById('cTel').value||'').trim(),
     email:    (document.getElementById('cEmail').value||'').trim(),
-    endereco: (document.getElementById('cEnd').value||'').trim(),
     cep:      (document.getElementById('cCep').value||'').trim(),
+    endereco: (document.getElementById('cEnd').value||'').trim(),
+    bairro:   (document.getElementById('cBairro').value||'').trim(),
+    cidade:   (document.getElementById('cCidade').value||'').trim(),
+    uf:       ((document.getElementById('cUF').value||'').trim()).toUpperCase(),
     cnh:      (document.getElementById('cCnh').value||'').trim(),
     cnhCat:   document.getElementById('cCnhCat').value,
     status:   document.getElementById('cStatus').value,
@@ -925,15 +979,29 @@ function salvarCliente() {
 async function buscaCep() {
   var cep = (document.getElementById('cCep').value||'').replace(/\D/g,'');
   if (cep.length !== 8) return;
+  // Feedback visual
+  var cepEl = document.getElementById('cCep');
+  if (cepEl) { cepEl.style.borderColor = 'var(--blue)'; cepEl.placeholder = 'Buscando...'; }
   try {
-    var r = await fetch('https://viacep.com.br/ws/'+cep+'/json/');
+    var r = await fetch('https://viacep.com.br/ws/' + cep + '/json/');
     var d = await r.json();
-    if (!d.erro) {
-      var el = document.getElementById('cEnd');
-      if (el && !el.value) el.value = [d.logradouro,d.bairro,d.localidade+'-'+d.uf].filter(Boolean).join(', ');
-      toast('✅ CEP: '+d.localidade,'#0d7a3e');
-    }
-  } catch(e) {}
+    if (cepEl) { cepEl.style.borderColor = ''; cepEl.placeholder = '00000-000'; }
+    if (d.erro) { toast('⚠️ CEP não encontrado', '#b45309'); return; }
+    // Preenche apenas campos vazios
+    var endEl    = document.getElementById('cEnd');
+    var bairroEl = document.getElementById('cBairro');
+    var cidadeEl = document.getElementById('cCidade');
+    var ufEl     = document.getElementById('cUF');
+    var logr = [d.logradouro, d.complemento].filter(Boolean).join(', ');
+    if (endEl    && !endEl.value)    endEl.value    = logr;
+    if (bairroEl && !bairroEl.value) bairroEl.value = d.bairro || '';
+    if (cidadeEl && !cidadeEl.value) cidadeEl.value = d.localidade || '';
+    if (ufEl     && !ufEl.value)     ufEl.value     = d.uf || '';
+    toast('✅ ' + (d.localidade || 'CEP') + ' – ' + (d.uf || ''), '#0d7a3e');
+  } catch(e) {
+    if (cepEl) { cepEl.style.borderColor = ''; cepEl.placeholder = '00000-000'; }
+    toast('⚠️ Erro ao buscar CEP', '#b45309');
+  }
 }
 
 function selecionarContrato(idx) {
@@ -1196,6 +1264,129 @@ function copiarLinkCadastro() {
     el.select(); document.execCommand('copy');
     toast('✅ Link copiado!', '#0d7a3e');
   });
+}
+
+
+// ── RESERVAS ─────────────────────────────────────────────────────────────────
+var _reservasCache = [];
+
+function initReservaPanel() {
+  // Preenche URL
+  var el = document.getElementById('reservaUrl');
+  if (el) el.value = window.location.href.replace('gestao.html','reserva.html');
+  // Carrega do Firebase
+  carregarReservasFirebase();
+}
+
+function carregarReservasFirebase() {
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('reservas').orderByChild('criadoEm').once('value', function(snap) {
+        _reservasCache = [];
+        snap.forEach(function(child) { _reservasCache.push(child.val()); });
+        _reservasCache.reverse(); // mais recentes primeiro
+        renderReservas();
+      });
+    } else {
+      renderReservas();
+    }
+  } catch(e) { renderReservas(); }
+}
+
+function renderReservas() {
+  var q  = (document.getElementById('qReservas') && document.getElementById('qReservas').value || '').toLowerCase();
+  var f  = document.getElementById('fReservas') && document.getElementById('fReservas').value || '';
+  var list = _reservasCache.filter(function(r) {
+    if (q && (r.nome + ' ' + (r.veiculo||'')).toLowerCase().indexOf(q) < 0) return false;
+    if (f && (r.status||'pendente') !== f) return false;
+    return true;
+  });
+
+  // Stats
+  var nPend  = _reservasCache.filter(function(r){return !r.status||r.status==='pendente';}).length;
+  var nConf  = _reservasCache.filter(function(r){return r.status==='confirmado';}).length;
+  var nCanc  = _reservasCache.filter(function(r){return r.status==='cancelado';}).length;
+  var stats  = document.getElementById('resStats');
+  if (stats) stats.innerHTML =
+    '<div class="stat" style="border-left-color:var(--amber)"><div class="stat-value">'+nPend+'</div><div class="stat-label">Pendentes</div></div>'+
+    '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value">'+nConf+'</div><div class="stat-label">Confirmados</div></div>'+
+    '<div class="stat" style="border-left-color:var(--red)"><div class="stat-value">'+nCanc+'</div><div class="stat-label">Cancelados</div></div>'+
+    '<div class="stat"><div class="stat-value">'+_reservasCache.length+'</div><div class="stat-label">Total</div></div>';
+
+  var el = document.getElementById('resCount'); if(el) el.textContent = list.length + ' reserva(s)';
+
+  var tbody = document.getElementById('resTable');
+  if (!tbody) return;
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">'+
+      (_reservasCache.length ? 'Nenhuma reserva para o filtro selecionado.' : 'Nenhuma reserva recebida ainda. Os pedidos do formulário público aparecerão aqui.')+
+      '</td></tr>';
+    return;
+  }
+
+  var stCls  = {pendente:'ba', confirmado:'bg', cancelado:'br'};
+  var stLbl  = {pendente:'⏳ Pendente', confirmado:'✅ Confirmado', cancelado:'❌ Cancelado'};
+
+  tbody.innerHTML = list.map(function(r) {
+    var st = r.status || 'pendente';
+    var dt = r.criadoEm ? new Date(r.criadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    var rid = encodeURIComponent(JSON.stringify(r));
+    return '<tr>'+
+      '<td style="font-size:10px;color:var(--muted);white-space:nowrap">'+dt+'</td>'+
+      '<td><strong>'+(r.nome||'—')+'</strong></td>'+
+      '<td style="font-size:10px">'+(r.tel||'—')+'<br><span style="color:var(--muted)">'+(r.cpf||'')+'</span></td>'+
+      '<td style="font-size:11px">'+(r.veiculo||'—')+'</td>'+
+      '<td><span class="badge bb">'+(r.tipo||'—')+'</span></td>'+
+      '<td style="font-size:11px;white-space:nowrap">'+(r.retirada?new Date(r.retirada+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'+
+      '<td style="font-size:11px;white-space:nowrap">'+(r.devolucao?new Date(r.devolucao+'T00:00').toLocaleDateString('pt-BR'):'—')+'</td>'+
+      '<td style="font-size:11px;font-weight:700;color:var(--green)">'+(r.valor||'—')+'</td>'+
+      '<td><span class="badge '+(stCls[st]||'bm')+'">'+( stLbl[st]||st)+'</span></td>'+
+      '<td><div class="td-actions">'+
+        '<button class="icon-btn" title="Ver Recibo" onclick="abrirReciboReserva(''+r.id+'')">🧾</button>'+
+        (st!=='confirmado' ? '<button class="icon-btn" title="Confirmar" onclick="setStatusReserva(''+r.id+'','confirmado')" style="border-color:var(--green);color:var(--green)">✅</button>' : '')+
+        (st!=='cancelado'  ? '<button class="icon-btn" title="Cancelar" onclick="setStatusReserva(''+r.id+'','cancelado')"  style="border-color:var(--red);color:var(--red)">✕</button>'   : '')+
+        '<button class="icon-btn" title="WhatsApp" onclick="abrirWhatsAppReserva(''+r.id+'')">💬</button>'+
+      '</div></td></tr>';
+  }).join('');
+}
+
+function abrirReciboReserva(id) {
+  var r = _reservasCache.find(function(x){return x.id===id;});
+  if (!r) return;
+  var p = encodeURIComponent(JSON.stringify(r));
+  window.open('recibo-reserva.html#reserva='+p, '_blank');
+}
+
+function abrirWhatsAppReserva(id) {
+  var r = _reservasCache.find(function(x){return x.id===id;});
+  if (!r) return;
+  var msg = encodeURIComponent(
+    '🚗 *LOKÁ – Confirmação de Reserva*\n\n'+
+    '👤 *Cliente:* '+(r.nome||'—')+'\n'+
+    '🚘 *Veículo:* '+(r.veiculo||'—')+'\n'+
+    '📋 *Tipo:* '+(r.tipo||'—')+'\n'+
+    '📅 *Retirada:* '+(r.retirada||'—')+'\n'+
+    '📅 *Devolução:* '+(r.devolucao||'—')+'\n'+
+    '💰 *Valor estimado:* '+(r.valor||'—')
+  );
+  var tel = (r.tel||'').replace(/\D/g,'');
+  if (!tel.startsWith('55')) tel = '55' + tel;
+  window.open('https://wa.me/'+tel+'?text='+msg, '_blank');
+}
+
+function setStatusReserva(id, status) {
+  var idx = _reservasCache.findIndex(function(x){return x.id===id;});
+  if (idx < 0) return;
+  _reservasCache[idx].status = status;
+  // Atualiza no Firebase
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('reservas/'+id+'/status').set(status);
+    }
+  } catch(e) {}
+  renderReservas();
+  toast(status==='confirmado' ? '✅ Reserva confirmada!' : '❌ Reserva cancelada',
+        status==='confirmado' ? '#0d7a3e' : '#c0392b');
 }
 
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
