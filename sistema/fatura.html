@@ -201,25 +201,56 @@ tr.vsel .veic-fin { pointer-events: auto; }
 .veic-search-input:focus { border-color:var(--blue); background-color:#fff; }
 .veic-count { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
 @media print {
-  @page { size: A4 portrait; margin: 12mm 10mm 12mm 10mm; }
-  body { background: #fff !important; padding: 0 !important; }
+  @page { size: A4 portrait; margin: 10mm 8mm; }
+  body { background: #fff !important; padding: 0 !important; font-size: 11px !important; }
+
+  /* Ocultar elementos de UI */
   .action-bar, .cli-search-wrap, .veic-search-bar, .add-outro,
-  .del-btn, #resumoBox { display: none !important; }
+  .del-btn, #resumoBox, #secHistFaturas { display: none !important; }
+
+  /* Fatura */
   .fatura { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
-  .fatura-body { padding: 16px 20px !important; }
-  .fatura-header { padding: 14px 20px !important; }
-  .fatura-footer { padding: 10px 20px !important; }
-  tr:not(.vsel) { display: none !important; }
-  .veic-fin, .fin-input { border: none !important; background: transparent !important; color: #111 !important; padding: 4px 0 !important; }
-  .veic-table { font-size: 11px !important; }
-  .veic-table th { padding: 7px 8px !important; font-size: 8px !important; }
-  .veic-table td { padding: 6px 8px !important; }
-  .fin-table th { padding: 7px 8px !important; }
+  .fatura-header { padding: 12px 16px !important; }
+  .fatura-body  { padding: 12px 16px !important; }
+  .fatura-footer{ padding: 8px 16px !important; }
+  .sec { margin-bottom: 12px !important; }
+  .g2, .g3 { gap: 6px !important; }
+
+  /* Campos */
+  .input, .select { border: 1px solid #ddd !important; background: transparent !important; padding: 4px 6px !important; font-size: 11px !important; }
+  .input[readonly] { border: none !important; background: transparent !important; font-size: 11px !important; }
+  .fin-input { border: none !important; background: transparent !important; color: #111 !important; padding: 2px 0 !important; text-align: right; }
+
+  /* CORREÇÃO CRÍTICA: só ocultar linhas NÃO selecionadas da tabela de veículos */
+  .veic-table tbody tr:not(.vsel) { display: none !important; }
+
+  /* Veic table — compactar para caber no A4 */
+  .veic-table-wrap { overflow: visible !important; border: 1px solid #ccc !important; }
+  .veic-table { font-size: 10px !important; width: 100% !important; table-layout: fixed !important; }
+  .veic-table .chk-cell { display: none !important; width: 0 !important; }
+  .veic-table thead th { padding: 5px 6px !important; font-size: 8px !important; }
+  .veic-table tbody td { padding: 5px 6px !important; }
+  .veic-table thead th:nth-child(2) { width: 32% !important; }  /* Veículo */
+  .veic-table thead th:nth-child(3) { width: 12% !important; }  /* Placa */
+  .veic-table thead th:nth-child(4) { width: 10% !important; }  /* Status */
+  .veic-table thead th:nth-child(5) { width: 8% !important;  }  /* Qtd */
+  .veic-table thead th:nth-child(6) { width: 15% !important; }  /* Valor Unit */
+  .veic-table thead th:nth-child(7) { width: 12% !important; }  /* Seguro */
+  .veic-table thead th:nth-child(8) { width: 11% !important; }  /* Subtotal */
+  .veic-fin { font-size: 10px !important; padding: 2px 0 !important; }
+  .placa-badge { font-size: 8px !important; padding: 1px 4px !important; }
+  .st-badge { font-size: 8px !important; padding: 1px 4px !important; }
+
+  /* Fin table */
+  .fin-table { font-size: 11px !important; }
+  .fin-table th { padding: 6px 8px !important; font-size: 8px !important; }
   .fin-table td { padding: 6px 8px !important; }
-  .fin-row-total td { padding: 10px 8px !important; }
-  .sec { margin-bottom: 16px !important; }
-  .g2, .g3 { gap: 8px !important; }
-  .input[readonly] { background: transparent !important; color: #111 !important; border: none !important; }
+  .fin-row-total td { padding: 8px !important; font-size: 13px !important; }
+
+  /* Quebras de página */
+  .veic-table-wrap { page-break-inside: avoid; }
+  .sec { page-break-inside: avoid; }
+
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
@@ -882,12 +913,20 @@ function remOutro(id) {
 
 // ── TOTAL ─────────────────────────────────────────────────────
 function calcTotal() {
-  // Soma da planilha de veículos (substitui campo vlMensal manual)
+  // Soma da planilha de veículos → preenche automaticamente o campo de locação
   var veicTotal = calcTotalVeic();
-  // Atualiza campo de locação mensal automaticamente
   if (veicTotal > 0) {
     var s = veicTotal.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-    document.getElementById('vlMensal').value = s;
+    var vlM = document.getElementById('vlMensal');
+    if (vlM) vlM.value = s;
+    // Atualizar referência se ainda vazia
+    var refM = document.getElementById('refMensal');
+    if (refM && !refM.value) {
+      var nVeic = _veicSelecionados.size;
+      var per = document.getElementById('periodoRef') && document.getElementById('periodoRef').value;
+      var nomeMes = per ? new Date(per+'-01').toLocaleString('pt-BR',{month:'long',year:'numeric'}) : '';
+      refM.value = (nomeMes || '') + (nVeic > 1 ? ' · '+nVeic+' veículos' : '');
+    }
   }
   var sub = parseBRL(document.getElementById('vlMensal').value)
            + parseBRL(document.getElementById('vlSeguro').value);
@@ -903,7 +942,10 @@ function calcTotal() {
   document.getElementById('rSubtotal').textContent  = fmtBRL(sub);
   document.getElementById('rDesconto').textContent  = fmtBRL(desc);
   document.getElementById('rTotal').textContent     = fmtBRL(total);
-  document.getElementById('resumoBox').style.display = (sub > 0) ? 'flex' : 'none';
+  document.getElementById('resumoBox').style.display = (sub > 0 || total > 0) ? 'flex' : 'none';
+  // Mostrar seção Composição do Valor sempre que houver veículos selecionados
+  var finSection = document.querySelector('.fin-table');
+  if (finSection) finSection.closest('.sec') && finSection.closest('.sec');
 }
 
 // ── SALVAR FATURA ─────────────────────────────────────────────
