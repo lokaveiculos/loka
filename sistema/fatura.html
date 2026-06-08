@@ -187,14 +187,40 @@ body {
   border: 1.5px solid var(--border); border-radius: 6px;
   padding: 5px 8px; font-family: Montserrat, sans-serif; font-size: 12px;
   color: var(--text); outline: none; background: #fff; width: 100%;
-  text-align: right; transition: border-color .2s; min-width: 90px;
+  text-align: right; transition: border-color .2s; min-width: 80px;
 }
 .veic-fin:focus { border-color: var(--blue); }
 tr:not(.vsel) .veic-fin { background: #f9fafb; color: #c5cce0; pointer-events: none; }
 tr.vsel .veic-fin { pointer-events: auto; }
+.veic-search-bar { display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
+.veic-search-input {
+  flex:1; min-width:180px; padding:8px 12px 8px 32px; border:1.5px solid var(--border);
+  border-radius:7px; font-family:Montserrat,sans-serif; font-size:12px; outline:none;
+  background:#f9fafb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 24 24' stroke='%23aaa' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") 10px center no-repeat;
+}
+.veic-search-input:focus { border-color:var(--blue); background-color:#fff; }
+.veic-count { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
 @media print {
+  @page { size: A4 portrait; margin: 12mm 10mm 12mm 10mm; }
+  body { background: #fff !important; padding: 0 !important; }
+  .action-bar, .cli-search-wrap, .veic-search-bar, .add-outro,
+  .del-btn, #resumoBox { display: none !important; }
+  .fatura { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+  .fatura-body { padding: 16px 20px !important; }
+  .fatura-header { padding: 14px 20px !important; }
+  .fatura-footer { padding: 10px 20px !important; }
   tr:not(.vsel) { display: none !important; }
-  .veic-fin { border: none !important; background: transparent !important; }
+  .veic-fin, .fin-input { border: none !important; background: transparent !important; color: #111 !important; padding: 4px 0 !important; }
+  .veic-table { font-size: 11px !important; }
+  .veic-table th { padding: 7px 8px !important; font-size: 8px !important; }
+  .veic-table td { padding: 6px 8px !important; }
+  .fin-table th { padding: 7px 8px !important; }
+  .fin-table td { padding: 6px 8px !important; }
+  .fin-row-total td { padding: 10px 8px !important; }
+  .sec { margin-bottom: 16px !important; }
+  .g2, .g3 { gap: 8px !important; }
+  .input[readonly] { background: transparent !important; color: #111 !important; border: none !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
 /* ── TABELA FINANCEIRA ── */
@@ -425,6 +451,14 @@ textarea.input {
     <!-- VEÍCULOS -->
     <div class="sec">
       <div class="sec-title">Veículos Locados <span id="veicContador" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--muted)"></span></div>
+      <div class="veic-search-bar">
+        <input class="veic-search-input" id="veicSearch" type="text"
+          placeholder="Pesquisar por placa, modelo ou marca..."
+          oninput="filtrarVeiculos(this.value)">
+        <span class="veic-count" id="veicCount"></span>
+        <button class="btn btn-outline" onclick="selecionarTodosVisiveis()" style="white-space:nowrap;font-size:10px;padding:7px 12px">☑ Selec. visíveis</button>
+        <button class="btn btn-outline" onclick="limparSelecao()" style="white-space:nowrap;font-size:10px;padding:7px 12px">☐ Limpar</button>
+      </div>
       <div id="veiculosArea">
         <div class="loading"><div class="spinner"></div>Carregando veículos...</div>
       </div>
@@ -498,6 +532,29 @@ textarea.input {
       <div class="field">
         <textarea class="input" id="fatObs" rows="3"
           placeholder="Informações adicionais, condições de pagamento, chave PIX..."></textarea>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO DE FATURAS DO CLIENTE -->
+    <div class="sec" id="secHistFaturas" style="display:none">
+      <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Faturas Anteriores — <span id="histNomeCliente"></span></span>
+        <span id="histCount" style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0"></span>
+      </div>
+      <div style="border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:var(--azul);color:#fff">
+              <th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px">Nº</th>
+              <th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase">Período</th>
+              <th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase">Emissão</th>
+              <th style="padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase">Status</th>
+              <th style="padding:8px 12px;text-align:right;font-size:9px;text-transform:uppercase">Total</th>
+              <th style="padding:8px 12px;text-align:center;font-size:9px;text-transform:uppercase">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="histFaturasBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -641,12 +698,16 @@ function selecionarCliente(idx) {
   var periodo = document.getElementById('periodoRef').value;
   var nomeMes = periodo ? new Date(periodo+'-01').toLocaleString('pt-BR',{month:'long',year:'numeric'}) : '';
   document.getElementById('refMensal').placeholder = 'Mensalidade ' + nomeMes;
+  // Carrega faturas anteriores do cliente
+  if (c.id) carregarFaturasCliente(c.id);
 }
 function limparCliente() {
   _clienteSelecionado = null;
   document.getElementById('cliSelecionado').style.display = 'none';
   document.getElementById('cliSearch').style.display = 'block';
   document.getElementById('cliSearch').value = '';
+  var sec = document.getElementById('secHistFaturas');
+  if (sec) sec.style.display = 'none';
 }
 
 // ── VEÍCULOS ──────────────────────────────────────────────────
@@ -670,24 +731,30 @@ function renderVeiculosArea(lista) {
     var mensal = v.mensal || 0;
     var mensal_km = v.diaria_km_livre ? v.diaria_km_livre * 30 : 0;
     var valMensal = mensal > 0 ? mensal.toFixed(2).replace('.',',') : '';
-    return '<tr id="vrow-'+i+'" onclick="toggleVeiculo('+i+')" title="Clique para selecionar/desselecionar">'
+    return '<tr id="vrow-'+i+'" onclick="toggleVeiculo('+i+')" title="Clique para selecionar">'
       + '<td class="chk-cell"><div class="vchk" id="vchk-'+i+'"></div></td>'
       + '<td><strong>'+v.marca+' '+v.modelo+'</strong><br><span style="font-size:10px;color:var(--muted)">'+v.cor+' · '+v.ano+'</span></td>'
       + '<td><span class="placa-badge">'+v.placa+'</span></td>'
       + '<td>'+stBadge(v.status||'disponivel')+'</td>'
+      + '<td class="num-cell"><input class="veic-fin" id="vqtd-'+i+'" type="text" value="1" placeholder="1" oninput="calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="max-width:50px;text-align:center"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
-      + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px">—</td>'
+      + '<td class="num-cell"><input class="veic-fin" id="vseg-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
+      + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px;font-weight:700">—</td>'
     + '</tr>';
   }).join('');
 
+  var cnt = document.getElementById('veicCount');
+  if (cnt) cnt.textContent = lista.length + ' veículos';
   area.innerHTML = '<div class="veic-table-wrap">'
     + '<table class="veic-table">'
     + '<thead><tr>'
-    + '<th></th>'
+    + '<th style="width:36px"></th>'
     + '<th>Veículo</th>'
     + '<th>Placa</th>'
     + '<th>Status</th>'
-    + '<th>Valor Mensal (R$)</th>'
+    + '<th>Qtd dias/meses</th>'
+    + '<th>Valor Unit. (R$)</th>'
+    + '<th>Seguro (R$)</th>'
     + '<th>Subtotal</th>'
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
@@ -697,6 +764,54 @@ function renderVeiculosArea(lista) {
     + '<td class="total-val" id="veicTotalDisplay">R$ 0,00</td>'
     + '</tr></tfoot>'
     + '</table></div>';
+}
+
+
+// ── FILTRO E SELEÇÃO DE VEÍCULOS ────────────────────────────────────────────
+function filtrarVeiculos(q) {
+  q = (q||'').toLowerCase().trim();
+  var total = 0, visiveis = 0;
+  _veiculos.forEach(function(v, i) {
+    var row = document.getElementById('vrow-'+i);
+    if (!row) return;
+    total++;
+    var match = !q
+      || (v.placa||'').toLowerCase().includes(q)
+      || (v.marca||'').toLowerCase().includes(q)
+      || (v.modelo||'').toLowerCase().includes(q)
+      || (v.cor||'').toLowerCase().includes(q);
+    row.style.display = match ? '' : 'none';
+    if (match) visiveis++;
+  });
+  var cnt = document.getElementById('veicCount');
+  if (cnt) cnt.textContent = q ? visiveis + ' de ' + total + ' veículos' : total + ' veículos';
+}
+
+function selecionarTodosVisiveis() {
+  _veiculos.forEach(function(v, i) {
+    var row = document.getElementById('vrow-'+i);
+    if (!row || row.style.display === 'none') return;
+    if (!_veicSelecionados.has(i)) {
+      _veicSelecionados.add(i);
+      row.classList.add('vsel');
+      var chk = document.getElementById('vchk-'+i);
+      if (chk) chk.textContent = '✓';
+    }
+  });
+  atualizarContadorVeic(); calcTotalVeic(); calcTotal();
+}
+
+function limparSelecao() {
+  _veicSelecionados.forEach(function(i) {
+    var row = document.getElementById('vrow-'+i);
+    if (row) row.classList.remove('vsel');
+    var chk = document.getElementById('vchk-'+i);
+    if (chk) chk.textContent = '';
+    var sub = document.getElementById('vsub-'+i);
+    if (sub) sub.textContent = '—';
+  });
+  _veicSelecionados.clear();
+  atualizarContadorVeic(); calcTotalVeic(); calcTotal();
 }
 
 function toggleVeiculo(i) {
@@ -718,13 +833,16 @@ function toggleVeiculo(i) {
 function calcTotalVeic() {
   var total = 0;
   _veicSelecionados.forEach(function(i) {
+    var qtd = parseFloat(document.getElementById('vqtd-'+i) && document.getElementById('vqtd-'+i).value) || 1;
     var val = parseBRL(document.getElementById('vfin-'+i) && document.getElementById('vfin-'+i).value);
-    total += val;
-    var sub = document.getElementById('vsub-'+i);
-    if (sub) sub.textContent = val > 0 ? fmtBRL(val) : '—';
+    var seg = parseBRL(document.getElementById('vseg-'+i) && document.getElementById('vseg-'+i).value);
+    var sub = (val * qtd) + seg;
+    total += sub;
+    var subEl = document.getElementById('vsub-'+i);
+    if (subEl) subEl.textContent = sub > 0 ? fmtBRL(sub) : '—';
   });
   var el = document.getElementById('veicTotalDisplay');
-  if (el) el.textContent = total > 0 ? fmtBRL(total) : 'R$ 0,00';
+  if (el) el.textContent = fmtBRL(total);
   return total;
 }
 function atualizarContadorVeic() {
@@ -789,6 +907,52 @@ function calcTotal() {
 }
 
 // ── SALVAR FATURA ─────────────────────────────────────────────
+
+// ── HISTÓRICO DE FATURAS DO CLIENTE ─────────────────────────────────────────
+function carregarFaturasCliente(clienteId) {
+  if (!clienteId || !db) return;
+  db.ref('faturas/' + clienteId).once('value').then(function(snap) {
+    var data = snap.val();
+    var sec  = document.getElementById('secHistFaturas');
+    var body = document.getElementById('histFaturasBody');
+    if (!data) { if(sec) sec.style.display='none'; return; }
+    var faturas = Object.values(data).sort(function(a,b) {
+      return (b.criadoEm||'').localeCompare(a.criadoEm||'');
+    });
+    var cnt = document.getElementById('histCount');
+    if (cnt) cnt.textContent = faturas.length + ' fatura(s) encontrada(s)';
+    var stCls = { pago:'color:#0d7a3e', pendente:'color:#b45309', vencido:'color:#c0392b', parcial:'color:#7c3aed' };
+    var stLbl = { pago:'✅ Pago', pendente:'⏳ Pendente', vencido:'❌ Vencido', parcial:'⚠️ Parcial' };
+    _histFatMap = {};
+    body.innerHTML = faturas.map(function(f, fi) {
+      _histFatMap[fi] = {cid: clienteId, fid: f.id};
+      var st   = f.status || 'pendente';
+      var per  = f.periodo ? new Date(f.periodo+'-01').toLocaleString('pt-BR',{month:'short',year:'numeric'}) : '—';
+      var emi  = f.emissao ? new Date(f.emissao+'T00:00').toLocaleDateString('pt-BR') : '—';
+      return '<tr style="border-bottom:1px solid #f0f2f8">'
+        + '<td style="padding:9px 12px;font-weight:700">#'+f.numero+'</td>'
+        + '<td style="padding:9px 12px">'+per+'</td>'
+        + '<td style="padding:9px 12px;font-size:11px;color:var(--muted)">'+emi+'</td>'
+        + '<td style="padding:9px 12px;'+( stCls[st]||'')+';font-weight:700;font-size:11px">'+( stLbl[st]||st)+'</td>'
+                + '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace">'+f.total+'</td>'
+        + '<td style="padding:9px 12px;text-align:center"><button onclick="delFat('+fi+')" style="background:none;border:none;color:#e5e7eb;cursor:pointer;font-size:14px" title="Excluir">🗑</button></td>'
+        + '</tr>';
+    }).join('');
+    if(sec) sec.style.display = 'block';
+    document.getElementById('histNomeCliente').textContent = _clienteSelecionado ? _clienteSelecionado.nome : '';
+  }).catch(function(e){ console.warn('Hist faturas:', e); });
+}
+
+var _histFatMap = {};
+function delFat(n) {
+  var m = _histFatMap[n]; if (!m) return;
+  if (!confirm('Excluir esta fatura permanentemente?')) return;
+  db.ref('faturas/' + m.cid + '/' + m.fid).remove().then(function() {
+    status('🗑 Fatura excluída.', '#c0392b');
+    carregarFaturasCliente(m.cid);
+  }).catch(function(e) { status('❌ Erro: '+e.message, '#c0392b'); });
+}
+
 function salvarFatura() {
   var num   = document.getElementById('faturaNum').value;
   var cli   = _clienteSelecionado;
@@ -818,9 +982,12 @@ function salvarFatura() {
   };
 
   try {
+    // Salva vinculada ao cliente: faturas/{clienteId}/{faturaId}
+    var path = 'faturas/' + (fatura.clienteId || 'sem_cliente') + '/' + fatura.id;
     if (db) {
-      db.ref('faturas/' + fatura.id).set(fatura).then(function() {
-        status('✅ Fatura salva no sistema!', '#0d7a3e');
+      db.ref(path).set(fatura).then(function() {
+        status('✅ Fatura salva para ' + fatura.cliente + '!', '#0d7a3e');
+        carregarFaturasCliente(fatura.clienteId);
       }).catch(function(e) { status('❌ Erro Firebase: '+e.message, '#c0392b'); });
     } else {
       var list = JSON.parse(localStorage.getItem('loka_faturas')||'[]');

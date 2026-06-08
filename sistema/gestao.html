@@ -327,6 +327,19 @@ tr:hover td{background:#f8f9fe;}
       <div class="veiculo-grid" id="frotaGrid"></div>
     </div>
 
+
+    <!-- ══ FATURAS ══ -->
+    <div class="panel" id="panel-faturas" style="display:none">
+      <div style="background:#fff;border-radius:10px;padding:12px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--dark)">💰 Faturamento Mensal — Mensalistas</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">Fechamento de faturas para clientes mensalistas</div>
+        </div>
+        <button class="btn btn-outline" onclick="window.open('fatura.html','_blank')" style="white-space:nowrap;font-size:10px">↗ Abrir em nova aba</button>
+      </div>
+      <iframe src="fatura.html" style="width:100%;height:calc(100vh - 180px);border:none;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)" title="Faturas"></iframe>
+    </div>
+
     <!-- ══ FORMULÁRIOS ══ -->
     <div class="panel" id="panel-formularios">
       <div class="form-cards">
@@ -613,11 +626,11 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
-  historico:'Histórico de Locações', reserva:'Reservas', cadastro:'Pré-Cadastro'
+  historico:'Histórico de Locações', faturas:'Faturas', reserva:'Reservas', cadastro:'Pré-Cadastro'
 };
 
 // ── NAVEGAÇÃO ──────────────────────────────────────────────────
@@ -1519,10 +1532,11 @@ function excluirReserva(n) {
 var _precosVId = null;
 
 function abrirPrecos(vId) {
-  // Verificar se é admin/master
+  // Verificar se é admin ou master (operador não pode editar preços)
   try {
     var u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
-    if (u.perfil === 'operador') { toast('⚠️ Apenas Admin pode editar preços', '#b45309'); return; }
+    var pf = (u.perfil || '').toLowerCase();
+    if (pf !== 'admin' && pf !== 'master') { toast('⚠️ Apenas Admin e Master podem editar preços', '#b45309'); return; }
   } catch(e) {}
   _precosVId = vId;
   var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
