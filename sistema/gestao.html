@@ -1514,6 +1514,43 @@ function excluirReserva(n) {
   toast('🗑 Reserva excluída.', '#c0392b');
 }
 
+
+// ── EDITAR PREÇOS (Admin) ─────────────────────────────────────────────────────
+var _precosVId = null;
+
+function abrirPrecos(vId) {
+  // Verificar se é admin/master
+  try {
+    var u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
+    if (u.perfil === 'operador') { toast('⚠️ Apenas Admin pode editar preços', '#b45309'); return; }
+  } catch(e) {}
+  _precosVId = vId;
+  var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
+  document.getElementById('mPrecosNome').textContent = v.marca + ' ' + v.modelo + ' · ' + v.placa;
+  document.getElementById('pDiaria').value    = v.diaria         || '';
+  document.getElementById('pDiariaKm').value  = v.diaria_km_livre|| '';
+  document.getElementById('pMensal').value    = v.mensal         || '';
+  document.getElementById('pMensalKm').value  = v.mensal_km_livre|| '';
+  document.getElementById('pFranquia').value  = v.franquia       || '';
+  openM('mPrecos');
+}
+
+function salvarPrecos() {
+  var idx = db.veiculos.findIndex(function(v){return v.id===_precosVId;});
+  if (idx < 0) return;
+  var get = function(id) { return parseFloat(document.getElementById(id).value) || 0; };
+  db.veiculos[idx].diaria          = get('pDiaria');
+  db.veiculos[idx].diaria_km_livre = get('pDiariaKm');
+  db.veiculos[idx].mensal          = get('pMensal');
+  db.veiculos[idx].mensal_km_livre = get('pMensalKm');
+  db.veiculos[idx].franquia        = document.getElementById('pFranquia').value;
+  saveDB();
+  renderVeiculos();
+  renderFrota();
+  closeM('mPrecos');
+  toast('💰 Preços atualizados!', '#7c3aed');
+}
+
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
 function renderFrota() {
   if (!db) return;
@@ -1574,10 +1611,14 @@ function renderFrota() {
       '<span class="veiculo-placa">'+v.placa+'</span>'+
       ' <span class="badge '+(stCls[st]||'bm')+'">'+( stLbl[st]||st)+'</span>'+
       ativoInfo + manutInfo +
-      '<div class="veiculo-prices">'+
-        '<div class="vp-box"><div class="vp-label">Diária</div><div class="vp-value">R$ '+(v.diaria||0).toLocaleString('pt-BR')+'</div></div>'+
-        '<div class="vp-box"><div class="vp-label">Mensal</div><div class="vp-value" style="color:var(--green)">R$ '+(v.mensal||0).toLocaleString('pt-BR')+'</div></div>'+
-      '</div></div>';
+      '<div class="veiculo-prices" style="grid-template-columns:1fr 1fr">'+
+        '<div class="vp-box"><div class="vp-label">Diária Normal</div><div class="vp-value">R$ '+(v.diaria||0).toLocaleString('pt-BR')+'</div></div>'+
+        '<div class="vp-box"><div class="vp-label">Diária KM Livre</div><div class="vp-value" style="color:var(--blue)">R$ '+(v.diaria_km_livre||0).toLocaleString('pt-BR')+'</div></div>'+
+        '<div class="vp-box"><div class="vp-label">Mensal Normal</div><div class="vp-value" style="color:var(--green)">R$ '+(v.mensal||0).toLocaleString('pt-BR')+'</div></div>'+
+        '<div class="vp-box"><div class="vp-label">Mensal KM Livre</div><div class="vp-value" style="color:var(--green)">R$ '+(v.mensal_km_livre||0).toLocaleString('pt-BR')+'</div></div>'+
+      '</div>'+
+      (v.franquia?'<div style="font-size:9px;color:var(--muted);margin-top:4px">Franquia: '+v.franquia+' km/dia</div>':'')+
+      '</div>';
   }).join('');
 }
 
@@ -1607,10 +1648,14 @@ function renderVeiculos() {
       '<div class="veiculo-info">'+v.ano+' · '+v.cor+'</div>'+
       '<span class="veiculo-placa">'+v.placa+'</span>'+
       ' <span class="badge '+(stCls[st]||'bm')+'">'+( stLbl[st]||st)+'</span>'+
-      '<div class="veiculo-prices">'+
-        '<div class="vp-box"><div class="vp-label">Diária</div><div class="vp-value">R$ '+(v.diaria||0).toLocaleString('pt-BR')+'</div></div>'+
-        '<div class="vp-box"><div class="vp-label">Mensal</div><div class="vp-value" style="color:var(--green)">R$ '+(v.mensal||0).toLocaleString('pt-BR')+'</div></div>'+
-      '</div>'+btn+
+      '<div class="veiculo-prices" style="grid-template-columns:1fr 1fr">'+
+        '<div class="vp-box"><div class="vp-label">Diária Normal</div><div class="vp-value">R$ '+(v.diaria||0).toLocaleString('pt-BR')+'</div></div>'+
+        '<div class="vp-box"><div class="vp-label">Diária KM Livre</div><div class="vp-value" style="color:var(--blue)">R$ '+(v.diaria_km_livre||0).toLocaleString('pt-BR')+'</div></div>'+
+        '<div class="vp-box"><div class="vp-label">Mensal Normal</div><div class="vp-value" style="color:var(--green)">R$ '+(v.mensal||0).toLocaleString('pt-BR')+'</div></div>'+
+        '<div class="vp-box"><div class="vp-label">Mensal KM Livre</div><div class="vp-value" style="color:var(--green)">R$ '+(v.mensal_km_livre||0).toLocaleString('pt-BR')+'</div></div>'+
+      '</div>'+
+      (v.franquia?'<div style="font-size:9px;color:var(--muted);margin-top:4px">Franquia: '+v.franquia+' km/dia</div>':'')+
+      btn+
     '</div>';
   }).join('') : '<div class="empty"><p>Nenhum veículo encontrado.</p></div>';
 }
@@ -1849,6 +1894,27 @@ function importDB(input) {
     <button class="btn btn-outline" onclick="closeM('mEditarReserva')">Cancelar</button>
     <button class="btn" style="background:#c0392b;color:#fff" onclick="excluirReserva(_editReservaIdx)">🗑 Excluir</button>
     <button class="btn btn-blue" onclick="salvarEdicaoReserva()">💾 Salvar</button>
+  </div>
+</div></div>
+
+<!-- MODAL: EDITAR PREÇOS DO VEÍCULO -->
+<div class="modal-bg" id="mPrecos"><div class="modal" style="max-width:460px">
+  <div class="modal-head" style="background:#7c3aed"><h3>💰 Editar Preços — <span id="mPrecosNome"></span></h3><button class="modal-close" onclick="closeM('mPrecos')">✕</button></div>
+  <div class="modal-body">
+    <div class="g2">
+      <div class="fg"><label class="fl">Diária Normal (R$)</label><input class="fi" id="pDiaria" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Diária KM Livre (R$)</label><input class="fi" id="pDiariaKm" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Mensal Normal (R$)</label><input class="fi" id="pMensal" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Mensal KM Livre (R$)</label><input class="fi" id="pMensalKm" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Franquia (km/dia) — para modalidade diária normal</label><input class="fi" id="pFranquia" type="number" placeholder="Ex: 100"></div>
+    </div>
+    <div style="background:#EEF1FD;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:11px;color:var(--muted)">
+      💡 Alterações se aplicam imediatamente ao banco de dados e ficam visíveis na Frota Ativa.
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mPrecos')">Cancelar</button>
+    <button class="btn" style="background:#7c3aed;color:#fff" onclick="salvarPrecos()">💾 Salvar Preços</button>
   </div>
 </div></div>
 

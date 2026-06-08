@@ -122,7 +122,7 @@ body{font-family:"Barlow",sans-serif;background:#e8eaf0;color:var(--dark);font-s
 /* ── FOTOS ── */
 .fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
 @media(min-width:480px){.fotos-grid{grid-template-columns:repeat(4,1fr);}}
-.foto-slot{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#f3f4f6;border:2px dashed #d1d5db;cursor:pointer;}
+.foto-slot{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#f3f4f6;border:2px dashed #d1d5db;display:block;cursor:pointer;}
 .foto-slot img{width:100%;height:100%;object-fit:cover;display:block;}
 .foto-empty{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;}
 .foto-empty svg{opacity:.4;}
@@ -151,8 +151,11 @@ body{font-family:"Barlow",sans-serif;background:#e8eaf0;color:var(--dark);font-s
   @page{margin:8mm;size:A4;}
   body{background:#fff;}
   .action-bar,.modal-bg{display:none!important;}
-  .section{margin:6px;border-radius:0;box-shadow:none;}
+  .section{margin:6px;border-radius:0;box-shadow:none;break-inside:avoid;}
   .header{position:relative;}
+  .foto-slot{break-inside:avoid;}
+  .foto-slot img{display:block!important;max-width:100%;height:auto!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  .fotos-grid{display:grid!important;grid-template-columns:repeat(3,1fr)!important;}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
 }
 
@@ -545,17 +548,33 @@ document.getElementById("modalFoto").addEventListener("click",function(e){if(e.t
 function processarFoto(file){
   if(!file||!currentSlotId)return;
   const id=currentSlotId;
+  currentSlotId=null;
+  // Comprime e redimensiona para max 900px antes de exibir
+  const MAX=900, QUALITY=0.82;
   const reader=new FileReader();
   reader.onload=function(e){
-    const slot=document.getElementById("slot-"+id);
-    if(!slot)return;
-    slot.innerHTML=`<img src="${e.target.result}" alt="Foto">
-      <button class="foto-remove" onclick="removerFoto('${id}')">×</button>
-      <div class="foto-name"><span>${file.name.substring(0,20)}</span></div>`;
-    atualizarContador();
+    const img=new Image();
+    img.onload=function(){
+      let w=img.width, h=img.height;
+      if(w>MAX||h>MAX){
+        const r=Math.min(MAX/w,MAX/h);
+        w=Math.round(w*r); h=Math.round(h*r);
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      const dataUrl=canvas.toDataURL('image/jpeg',QUALITY);
+      const slot=document.getElementById('slot-'+id);
+      if(!slot)return;
+      var _rb='<button class="foto-remove" onclick="removerFoto('+JSON.stringify(id)+')">×</button>';
+      slot.innerHTML='<img src="'+dataUrl+'" alt="Foto" style="width:100%;height:100%;object-fit:cover;display:block;">'
+        +_rb+'<div class="foto-name"><span>'+file.name.substring(0,18)+'</span></div>';
+      atualizarContador();
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
-  currentSlotId=null;
 }
 
 document.getElementById("inputCamera").addEventListener("change",function(){processarFoto(this.files[0]);});
