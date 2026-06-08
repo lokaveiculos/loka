@@ -718,28 +718,104 @@ function lokaLogout() {
 
 // ── DB ─────────────────────────────────────────────────────────
 function loadDB() {
+  // 1. Carregar do localStorage imediatamente (rápido)
   var local = null;
   try { local = JSON.parse(localStorage.getItem('loka_db') || 'null'); } catch(e) {}
-  if (local && local.clients && local.clients.length > 0) {
-    db = local;
+
+  function inicializarCom(dados, origem) {
+    db = dados;
+    if (!db.historico) db.historico = [];
+    if (!db.contratos) db.contratos = [];
+    if (!db.ativos)    db.ativos    = [];
+    // Só salva no localStorage — NUNCA sobrescreve Firebase com seed
+    try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+    preencherCliSel();
+    checkAlertas();
+    showPanel('dashboard');
+    if (origem) toast('📂 Dados carregados: ' + origem, '#2B4BF2');
+  }
+
+  // 2. Tentar carregar do Firebase (protege contra localStorage vazio)
+  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    firebase.database().ref('loka_db').once('value', function(snap) {
+      var fbData = snap.val();
+      var nFB = fbData ? (fbData.clients||[]).length : 0;
+      var nLS = local  ? (local.clients||[]).length   : 0;
+
+      if (nFB > nLS && nFB > 64) {
+        // Firebase tem mais clientes reais — usa Firebase e atualiza localStorage
+        inicializarCom(fbData, null);
+        return;
+      }
+
+      if (nLS > 0) {
+        // localStorage OK — usa ele e sincroniza Firebase em background
+        db = local;
+        if (!db.historico) db.historico = [];
+        if (!db.contratos) db.contratos = [];
+        if (!db.ativos)    db.ativos    = [];
+        // Sincronizar Firebase se necessário
+        if (nLS > nFB) {
+          try { firebase.database().ref('loka_db').set(db); } catch(e) {}
+        }
+        preencherCliSel(); checkAlertas(); showPanel('dashboard');
+        return;
+      }
+
+      if (nFB > 0) {
+        // Só Firebase tem dados — restaurar
+        inicializarCom(fbData, 'Firebase');
+        return;
+      }
+
+      // 3. Nenhuma fonte tem dados — usar SEED
+      // IMPORTANTE: NÃO salvar no Firebase para não sobrescrever dados que possam estar lá
+      db = {
+        clients:  CSEED.map(function(c, i) {
+          return Object.assign({}, c, {id:'c'+i, email:c.email||'', status:'ativo', obs:'', cnh:'', cnhCat:''});
+        }),
+        veiculos: VSEED.map(function(v) { return Object.assign({}, v, {status:'disponivel'}); }),
+        ativos: [], historico: [], contratos: []
+      };
+      // Salva apenas no localStorage, não no Firebase
+      try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+      preencherCliSel(); checkAlertas(); showPanel('dashboard');
+
+    }).catch(function() {
+      // Firebase falhou — usar localStorage ou seed
+      if (local && local.clients && local.clients.length > 0) {
+        db = local;
+      } else {
+        db = {
+          clients:  CSEED.map(function(c, i) {
+            return Object.assign({}, c, {id:'c'+i, email:c.email||'', status:'ativo', obs:'', cnh:'', cnhCat:''});
+          }),
+          veiculos: VSEED.map(function(v) { return Object.assign({}, v, {status:'disponivel'}); }),
+          ativos: [], historico: [], contratos: []
+        };
+      }
+      if (!db.historico) db.historico = [];
+      if (!db.contratos) db.contratos = [];
+      preencherCliSel(); checkAlertas(); showPanel('dashboard');
+    });
+
   } else {
-    db = {
-      clients:  CSEED.map(function(c, i) {
-        return Object.assign({}, c, {id:'c'+i, email:c.email||'', status:'ativo', obs:'', cnh:'', cnhCat:''});
-      }),
-      veiculos: VSEED.map(function(v) { return Object.assign({}, v, {status:'disponivel'}); }),
-      ativos: [], historico: [], contratos: []
-    };
-    saveDB();
+    // Firebase indisponível — usar localStorage ou seed
+    if (local && local.clients && local.clients.length > 0) {
+      db = local;
+    } else {
+      db = {
+        clients:  CSEED.map(function(c, i) {
+          return Object.assign({}, c, {id:'c'+i, email:c.email||'', status:'ativo', obs:'', cnh:'', cnhCat:''});
+        }),
+        veiculos: VSEED.map(function(v) { return Object.assign({}, v, {status:'disponivel'}); }),
+        ativos: [], historico: [], contratos: []
+      };
+    }
+    if (!db.historico) db.historico = [];
+    if (!db.contratos) db.contratos = [];
+    preencherCliSel(); checkAlertas(); showPanel('dashboard');
   }
-  if (!db.veiculos || db.veiculos.length < 50) {
-    db.veiculos = VSEED.map(function(v) { return Object.assign({}, v, {status:'disponivel'}); });
-  }
-  if (!db.historico) db.historico = [];
-  if (!db.contratos) db.contratos = [];
-  preencherCliSel();
-  checkAlertas();
-  showPanel('dashboard');
 }
 
 function saveDB() {
