@@ -94,7 +94,7 @@ tr:hover td{background:#f8f9fe;}
 .br{background:#fdecea;color:var(--red);}
 .bb{background:var(--light);color:var(--blue);}
 .bm{background:#f8f9fe;color:var(--muted);}
-.bp{background:#ede9fe;color:var(--purple);}
+.bp{background:#ede9fe;color:var(--purple);}.bi{background:#f1f5f9;color:#64748b;}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(7,16,46,.75);z-index:500;align-items:center;justify-content:center;padding:16px;}
 .modal-bg.open{display:flex;}
 .modal{background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);}
@@ -301,10 +301,12 @@ tr:hover td{background:#f8f9fe;}
         </div>
         <select class="filter-sel" id="fVeiculos" onchange="renderVeiculos()">
           <option value="">Todos</option>
-          <option value="disponivel">Disponíveis</option>
-          <option value="alugado">Alugados</option>
-          <option value="manutencao">Em Manutenção</option>
+          <option value="disponivel">✅ Disponíveis</option>
+          <option value="alugado">🔑 Alugados</option>
+          <option value="manutencao">🔧 Manutenção</option>
+          <option value="inativo">⛔ Inativos</option>
         </select>
+        <button class="btn btn-blue" onclick="openVeiculo(null)">+ Adicionar Veículo</button>
       </div>
       <div class="veiculo-grid" id="veiculosGrid"></div>
     </div>
@@ -323,7 +325,9 @@ tr:hover td{background:#f8f9fe;}
           <option value="disponivel">✅ Disponíveis</option>
           <option value="alugado">🔑 Alugados</option>
           <option value="manutencao">🔧 Em Manutenção</option>
+          <option value="inativo">⛔ Inativos</option>
         </select>
+        <button class="btn btn-blue" onclick="openVeiculo(null)" style="white-space:nowrap">+ Adicionar</button>
       </div>
       <div class="veiculo-grid" id="frotaGrid"></div>
     </div>
@@ -1882,6 +1886,118 @@ function salvarPrecos() {
   toast('💰 Preços atualizados!', '#7c3aed');
 }
 
+
+// ── GESTÃO DE VEÍCULOS ──────────────────────────────────────────────────────
+var _curVeiculoId = null;
+
+function openVeiculo(vId) {
+  _curVeiculoId = vId || null;
+  var v = vId ? (db.veiculos.find(function(x){return x.id===vId;}) || {}) : {};
+  var isNew = !vId;
+
+  document.getElementById('mVeiculoTitulo').textContent = isNew ? 'Novo Veículo' : 'Editar Veículo';
+  document.getElementById('btnExcluirVeiculo').style.display = isNew ? 'none' : 'flex';
+
+  var map = {
+    vvMarca:'marca', vvModelo:'modelo', vvPlaca:'placa', vvAno:'ano',
+    vvCor:'cor', vvKm:'km', vvObs:'obs', vvFranquia:'franquia'
+  };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = v[map[id]] || '';
+  });
+  var nums = {vvDiaria:'diaria', vvDiariaKm:'diaria_km_livre', vvMensal:'mensal', vvMensalKm:'mensal_km_livre'};
+  Object.keys(nums).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = v[nums[id]] || '';
+  });
+  var st = document.getElementById('vvStatus');
+  if (st) st.value = v.status || 'disponivel';
+
+  openM('mVeiculo');
+}
+
+function salvarVeiculo() {
+  var marca  = (document.getElementById('vvMarca').value||'').trim();
+  var modelo = (document.getElementById('vvModelo').value||'').trim();
+  var placa  = (document.getElementById('vvPlaca').value||'').trim().toUpperCase();
+  if (!marca)  { toast('⚠️ Informe a marca', '#b45309'); return; }
+  if (!modelo) { toast('⚠️ Informe o modelo', '#b45309'); return; }
+  if (!placa)  { toast('⚠️ Informe a placa', '#b45309'); return; }
+
+  // Verificar placa duplicada (exceto edição do mesmo veículo)
+  var dup = db.veiculos.find(function(v) {
+    return v.placa === placa && v.id !== _curVeiculoId;
+  });
+  if (dup) { toast('⚠️ Já existe um veículo com esta placa', '#c0392b'); return; }
+
+  var get = function(id) { return document.getElementById(id) && document.getElementById(id).value || ''; };
+  var getNum = function(id) { return parseFloat(get(id)) || 0; };
+
+  var v = {
+    id:              _curVeiculoId || 'vf' + Date.now(),
+    marca:           marca,
+    modelo:          modelo,
+    placa:           placa,
+    ano:             get('vvAno'),
+    cor:             get('vvCor'),
+    km:              get('vvKm'),
+    diaria:          getNum('vvDiaria'),
+    diaria_km_livre: getNum('vvDiariaKm'),
+    mensal:          getNum('vvMensal'),
+    mensal_km_livre: getNum('vvMensalKm'),
+    franquia:        get('vvFranquia'),
+    status:          document.getElementById('vvStatus').value || 'disponivel',
+    obs:             get('vvObs'),
+  };
+
+  if (_curVeiculoId) {
+    var idx = db.veiculos.findIndex(function(x){return x.id===_curVeiculoId;});
+    if (idx >= 0) db.veiculos[idx] = v;
+  } else {
+    db.veiculos.push(v);
+  }
+
+  saveDB();
+  renderVeiculos();
+  renderFrota();
+  renderDashboard();
+  closeM('mVeiculo');
+  toast(_curVeiculoId ? '✅ Veículo atualizado!' : '✅ Veículo adicionado!', '#0d7a3e');
+}
+
+function excluirVeiculo() {
+  if (!_curVeiculoId) return;
+  var v = db.veiculos.find(function(x){return x.id===_curVeiculoId;});
+  if (!v) return;
+  // Verificar se está alugado
+  var ativo = db.ativos.find(function(a){return a.placa===v.placa||a.veiculoId===v.id;});
+  if (ativo) { toast('⚠️ Não é possível excluir: veículo com aluguel ativo', '#c0392b'); return; }
+  if (!confirm('Excluir o veículo ' + v.marca + ' ' + v.modelo + ' · ' + v.placa + '?\n\nEsta ação não pode ser desfeita.')) return;
+  db.veiculos = db.veiculos.filter(function(x){return x.id !== _curVeiculoId;});
+  saveDB();
+  renderVeiculos();
+  renderFrota();
+  renderDashboard();
+  closeM('mVeiculo');
+  toast('🗑 Veículo excluído.', '#c0392b');
+}
+
+function inativarVeiculo(vId) {
+  var idx = db.veiculos.findIndex(function(v){return v.id===vId;});
+  if (idx < 0) return;
+  var v = db.veiculos[idx];
+  var novoStatus = v.status === 'inativo' ? 'disponivel' : 'inativo';
+  var label = novoStatus === 'inativo' ? 'Inativar' : 'Reativar';
+  if (!confirm(label + ' o veículo ' + v.marca + ' ' + v.modelo + ' · ' + v.placa + '?')) return;
+  db.veiculos[idx].status = novoStatus;
+  saveDB();
+  renderVeiculos();
+  renderFrota();
+  renderDashboard();
+  toast(novoStatus==='inativo' ? '⛔ Veículo inativado' : '✅ Veículo reativado', novoStatus==='inativo'?'#c0392b':'#0d7a3e');
+}
+
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
 function renderFrota() {
   if (!db) return;
@@ -1906,8 +2022,8 @@ function renderFrota() {
       '<div class="stat"><div class="stat-value">'+db.veiculos.length+'</div><div class="stat-label">Total</div></div>';
   }
 
-  var stLbl = {disponivel:'Disponível', alugado:'Alugado', manutencao:'Em Manutenção'};
-  var stCls = {disponivel:'bg', alugado:'ba', manutencao:'bp'};
+  var stLbl = {disponivel:'Disponível', alugado:'Alugado', manutencao:'Em Manutenção', inativo:'Inativo'};
+  var stCls = {disponivel:'bg', alugado:'ba', manutencao:'bp', inativo:'bi'};
 
   var grid = document.getElementById('frotaGrid');
   if (!grid) return;
@@ -1965,8 +2081,8 @@ function renderVeiculos() {
   });
   var grid = document.getElementById('veiculosGrid');
   if (!grid) return;
-  var stLbl = {disponivel:'Disponível', alugado:'Alugado', manutencao:'Em Manutenção'};
-  var stCls = {disponivel:'bg', alugado:'ba', manutencao:'bp'};
+  var stLbl = {disponivel:'Disponível', alugado:'Alugado', manutencao:'Em Manutenção', inativo:'Inativo'};
+  var stCls = {disponivel:'bg', alugado:'ba', manutencao:'bp', inativo:'bi'};
   grid.innerHTML = list.length ? list.map(function(v){
     var st = v.status||'disponivel';
     var btn = st==='manutencao'
@@ -2248,6 +2364,44 @@ function renderFormularios() { preencherCliSel(); } // alias
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeM('mPrecos')">Cancelar</button>
     <button class="btn" style="background:#7c3aed;color:#fff" onclick="salvarPrecos()">💾 Salvar Preços</button>
+  </div>
+</div></div>
+
+<!-- MODAL: ADICIONAR / EDITAR VEÍCULO -->
+<div class="modal-bg" id="mVeiculo"><div class="modal" style="max-width:520px">
+  <div class="modal-head" style="background:#0E1B4D">
+    <h3 id="mVeiculoTitulo">Novo Veículo</h3>
+    <button class="modal-close" onclick="closeM('mVeiculo')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="g2">
+      <div class="fg"><label class="fl">Marca *</label><input class="fi" id="vvMarca" placeholder="Ex: VW, Toyota, Fiat"></div>
+      <div class="fg"><label class="fl">Modelo *</label><input class="fi" id="vvModelo" placeholder="Ex: Gol, Hilux, Uno"></div>
+      <div class="fg"><label class="fl">Placa *</label><input class="fi" id="vvPlaca" placeholder="AAA-0000" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="fg"><label class="fl">Ano</label><input class="fi" id="vvAno" placeholder="2024" type="number" min="2000" max="2030"></div>
+      <div class="fg"><label class="fl">Cor</label><input class="fi" id="vvCor" placeholder="Ex: Branca, Prata"></div>
+      <div class="fg"><label class="fl">KM atual</label><input class="fi" id="vvKm" placeholder="000000" type="number"></div>
+      <div class="sec-label" style="grid-column:1/-1;margin-top:4px">Tarifas</div>
+      <div class="fg"><label class="fl">Diária Normal (R$)</label><input class="fi" id="vvDiaria" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Diária KM Livre (R$)</label><input class="fi" id="vvDiariaKm" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Mensal Normal (R$)</label><input class="fi" id="vvMensal" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Mensal KM Livre (R$)</label><input class="fi" id="vvMensalKm" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Franquia (km/dia)</label><input class="fi" id="vvFranquia" placeholder="Ex: 100"></div>
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fs" id="vvStatus">
+          <option value="disponivel">✅ Disponível</option>
+          <option value="alugado">🔑 Alugado</option>
+          <option value="manutencao">🔧 Em Manutenção</option>
+          <option value="inativo">⛔ Inativo</option>
+        </select>
+      </div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="vvObs" placeholder="Observações adicionais..."></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mVeiculo')">Cancelar</button>
+    <button class="btn" id="btnExcluirVeiculo" style="background:#fdecea;color:#c0392b;border:1.5px solid #f5c6cb;display:none" onclick="excluirVeiculo()">🗑 Excluir</button>
+    <button class="btn btn-blue" onclick="salvarVeiculo()">💾 Salvar Veículo</button>
   </div>
 </div></div>
 
