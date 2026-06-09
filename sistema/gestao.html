@@ -448,7 +448,7 @@ tr:hover td{background:#f8f9fe;}
 <!-- USER BAR -->
 <div class="user-bar">
   <span id="userBarName">LOKÁ</span>
-  <span style="font-size:9px;color:rgba(255,255,255,.2)">01.02 · build 05/06/2026 15:03</span>
+  <span style="font-size:9px;color:rgba(255,255,255,.2)">01.02 · build 09/06/2026 11:58</span>
   <button class="logout-btn" onclick="lokaLogout()">⏻ Sair</button>
 </div>
 
@@ -664,7 +664,7 @@ function showPanel(name) {
     if (name === 'ativos')      renderAtivos();
     if (name === 'veiculos')    renderVeiculos();
     if (name === 'frota')       renderFrota();
-    if (name === 'formularios') preencherCliSel();
+    if (name === 'formularios') { preencherCliSel(); if(typeof renderFormularios==='function') renderFormularios(); }
     if (name === 'reserva')    initReservaPanel();
     if (name === 'cadastro')   initCadastroPanel();
     if (name === 'contratos')   renderContratos();
@@ -834,6 +834,8 @@ function fmt(s) {
   var d = new Date(s + 'T00:00');
   return isNaN(d) ? s : d.toLocaleDateString('pt-BR');
 }
+function fmtDate(s) { return fmt(s); } // alias
+
 function fmtBRL(v) {
   var n = parseFloat(String(v||0).replace(/[^\d,.-]/g,'').replace(',','.'));
   return isNaN(n) ? '—' : 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2});
@@ -1965,6 +1967,8 @@ function importDB(input) {
   reader.readAsText(file);
   input.value = '';
 }
+function renderFormularios() { preencherCliSel(); } // alias
+
 
 </script>
 <!-- MODAL: EDITAR RESERVA -->

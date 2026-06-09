@@ -1,24 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <!-- Auth Guard -->
-  <script>
-  (function lokaAuthGuard() {
-    const SESSION_KEY = 'loka_session';
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) { window.location.replace('index.html'); return; }
-    try {
-      const s = JSON.parse(atob(raw));
-      if (s.exp <= Date.now()) {
-        sessionStorage.removeItem(SESSION_KEY);
-        window.location.replace('index.html');
-      }
-    } catch(e) {
-      sessionStorage.removeItem(SESSION_KEY);
-      window.location.replace('index.html');
-    }
-  })();
-  </script>
+  <!-- Sem auth guard — página pública de pré-cadastro -->
 
 <meta charset="UTF-8">
   <meta name="theme-color" content="#0E1B4D">
