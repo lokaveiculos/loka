@@ -224,6 +224,13 @@ tr:hover td{background:#f8f9fe;}
 <div class="main">
   <div class="topbar">
     <h2 id="pageTitle">Dashboard</h2>
+    <div id="syncBadge" style="display:none;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#0d7a3e;background:#e8f5ef;border-radius:20px;padding:3px 10px;white-space:nowrap">
+      <span id="syncDot" style="width:7px;height:7px;background:#0d7a3e;border-radius:50%;display:inline-block;animation:syncPulse 1s infinite"></span>
+      <span id="syncText">Sincronizado</span>
+    </div>
+    <style>
+    @keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.3}}
+    </style>
     <div class="topbar-actions">
       <div class="search-wrap">
         <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -698,6 +705,8 @@ var CSEED = [{"nome": "Ana Claudia De Jesus Dias", "cpf": "055839655-09", "ender
 
 // ── ESTADO ─────────────────────────────────────────────────────
 var db = null;
+var _isSaving = false;       // Evita loop: nosso próprio save não re-renderiza
+var _syncTimeout = null;     // Timer para mostrar indicador
 var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
@@ -802,12 +811,13 @@ function loadDB() {
     if (!db.historico) db.historico = [];
     if (!db.contratos) db.contratos = [];
     if (!db.ativos)    db.ativos    = [];
-    // Só salva no localStorage — NUNCA sobrescreve Firebase com seed
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
     preencherCliSel();
     checkAlertas();
     showPanel('dashboard');
     if (origem) toast('📂 Dados carregados: ' + origem, '#2B4BF2');
+    // Ativar sincronização em tempo real
+    setupRealtimeSync();
   }
 
   // 2. Tentar carregar do Firebase (protege contra localStorage vazio)
@@ -834,6 +844,8 @@ function loadDB() {
           try { firebase.database().ref('loka_db').set(db); } catch(e) {}
         }
         preencherCliSel(); checkAlertas(); showPanel('dashboard');
+        // Ativar sincronização em tempo real
+        setupRealtimeSync();
         return;
       }
 
@@ -872,6 +884,7 @@ function loadDB() {
       if (!db.historico) db.historico = [];
       if (!db.contratos) db.contratos = [];
       preencherCliSel(); checkAlertas(); showPanel('dashboard');
+      // Sem sync em tempo real (Firebase falhou)
     });
 
   } else {
@@ -895,12 +908,87 @@ function loadDB() {
 
 function saveDB() {
   if (!db) return;
+  // Salva no localStorage imediatamente
   try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+  // Salva no Firebase — levanta flag para não re-renderizar ao receber o próprio save
   try {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && navigator.onLine) {
-      firebase.database().ref('loka_db').set(db);
+      _isSaving = true;
+      firebase.database().ref('loka_db').set(db).then(function() {
+        // Libera flag após Firebase confirmar (2s de margem)
+        setTimeout(function() { _isSaving = false; }, 2000);
+      }).catch(function() { _isSaving = false; });
     }
+  } catch(e) { _isSaving = false; }
+}
+
+// ── SINCRONIZAÇÃO EM TEMPO REAL ────────────────────────────────
+// Chamada uma vez após loadDB — escuta mudanças feitas por OUTROS usuários
+function setupRealtimeSync() {
+  if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+
+  firebase.database().ref('loka_db').on('value', function(snap) {
+    // Ignora se fomos nós que salvamos (evita re-render desnecessário)
+    if (_isSaving) return;
+    // Ignora se db ainda não foi inicializado
+    if (!db) return;
+
+    var fbData = snap.val();
+    if (!fbData || !fbData.clients) return;
+
+    // Compara tamanho para detectar mudança real
+    var mudou = (fbData.clients||[]).length !== (db.clients||[]).length
+      || (fbData.ativos||[]).length   !== (db.ativos||[]).length
+      || (fbData.veiculos||[]).length !== (db.veiculos||[]).length
+      || (fbData.historico||[]).length !== (db.historico||[]).length
+      || JSON.stringify(fbData.ativos) !== JSON.stringify(db.ativos)
+      || JSON.stringify(fbData.clients).length !== JSON.stringify(db.clients).length;
+
+    if (!mudou) return;
+
+    // Atualiza db e localStorage silenciosamente
+    db = fbData;
+    if (!db.historico) db.historico = [];
+    if (!db.contratos) db.contratos = [];
+    if (!db.ativos)    db.ativos    = [];
+    try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+
+    // Não re-renderiza se há modal aberto (usuário pode estar digitando)
+    var modalAberto = document.querySelector('.modal-bg.open');
+    if (modalAberto) return;
+
+    // Re-renderiza o painel ativo sem alterar navegação
+    _reRenderPainelAtivo();
+    checkAlertas();
+    _mostrarSyncBadge('🔄 Dados atualizados');
+  });
+}
+
+function _reRenderPainelAtivo() {
+  try {
+    var painel = document.querySelector('.panel[style*="display: block"], .panel[style*="display:block"]');
+    if (!painel) return;
+    var nome = painel.id.replace('panel-', '');
+    if (nome === 'dashboard')  renderDashboard();
+    if (nome === 'clientes')   { renderClientes(); preencherCliSel(); }
+    if (nome === 'ativos')     renderAtivos();
+    if (nome === 'veiculos')   renderVeiculos();
+    if (nome === 'frota')      renderFrota();
+    if (nome === 'historico')  renderHistorico();
+    if (nome === 'contratos')  renderContratos();
   } catch(e) {}
+}
+
+function _mostrarSyncBadge(texto) {
+  var badge = document.getElementById('syncBadge');
+  var txt   = document.getElementById('syncText');
+  if (!badge) return;
+  if (txt) txt.textContent = texto || '🔄 Sincronizado';
+  badge.style.display = 'flex';
+  clearTimeout(_syncTimeout);
+  _syncTimeout = setTimeout(function() {
+    badge.style.display = 'none';
+  }, 3000);
 }
 
 // ── UTILIDADES ─────────────────────────────────────────────────
