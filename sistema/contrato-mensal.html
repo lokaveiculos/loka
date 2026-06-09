@@ -103,7 +103,7 @@
 
   /* Clauses */
   .clauses { display: flex; flex-direction: column; gap: 8px; }
-  .clause { font-family: 'Source Serif 4', serif; font-size: 12.5px; color: var(--text); line-height: 1.65; text-align: justify; }
+  .clause { font-family: 'Source Serif 4', serif; font-size:8.5px; color: var(--text); line-height: 1.65; text-align: justify; }
   .clause strong { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700; color: var(--dark); }
   .clause-indent { padding-left: 20px; border-left: 2px solid var(--light-blue); }
 
@@ -139,49 +139,25 @@
 
   /* Print / A4 */
   @media print {
-    @page { size: A4; margin: 6mm 8mm; }
-    body { background: #fff; padding: 0; }
-    .action-bar, .sig-actions, #mobileModal { display: none !important; }
-    .contract { box-shadow: none; border-radius: 0; max-width: 100%; }
-    .contract-header { padding: 7px 16px; }
-    .logo-wrap img { height: 28px; }
-    .header-title h1 { font-size: 8.5px; line-height: 1.2; }
-    .header-title p { font-size: 7px; margin-top: 2px; }
-    .header-stripe { height: 2px; }
-    .contract-body { padding: 7px 16px 8px; }
-    .section { margin-bottom: 5px; }
-    .section-title { font-size: 7px; letter-spacing: 1px; padding-bottom: 2px; margin-bottom: 4px; border-bottom-width: 1.5px; }
-    .clause { font-size: 7px !important; line-height: 1.35 !important; text-align: justify; }
-    .clause strong { font-size: 6.5px !important; }
-    .clauses { gap: 2px; }
-    .clause-indent { padding-left: 8px; border-left-width: 1.5px; }
-    .field-label { font-size: 6.5px; }
-    .field-input { font-size: 8.5px; padding: 1px 2px; }
-    .field-grid { gap: 3px 8px; }
-    .data-table th { font-size: 6.5px; padding: 3px 3px; letter-spacing: 0.5px; }
-    .data-table td input { font-size: 8px; padding: 3px 3px; }
-    .data-table { margin-top: 3px; }
-    .locatario-row { gap: 8px; }
-    .photo-upload { width: 60px; height: 74px; }
-    .photo-box { gap: 2px; }
-    .photo-label { font-size: 7px; }
-    .sig-canvas-wrap canvas { height: 55px !important; }
-    .sig-fixed-wrap { height: 55px !important; }
-    .sig-fixed-wrap img { max-height: 48px !important; }
-    .signatures { gap: 16px; margin-top: 4px; }
-    .sig-name-label { font-size: 7px; }
-    .sig-company { font-size: 8px; }
-    .sig-cnpj { font-size: 7px; }
-    #sigNome { font-size: 8px; }
-    .date-row { margin-bottom: 6px; font-size: 9px; }
-    .obs-area { min-height: 22px; font-size: 8px; padding: 3px 6px; }
-    .contract-footer { padding: 5px 16px; font-size: 7px; line-height: 1.6; }
-    .header-badge { padding: 2px 8px; }
-    .header-badge span { font-size: 7px; }
-    #veiculosTable th:last-child, #veiculosTable td:last-child { display: none !important; }
-    button[onclick="addVeiculo()"] { display: none !important; }
-    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  }
+  @page { size: A4 portrait; margin: 8mm 10mm; }
+  body { background: #fff !important; padding: 0 !important; }
+  .action-bar, .modal-bg, button:not(.sig-btn) { display: none !important; }
+  .contract { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+  .contract-header { padding: 10px 16px !important; }
+  .section { padding: 8px 16px !important; margin: 0 !important; break-inside: avoid; }
+  .section-title { font-size: 8px !important; padding: 3px 0 !important; margin-bottom: 4px !important; }
+  .data-table th { font-size: 7px !important; padding: 4px 6px !important; }
+  .data-table td { font-size: 10px !important; padding: 4px 6px !important; }
+  .data-table input { font-size: 10px !important; padding: 2px 4px !important; border: none !important; background: transparent !important; }
+  .clause { font-size:8.5px !important; line-height: 1.4 !important; margin: 2px 0 !important; padding: 0 !important; }
+  .clause p { margin: 2px 0 !important; }
+  .clause strong { font-weight: 700 !important; }
+  .sig-area { margin-top: 8px !important; }
+  .sig-area input { border: none !important; background: transparent !important; font-size: 10px !important; }
+  .field-input { border: none !important; background: transparent !important; border-bottom: 1px solid #999 !important; border-radius: 0 !important; font-size: 10px !important; }
+  h1 { font-size: 13px !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
 </style>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -214,7 +190,7 @@
   /* Section titles */
   .section-title { font-size: 9px !important; }
   /* Clauses */
-  .clause { font-size: 12px !important; }
+  .clause { font-size:8.5px !important; }
   /* Mobile sig actions */
   .sig-actions { flex-wrap: wrap; }
   .sig-btn-qr { width: 100% !important; }
@@ -560,12 +536,30 @@ async function buscarCpfCnpj(valor) {
 
 /* ── Preenche todos os campos do contrato ── */
 function fillFields(data) {
-  // ── Por ID direto ──
+  // ── Por ID direto (inclui campos do contrato passados pelo gestao) ──
   const byId = {
     locatarioNome: data.nome,
     sigNome:       data.nome,
     fNome:         data.nome,
+    vPlaca:        data.placa,
+    vModelo:       data.modelo,
+    vMarca:        data.marca,
+    vCor:          data.cor,
+    vKm:           data.km,
+    dtRetirada:    data.retirada,
+    dtDevolucao:   data.devolucao,
   };
+  // Preencher valor e caução se fornecidos
+  if (data.valor) {
+    var ve = document.getElementById('tarTotal') || document.getElementById('tarMensal');
+    if (ve && !ve.readOnly) ve.value = data.valor;
+    var vT = document.getElementById('tarTotal');
+    if (vT && vT.readOnly) vT.value = data.valor;
+  }
+  if (data.caucao) {
+    var ca = document.getElementById('tarCaucao');
+    if (ca) ca.value = data.caucao;
+  }
   Object.entries(byId).forEach(([id, val]) => {
     if (!val) return;
     const el = document.getElementById(id);

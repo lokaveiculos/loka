@@ -541,19 +541,69 @@ tr:hover td{background:#f8f9fe;}
   </div>
 </div></div>
 
-<!-- MODAL: CONTRATO -->
-<div class="modal-bg" id="mContrato"><div class="modal" style="max-width:380px">
-  <div class="modal-head"><h3>Gerar Contrato</h3><button class="modal-close" onclick="closeM('mContrato')">✕</button></div>
+<!-- MODAL: CONTRATO COM PRÉ-REGISTRO -->
+<div class="modal-bg" id="mContrato"><div class="modal" style="max-width:520px">
+  <div class="modal-head"><h3>📄 Gerar Contrato</h3><button class="modal-close" onclick="closeM('mContrato')">✕</button></div>
   <div class="modal-body">
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Para: <strong id="mContratoNome"></strong></p>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-blue" style="justify-content:flex-start" onclick="abrirContrato('diaria')">📄 Contrato por Diária</button>
-      <button class="btn btn-green" style="justify-content:flex-start" onclick="abrirContrato('mensal')">📄 Contrato Mensal</button>
-      <button class="btn btn-outline" style="justify-content:flex-start" onclick="abrirContrato('reserva')">🧾 Recibo de Reserva</button>
-      <button class="btn btn-outline" style="justify-content:flex-start" onclick="abrirContrato('checklist')">✅ Checklist Vistoria</button>
+    <div style="background:#EEF1FD;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
+      Cliente: <strong id="mContratoNome"></strong>
+    </div>
+
+    <!-- TIPO -->
+    <div class="sec-label" style="margin-top:0">Tipo de Contrato</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <button id="ctBtnDiaria" class="btn btn-blue" onclick="selecionarTipoContrato('diaria')" style="flex-direction:column;padding:12px;gap:4px;font-size:11px">
+        🚗<span>Por Diária</span>
+      </button>
+      <button id="ctBtnMensal" class="btn btn-outline" onclick="selecionarTipoContrato('mensal')" style="flex-direction:column;padding:12px;gap:4px;font-size:11px">
+        📅<span>Mensal</span>
+      </button>
+    </div>
+
+    <!-- VEÍCULO E DATAS -->
+    <div class="sec-label">Dados da Locação</div>
+    <div class="g2">
+      <div class="fg" style="grid-column:1/-1">
+        <label class="fl">Veículo *</label>
+        <select class="fs" id="ctVeiculo" onchange="calcValorContrato()">
+          <option value="">— Selecione o veículo —</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">Data de Retirada *</label>
+        <input class="fi" id="ctRetirada" type="date" oninput="calcValorContrato()">
+      </div>
+      <div class="fg">
+        <label class="fl">Data de Devolução *</label>
+        <input class="fi" id="ctDevolucao" type="date" oninput="calcValorContrato()">
+      </div>
+      <div class="fg">
+        <label class="fl">Valor (R$)</label>
+        <input class="fi" id="ctValor" placeholder="Calculado automaticamente">
+      </div>
+      <div class="fg">
+        <label class="fl">Caução (R$)</label>
+        <input class="fi" id="ctCaucao" placeholder="0,00" oninput="maskBRL(this)">
+      </div>
+      <div class="fg" style="grid-column:1/-1">
+        <label class="fl">KM inicial / Obs</label>
+        <input class="fi" id="ctKm" placeholder="Ex: 45.320 km">
+      </div>
+    </div>
+
+    <div id="ctValorInfo" style="display:none;background:#e8f5ef;border-radius:7px;padding:10px 12px;margin-top:10px;font-size:12px;font-weight:700;color:#0d7a3e"></div>
+
+    <!-- OUTROS DOCUMENTOS -->
+    <div class="sec-label" style="margin-top:16px">Outros Documentos</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="abrirContrato('reserva')"  style="font-size:10px">🧾 Recibo de Reserva</button>
+      <button class="btn btn-outline" onclick="abrirContrato('checklist')" style="font-size:10px">✅ Checklist Vistoria</button>
     </div>
   </div>
-  <div class="modal-foot"><button class="btn btn-outline" onclick="closeM('mContrato')">Fechar</button></div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mContrato')">Cancelar</button>
+    <button class="btn btn-blue" onclick="gerarERegistrarContrato()">📄 Gerar Contrato e Registrar Aluguel</button>
+  </div>
 </div></div>
 
 <!-- MODAL: MANUTENÇÃO -->
@@ -1115,17 +1165,142 @@ function abrirMContrato() {
   openM('mContrato');
 }
 
-function abrirContrato(tipo) {
+// Tipo de contrato selecionado no modal
+var _ctTipo = 'diaria';
+function selecionarTipoContrato(tipo) {
+  _ctTipo = tipo;
+  var bD = document.getElementById('ctBtnDiaria');
+  var bM = document.getElementById('ctBtnMensal');
+  if (bD) { bD.className = tipo==='diaria' ? 'btn btn-blue' : 'btn btn-outline'; }
+  if (bM) { bM.className = tipo==='mensal' ? 'btn btn-blue' : 'btn btn-outline'; }
+  calcValorContrato();
+}
+
+function calcValorContrato() {
+  var vIdx = parseInt((document.getElementById('ctVeiculo') && document.getElementById('ctVeiculo').value) || '');
+  var ret  = document.getElementById('ctRetirada')  && document.getElementById('ctRetirada').value;
+  var dev  = document.getElementById('ctDevolucao') && document.getElementById('ctDevolucao').value;
+  var info = document.getElementById('ctValorInfo');
+  if (isNaN(vIdx) || !ret || !dev || !db) { if(info) info.style.display='none'; return; }
+  var v = db.veiculos[vIdx];
+  if (!v) return;
+  var dias = Math.max(1, Math.ceil((new Date(dev+'T00:00')-new Date(ret+'T00:00'))/86400000));
+  var val  = _ctTipo==='mensal' ? v.mensal*Math.ceil(dias/30) : v.diaria*dias;
+  var s    = val.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  var vlEl = document.getElementById('ctValor');
+  if (vlEl) vlEl.value = s;
+  if (info) {
+    info.textContent = (_ctTipo==='mensal'?'Mensal':'Diária')+': '+dias+' dia(s) × R$ '+
+      (_ctTipo==='mensal'?v.mensal:v.diaria).toLocaleString('pt-BR')+' = R$ '+s;
+    info.style.display = 'block';
+  }
+}
+
+function gerarERegistrarContrato() {
+  var cl   = _curCli >= 0 ? db.clients[_curCli] : {};
+  var vIdx = parseInt((document.getElementById('ctVeiculo') && document.getElementById('ctVeiculo').value) || '');
+  var ret  = document.getElementById('ctRetirada')  && document.getElementById('ctRetirada').value  || '';
+  var dev  = document.getElementById('ctDevolucao') && document.getElementById('ctDevolucao').value || '';
+  var val  = document.getElementById('ctValor')     && document.getElementById('ctValor').value     || '';
+  var cau  = document.getElementById('ctCaucao')    && document.getElementById('ctCaucao').value    || '';
+  var km   = document.getElementById('ctKm')        && document.getElementById('ctKm').value        || '';
+
+  if (isNaN(vIdx)) { toast('⚠️ Selecione o veículo','#b45309'); return; }
+  if (!ret || !dev)  { toast('⚠️ Informe as datas','#b45309'); return; }
+  if (dev <= ret)    { toast('⚠️ Devolução deve ser após a retirada','#b45309'); return; }
+
+  var v = db.veiculos[vIdx];
+  if (!v) return;
+
+  // Criar ativo
+  var ativo = {
+    id:          'a'+Date.now(),
+    clienteId:   cl.id||'', clienteNome: cl.nome||'',
+    veiculoId:   v.id||'',  veiculoNome: v.marca+' '+v.modelo, placa: v.placa,
+    tipo:        _ctTipo,
+    retirada:    ret, devolucao: dev,
+    valor:       val ? 'R$ '+val : '',
+    caucao:      cau, km: km,
+    obs:         '',
+    geradoEm:    new Date().toISOString(),
+    status:      'ativo',
+    origem:      'contrato-'+_ctTipo
+  };
+
+  // Atualizar status veículo
+  db.veiculos[vIdx].status = 'alugado';
+  db.clients[_curCli].alugueis = (db.clients[_curCli].alugueis||0)+1;
+  db.ativos.push(ativo);
+  if (!db.contratos) db.contratos = [];
+  db.contratos.unshift({id:'ct'+Date.now(), clienteNome:cl.nome||'', tipo:_ctTipo, geradoEm:new Date().toISOString()});
+  saveDB();
+
+  // Passar dados para o contrato via localStorage + Firebase pass
+  var passData = {
+    nome:  cl.nome||'', cpf: cl.cpf||'', tel: cl.telefone||'',
+    end:   [cl.endereco,cl.bairro,cl.cidade].filter(Boolean).join(', ')||'',
+    placa: v.placa, modelo: v.modelo, marca: v.marca, cor: v.cor, km: km,
+    retirada: ret, devolucao: dev, valor: val, caucao: cau, tipo: _ctTipo
+  };
+  try { localStorage.setItem('loka_contrato_client', JSON.stringify(passData)); } catch(e) {}
+  if (typeof LokaDB !== 'undefined') LokaDB.setClientPass(passData).catch(function(){});
+
+  // Abrir contrato
+  var files = {diaria:'contrato-diaria.html', mensal:'contrato-mensal.html'};
+  window.open(files[_ctTipo]||'contrato-diaria.html','_blank');
+
   closeM('mContrato');
-  var files = {diaria:'contrato-diaria.html', mensal:'contrato-mensal.html', reserva:'recibo-reserva.html', checklist:'checklist.html'};
+  renderAtivos(); renderDashboard(); checkAlertas();
+  toast('✅ Aluguel registrado e contrato gerado!','#0d7a3e');
+}
+
+function abrirMContrato() {
+  closeM('mCliente');
+  if (_curCli < 0) return;
+  var cl = db.clients[_curCli];
+  var el = document.getElementById('mContratoNome');
+  if (el) el.textContent = cl.nome;
+  // Popular select de veículos disponíveis
+  var sel = document.getElementById('ctVeiculo');
+  if (sel) {
+    sel.innerHTML = '<option value="">— Selecione o veículo —</option>'+
+      db.veiculos.filter(function(v){return v.status==='disponivel';}).map(function(v){
+        var i = db.veiculos.indexOf(v);
+        return '<option value="'+i+'">'+v.marca+' '+v.modelo+' · '+v.placa+
+          (v.diaria?' · Diária: R$'+v.diaria.toLocaleString('pt-BR'):'')+'</option>';
+      }).join('');
+  }
+  // Datas padrão
+  var hoje = new Date().toISOString().split('T')[0];
+  var ret = document.getElementById('ctRetirada'); if(ret) ret.value=hoje;
+  var dev = document.getElementById('ctDevolucao'); if(dev) dev.value='';
+  var cau = document.getElementById('ctCaucao');   if(cau) cau.value='';
+  var km  = document.getElementById('ctKm');       if(km)  km.value='';
+  var vi  = document.getElementById('ctValorInfo'); if(vi)  vi.style.display='none';
+  _ctTipo = 'diaria';
+  selecionarTipoContrato('diaria');
+  openM('mContrato');
+}
+
+function selecionarContrato(idx) {
+  _curCli = idx;
+  abrirMContrato();
+}
+
+function abrirContrato(tipo) {
+  // Para reserva/checklist — abre diretamente sem registro
   var cl = _curCli >= 0 ? db.clients[_curCli] : {};
   var data = {nome:cl.nome||'',cpf:cl.cpf||'',tel:cl.telefone||'',end:cl.endereco||''};
   try { localStorage.setItem('loka_contrato_client', JSON.stringify(data)); } catch(e) {}
   if (typeof LokaDB !== 'undefined') LokaDB.setClientPass(data).catch(function(){});
-  window.open(files[tipo]||'contrato-diaria.html','_blank');
-  if (!db.contratos) db.contratos = [];
-  db.contratos.unshift({id:'ct'+Date.now(), clienteNome:cl.nome||'', tipo:tipo, geradoEm:new Date().toISOString()});
-  saveDB();
+  var files = {reserva:'recibo-reserva.html', checklist:'checklist.html'};
+  if (files[tipo]) {
+    window.open(files[tipo],'_blank');
+    if (!db.contratos) db.contratos = [];
+    db.contratos.unshift({id:'ct'+Date.now(), clienteNome:cl.nome||'', tipo:tipo, geradoEm:new Date().toISOString()});
+    saveDB();
+    closeM('mContrato');
+  }
 }
 
 function abrirContratoComCliente(tipo) {
@@ -1258,6 +1433,8 @@ function confirmarPror() {
   if (!nd) { toast('⚠️ Informe a nova data','#b45309'); return; }
   var idx = db.ativos.findIndex(function(x){return x.id===_prorId;});
   if (idx<0) return;
+  var a = db.ativos[idx];
+  var datAnterior = a.devolucao;
   db.ativos[idx].devolucao = nd;
   db.ativos[idx].tipo = document.getElementById('prorTipo').value;
   var obs = document.getElementById('prorObs').value;
@@ -1265,6 +1442,63 @@ function confirmarPror() {
   saveDB(); renderAtivos(); renderDashboard();
   closeM('mProrrogacao');
   toast('✅ Prorrogado até '+fmt(nd),'#0d7a3e');
+  // Gerar termo de prorrogação — captura ativo antes do re-render
+  var ativoParaTermo = db.ativos[idx];
+  setTimeout(function(){ gerarTermoProrrogacao(ativoParaTermo, datAnterior, nd, obs); }, 300);
+}
+
+function gerarTermoProrrogacao(a, datAnterior, novaData, motivo) {
+  if (!a) return;
+  var fmtD = function(s){ if(!s)return'—'; var d=new Date(s+'T00:00'); return isNaN(d)?s:d.toLocaleDateString('pt-BR'); };
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Termo de Prorrogação</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">'
+    + '<style>'
+    + 'body{font-family:Montserrat,sans-serif;color:#0E1B4D;max-width:720px;margin:0 auto;padding:20px;font-size:12px}'
+    + 'h1{font-size:18px;font-weight:900;text-align:center;margin-bottom:4px}'
+    + 'h2{font-size:11px;font-weight:700;text-align:center;color:#5a607a;text-transform:uppercase;letter-spacing:1px;margin-bottom:24px}'
+    + '.head-logo{text-align:center;margin-bottom:16px}'
+    + '.head-logo strong{font-size:20px;font-weight:900;color:#0E1B4D;letter-spacing:-0.5px}'
+    + '.head-logo small{display:block;font-size:10px;color:#5a607a;font-weight:600;letter-spacing:1px}'
+    + 'table{width:100%;border-collapse:collapse;margin:16px 0}'
+    + 'th{background:#0E1B4D;color:#fff;padding:8px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px}'
+    + 'td{padding:9px 12px;border-bottom:1px solid #f0f2f8;font-size:12px}'
+    + 'tr:last-child td{border-bottom:none}'
+    + 'td.lbl{font-weight:700;width:35%;color:#5a607a}'
+    + '.cla{font-size:11px;line-height:1.7;color:#374151;margin:16px 0;padding:14px 16px;background:#f9fafb;border-radius:8px;border-left:3px solid #0E1B4D}'
+    + '.sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}'
+    + '.sig-box{text-align:center}'
+    + '.sig-line{border-top:1px solid #0E1B4D;margin-bottom:6px;padding-top:6px;font-size:11px}'
+    + '.dt{font-size:10px;color:#5a607a;text-align:right;margin-bottom:16px}'
+    + '@media print{@page{margin:12mm;size:A4}body{padding:0}button{display:none!important}}'
+    + '</style></head><body>'
+    + '<div class="head-logo"><strong>LOKÁ</strong><small>Aluguel de Veículos · CNPJ 39.911.638/0001-10</small></div>'
+    + '<h1>Termo de Prorrogação de Contrato</h1>'
+    + '<h2>Aditivo Contratual</h2>'
+    + '<div class="dt">Feira de Santana-BA, '+new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})+'</div>'
+    + '<table>'
+    + '<tr><td class="lbl">Locatário</td><td>'+a.clienteNome+'</td></tr>'
+    + '<tr><td class="lbl">Veículo</td><td>'+a.veiculoNome+(a.placa?' · '+a.placa:'')+'</td></tr>'
+    + '<tr><td class="lbl">Data de retirada</td><td>'+fmtD(a.retirada)+'</td></tr>'
+    + '<tr><td class="lbl">Devolução original</td><td>'+fmtD(datAnterior)+'</td></tr>'
+    + '<tr><td class="lbl" style="color:#2B4BF2">Nova devolução</td><td style="font-weight:800;color:#2B4BF2">'+fmtD(novaData)+'</td></tr>'
+    + '<tr><td class="lbl">Tipo</td><td>'+(a.tipo==='mensal'?'Locação Mensal':'Locação por Diária')+'</td></tr>'
+    + (motivo?'<tr><td class="lbl">Motivo</td><td>'+motivo+'</td></tr>':'')
+    + '</table>'
+    + '<div class="cla">Por meio deste Termo, as partes signatárias — <strong>LOKÁ Aluguel de Veículos</strong> (Locadora) '
+    + 'e o Locatário identificado acima — acordam a prorrogação da data de devolução do veículo mencionado, passando a viger '
+    + 'a nova data estabelecida, mantidas todas as demais condições e cláusulas do contrato original. '
+    + 'O Locatário declara estar ciente das condições aplicáveis ao período adicional e compromete-se a devolver o veículo '
+    + 'na data acordada neste aditivo.</div>'
+    + '<div class="sig">'
+    + '<div class="sig-box"><div style="height:50px"></div><div class="sig-line">'+a.clienteNome+'<br><small>Locatário</small></div></div>'
+    + '<div class="sig-box"><div style="height:50px"></div><div class="sig-line">LOKÁ Aluguel de Veículos<br><small>Locadora</small></div></div>'
+    + '</div>'
+    + '<div style="text-align:center;margin-top:24px">'
+    + '<button onclick="window.print()" style="padding:10px 24px;background:#0E1B4D;color:#fff;border:none;border-radius:7px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>'
+    + '</div></body></html>';
+  var w = window.open('','_blank');
+  if (w) { w.document.write(html); w.document.close(); }
 }
 
 // Encerramento
