@@ -225,6 +225,11 @@
 
 <!-- Botões -->
 <div class="action-bar">
+  <button class="btn" id="btnRegistrarMensal" onclick="registrarAluguelMensal()" style="background:#0d7a3e;color:#fff;display:inline-flex;align-items:center;gap:7px">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Registrar Aluguel
+  </button>
+  <div id="regMsgM" style="display:none;font-size:11px;font-weight:700;padding:6px 12px;border-radius:6px;align-self:center"></div>
   <button class="btn btn-print" onclick="window.print()">
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
     Imprimir
@@ -350,9 +355,9 @@
             <td><input id="tarMensal" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
             <td><input id="tarCondutor" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
             <td><input id="tarTotal" placeholder="0,00" readonly style="background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>
-            <td><input placeholder="R$ 0,00" oninput="maskBRL(this)"></td>
-            <td><input placeholder="Ex: 11"></td>
-            <td><input placeholder="Ex: 90 dias"></td>
+            <td><input id="tarCaucao" placeholder="R$ 0,00" oninput="maskBRL(this)"></td>
+            <td><input id="dtInicio" placeholder="Ex: 11 (dia)"></td>
+            <td><input id="dtVigencia" placeholder="Ex: 90 dias"></td>
           </tr>
         </tbody>
       </table>
@@ -702,7 +707,131 @@ if (document.readyState === 'loading') {
     sessionStorage.removeItem('loka_user');
     window.location.replace('index.html');
   }
-  </script>
+  
+// ── REGISTRAR ALUGUEL MENSAL NO SISTEMA ──────────────────────────────────────
+function registrarAluguelMensal() {
+  var btn = document.getElementById('btnRegistrarMensal');
+  var msg = document.getElementById('regMsgM');
+
+  function showMsg(text, color) {
+    msg.textContent = text;
+    msg.style.background = color === 'ok' ? '#e8f5ef' : '#fdecea';
+    msg.style.color = color === 'ok' ? '#0d7a3e' : '#c0392b';
+    msg.style.display = 'inline-block';
+  }
+
+  var nome  = (document.getElementById('locatarioNome') && document.getElementById('locatarioNome').value || '').trim();
+  var valor = document.getElementById('tarTotal')  && document.getElementById('tarTotal').value  || '';
+  var caucao = document.getElementById('tarCaucao') && document.getElementById('tarCaucao').value || '';
+  var inicio = document.getElementById('dtInicio') && document.getElementById('dtInicio').value || '';
+  var vigencia = document.getElementById('dtVigencia') && document.getElementById('dtVigencia').value || '';
+
+  // Coletar placas da tabela de veículos
+  var veiculosBody = document.getElementById('veiculosBody');
+  var placas = [], modelos = [];
+  if (veiculosBody) {
+    var rows = veiculosBody.querySelectorAll('tr');
+    rows.forEach(function(row) {
+      var inputs = row.querySelectorAll('input');
+      if (inputs.length >= 3) {
+        var mod = inputs[0].value.trim();
+        var placa = inputs[2].value.trim().toUpperCase();
+        if (mod || placa) {
+          modelos.push(inputs[1].value.trim() + ' ' + mod);
+          placas.push(placa);
+        }
+      }
+    });
+  }
+
+  if (!nome) { showMsg('⚠️ Informe o nome do locatário', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  var primeiraPlaca = placas[0] || '';
+  var ativo = {
+    id:          'a' + Date.now(),
+    clienteNome: nome,
+    clienteId:   '',
+    veiculoNome: modelos.length ? modelos.join(', ') : primeiraPlaca,
+    placa:       primeiraPlaca,
+    placas:      placas,
+    tipo:        'mensal',
+    retirada:    inicio ? new Date().getFullYear() + '-' + (new Date().getMonth()+1).toString().padStart(2,'0') + '-' + (inicio.replace(/\D/g,'')||'01').padStart(2,'0') : new Date().toISOString().split('T')[0],
+    devolucao:   '',
+    valor:       valor ? 'R$ ' + valor : '',
+    caucao:      caucao,
+    vigencia:    vigencia,
+    obs:         'Contrato mensal gerado em ' + new Date().toLocaleDateString('pt-BR'),
+    geradoEm:    new Date().toISOString(),
+    status:      'ativo',
+    origem:      'contrato-mensal'
+  };
+
+  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    firebase.database().ref('loka_db').once('value').then(function(snap) {
+      var db = snap.val();
+      if (!db) db = { clients:[], veiculos:[], ativos:[], historico:[], contratos:[] };
+      if (!db.ativos) db.ativos = [];
+      if (!db.contratos) db.contratos = [];
+
+      // Buscar clienteId
+      var cli = (db.clients || []).find(function(c) {
+        return c.nome && c.nome.toLowerCase() === nome.toLowerCase();
+      });
+      if (cli) ativo.clienteId = cli.id || '';
+
+      // Atualizar status dos veículos pelas placas
+      placas.forEach(function(placa) {
+        if (!placa || !db.veiculos) return;
+        var vi = db.veiculos.findIndex(function(v) {
+          return v.placa && v.placa.toUpperCase() === placa.toUpperCase();
+        });
+        if (vi >= 0) db.veiculos[vi].status = 'alugado';
+      });
+
+      db.ativos.push(ativo);
+      db.contratos.push({
+        id: 'ct' + Date.now(),
+        clienteNome: nome,
+        tipo: 'mensal',
+        geradoEm: new Date().toISOString()
+      });
+
+      return firebase.database().ref('loka_db').set(db);
+    }).then(function() {
+      try {
+        var local = JSON.parse(localStorage.getItem('loka_db') || 'null');
+        if (local) {
+          if (!local.ativos) local.ativos = [];
+          local.ativos.push(ativo);
+          localStorage.setItem('loka_db', JSON.stringify(local));
+        }
+      } catch(e) {}
+      btn.textContent = '✅ Registrado!';
+      btn.style.background = '#0d7a3e';
+      showMsg('✅ Aluguel de ' + nome + ' registrado em Aluguéis Ativos!', 'ok');
+    }).catch(function(e) {
+      btn.disabled = false; btn.textContent = 'Registrar Aluguel';
+      showMsg('❌ Erro: ' + e.message, 'err');
+    });
+  } else {
+    try {
+      var local = JSON.parse(localStorage.getItem('loka_db') || 'null');
+      if (local) {
+        if (!local.ativos) local.ativos = [];
+        local.ativos.push(ativo);
+        localStorage.setItem('loka_db', JSON.stringify(local));
+        btn.textContent = '✅ Salvo localmente';
+        showMsg('✅ Salvo no localStorage (Firebase indisponível)', 'ok');
+      }
+    } catch(e) {
+      showMsg('❌ Erro: ' + e.message, 'err');
+      btn.disabled = false; btn.textContent = 'Registrar Aluguel';
+    }
+  }
+}
+</script>
 
 </body>
 </html>
