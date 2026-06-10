@@ -709,6 +709,16 @@ var CSEED = [{"nome": "Ana Claudia De Jesus Dias", "cpf": "055839655-09", "ender
 var db = null;
 var _isSaving = false;       // Evita loop: nosso próprio save não re-renderiza
 var _syncTimeout = null;     // Timer para mostrar indicador
+
+// ── Limpa nulls/undefined/objetos vazios de arrays do Firebase ──
+function cleanArr(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(x) { return x !== null && x !== undefined && typeof x === 'object'; });
+}
+// Limpa especificamente veículos (requer pelo menos placa)
+function cleanVeics(arr) {
+  return cleanArr(arr).filter(function(v) { return v.placa || v.modelo; });
+}
 var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
@@ -819,11 +829,11 @@ function loadDB() {
   function inicializarCom(dados, origem) {
     db = dados;
     // Limpar nulls que o Firebase pode deixar em gaps de arrays deletados
-    db.ativos    = (db.ativos    || []).filter(Boolean);
-    db.veiculos  = (db.veiculos  || []).filter(Boolean);
-    db.clients   = (db.clients   || []).filter(Boolean);
-    db.historico = (db.historico || []).filter(Boolean);
-    db.contratos = (db.contratos || []).filter(Boolean);
+    db.ativos    = cleanArr(db.ativos);
+    db.veiculos  = cleanVeics(db.veiculos);
+    db.clients   = cleanArr(db.clients);
+    db.historico = cleanArr(db.historico);
+    db.contratos = cleanArr(db.contratos);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
     preencherCliSel();
     checkAlertas();
@@ -858,11 +868,11 @@ function loadDB() {
 
         // localStorage OK — usa ele e limpa nulls
         db = local;
-        db.ativos    = (db.ativos    || []).filter(Boolean);
-        db.veiculos  = (db.veiculos  || []).filter(Boolean);
-        db.clients   = (db.clients   || []).filter(Boolean);
-        db.historico = (db.historico || []).filter(Boolean);
-        db.contratos = (db.contratos || []).filter(Boolean);
+        db.ativos    = cleanArr(db.ativos);
+        db.veiculos  = cleanVeics(db.veiculos);
+        db.clients   = cleanArr(db.clients);
+        db.historico = cleanArr(db.historico);
+        db.contratos = cleanArr(db.contratos);
         // Sincronizar Firebase SOMENTE se local tem mais clientes OU mais ativos
         if (nLS > nFB || nLsAtv > nFbAtv) {
           try { firebase.database().ref('loka_db').set(db); } catch(e) {}
@@ -985,11 +995,11 @@ function setupRealtimeSync() {
 
     // Atualiza db e localStorage silenciosamente — filtra nulls do Firebase
     db = fbData;
-    db.ativos    = (db.ativos    || []).filter(Boolean);
-    db.veiculos  = (db.veiculos  || []).filter(Boolean);
-    db.clients   = (db.clients   || []).filter(Boolean);
-    db.historico = (db.historico || []).filter(Boolean);
-    db.contratos = (db.contratos || []).filter(Boolean);
+    db.ativos    = cleanArr(db.ativos);
+    db.veiculos  = cleanVeics(db.veiculos);
+    db.clients   = cleanArr(db.clients);
+    db.historico = cleanArr(db.historico);
+    db.contratos = cleanArr(db.contratos);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
 
     // Não re-renderiza se há modal aberto (usuário pode estar digitando)
@@ -1179,10 +1189,10 @@ function globalSearch(q) {
 // ── DASHBOARD ─────────────────────────────────────────────────
 function renderDashboard() {
   if (!db) return;
-  db.ativos    = (db.ativos    || []).filter(Boolean);
-  db.veiculos  = (db.veiculos  || []).filter(Boolean);
-  db.clients   = (db.clients   || []).filter(Boolean);
-  db.historico = (db.historico || []).filter(Boolean);
+  db.ativos    = cleanArr(db.ativos);
+  db.veiculos  = cleanVeics(db.veiculos);
+  db.clients   = cleanArr(db.clients);
+  db.historico = cleanArr(db.historico);
   function set(id, val) { var e=document.getElementById(id); if(e) e.textContent=val; }
   set('sClientes', db.clients.length);
   set('sAtivos',   db.ativos.length);
@@ -1199,7 +1209,7 @@ function renderDashboard() {
 // ── CLIENTES ──────────────────────────────────────────────────
 function renderClientes() {
   if (!db) return;
-  db.clients = (db.clients || []).filter(Boolean);
+  db.clients   = cleanArr(db.clients);
   var q = (document.getElementById('qClientes').value||'').toLowerCase();
   var f = document.getElementById('fClientes').value;
   var list = db.clients.filter(function(c) {
@@ -1485,8 +1495,8 @@ function ativoCard(a) {
 
 function renderAtivos() {
   if (!db) return;
-  db.ativos   = (db.ativos   || []).filter(Boolean);
-  db.veiculos = (db.veiculos || []).filter(Boolean);
+  db.ativos    = cleanArr(db.ativos);
+  db.veiculos  = cleanVeics(db.veiculos);
   var q = (document.getElementById('qAtivos').value||'').toLowerCase();
   var list = db.ativos.filter(function(a){
     return !q || (a.clienteNome+' '+a.veiculoNome+' '+(a.placa||'')).toLowerCase().indexOf(q)>=0;
@@ -1515,6 +1525,7 @@ function renderAtivos() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
     + '</tr></thead><tbody>'
     + list.map(function(a) {
+      try {
       var d = a.devolucao ? Math.ceil((new Date(a.devolucao+'T00:00')-hoje)/86400000) : null;
       var dStr = d===null ? '—'
         : d < 0  ? '<span style="color:var(--red);font-weight:800">Vencido '+Math.abs(d)+'d</span>'
@@ -1544,6 +1555,7 @@ function renderAtivos() {
           '<button class="icon-btn" onclick="openEncerramento(\''+a.id+'\')" title="Encerrar" style="color:#c0392b;border-color:#c0392b">🔴</button>'+
         '</div></td>'+
       '</tr>';
+      } catch(e) { return '<tr><td colspan="8" style="color:#c0392b;font-size:10px;padding:6px 12px">⚠ '+e.message+'</td></tr>'; }
     }).join('')
     + '</tbody></table></div>';
 }
@@ -2386,8 +2398,8 @@ function limparFormUsuario() {
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
 function renderFrota() {
   if (!db) return;
-  db.ativos   = (db.ativos   || []).filter(Boolean);
-  db.veiculos = (db.veiculos || []).filter(Boolean);
+  db.ativos    = cleanArr(db.ativos);
+  db.veiculos  = cleanVeics(db.veiculos);
   var q = (document.getElementById('qFrota').value || '').toLowerCase();
   var f = document.getElementById('fFrota').value;
   var list = db.veiculos.filter(function(v) {
@@ -2431,8 +2443,9 @@ function renderFrota() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
     + '</tr></thead><tbody>'
     + list.map(function(v) {
+      try {
       var st = v.status || 'disponivel';
-      var ativo = db.ativos.find(function(a){ return a.placa===v.placa || a.veiculoId===v.id; });
+      var ativo = db.ativos.find(function(a){ return a && (a.placa===v.placa || a.veiculoId===v.id); });
       var infoCell = '—';
       if (ativo) {
         var d = Math.ceil((new Date(ativo.devolucao+'T00:00') - new Date()) / 86400000);
@@ -2466,6 +2479,7 @@ function renderFrota() {
           manutBtn + inatBtn +
         '</div></td>'+
       '</tr>';
+      } catch(_e) { console.error('renderFrota row:', _e); return '<tr><td colspan="7" style="color:#c0392b;font-size:11px;padding:8px">⚠️ Linha com erro: ' + (_e.message||'') + '</td></tr>'; }
     }).join('')
     + '</tbody></table></div>';
 }
@@ -2474,7 +2488,7 @@ function renderFrota() {
 // ── VEÍCULOS ─────────────────────────────────────────────
 function renderVeiculos() {
   if (!db) return;
-  db.veiculos = (db.veiculos || []).filter(Boolean);
+  db.veiculos  = cleanVeics(db.veiculos);
   var q = (document.getElementById('qVeiculos').value||'').toLowerCase();
   var f = document.getElementById('fVeiculos').value;
   var list = db.veiculos.filter(function(v){
