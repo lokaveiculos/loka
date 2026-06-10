@@ -818,9 +818,12 @@ function loadDB() {
 
   function inicializarCom(dados, origem) {
     db = dados;
-    if (!db.historico) db.historico = [];
-    if (!db.contratos) db.contratos = [];
-    if (!db.ativos)    db.ativos    = [];
+    // Limpar nulls que o Firebase pode deixar em gaps de arrays deletados
+    db.ativos    = (db.ativos    || []).filter(Boolean);
+    db.veiculos  = (db.veiculos  || []).filter(Boolean);
+    db.clients   = (db.clients   || []).filter(Boolean);
+    db.historico = (db.historico || []).filter(Boolean);
+    db.contratos = (db.contratos || []).filter(Boolean);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
     preencherCliSel();
     checkAlertas();
@@ -853,11 +856,13 @@ function loadDB() {
           return;
         }
 
-        // localStorage OK — usa ele
+        // localStorage OK — usa ele e limpa nulls
         db = local;
-        if (!db.historico) db.historico = [];
-        if (!db.contratos) db.contratos = [];
-        if (!db.ativos)    db.ativos    = [];
+        db.ativos    = (db.ativos    || []).filter(Boolean);
+        db.veiculos  = (db.veiculos  || []).filter(Boolean);
+        db.clients   = (db.clients   || []).filter(Boolean);
+        db.historico = (db.historico || []).filter(Boolean);
+        db.contratos = (db.contratos || []).filter(Boolean);
         // Sincronizar Firebase SOMENTE se local tem mais clientes OU mais ativos
         if (nLS > nFB || nLsAtv > nFbAtv) {
           try { firebase.database().ref('loka_db').set(db); } catch(e) {}
@@ -978,11 +983,13 @@ function setupRealtimeSync() {
 
     if (!mudou) return;
 
-    // Atualiza db e localStorage silenciosamente
+    // Atualiza db e localStorage silenciosamente — filtra nulls do Firebase
     db = fbData;
-    if (!db.historico) db.historico = [];
-    if (!db.contratos) db.contratos = [];
-    if (!db.ativos)    db.ativos    = [];
+    db.ativos    = (db.ativos    || []).filter(Boolean);
+    db.veiculos  = (db.veiculos  || []).filter(Boolean);
+    db.clients   = (db.clients   || []).filter(Boolean);
+    db.historico = (db.historico || []).filter(Boolean);
+    db.contratos = (db.contratos || []).filter(Boolean);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
 
     // Não re-renderiza se há modal aberto (usuário pode estar digitando)
@@ -1172,10 +1179,10 @@ function globalSearch(q) {
 // ── DASHBOARD ─────────────────────────────────────────────────
 function renderDashboard() {
   if (!db) return;
-  if (!db.ativos)   db.ativos   = [];
-  if (!db.veiculos) db.veiculos = [];
-  if (!db.clients)  db.clients  = [];
-  if (!db.historico)db.historico= [];
+  db.ativos    = (db.ativos    || []).filter(Boolean);
+  db.veiculos  = (db.veiculos  || []).filter(Boolean);
+  db.clients   = (db.clients   || []).filter(Boolean);
+  db.historico = (db.historico || []).filter(Boolean);
   function set(id, val) { var e=document.getElementById(id); if(e) e.textContent=val; }
   set('sClientes', db.clients.length);
   set('sAtivos',   db.ativos.length);
@@ -1192,6 +1199,7 @@ function renderDashboard() {
 // ── CLIENTES ──────────────────────────────────────────────────
 function renderClientes() {
   if (!db) return;
+  db.clients = (db.clients || []).filter(Boolean);
   var q = (document.getElementById('qClientes').value||'').toLowerCase();
   var f = document.getElementById('fClientes').value;
   var list = db.clients.filter(function(c) {
@@ -1477,8 +1485,8 @@ function ativoCard(a) {
 
 function renderAtivos() {
   if (!db) return;
-  if (!db.ativos)   db.ativos   = [];
-  if (!db.veiculos) db.veiculos = [];
+  db.ativos   = (db.ativos   || []).filter(Boolean);
+  db.veiculos = (db.veiculos || []).filter(Boolean);
   var q = (document.getElementById('qAtivos').value||'').toLowerCase();
   var list = db.ativos.filter(function(a){
     return !q || (a.clienteNome+' '+a.veiculoNome+' '+(a.placa||'')).toLowerCase().indexOf(q)>=0;
@@ -2378,8 +2386,8 @@ function limparFormUsuario() {
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
 function renderFrota() {
   if (!db) return;
-  if (!db.ativos)   db.ativos   = [];
-  if (!db.veiculos) db.veiculos = [];
+  db.ativos   = (db.ativos   || []).filter(Boolean);
+  db.veiculos = (db.veiculos || []).filter(Boolean);
   var q = (document.getElementById('qFrota').value || '').toLowerCase();
   var f = document.getElementById('fFrota').value;
   var list = db.veiculos.filter(function(v) {
@@ -2466,7 +2474,7 @@ function renderFrota() {
 // ── VEÍCULOS ─────────────────────────────────────────────
 function renderVeiculos() {
   if (!db) return;
-  if (!db.veiculos) db.veiculos = [];
+  db.veiculos = (db.veiculos || []).filter(Boolean);
   var q = (document.getElementById('qVeiculos').value||'').toLowerCase();
   var f = document.getElementById('fVeiculos').value;
   var list = db.veiculos.filter(function(v){
