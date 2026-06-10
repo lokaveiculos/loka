@@ -838,13 +838,22 @@ function loadDB() {
       }
 
       if (nLS > 0) {
-        // localStorage OK — usa ele e sincroniza Firebase em background
+        var nLsAtv = (local.ativos||[]).length;
+        var nFbAtv = fbData ? (fbData.ativos||[]).length : 0;
+
+        // Se Firebase tem mais ativos, usar Firebase (dados mais completos)
+        if (nFbAtv > nLsAtv) {
+          inicializarCom(fbData, null);
+          return;
+        }
+
+        // localStorage OK — usa ele
         db = local;
         if (!db.historico) db.historico = [];
         if (!db.contratos) db.contratos = [];
         if (!db.ativos)    db.ativos    = [];
-        // Sincronizar Firebase se necessário
-        if (nLS > nFB) {
+        // Sincronizar Firebase SOMENTE se local tem mais clientes OU mais ativos
+        if (nLS > nFB || nLsAtv > nFbAtv) {
           try { firebase.database().ref('loka_db').set(db); } catch(e) {}
         }
         preencherCliSel(); checkAlertas(); showPanel('dashboard');
@@ -940,9 +949,22 @@ function setupRealtimeSync() {
     var fbData = snap.val();
     if (!fbData || !fbData.clients) return;
 
-    // Compara tamanho para detectar mudança real
+    // ── PROTEÇÃO CRÍTICA: nunca sobrescrever dados locais com Firebase mais vazio ──
+    var nFbAtv = (fbData.ativos||[]).length;
+    var nDbAtv = (db.ativos||[]).length;
+
+    // Se Firebase tem MENOS ativos que local → alguém sobrescreveu o Firebase por engano
+    // Não atualiza e re-sincroniza Firebase com dados locais
+    if (nFbAtv < nDbAtv) {
+      // Restaurar Firebase com dados locais (que tem mais dados)
+      try { firebase.database().ref('loka_db').set(db); } catch(e) {}
+      _mostrarSyncBadge('⚠️ Firebase restaurado');
+      return;
+    }
+
+    // Compara para detectar mudança real
     var mudou = (fbData.clients||[]).length !== (db.clients||[]).length
-      || (fbData.ativos||[]).length   !== (db.ativos||[]).length
+      || nFbAtv   !== nDbAtv
       || (fbData.veiculos||[]).length !== (db.veiculos||[]).length
       || (fbData.historico||[]).length !== (db.historico||[]).length
       || JSON.stringify(fbData.ativos) !== JSON.stringify(db.ativos)
