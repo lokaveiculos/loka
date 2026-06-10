@@ -600,6 +600,11 @@
 <div class="action-bar">
   
   
+  <button class="btn" id="btnRegContrato" onclick="registrarContratoDiaria()" style="background:#0d7a3e;color:#fff;display:inline-flex;align-items:center;gap:7px">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Registrar Contrato
+  </button>
+  <div id="regStatusD" style="font-size:11px;font-weight:700;padding:6px 10px;border-radius:6px;display:none"></div>
   <button class="btn btn-print" onclick="window.print()">
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
     Imprimir
@@ -700,7 +705,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>KM/Diária</th>
+            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>KM/Diária</th><th>Valor Unit. (R$)</th>
           </tr>
         </thead>
         <tbody>
@@ -710,6 +715,7 @@
             <td><input id="vPlaca"  placeholder="AAA-0000" style="text-transform:uppercase"></td>
             <td><input id="vCor"    placeholder=""></td>
             <td><input id="vKm"     placeholder="100 km" value="100 km"></td>
+            <td><input id="vValUnit" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalDiaria()" style="text-align:right;width:90px"></td>
           </tr>
         </tbody>
       </table>
@@ -732,9 +738,9 @@
         </thead>
         <tbody>
           <tr>
-            <td><input id="tarDiaria" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotal()"></td>
-            <td><input id="tarCondutor" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotal()"></td>
-            <td><input id="tarDias" placeholder="0" oninput="calcTotal()"></td>
+            <td><input id="tarDiaria" oninput="maskBRL(this);calcTotalDiaria()" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotal()"></td>
+            <td><input id="tarCondutor" oninput="maskBRL(this);calcTotalDiaria()" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotal()"></td>
+            <td><input id="tarDias" oninput="calcTotalDiaria()" placeholder="0" oninput="calcTotal()"></td>
             <td><input id="tarTotal" placeholder="0,00" readonly style="background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>
             <td><input id="tarCaucao" placeholder="R$ 0,00" oninput="maskBRL(this)"></td>
             <td><input type="date" id="dtRetirada"></td>
@@ -1204,6 +1210,113 @@ if (document.readyState === 'loading') {
   }
   
 
+
+// ── CÁLCULO AUTOMÁTICO DO TOTAL ──────────────────────────────
+function parseBRLLocal(s) {
+  if (!s) return 0;
+  return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
+}
+function maskBRL(el) {
+  var v = el.value.replace(/\D/g,'');
+  if (!v) { el.value=''; return; }
+  v = (parseInt(v)/100).toFixed(2);
+  el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+function calcTotalDiaria() {
+  var diaria   = parseBRLLocal(document.getElementById('tarDiaria')   && document.getElementById('tarDiaria').value);
+  var condutor = parseBRLLocal(document.getElementById('tarCondutor') && document.getElementById('tarCondutor').value);
+  var dias     = parseInt(document.getElementById('tarDias')          && document.getElementById('tarDias').value) || 1;
+  var valUnit  = parseBRLLocal(document.getElementById('vValUnit')    && document.getElementById('vValUnit').value);
+  // Se tiver valor unitário por veículo, usar ele; senão calcular pela diária
+  var base = valUnit > 0 ? valUnit : (diaria + condutor) * dias;
+  var totalEl = document.getElementById('tarTotal');
+  if (totalEl && !totalEl.readOnly) {
+    totalEl.value = base.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  }
+}
+
+// ── REGISTRAR CONTRATO ──────────────────────────────────────
+function registrarContratoDiaria() {
+  var btn = document.getElementById('btnRegContrato');
+  var msg = document.getElementById('regStatusD');
+  function showMsg(text, color) {
+    msg.textContent = text;
+    msg.style.background = color === 'ok' ? '#e8f5ef' : '#fdecea';
+    msg.style.color = color === 'ok' ? '#0d7a3e' : '#c0392b';
+    msg.style.display = 'inline-block';
+    setTimeout(function(){ msg.style.display='none'; }, 5000);
+  }
+  var nome     = (document.getElementById('locatarioNome') && document.getElementById('locatarioNome').value || '').trim();
+  var placa    = (document.getElementById('vPlaca')   && document.getElementById('vPlaca').value   || '').toUpperCase().trim();
+  var modelo   = (document.getElementById('vModelo')  && document.getElementById('vModelo').value  || '').trim();
+  var marca    = (document.getElementById('vMarca')   && document.getElementById('vMarca').value   || '').trim();
+  var cor      = (document.getElementById('vCor')     && document.getElementById('vCor').value     || '').trim();
+  var retirada = document.getElementById('dtRetirada')  && document.getElementById('dtRetirada').value  || '';
+  var devolucao= document.getElementById('dtDevolucao') && document.getElementById('dtDevolucao').value || '';
+  var valor    = document.getElementById('tarTotal')    && document.getElementById('tarTotal').value    || '';
+  var caucao   = document.getElementById('tarCaucao')   && document.getElementById('tarCaucao').value   || '';
+
+  if (!nome)              { showMsg('⚠️ Preencha o nome do locatário', 'err'); return; }
+  if (!placa && !modelo)  { showMsg('⚠️ Preencha o veículo', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  var ativo = {
+    id: 'a' + Date.now(), clienteNome: nome, clienteId: '',
+    veiculoNome: (marca+' '+modelo).trim() || placa, placa: placa,
+    cor: cor, tipo: 'diaria',
+    retirada: retirada, devolucao: devolucao,
+    valor: valor ? 'R$ ' + valor : '',
+    caucao: caucao, km: document.getElementById('vKm') && document.getElementById('vKm').value || '',
+    status: 'ativo', origem: 'contrato-diaria', geradoEm: new Date().toISOString()
+  };
+
+  var salvar = function(db_data) {
+    if (!db_data) db_data = {clients:[],veiculos:[],ativos:[],historico:[],contratos:[]};
+    // Verificar duplicata pela placa + cliente
+    var dup = (db_data.ativos||[]).find(function(a) {
+      return a && a.clienteNome === nome && a.placa === placa && a.status === 'ativo';
+    });
+    if (dup) {
+      btn.disabled=false; btn.textContent='Registrar Contrato';
+      showMsg('⚠️ Contrato já registrado para este cliente/veículo', 'err'); return;
+    }
+    // Buscar clienteId
+    var cli = (db_data.clients||[]).find(function(c){ return c && c.nome && c.nome.toLowerCase()===nome.toLowerCase(); });
+    if (cli) ativo.clienteId = cli.id || '';
+    // Atualizar status do veículo
+    var vi = (db_data.veiculos||[]).findIndex(function(v){ return v && v.placa && v.placa.toUpperCase()===placa; });
+    if (vi >= 0) { db_data.veiculos[vi].status = 'alugado'; ativo.veiculoId = db_data.veiculos[vi].id || ''; }
+    if (!db_data.ativos) db_data.ativos = [];
+    db_data.ativos.push(ativo);
+    return db_data;
+  };
+
+  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    firebase.database().ref('loka_db').once('value').then(function(snap) {
+      var updated = salvar(snap.val());
+      if (!updated) return;
+      return firebase.database().ref('loka_db').set(updated);
+    }).then(function() {
+      // Também atualizar localStorage
+      try {
+        var local = JSON.parse(localStorage.getItem('loka_db')||'null');
+        if (local) { local.ativos = local.ativos || []; local.ativos.push(ativo); localStorage.setItem('loka_db', JSON.stringify(local)); }
+      } catch(e) {}
+      btn.textContent = '✅ Registrado!'; btn.style.background = '#0d7a3e';
+      showMsg('✅ Contrato registrado em Aluguéis Ativos!', 'ok');
+    }).catch(function(e) {
+      btn.disabled=false; btn.textContent='Registrar Contrato';
+      showMsg('❌ Erro: '+e.message, 'err');
+    });
+  } else {
+    try {
+      var local2 = JSON.parse(localStorage.getItem('loka_db')||'null');
+      var updated2 = salvar(local2);
+      if (updated2) { localStorage.setItem('loka_db', JSON.stringify(updated2)); btn.textContent='✅ Salvo'; showMsg('✅ Salvo localmente!','ok'); }
+    } catch(e) { showMsg('❌ '+e.message,'err'); btn.disabled=false; btn.textContent='Registrar Contrato'; }
+  }
+}
 </script>
 
 </body>

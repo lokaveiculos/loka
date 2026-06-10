@@ -352,7 +352,7 @@
       <table class="data-table" id="veiculosTable">
         <thead>
           <tr>
-            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>Franquia KM</th><th style="width:36px;"></th>
+            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>Franquia KM</th><th>Valor Unit. (R$)</th><th style="width:36px;"></th>
           </tr>
         </thead>
         <tbody id="veiculosBody">
@@ -390,8 +390,8 @@
         </thead>
         <tbody>
           <tr>
-            <td><input id="tarMensal" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
-            <td><input id="tarCondutor" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
+            <td><input id="tarMensal" oninput="maskBRL(this);calcTotalMensal()" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
+            <td><input id="tarCondutor" oninput="maskBRL(this);calcTotalMensal()" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
             <td><input id="tarTotal" placeholder="0,00" readonly style="background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>
             <td><input id="tarCaucao" placeholder="R$ 0,00" oninput="maskBRL(this)"></td>
             <td><input id="dtInicio" placeholder="Ex: 11 (dia)"></td>
@@ -529,6 +529,7 @@ function addVeiculo() {
     '<td><input placeholder="AAA-0000" style="text-transform:uppercase"></td>' +
     '<td><input placeholder=""></td>' +
     '<td><input placeholder="0000 km"></td>' +
+    '<td><input class="vValUnitM" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalMensal()" style="text-align:right;width:90px"></td>' +
     '<td style="text-align:center;background:#fdecea;cursor:pointer;" onclick="removeVeiculo(this)" title="Remover">' +
     '<span style="font-size:14px;color:#c0392b;font-weight:700;">×</span></td>';
   document.getElementById('veiculosBody').appendChild(row);
@@ -766,6 +767,141 @@ if (document.readyState === 'loading') {
   
 // ── REGISTRAR ALUGUEL MENSAL NO SISTEMA ──────────────────────────────────────
 
+
+// ── CÁLCULO AUTOMÁTICO DO TOTAL (MENSAL) ─────────────────────
+function parseBRLLocal(s) {
+  if (!s) return 0;
+  return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
+}
+function maskBRL(el) {
+  var v = el.value.replace(/\D/g,'');
+  if (!v) { el.value=''; return; }
+  v = (parseInt(v)/100).toFixed(2);
+  el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+function calcTotalMensal() {
+  // Somar valores unitários de todos os veículos
+  var totalVeic = 0;
+  document.querySelectorAll('.vValUnitM').forEach(function(el) {
+    totalVeic += parseBRLLocal(el.value);
+  });
+  var condutor = parseBRLLocal(document.getElementById('tarCondutor') && document.getElementById('tarCondutor').value);
+  // Se tiver valores por veículo, usar eles; senão pegar tarMensal
+  var total;
+  if (totalVeic > 0) {
+    total = totalVeic + condutor;
+  } else {
+    var mensal = parseBRLLocal(document.getElementById('tarMensal') && document.getElementById('tarMensal').value);
+    total = mensal + condutor;
+  }
+  var totalEl = document.getElementById('tarTotal');
+  if (totalEl && !totalEl.readOnly) {
+    totalEl.value = total.toLocaleString('pt-BR', {minimumFractionDigits:2});
+  }
+  // Atualizar tarMensal com a soma se vValUnitM estiver preenchido
+  if (totalVeic > 0) {
+    var mensalEl = document.getElementById('tarMensal');
+    if (mensalEl && !mensalEl.readOnly) {
+      mensalEl.value = totalVeic.toLocaleString('pt-BR', {minimumFractionDigits:2});
+    }
+  }
+}
+
+// ── REGISTRAR CONTRATO MENSAL ──────────────────────────────
+function registrarContratoMensal() {
+  var btn = document.getElementById('btnRegContratoM');
+  var msg = document.getElementById('regStatusM');
+  function showMsg(text, color) {
+    msg.textContent = text;
+    msg.style.background = color === 'ok' ? '#e8f5ef' : '#fdecea';
+    msg.style.color = color === 'ok' ? '#0d7a3e' : '#c0392b';
+    msg.style.display = 'inline-block';
+    setTimeout(function(){ msg.style.display='none'; }, 5000);
+  }
+  var nome   = (document.getElementById('locatarioNome') && document.getElementById('locatarioNome').value || '').trim();
+  var valor  = document.getElementById('tarTotal')  && document.getElementById('tarTotal').value  || '';
+  var caucao = document.getElementById('tarCaucao') && document.getElementById('tarCaucao').value || '';
+  var inicio = document.getElementById('dtInicio')  && document.getElementById('dtInicio').value  || '';
+  var vigencia = document.getElementById('dtVigencia') && document.getElementById('dtVigencia').value || '';
+
+  // Coletar placas e valores dos veículos
+  var placas = [], veiculoNomes = [], valoresVeic = [];
+  var rows = document.getElementById('veiculosBody') && document.getElementById('veiculosBody').querySelectorAll('tr') || [];
+  rows.forEach(function(row) {
+    var inputs = row.querySelectorAll('input');
+    if (inputs.length >= 3) {
+      var marca  = inputs[0] && inputs[0].value.trim();
+      var modelo = inputs[1] && inputs[1].value.trim();
+      var placa  = inputs[2] && inputs[2].value.trim().toUpperCase();
+      var valUnit = inputs[5] && inputs[5].value.trim();
+      if (placa || modelo) {
+        placas.push(placa);
+        veiculoNomes.push((marca+' '+modelo).trim() || placa);
+        valoresVeic.push(valUnit);
+      }
+    }
+  });
+
+  if (!nome)              { showMsg('⚠️ Preencha o nome do locatário', 'err'); return; }
+  if (!placas.length)     { showMsg('⚠️ Preencha ao menos um veículo', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  var hoje = new Date().toISOString().split('T')[0];
+  var ativo = {
+    id: 'a' + Date.now(), clienteNome: nome, clienteId: '',
+    veiculoNome: veiculoNomes.join(', '), placa: placas[0], placas: placas,
+    tipo: 'mensal',
+    retirada: hoje, devolucao: '', vigencia: vigencia,
+    valor: valor ? 'R$ ' + valor : '',
+    caucao: caucao,
+    status: 'ativo', origem: 'contrato-mensal', geradoEm: new Date().toISOString()
+  };
+
+  var salvar = function(db_data) {
+    if (!db_data) db_data = {clients:[],veiculos:[],ativos:[],historico:[],contratos:[]};
+    // Verificar duplicata
+    var dup = (db_data.ativos||[]).find(function(a) {
+      return a && a.clienteNome === nome && a.placa === placas[0] && a.status === 'ativo';
+    });
+    if (dup) {
+      btn.disabled=false; btn.textContent='Registrar Contrato';
+      showMsg('⚠️ Contrato já registrado para este cliente/veículo', 'err'); return null;
+    }
+    var cli = (db_data.clients||[]).find(function(c){ return c && c.nome && c.nome.toLowerCase()===nome.toLowerCase(); });
+    if (cli) ativo.clienteId = cli.id || '';
+    placas.forEach(function(placa) {
+      var vi = (db_data.veiculos||[]).findIndex(function(v){ return v && v.placa && v.placa.toUpperCase()===placa; });
+      if (vi >= 0) db_data.veiculos[vi].status = 'alugado';
+    });
+    if (!db_data.ativos) db_data.ativos = [];
+    db_data.ativos.push(ativo);
+    return db_data;
+  };
+
+  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    firebase.database().ref('loka_db').once('value').then(function(snap) {
+      var updated = salvar(snap.val());
+      if (!updated) return Promise.reject(new Error('cancelado'));
+      return firebase.database().ref('loka_db').set(updated);
+    }).then(function() {
+      try {
+        var local = JSON.parse(localStorage.getItem('loka_db')||'null');
+        if (local) { local.ativos = local.ativos||[]; local.ativos.push(ativo); localStorage.setItem('loka_db', JSON.stringify(local)); }
+      } catch(e) {}
+      btn.textContent = '✅ Registrado!'; btn.style.background = '#0d7a3e';
+      showMsg('✅ Contrato registrado em Aluguéis Ativos!', 'ok');
+    }).catch(function(e) {
+      if (e.message !== 'cancelado') { btn.disabled=false; btn.textContent='Registrar Contrato'; showMsg('❌ Erro: '+e.message, 'err'); }
+    });
+  } else {
+    try {
+      var local2 = JSON.parse(localStorage.getItem('loka_db')||'null');
+      var updated2 = salvar(local2);
+      if (updated2) { localStorage.setItem('loka_db', JSON.stringify(updated2)); btn.textContent='✅ Salvo'; showMsg('✅ Salvo localmente!','ok'); }
+    } catch(e) { showMsg('❌ '+e.message,'err'); btn.disabled=false; btn.textContent='Registrar Contrato'; }
+  }
+}
 </script>
 
 </body>
