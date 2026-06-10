@@ -970,18 +970,10 @@ function setupRealtimeSync() {
     var fbData = snap.val();
     if (!fbData || !fbData.clients) return;
 
-    // ── PROTEÇÃO CRÍTICA: nunca sobrescrever dados locais com Firebase mais vazio ──
+    // Firebase é a fonte de verdade — sempre aceitar dados dele
+    // (a lógica de "restaurar" causava conflito com exclusões legítimas)
     var nFbAtv = (fbData.ativos||[]).length;
     var nDbAtv = (db.ativos||[]).length;
-
-    // Se Firebase tem MENOS ativos que local → alguém sobrescreveu o Firebase por engano
-    // Não atualiza e re-sincroniza Firebase com dados locais
-    if (nFbAtv < nDbAtv) {
-      // Restaurar Firebase com dados locais (que tem mais dados)
-      try { firebase.database().ref('loka_db').set(db); } catch(e) {}
-      _mostrarSyncBadge('⚠️ Firebase restaurado');
-      return;
-    }
 
     // Compara para detectar mudança real
     var mudou = (fbData.clients||[]).length !== (db.clients||[]).length
