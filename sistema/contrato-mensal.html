@@ -811,15 +811,16 @@ function calcTotalMensal() {
 }
 
 // ── REGISTRAR CONTRATO MENSAL ──────────────────────────────
+var _forcarRegistro = false;
 function registrarContratoMensal() {
   var btn = document.getElementById('btnRegContratoM');
   var msg = document.getElementById('regStatusM');
   function showMsg(text, color) {
     msg.textContent = text;
-    msg.style.background = color === 'ok' ? '#e8f5ef' : '#fdecea';
-    msg.style.color = color === 'ok' ? '#0d7a3e' : '#c0392b';
+    msg.style.background = color === 'ok' ? '#e8f5ef' : color === 'warn' ? '#fef3cd' : '#fdecea';
+    msg.style.color = color === 'ok' ? '#0d7a3e' : color === 'warn' ? '#b45309' : '#c0392b';
     msg.style.display = 'inline-block';
-    setTimeout(function(){ msg.style.display='none'; }, 5000);
+    if (color !== 'warn') setTimeout(function(){ msg.style.display='none'; }, 5000);
   }
   var nome   = (document.getElementById('locatarioNome') && document.getElementById('locatarioNome').value || '').trim();
   var valor  = document.getElementById('tarTotal')  && document.getElementById('tarTotal').value  || '';

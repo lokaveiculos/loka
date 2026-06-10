@@ -1236,15 +1236,16 @@ function calcTotalDiaria() {
 }
 
 // ── REGISTRAR CONTRATO ──────────────────────────────────────
+var _forcarRegistro = false;
 function registrarContratoDiaria() {
   var btn = document.getElementById('btnRegContrato');
   var msg = document.getElementById('regStatusD');
   function showMsg(text, color) {
     msg.textContent = text;
-    msg.style.background = color === 'ok' ? '#e8f5ef' : '#fdecea';
-    msg.style.color = color === 'ok' ? '#0d7a3e' : '#c0392b';
+    msg.style.background = color === 'ok' ? '#e8f5ef' : color === 'warn' ? '#fef3cd' : '#fdecea';
+    msg.style.color = color === 'ok' ? '#0d7a3e' : color === 'warn' ? '#b45309' : '#c0392b';
     msg.style.display = 'inline-block';
-    setTimeout(function(){ msg.style.display='none'; }, 5000);
+    if (color !== 'warn') setTimeout(function(){ msg.style.display='none'; }, 5000);
   }
   var nome     = (document.getElementById('locatarioNome') && document.getElementById('locatarioNome').value || '').trim();
   var placa    = (document.getElementById('vPlaca')   && document.getElementById('vPlaca').value   || '').toUpperCase().trim();
@@ -1273,14 +1274,16 @@ function registrarContratoDiaria() {
 
   var salvar = function(db_data) {
     if (!db_data) db_data = {clients:[],veiculos:[],ativos:[],historico:[],contratos:[]};
-    // Verificar duplicata pela placa + cliente
+    // Verificar duplicata — avisar mas permitir (pode ser renovação)
     var dup = (db_data.ativos||[]).find(function(a) {
       return a && a.clienteNome === nome && a.placa === placa && a.status === 'ativo';
     });
-    if (dup) {
+    if (dup && !_forcarRegistro) {
       btn.disabled=false; btn.textContent='Registrar Contrato';
-      showMsg('⚠️ Contrato já registrado para este cliente/veículo', 'err'); return;
+      showMsg('⚠️ Já existe um aluguel ativo para ' + nome + ' / ' + placa + '. Clique novamente para registrar mesmo assim.', 'warn');
+      _forcarRegistro = true; return;
     }
+    _forcarRegistro = false;
     // Buscar clienteId
     var cli = (db_data.clients||[]).find(function(c){ return c && c.nome && c.nome.toLowerCase()===nome.toLowerCase(); });
     if (cli) ativo.clienteId = cli.id || '';
