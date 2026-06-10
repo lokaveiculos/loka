@@ -56,8 +56,8 @@ body{font-family:"Montserrat",sans-serif;background:#f0f2fa;color:var(--dark);fo
 .gsr-item-title{font-weight:700;}
 .gsr-item-sub{font-size:10px;color:var(--muted);margin-top:1px;}
 .gsr-empty{padding:16px;text-align:center;color:var(--muted);font-size:12px;}
-.content{padding:20px;flex:1;}
-.panel{display:none;}
+.content{padding:16px;flex:1;min-width:0;}
+.panel{display:none;width:100%;}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;}
 .stat{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:3px solid var(--blue);}
 .stat-value{font-size:24px;font-weight:800;color:var(--dark);}
@@ -296,7 +296,7 @@ tr:hover td{background:#f8f9fe;}
         </div>
         <button class="btn btn-blue" onclick="openAluguel()">+ Registrar Aluguel</button>
       </div>
-      <div class="ativos-grid" id="ativosGrid"></div>
+      <div id="ativosGrid"></div>
     </div>
 
     <!-- ══ VEÍCULOS ══ -->
@@ -315,7 +315,7 @@ tr:hover td{background:#f8f9fe;}
         </select>
         <button class="btn btn-blue" onclick="openVeiculo(null)">+ Adicionar Veículo</button>
       </div>
-      <div class="veiculo-grid" id="veiculosGrid"></div>
+      <div id="veiculosGrid"></div>
     </div>
 
 
@@ -336,7 +336,7 @@ tr:hover td{background:#f8f9fe;}
         </select>
         <button class="btn btn-blue" onclick="openVeiculo(null)" style="white-space:nowrap">+ Adicionar</button>
       </div>
-      <div class="veiculo-grid" id="frotaGrid"></div>
+      <div id="frotaGrid"></div>
     </div>
 
 
