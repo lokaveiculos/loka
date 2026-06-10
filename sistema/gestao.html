@@ -1475,8 +1475,8 @@ function ativoCard(a) {
 
 function renderAtivos() {
   if (!db) return;
-  db.ativos    = cleanArr(db.ativos);
-  db.veiculos  = cleanVeics(db.veiculos);
+  db.ativos   = cleanArr(db.ativos);
+  db.veiculos = cleanVeics(db.veiculos);
   var q = (document.getElementById('qAtivos').value||'').toLowerCase();
   var list = db.ativos.filter(function(a){
     return !q || (a.clienteNome+' '+a.veiculoNome+' '+(a.placa||'')).toLowerCase().indexOf(q)>=0;
@@ -1491,11 +1491,44 @@ function renderAtivos() {
   }
 
   var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var rows = list.map(function(a, li) {
+    // índice real no db.ativos
+    var ri = db.ativos.indexOf(a);
+    var d = a.devolucao ? Math.ceil((new Date(a.devolucao+'T00:00')-hoje)/86400000) : null;
+    var dStr = d===null ? '—'
+      : d<0  ? '<span style="color:var(--red);font-weight:800">Vencido '+Math.abs(d)+'d</span>'
+      : d===0 ? '<span style="color:var(--red);font-weight:800">Hoje!</span>'
+      : d<=3  ? '<span style="color:#f59e0b;font-weight:700">'+d+'d</span>'
+      : '<span style="color:var(--green);font-weight:600">'+d+'d</span>';
+    var rowBg = d!==null && d<0 ? '#fef2f2' : d!==null && d<=3 ? '#fffbeb' : '';
+    var pg = a.pagamento||{};
+    var pgBadge = pg.status==='pago'
+      ? '<span class="badge bg">✅ Pago</span>'
+      : pg.status==='parcial'
+      ? '<span class="badge" style="background:#ede9fe;color:#7c3aed">⚠️ Parcial</span>'
+      : '<span class="badge br">❌ Pendente</span>';
+    return '<tr style="border-bottom:1px solid #f0f2f8;background:'+rowBg+'" onmouseenter="this.style.background=\'#f8f9ff\'" onmouseleave="this.style.background=\''+rowBg+'\'">'+
+      '<td style="padding:9px 12px"><strong>'+a.clienteNome+'</strong></td>'+
+      '<td style="padding:9px 12px;font-size:11px">'+a.veiculoNome+
+        '<br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(a.placa||'')+'</span></td>'+
+      '<td style="padding:9px 12px"><span class="badge '+(a.tipo==='mensal'?'bb':'bg')+'">'+(a.tipo==='mensal'?'Mensal':'Diária')+'</span></td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(a.retirada)+'</td>'+
+      '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(a.devolucao)+'</td>'+
+      '<td style="padding:9px 12px;text-align:center">'+dStr+'</td>'+
+      '<td style="padding:9px 12px;text-align:right;font-weight:700;font-size:11px">'+(a.valor||'—')+'<br>'+pgBadge+'</td>'+
+      '<td style="padding:9px 12px"><div style="display:flex;gap:4px;justify-content:center">'+
+        '<button class="icon-btn" data-act="pror" data-idx="'+ri+'" title="Prorrogar" style="color:#2B4BF2;border-color:#2B4BF2">📅</button>'+
+        '<button class="icon-btn" data-act="pgto" data-idx="'+ri+'" title="Pagamento" style="color:#0d7a3e;border-color:#0d7a3e">💳</button>'+
+        '<button class="icon-btn" data-act="enc"  data-idx="'+ri+'" title="Encerrar"  style="color:#c0392b;border-color:#c0392b">🔴</button>'+
+        '<button class="icon-btn" data-act="del"  data-idx="'+ri+'" title="Excluir"   style="color:#7c3aed;border-color:#7c3aed">🗑</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
 
   grid.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px">'
     + '<thead><tr style="background:var(--dark)">'
-    + '<th style="padding:9px 12px;text-align:left;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px">Cliente</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px">Cliente</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Veículo</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Tipo</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Retirada</th>'
@@ -1504,40 +1537,22 @@ function renderAtivos() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Valor</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
     + '</tr></thead><tbody>'
-    + list.map(function(a) {
-      try {
-      var d = a.devolucao ? Math.ceil((new Date(a.devolucao+'T00:00')-hoje)/86400000) : null;
-      var dStr = d===null ? '—'
-        : d < 0  ? '<span style="color:var(--red);font-weight:800">Vencido '+Math.abs(d)+'d</span>'
-        : d === 0 ? '<span style="color:var(--red);font-weight:800">Hoje!</span>'
-        : d <= 3  ? '<span style="color:#f59e0b;font-weight:700">'+d+'d</span>'
-        : '<span style="color:var(--green);font-weight:600">'+d+'d</span>';
-      var rowBg = d!==null && d<0 ? '#fef2f2' : d!==null && d<=3 ? '#fffbeb' : '';
-      var pg = a.pagamento||{};
-      var pgBadge = pg.status==='pago'
-        ? '<span class="badge bg" style="cursor:pointer" onclick="openPagamento(\''+a.id+'\')">✅ Pago</span>'
-        : pg.status==='parcial'
-        ? '<span class="badge" style="background:#ede9fe;color:#7c3aed;cursor:pointer" onclick="openPagamento(\''+a.id+'\')">⚠️ Parcial</span>'
-        : '<span class="badge br" style="cursor:pointer" onclick="openPagamento(\''+a.id+'\')">❌ Pendente</span>';
-      return '<tr style="border-bottom:1px solid #f0f2f8;background:'+rowBg+'" onmouseenter="if(!this.dataset.bg)this.style.background=\'#f8f9ff\'" onmouseleave="this.style.background=\''+rowBg+'\'">'+
-        '<td style="padding:9px 12px"><strong>'+a.clienteNome+'</strong></td>'+
-        '<td style="padding:9px 12px;font-size:11px">'+a.veiculoNome+
-          '<br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(a.placa||'')+'</span></td>'+
-        '<td style="padding:9px 12px"><span class="badge '+(a.tipo==='mensal'?'bb':'bg')+'">'+(a.tipo==='mensal'?'Mensal':'Diária')+'</span></td>'+
-        '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(a.retirada)+'</td>'+
-        '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(a.devolucao)+'</td>'+
-        '<td style="padding:9px 12px;text-align:center">'+dStr+'</td>'+
-        '<td style="padding:9px 12px;text-align:right;font-weight:700;font-size:11px">'+
-          (a.valor||'—')+'<br>'+pgBadge+'</td>'+
-        '<td style="padding:9px 12px"><div style="display:flex;gap:4px;justify-content:center">'+
-          '<button class="icon-btn" onclick="openProrrogacao(\''+a.id+'\')" title="Prorrogar" style="color:#2B4BF2;border-color:#2B4BF2">📅</button>'+
-          '<button class="icon-btn" onclick="openPagamento(\''+a.id+'\')" title="Pagamento" style="color:#0d7a3e;border-color:#0d7a3e">💳</button>'+
-          '<button class="icon-btn" onclick="openEncerramento(\''+a.id+'\')" title="Encerrar" style="color:#c0392b;border-color:#c0392b">🔴</button>'+
-        '</div></td>'+
-      '</tr>';
-      } catch(e) { return '<tr><td colspan="8" style="color:#c0392b;font-size:10px;padding:6px 12px">⚠ '+e.message+'</td></tr>'; }
-    }).join('')
+    + rows
     + '</tbody></table></div>';
+
+  // Event delegation — sem onclick inline, sem escaping de string
+  grid.querySelector('table').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    var idx = parseInt(btn.dataset.idx);
+    var a   = db.ativos[idx];
+    if (!a) return;
+    var act = btn.dataset.act;
+    if (act==='pror') openProrrogacao(a.id);
+    if (act==='pgto') openPagamento(a.id);
+    if (act==='enc')  openEncerramento(a.id);
+    if (act==='del')  excluirAtivo(idx);
+  });
 }
 
 
