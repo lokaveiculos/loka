@@ -266,8 +266,11 @@
 
 <!-- Botões -->
 <div class="action-bar">
-  
-  
+  <button class="btn" id="btnRegContratoM" onclick="registrarContratoMensal()" style="background:#0d7a3e;color:#fff;display:inline-flex;align-items:center;gap:7px">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Registrar Contrato
+  </button>
+  <div id="regStatusM" style="font-size:11px;font-weight:700;padding:6px 10px;border-radius:6px;display:none"></div>
   <button class="btn btn-print" onclick="window.print()">
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
     Imprimir
