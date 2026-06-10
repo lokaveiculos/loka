@@ -460,6 +460,7 @@ tr:hover td{background:#f8f9fe;}
 <div class="user-bar">
   <span id="userBarName">LOKÁ</span>
   <span style="font-size:9px;color:rgba(255,255,255,.2)">01.02 · build 09/06/2026 11:58</span>
+  <button class="logout-btn" onclick="abrirGerenciarUsuarios()" id="btnGerUsers" style="display:none">👥 Usuários</button>
   <button class="logout-btn" onclick="lokaLogout()">⏻ Sair</button>
 </div>
 
@@ -769,6 +770,9 @@ window.addEventListener('DOMContentLoaded', function() {
     var _perfil = (u.perfil || '').toLowerCase();
     var _niFrota = document.getElementById('ni-frota');
     if (_niFrota && _perfil === 'operador') _niFrota.style.display = 'none';
+    // Botão Gerenciar Usuários: só para admin e master
+    var _btnGU = document.getElementById('btnGerUsers');
+    if (_btnGU && (_perfil === 'admin' || _perfil === 'master')) _btnGU.style.display = 'inline-block';
   } catch(e) {}
   // Fecha modal ao clicar no fundo
   document.addEventListener('click', function(e) {
@@ -2169,6 +2173,142 @@ function inativarVeiculo(vId) {
   toast(novoStatus==='inativo' ? '⛔ Veículo inativado' : '✅ Veículo reativado', novoStatus==='inativo'?'#c0392b':'#0d7a3e');
 }
 
+
+// ── GERENCIAR USUÁRIOS ────────────────────────────────────────────────────────
+var _usuariosFirebase = [];
+
+function abrirGerenciarUsuarios() {
+  var perfil = '';
+  try { perfil = (JSON.parse(sessionStorage.getItem('loka_user')||'{}')).perfil || ''; } catch(e) {}
+  if (perfil !== 'admin' && perfil !== 'master') {
+    toast('⚠️ Acesso restrito a Admin e Master', '#c0392b'); return;
+  }
+  carregarUsuarios();
+  openM('mUsuarios');
+}
+
+function carregarUsuarios() {
+  if (!firebase || !firebase.apps || !firebase.apps.length) return;
+  firebase.database().ref('loka_users').once('value').then(function(snap) {
+    var fbData = snap.val();
+    _usuariosFirebase = fbData ? (Array.isArray(fbData) ? fbData : Object.values(fbData)) : [];
+    renderUsuarios();
+  });
+}
+
+function renderUsuarios() {
+  var el = document.getElementById('usuariosLista');
+  if (!el) return;
+  // Usuários padrão (hardcoded no index.html) + Firebase
+  var todos = _usuariosFirebase.slice();
+  if (!todos.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">Nenhum usuário adicional criado. Os usuários padrão (rogel, admin, equipe) são gerenciados no arquivo index.html.</p>'; return; }
+
+  var perfilBadge = {master:'bb', admin:'bg', operador:'bm'};
+  el.innerHTML = '<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:4px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<thead><tr style="background:#0E1B4D"><th style="padding:8px 12px;text-align:left;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Usuário</th><th style="padding:8px 12px;color:#fff;font-size:9px">Nome</th><th style="padding:8px 12px;color:#fff;font-size:9px">Perfil</th><th style="padding:8px 12px;color:#fff;font-size:9px">Ações</th></tr></thead>'
+    + '<tbody>'
+    + todos.map(function(u, n) {
+      return '<tr style="border-bottom:1px solid #f0f2f8">'
+        + '<td style="padding:8px 12px;font-weight:700">'+u.usuario+'</td>'
+        + '<td style="padding:8px 12px">'+u.nome+'</td>'
+        + '<td style="padding:8px 12px"><span class="badge '+(perfilBadge[u.perfil]||'bm')+'">'+u.perfil+'</span></td>'
+        + '<td style="padding:8px 12px"><div style="display:flex;gap:5px">'
+          + '<button class="icon-btn" onclick="editarUsuario('+n+')" title="Editar">✏️</button>'
+          + '<button class="icon-btn" onclick="excluirUsuario('+n+')" title="Excluir" style="border-color:#c0392b;color:#c0392b">🗑</button>'
+          + '<button class="icon-btn" onclick="resetarSenha('+n+')" title="Alterar Senha">🔑</button>'
+        + '</div></td></tr>';
+    }).join('')
+    + '</tbody></table></div>';
+}
+
+function salvarUsuario() {
+  var login  = (document.getElementById('uLogin').value||'').trim().toLowerCase();
+  var nome   = (document.getElementById('uNome').value||'').trim();
+  var senha  = document.getElementById('uSenha').value;
+  var senha2 = document.getElementById('uSenha2').value;
+  var perfil = document.getElementById('uPerfil').value;
+  var editId = document.getElementById('uEditId').value;
+
+  if (!login)  { toast('⚠️ Informe o login', '#b45309'); return; }
+  if (!nome)   { toast('⚠️ Informe o nome', '#b45309'); return; }
+  if (!editId && !senha) { toast('⚠️ Informe a senha', '#b45309'); return; }
+  if (senha && senha.length < 6) { toast('⚠️ Senha mínimo 6 caracteres', '#b45309'); return; }
+  if (senha && senha !== senha2) { toast('⚠️ Senhas não conferem', '#c0392b'); return; }
+
+  // Verificar login duplicado
+  var dup = _usuariosFirebase.find(function(u, i) {
+    return u.usuario.toLowerCase() === login && (editId === '' || i !== parseInt(editId));
+  });
+  if (dup) { toast('⚠️ Este login já existe', '#c0392b'); return; }
+
+  var usuario = {
+    id:       'u' + Date.now(),
+    usuario:  login,
+    nome:     nome,
+    senha:    senha || (editId !== '' ? _usuariosFirebase[parseInt(editId)].senha : ''),
+    perfil:   perfil
+  };
+
+  if (editId !== '') {
+    _usuariosFirebase[parseInt(editId)] = Object.assign({}, _usuariosFirebase[parseInt(editId)], usuario);
+    usuario = _usuariosFirebase[parseInt(editId)];
+  } else {
+    _usuariosFirebase.push(usuario);
+  }
+
+  // Salvar no Firebase
+  firebase.database().ref('loka_users').set(_usuariosFirebase).then(function() {
+    renderUsuarios();
+    limparFormUsuario();
+    toast(editId !== '' ? '✅ Usuário atualizado!' : '✅ Usuário criado!', '#0d7a3e');
+  }).catch(function(e) { toast('❌ Erro: ' + e.message, '#c0392b'); });
+}
+
+function editarUsuario(n) {
+  var u = _usuariosFirebase[n];
+  if (!u) return;
+  document.getElementById('uFormTitulo') && (document.getElementById('userFormTitulo').textContent = 'Editar Usuário');
+  document.getElementById('uLogin').value  = u.usuario;
+  document.getElementById('uNome').value   = u.nome;
+  document.getElementById('uSenha').value  = '';
+  document.getElementById('uSenha2').value = '';
+  document.getElementById('uPerfil').value = u.perfil;
+  document.getElementById('uEditId').value = String(n);
+}
+
+function excluirUsuario(n) {
+  var u = _usuariosFirebase[n];
+  if (!u) return;
+  if (!confirm('Excluir usuário "' + u.usuario + '" (' + u.nome + ')?\n\nEsta ação não pode ser desfeita.')) return;
+  _usuariosFirebase.splice(n, 1);
+  firebase.database().ref('loka_users').set(_usuariosFirebase).then(function() {
+    renderUsuarios();
+    toast('🗑 Usuário excluído.', '#c0392b');
+  });
+}
+
+function resetarSenha(n) {
+  var u = _usuariosFirebase[n];
+  if (!u) return;
+  var nova = prompt('Nova senha para "' + u.usuario + '" (mínimo 6 caracteres):');
+  if (!nova) return;
+  if (nova.length < 6) { toast('⚠️ Senha muito curta (mínimo 6)', '#b45309'); return; }
+  _usuariosFirebase[n].senha = nova;
+  firebase.database().ref('loka_users').set(_usuariosFirebase).then(function() {
+    toast('🔑 Senha alterada para ' + u.usuario, '#0d7a3e');
+  });
+}
+
+function limparFormUsuario() {
+  ['uLogin','uNome','uSenha','uSenha2'].forEach(function(id) {
+    var e = document.getElementById(id); if(e) e.value='';
+  });
+  document.getElementById('uPerfil').value = 'operador';
+  document.getElementById('uEditId').value = '';
+  var t = document.getElementById('userFormTitulo'); if(t) t.textContent='Novo Usuário';
+}
+
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
 function renderFrota() {
   if (!db) return;
@@ -2573,6 +2713,42 @@ function renderFormularios() { preencherCliSel(); } // alias
     <button class="btn btn-outline" onclick="closeM('mVeiculo')">Cancelar</button>
     <button class="btn" id="btnExcluirVeiculo" style="background:#fdecea;color:#c0392b;border:1.5px solid #f5c6cb;display:none" onclick="excluirVeiculo()">🗑 Excluir</button>
     <button class="btn btn-blue" onclick="salvarVeiculo()">💾 Salvar Veículo</button>
+  </div>
+</div></div>
+
+<!-- MODAL: GERENCIAR USUÁRIOS -->
+<div class="modal-bg" id="mUsuarios"><div class="modal" style="max-width:560px">
+  <div class="modal-head" style="background:#0E1B4D">
+    <h3>👥 Gerenciar Usuários</h3>
+    <button class="modal-close" onclick="closeM('mUsuarios')">✕</button>
+  </div>
+  <div class="modal-body">
+    <!-- Lista de usuários -->
+    <div id="usuariosLista" style="margin-bottom:16px"></div>
+    <!-- Formulário novo/editar -->
+    <div style="background:#f8f9ff;border-radius:10px;padding:14px;border:1.5px solid var(--border)">
+      <div class="sec-label" id="userFormTitulo" style="margin-top:0">Novo Usuário</div>
+      <div class="g2" style="margin-top:10px">
+        <div class="fg"><label class="fl">Login (usuário) *</label><input class="fi" id="uLogin" placeholder="Ex: joao" autocomplete="off"></div>
+        <div class="fg"><label class="fl">Nome completo *</label><input class="fi" id="uNome" placeholder="Ex: João Silva"></div>
+        <div class="fg"><label class="fl">Senha *</label><input class="fi" id="uSenha" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+        <div class="fg"><label class="fl">Confirmar Senha *</label><input class="fi" id="uSenha2" type="password" placeholder="Repita a senha" autocomplete="new-password"></div>
+        <div class="fg"><label class="fl">Perfil *</label>
+          <select class="fs" id="uPerfil">
+            <option value="operador">Operador</option>
+            <option value="admin">Admin</option>
+            <option value="master">Master</option>
+          </select>
+        </div>
+        <div class="fg" style="display:flex;align-items:flex-end">
+          <input type="hidden" id="uEditId">
+          <button class="btn btn-blue" onclick="salvarUsuario()" style="width:100%">💾 Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mUsuarios')">Fechar</button>
   </div>
 </div></div>
 

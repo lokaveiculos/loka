@@ -598,11 +598,8 @@
 
 <!-- Action Buttons -->
 <div class="action-bar">
-  <button class="btn btn-registrar" id="btnRegistrarAluguel" onclick="registrarAluguelDiaria()" style="background:#0d7a3e;color:#fff;display:inline-flex;align-items:center;gap:7px">
-    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-    Registrar Aluguel
-  </button>
-  <div id="regMsg" style="display:none;font-size:11px;font-weight:700;padding:6px 12px;border-radius:6px;align-self:center"></div>
+  
+  
   <button class="btn btn-print" onclick="window.print()">
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
     Imprimir
@@ -1206,128 +1203,7 @@ if (document.readyState === 'loading') {
     window.location.replace('index.html');
   }
   
-// ── REGISTRAR ALUGUEL NO SISTEMA ─────────────────────────────────────────────
-function registrarAluguelDiaria() {
-  var btn = document.getElementById('btnRegistrarAluguel');
-  var msg = document.getElementById('regMsg');
 
-  function showMsg(text, color) {
-    msg.textContent = text;
-    msg.style.background = color === 'ok' ? '#e8f5ef' : '#fdecea';
-    msg.style.color = color === 'ok' ? '#0d7a3e' : '#c0392b';
-    msg.style.display = 'inline-block';
-  }
-
-  // Coletar campos
-  var nome      = (document.getElementById('locatarioNome') && document.getElementById('locatarioNome').value || '').trim();
-  var placa     = (document.getElementById('vPlaca')   && document.getElementById('vPlaca').value   || '').trim().toUpperCase();
-  var modelo    = (document.getElementById('vModelo')  && document.getElementById('vModelo').value  || '').trim();
-  var marca     = (document.getElementById('vMarca')   && document.getElementById('vMarca').value   || '').trim();
-  var cor       = (document.getElementById('vCor')     && document.getElementById('vCor').value     || '').trim();
-  var retirada  = document.getElementById('dtRetirada')  && document.getElementById('dtRetirada').value  || '';
-  var devolucao = document.getElementById('dtDevolucao') && document.getElementById('dtDevolucao').value || '';
-  var valor     = document.getElementById('tarTotal')    && document.getElementById('tarTotal').value    || '';
-  var caucao    = document.getElementById('tarCaucao')   && document.getElementById('tarCaucao').value   || '';
-  var dias      = document.getElementById('tarDias')     && document.getElementById('tarDias').value     || '';
-
-  if (!nome)  { showMsg('⚠️ Informe o nome do locatário', 'err'); return; }
-  if (!placa && !modelo) { showMsg('⚠️ Informe o veículo (placa ou modelo)', 'err'); return; }
-
-  btn.disabled = true;
-  btn.textContent = 'Salvando...';
-
-  var ativo = {
-    id:           'a' + Date.now(),
-    clienteNome:  nome,
-    clienteId:    '',
-    veiculoNome:  (marca + ' ' + modelo).trim() || placa,
-    placa:        placa,
-    tipo:         'diaria',
-    retirada:     retirada,
-    devolucao:    devolucao,
-    valor:        valor ? 'R$ ' + valor : '',
-    caucao:       caucao,
-    km:           document.getElementById('vKm') && document.getElementById('vKm').value || '',
-    obs:          'Contrato gerado em ' + new Date().toLocaleDateString('pt-BR'),
-    geradoEm:     new Date().toISOString(),
-    status:       'ativo',
-    origem:       'contrato-diaria'
-  };
-
-  // Salvar no Firebase loka_db
-  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-    firebase.database().ref('loka_db').once('value').then(function(snap) {
-      var db = snap.val();
-      if (!db) db = { clients:[], veiculos:[], ativos:[], historico:[], contratos:[] };
-      if (!db.ativos) db.ativos = [];
-      if (!db.contratos) db.contratos = [];
-
-      // Encontrar clienteId pelo nome
-      var cli = (db.clients || []).find(function(c) {
-        return c.nome && c.nome.toLowerCase() === nome.toLowerCase();
-      });
-      if (cli) ativo.clienteId = cli.id || '';
-
-      // Atualizar status do veículo pela placa
-      if (placa && db.veiculos) {
-        var vi = db.veiculos.findIndex(function(v) {
-          return v.placa && v.placa.toUpperCase() === placa.toUpperCase();
-        });
-        if (vi >= 0) {
-          db.veiculos[vi].status = 'alugado';
-          if (cli) {
-            ativo.veiculoId  = db.veiculos[vi].id || '';
-            ativo.veiculoNome = db.veiculos[vi].marca + ' ' + db.veiculos[vi].modelo;
-          }
-        }
-      }
-
-      db.ativos.push(ativo);
-      db.contratos.push({
-        id: 'ct' + Date.now(),
-        clienteNome: nome,
-        tipo: 'diaria',
-        geradoEm: new Date().toISOString()
-      });
-
-      return firebase.database().ref('loka_db').set(db);
-    }).then(function() {
-      // Também salvar no localStorage do sistema
-      try {
-        var local = JSON.parse(localStorage.getItem('loka_db') || 'null');
-        if (local) {
-          if (!local.ativos) local.ativos = [];
-          local.ativos.push(ativo);
-          localStorage.setItem('loka_db', JSON.stringify(local));
-        }
-      } catch(e) {}
-      btn.textContent = '✅ Registrado!';
-      btn.style.background = '#0d7a3e';
-      showMsg('✅ Aluguel de ' + nome + ' registrado em Aluguéis Ativos!', 'ok');
-    }).catch(function(e) {
-      btn.disabled = false; btn.textContent = 'Registrar Aluguel';
-      showMsg('❌ Erro: ' + e.message, 'err');
-    });
-  } else {
-    // Fallback: salvar no localStorage
-    try {
-      var local = JSON.parse(localStorage.getItem('loka_db') || 'null');
-      if (local) {
-        if (!local.ativos) local.ativos = [];
-        local.ativos.push(ativo);
-        localStorage.setItem('loka_db', JSON.stringify(local));
-        btn.textContent = '✅ Salvo localmente';
-        showMsg('✅ Salvo no localStorage (Firebase indisponível)', 'ok');
-      } else {
-        showMsg('⚠️ Firebase e localStorage indisponíveis', 'err');
-        btn.disabled = false; btn.textContent = 'Registrar Aluguel';
-      }
-    } catch(e) {
-      showMsg('❌ Erro: ' + e.message, 'err');
-      btn.disabled = false; btn.textContent = 'Registrar Aluguel';
-    }
-  }
-}
 </script>
 
 </body>

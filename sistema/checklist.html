@@ -534,12 +534,17 @@ function closeModalFoto(){
 }
 
 document.getElementById("btnTirarFoto").onclick=function(){
-  closeModalFoto();
+  // Salva o id ANTES de fechar o modal (closeModalFoto zeraria currentSlotId)
+  var _savedId = currentSlotId;
+  document.getElementById("modalFoto").classList.remove("open");
+  currentSlotId = _savedId; // restaura após fechar
   document.getElementById("inputCamera").value="";
   document.getElementById("inputCamera").click();
 };
 document.getElementById("btnGaleria").onclick=function(){
-  closeModalFoto();
+  var _savedId = currentSlotId;
+  document.getElementById("modalFoto").classList.remove("open");
+  currentSlotId = _savedId; // restaura após fechar
   document.getElementById("inputGaleria").value="";
   document.getElementById("inputGaleria").click();
 };

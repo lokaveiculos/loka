@@ -67,6 +67,9 @@ body{
 .loading{display:none;text-align:center;padding:8px;font-size:12px;color:#5a607a;}
 .footer-text{text-align:center;font-size:10px;color:#9ca3af;margin-top:20px;letter-spacing:.3px;}
 </style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
 </head>
 <body>
 <div class="card">
@@ -123,6 +126,18 @@ const SESSION_HOURS = 8;
   } catch(e) { sessionStorage.removeItem(SESSION_KEY); }
 })();
 
+function autenticar(found) {
+  const token = btoa(JSON.stringify({
+    u: found.usuario, n: found.nome, p: found.perfil,
+    exp: Date.now() + SESSION_HOURS * 3600000
+  }));
+  sessionStorage.setItem(SESSION_KEY, token);
+  sessionStorage.setItem('loka_user', JSON.stringify({
+    nome: found.nome, perfil: found.perfil, usuario: found.usuario
+  }));
+  window.location.replace('gestao.html');
+}
+
 function doLogin() {
   const u   = document.getElementById('inputUser').value.trim().toLowerCase();
   const p   = document.getElementById('inputPass').value;
@@ -134,26 +149,49 @@ function doLogin() {
   btn.style.display    = 'none';
   loading.style.display = 'block';
 
-  setTimeout(() => {
-    const found = USERS.find(user => user.usuario.toLowerCase() === u && user.senha === p);
-    if (found) {
-      const token = btoa(JSON.stringify({
-        u: found.usuario, n: found.nome, p: found.perfil,
-        exp: Date.now() + SESSION_HOURS * 3600000
-      }));
-      sessionStorage.setItem(SESSION_KEY, token);
-      sessionStorage.setItem('loka_user', JSON.stringify({
-        nome: found.nome, perfil: found.perfil, usuario: found.usuario
-      }));
-      window.location.replace('gestao.html');
+  // Tenta autenticar via Firebase (usuários criados no sistema)
+  const tentarFirebase = () => {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('loka_users').once('value').then(snap => {
+        const fbUsers = snap.val();
+        if (fbUsers) {
+          const list = Array.isArray(fbUsers) ? fbUsers : Object.values(fbUsers);
+          const found = list.find(usr => usr.usuario && usr.usuario.toLowerCase() === u && usr.senha === p);
+          if (found) { autenticar(found); return; }
+        }
+        // Fallback: usuários locais (USERS hardcoded)
+        const local = USERS.find(usr => usr.usuario.toLowerCase() === u && usr.senha === p);
+        if (local) { autenticar(local); return; }
+        // Falhou
+        loading.style.display = 'none';
+        btn.style.display     = 'block';
+        err.style.display     = 'block';
+        document.getElementById('inputPass').value = '';
+        document.getElementById('inputPass').focus();
+      }).catch(() => {
+        // Firebase offline — usar USERS local
+        setTimeout(() => {
+          const found = USERS.find(usr => usr.usuario.toLowerCase() === u && usr.senha === p);
+          if (found) { autenticar(found); return; }
+          loading.style.display = 'none';
+          btn.style.display     = 'block';
+          err.style.display     = 'block';
+        }, 400);
+      });
     } else {
-      loading.style.display = 'none';
-      btn.style.display     = 'block';
-      err.style.display     = 'block';
-      document.getElementById('inputPass').value = '';
-      document.getElementById('inputPass').focus();
+      // Firebase não disponível
+      setTimeout(() => {
+        const found = USERS.find(usr => usr.usuario.toLowerCase() === u && usr.senha === p);
+        if (found) { autenticar(found); }
+        else {
+          loading.style.display = 'none';
+          btn.style.display     = 'block';
+          err.style.display     = 'block';
+        }
+      }, 400);
     }
-  }, 600);
+  };
+  setTimeout(tentarFirebase, 300);
 }
 
 function togglePass() {
