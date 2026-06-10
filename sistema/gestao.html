@@ -376,7 +376,7 @@ tr:hover td{background:#f8f9fe;}
       <div class="table-card">
         <div class="table-head"><h3>Contratos Gerados</h3><span id="ctCount"></span></div>
         <div class="table-scroll"><table><thead><tr>
-          <th>Cliente</th><th>Tipo</th><th>Gerado em</th>
+          <th>Cliente / Veículo</th><th>Tipo</th><th>Período</th><th>Gerado em</th><th>Ações</th>
         </tr></thead><tbody id="ctTable"></tbody></table></div>
       </div>
     </div>
@@ -636,7 +636,7 @@ tr:hover td{background:#f8f9fe;}
   </div>
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeM('mContrato')">Cancelar</button>
-    <button class="btn btn-blue" onclick="gerarERegistrarContrato()">📄 Gerar Contrato e Registrar Aluguel</button>
+    <button class="btn btn-blue" onclick="gerarERegistrarContrato()">📄 Gerar Contrato</button>
   </div>
 </div></div>
 
@@ -1363,30 +1363,7 @@ function gerarERegistrarContrato() {
   var v = db.veiculos[vIdx];
   if (!v) return;
 
-  // Criar ativo
-  var ativo = {
-    id:          'a'+Date.now(),
-    clienteId:   cl.id||'', clienteNome: cl.nome||'',
-    veiculoId:   v.id||'',  veiculoNome: v.marca+' '+v.modelo, placa: v.placa,
-    tipo:        _ctTipo,
-    retirada:    ret, devolucao: dev,
-    valor:       val ? 'R$ '+val : '',
-    caucao:      cau, km: km,
-    obs:         '',
-    geradoEm:    new Date().toISOString(),
-    status:      'ativo',
-    origem:      'contrato-'+_ctTipo
-  };
-
-  // Atualizar status veículo
-  db.veiculos[vIdx].status = 'alugado';
-  db.clients[_curCli].alugueis = (db.clients[_curCli].alugueis||0)+1;
-  db.ativos.push(ativo);
-  if (!db.contratos) db.contratos = [];
-  db.contratos.unshift({id:'ct'+Date.now(), clienteNome:cl.nome||'', tipo:_ctTipo, geradoEm:new Date().toISOString()});
-  saveDB();
-
-  // Passar dados para o contrato via localStorage + Firebase pass
+  // Apenas passa os dados para o contrato via localStorage — NÃO registra ativo
   var passData = {
     nome:  cl.nome||'', cpf: cl.cpf||'', tel: cl.telefone||'',
     end:   [cl.endereco,cl.bairro,cl.cidade].filter(Boolean).join(', ')||'',
@@ -1396,14 +1373,25 @@ function gerarERegistrarContrato() {
   try { localStorage.setItem('loka_contrato_client', JSON.stringify(passData)); } catch(e) {}
   if (typeof LokaDB !== 'undefined') LokaDB.setClientPass(passData).catch(function(){});
 
-  // Abrir contrato
+  // Registrar na lista de contratos gerados (apenas histórico, sem criar ativo)
+  if (!db.contratos) db.contratos = [];
+  db.contratos.unshift({
+    id: 'ct'+Date.now(), clienteNome: cl.nome||'',
+    clienteId: cl.id||'', veiculoNome: v.marca+' '+v.modelo,
+    placa: v.placa, tipo: _ctTipo,
+    retirada: ret, devolucao: dev, valor: val, caucao: cau,
+    geradoEm: new Date().toISOString()
+  });
+  saveDB();
+
+  // Abrir contrato pré-preenchido
   var files = {diaria:'contrato-diaria.html', mensal:'contrato-mensal.html'};
   window.open(files[_ctTipo]||'contrato-diaria.html','_blank');
 
   closeM('mContrato');
-  renderAtivos(); renderDashboard(); checkAlertas();
-  toast('✅ Aluguel registrado e contrato gerado!','#0d7a3e');
+  toast('📄 Contrato aberto — clique "Registrar Contrato" no formulário para confirmar o aluguel','#2B4BF2');
 }
+
 
 function abrirMContrato() {
   closeM('mCliente');
@@ -2651,15 +2639,73 @@ function gerarFormSelecionado() {
 // ── CONTRATOS ────────────────────────────────────────────────
 function renderContratos() {
   if (!db) return;
-  var list = (db.contratos||[]).slice().reverse();
+  db.contratos = cleanArr(db.contratos);
+  var list = db.contratos.slice().reverse();
   var el = document.getElementById('ctCount'); if(el) el.textContent=list.length+' contrato(s)';
   var tp = {diaria:'Diária',mensal:'Mensal',reserva:'Reserva',checklist:'Checklist'};
   var tb = document.getElementById('ctTable'); if(!tb) return;
-  tb.innerHTML = list.length ? list.map(function(ct){
-    return '<tr><td><strong>'+(ct.clienteNome||'—')+'</strong></td>'+
-      '<td><span class="badge bb">'+(tp[ct.tipo]||ct.tipo||'—')+'</span></td>'+
-      '<td style="font-size:10px;color:var(--muted)">'+(ct.geradoEm?new Date(ct.geradoEm).toLocaleString('pt-BR'):'—')+'</td></tr>';
-  }).join('') : '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--muted)">Nenhum contrato gerado.</td></tr>';
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Nenhum contrato gerado.</td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(function(ct, n) {
+    var arquivos = {diaria:'contrato-diaria.html', mensal:'contrato-mensal.html', reserva:'recibo-reserva.html', checklist:'checklist.html'};
+    var arq = arquivos[ct.tipo] || 'contrato-diaria.html';
+    var fmtD = function(s){ if(!s)return'—'; var d=new Date(s+'T00:00'); return isNaN(d)?s:d.toLocaleDateString('pt-BR'); };
+    return '<tr>'+
+      '<td style="padding:9px 12px"><strong>'+(ct.clienteNome||'—')+'</strong>'+
+        (ct.veiculoNome?'<br><span style="font-size:10px;color:var(--muted)">'+ct.veiculoNome+(ct.placa?' · '+ct.placa:'')+'</span>':'')+
+      '</td>'+
+      '<td style="padding:9px 12px"><span class="badge bb">'+(tp[ct.tipo]||ct.tipo||'—')+'</span></td>'+
+      '<td style="padding:9px 12px;font-size:11px">'+fmtD(ct.retirada)+(ct.devolucao?' → '+fmtD(ct.devolucao):'')+'</td>'+
+      '<td style="padding:9px 12px;font-size:11px;color:var(--muted)">'+(ct.geradoEm?new Date(ct.geradoEm).toLocaleString('pt-BR'):'—')+'</td>'+
+      '<td style="padding:9px 12px"><div style="display:flex;gap:5px">'+
+        '<button class="icon-btn" onclick="reabrirContrato('+n+')" title="Abrir contrato" style="color:#2B4BF2;border-color:#2B4BF2">📄</button>'+
+        '<button class="icon-btn" onclick="excluirContrato('+n+')" title="Excluir" style="color:#c0392b;border-color:#f5c6cb">🗑</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function reabrirContrato(n) {
+  var list = (db.contratos||[]).slice().reverse();
+  var ct = list[n];
+  if (!ct) return;
+  var passData = {
+    nome: ct.clienteNome||'', cpf:'', tel:'',
+    placa: ct.placa||'', modelo: ct.veiculoNome||'', marca:'', cor:'', km:'',
+    retirada: ct.retirada||'', devolucao: ct.devolucao||'',
+    valor: ct.valor||'', caucao: ct.caucao||'', tipo: ct.tipo
+  };
+  // Tentar buscar dados completos do cliente e veículo
+  var cli = (db.clients||[]).find(function(c){ return c && c.nome===ct.clienteNome; });
+  if (cli) {
+    passData.cpf = cli.cpf||''; passData.tel = cli.telefone||'';
+    passData.end = [cli.endereco,cli.bairro,cli.cidade].filter(Boolean).join(', ')||'';
+  }
+  var veic = (db.veiculos||[]).find(function(v){ return v && v.placa===ct.placa; });
+  if (veic) {
+    passData.modelo = veic.modelo; passData.marca = veic.marca; passData.cor = veic.cor||'';
+  }
+  try { localStorage.setItem('loka_contrato_client', JSON.stringify(passData)); } catch(e) {}
+  if (typeof LokaDB !== 'undefined') LokaDB.setClientPass(passData).catch(function(){});
+  var arquivos = {diaria:'contrato-diaria.html', mensal:'contrato-mensal.html', reserva:'recibo-reserva.html', checklist:'checklist.html'};
+  window.open(arquivos[ct.tipo]||'contrato-diaria.html','_blank');
+}
+
+function excluirContrato(n) {
+  if (!confirm('Excluir este registro de contrato?')) return;
+  var list = (db.contratos||[]).slice().reverse();
+  var ct = list[n];
+  if (!ct) return;
+  var idx = db.contratos.indexOf(ct);
+  if (idx < 0) {
+    // pode estar em outra posição — buscar por id
+    idx = db.contratos.findIndex(function(c){ return c && c.id===ct.id; });
+  }
+  if (idx >= 0) db.contratos.splice(idx, 1);
+  saveDB(); renderContratos();
+  toast('🗑 Contrato removido.','#c0392b');
 }
 
 // ── HISTÓRICO ────────────────────────────────────────────────
