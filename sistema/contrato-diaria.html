@@ -471,23 +471,88 @@
 
   /* ── Print / A4 ── */
   @media print {
-  @page { size: A4 portrait; margin: 8mm 10mm; }
-  body { background: #fff !important; padding: 0 !important; }
-  .action-bar, .modal-bg, button:not(.sig-btn) { display: none !important; }
+  @page { size: A4 portrait; margin: 6mm 8mm; }
+  body { background: #fff !important; padding: 0 !important; font-size: 9px !important; }
+
+  /* Ocultar elementos de UI */
+  .action-bar, .modal-bg, .sig-canvas-wrap, .sig-actions,
+  button:not(.nenhum), #dateRow input { display: none !important; }
+
+  /* Container */
   .contract { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
-  .contract-header { padding: 10px 16px !important; }
-  .section { padding: 8px 16px !important; margin: 0 !important; break-inside: avoid; }
-  .section-title { font-size: 8px !important; padding: 3px 0 !important; margin-bottom: 4px !important; }
-  .data-table th { font-size: 7px !important; padding: 4px 6px !important; }
-  .data-table td { font-size: 10px !important; padding: 4px 6px !important; }
-  .data-table input { font-size: 10px !important; padding: 2px 4px !important; border: none !important; background: transparent !important; }
-  .clause { font-size:8.5px !important; line-height: 1.4 !important; margin: 2px 0 !important; padding: 0 !important; }
-  .clause p { margin: 2px 0 !important; }
+
+  /* Cabeçalho compacto */
+  .contract-header { padding: 7px 14px !important; }
+  .logo-wrap img { height: 34px !important; }
+  .header-title h1 { font-size: 11px !important; }
+  .header-title p { font-size: 7px !important; margin-top: 2px !important; }
+
+  /* Seções */
+  .section { padding: 3px 14px !important; margin: 0 !important; }
+  .section-title { font-size: 7px !important; padding: 2px 0 !important; margin-bottom: 2px !important; letter-spacing: 1px !important; }
+
+  /* Campos do locatário */
+  .field-label { font-size: 6.5px !important; margin-bottom: 0 !important; }
+  .field-input { border: none !important; background: transparent !important;
+    border-bottom: 0.5px solid #999 !important; border-radius: 0 !important;
+    font-size: 9px !important; padding: 1px 0 !important; height: auto !important; }
+  .field-group { margin-bottom: 2px !important; }
+  .field-row { gap: 6px !important; margin-bottom: 2px !important; }
+
+  /* Tabelas compactas */
+  .data-table { margin: 2px 0 !important; }
+  .data-table th { font-size: 6.5px !important; padding: 3px 5px !important; }
+  .data-table td { font-size: 8.5px !important; padding: 3px 5px !important; }
+  .data-table input { font-size: 8.5px !important; padding: 1px 3px !important;
+    border: none !important; background: transparent !important; }
+
+  /* ★ CLÁUSULAS EM 2 COLUNAS — economiza ~50% de espaço vertical */
+  .clauses {
+    column-count: 2 !important;
+    column-gap: 10px !important;
+    column-rule: 0.5px solid #ddd !important;
+  }
+  .clause {
+    font-size: 7px !important;
+    line-height: 1.3 !important;
+    margin: 2px 0 !important;
+    padding: 0 !important;
+    break-inside: avoid !important;
+  }
   .clause strong { font-weight: 700 !important; }
-  .sig-area { margin-top: 8px !important; }
-  .sig-area input { border: none !important; background: transparent !important; font-size: 10px !important; }
-  .field-input { border: none !important; background: transparent !important; border-bottom: 1px solid #999 !important; border-radius: 0 !important; font-size: 10px !important; }
-  h1 { font-size: 13px !important; }
+
+  /* Observações compactas */
+  .obs-area { min-height: 16px !important; font-size: 8px !important; }
+  .obs-input { min-height: 16px !important; padding: 2px !important; font-size: 8px !important; }
+
+  /* Assinaturas */
+  .signatures { margin-top: 6px !important; gap: 20px !important; }
+  .sig-block { gap: 3px !important; }
+  .sig-canvas-wrap { display: none !important; }
+  /* Mostrar linha de assinatura manual */
+  .sig-block::before {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 42px;
+    border: 0.5px dashed #aaa;
+    border-radius: 4px;
+    margin-bottom: 3px;
+  }
+  .sig-name-label { font-size: 7px !important; }
+  .sig-company { font-size: 8px !important; }
+  .sig-cnpj { font-size: 7px !important; }
+  .sig-fixed-wrap { height: 50px !important; }
+
+  /* Rodapé compacto */
+  .contract-footer { padding: 5px 14px !important; font-size: 7px !important; }
+
+  /* Data */
+  .date-row { font-size: 9px !important; margin-bottom: 4px !important; }
+
+  /* Nota de total */
+  .calc-note { font-size: 6.5px !important; }
+
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 </style>
