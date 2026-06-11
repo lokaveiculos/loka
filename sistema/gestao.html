@@ -598,10 +598,9 @@ tr:hover td{background:#f8f9fe;}
     <div class="sec-label">Dados da Locação</div>
     <div class="g2">
       <div class="fg" style="grid-column:1/-1">
-        <label class="fl">Veículo *</label>
-        <select class="fs" id="ctVeiculo" onchange="calcValorContrato()">
-          <option value="">— Selecione o veículo —</option>
-        </select>
+        <label class="fl">Veículos * <span id="ctVeicCount" style="font-weight:400;color:var(--muted);font-size:10px"></span></label>
+        <input class="fi" id="ctVeicSearch" type="text" placeholder="🔍 Filtrar por placa ou modelo..." oninput="filtrarVeicsModal(this.value)" style="margin-bottom:6px">
+        <div id="ctVeiculosLista" style="border:1.5px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;background:#fafbff"></div>
       </div>
       <div class="fg">
         <label class="fl">Data de Retirada *</label>
@@ -1308,6 +1307,63 @@ async function buscaCep() {
   }
 }
 
+
+// ── MULTI-SELEÇÃO DE VEÍCULOS NO MODAL DE CONTRATO ──────────
+var _ctVeicsSelecionados = new Set();
+
+function renderVeicsModal(q) {
+  q = (q||'').toLowerCase().trim();
+  var lista = document.getElementById('ctVeiculosLista');
+  if (!lista || !db) return;
+  var veics = (db.veiculos||[]).filter(function(v,i) {
+    if (!v || v.status !== 'disponivel') return false;
+    if (!q) return true;
+    return (v.marca+' '+v.modelo+' '+v.placa).toLowerCase().indexOf(q) >= 0;
+  });
+  var counter = document.getElementById('ctVeicCount');
+  if (counter) counter.textContent = _ctVeicsSelecionados.size > 0
+    ? _ctVeicsSelecionados.size + ' selecionado(s)'
+    : veics.length + ' disponível(is)';
+  if (!veics.length) {
+    lista.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted);font-size:12px">Nenhum veículo disponível</div>';
+    return;
+  }
+  lista.innerHTML = veics.map(function(v) {
+    var i = db.veiculos.indexOf(v);
+    var sel = _ctVeicsSelecionados.has(i);
+    var preco = _ctTipo === 'mensal'
+      ? (v.mensal ? 'R$ '+Number(v.mensal).toLocaleString('pt-BR')+'/mês' : '')
+      : (v.diaria ? 'R$ '+Number(v.diaria).toLocaleString('pt-BR')+'/dia' : '');
+    return '<div onclick="toggleVeicModal('+i+')" style="'
+      + 'display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;'
+      + 'border-bottom:1px solid #f0f2f8;'
+      + (sel ? 'background:#EEF1FD;' : 'background:#fff;')
+      + '">'
+      + '<div style="width:18px;height:18px;border-radius:4px;border:2px solid '+(sel?'var(--blue)':'#c5cce0')+';'
+      + 'background:'+(sel?'var(--blue)':'transparent')+';flex-shrink:0;display:flex;align-items:center;justify-content:center">'
+      + (sel ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '')
+      + '</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:12px;font-weight:700">'+v.marca+' '+v.modelo+'</div>'
+      + '<div style="font-size:10px;color:var(--muted);margin-top:1px">'
+      + '<span style="font-family:monospace;background:#f0f2f9;padding:1px 5px;border-radius:3px;margin-right:5px">'+v.placa+'</span>'
+      + v.cor + (preco ? ' · <strong style="color:var(--blue)">'+preco+'</strong>' : '')
+      + '</div></div></div>';
+  }).join('');
+}
+
+function filtrarVeicsModal(q) {
+  renderVeicsModal(q);
+}
+
+function toggleVeicModal(i) {
+  if (_ctVeicsSelecionados.has(i)) _ctVeicsSelecionados.delete(i);
+  else _ctVeicsSelecionados.add(i);
+  var q = document.getElementById('ctVeicSearch');
+  renderVeicsModal(q ? q.value : '');
+  calcValorContrato();
+}
+
 // Tipo de contrato selecionado no modal
 var _ctTipo = 'diaria';
 function selecionarTipoContrato(tipo) {
@@ -1316,51 +1372,64 @@ function selecionarTipoContrato(tipo) {
   var bM = document.getElementById('ctBtnMensal');
   if (bD) { bD.className = tipo==='diaria' ? 'btn btn-blue' : 'btn btn-outline'; }
   if (bM) { bM.className = tipo==='mensal' ? 'btn btn-blue' : 'btn btn-outline'; }
+  renderVeicsModal(document.getElementById('ctVeicSearch') ? document.getElementById('ctVeicSearch').value : '');
   calcValorContrato();
 }
 
 function calcValorContrato() {
-  var vIdx = parseInt((document.getElementById('ctVeiculo') && document.getElementById('ctVeiculo').value) || '');
   var ret  = document.getElementById('ctRetirada')  && document.getElementById('ctRetirada').value;
   var dev  = document.getElementById('ctDevolucao') && document.getElementById('ctDevolucao').value;
   var info = document.getElementById('ctValorInfo');
-  if (isNaN(vIdx) || !ret || !dev || !db) { if(info) info.style.display='none'; return; }
-  var v = db.veiculos[vIdx];
-  if (!v) return;
+  if (!_ctVeicsSelecionados || !_ctVeicsSelecionados.size || !ret || !dev || !db) {
+    if (info) info.style.display = 'none'; return;
+  }
   var dias = Math.max(1, Math.ceil((new Date(dev+'T00:00')-new Date(ret+'T00:00'))/86400000));
-  var val  = _ctTipo==='mensal' ? v.mensal*Math.ceil(dias/30) : v.diaria*dias;
-  var s    = val.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  var totalVal = 0;
+  var detalhes = [];
+  _ctVeicsSelecionados.forEach(function(vIdx) {
+    var v = db.veiculos[vIdx];
+    if (!v) return;
+    var preco = _ctTipo==='mensal' ? (v.mensal||0)*Math.ceil(dias/30) : (v.diaria||0)*dias;
+    totalVal += preco;
+    detalhes.push(v.placa+': R$ '+preco.toLocaleString('pt-BR',{minimumFractionDigits:2}));
+  });
+  var s = totalVal.toLocaleString('pt-BR',{minimumFractionDigits:2});
   var vlEl = document.getElementById('ctValor');
   if (vlEl) vlEl.value = s;
-  if (info) {
-    info.textContent = (_ctTipo==='mensal'?'Mensal':'Diária')+': '+dias+' dia(s) × R$ '+
-      (_ctTipo==='mensal'?v.mensal:v.diaria).toLocaleString('pt-BR')+' = R$ '+s;
+  if (info && totalVal > 0) {
+    info.innerHTML = (_ctTipo==='mensal'?'📅 Mensal':'🚗 Diária')+' · '+dias+' dia(s) · '
+      + _ctVeicsSelecionados.size + ' veículo(s)<br>'
+      + '<span style="font-size:11px;opacity:.8">'+detalhes.join(' &nbsp;|&nbsp; ')+'</span>'
+      + '<br><strong>Total: R$ '+s+'</strong>';
     info.style.display = 'block';
   }
 }
 
 function gerarERegistrarContrato() {
   var cl   = _curCli >= 0 ? db.clients[_curCli] : {};
-  var vIdx = parseInt((document.getElementById('ctVeiculo') && document.getElementById('ctVeiculo').value) || '');
   var ret  = document.getElementById('ctRetirada')  && document.getElementById('ctRetirada').value  || '';
   var dev  = document.getElementById('ctDevolucao') && document.getElementById('ctDevolucao').value || '';
   var val  = document.getElementById('ctValor')     && document.getElementById('ctValor').value     || '';
   var cau  = document.getElementById('ctCaucao')    && document.getElementById('ctCaucao').value    || '';
   var km   = document.getElementById('ctKm')        && document.getElementById('ctKm').value        || '';
 
-  if (isNaN(vIdx)) { toast('⚠️ Selecione o veículo','#b45309'); return; }
+  if (!_ctVeicsSelecionados || !_ctVeicsSelecionados.size) { toast('⚠️ Selecione ao menos um veículo','#b45309'); return; }
   if (!ret || !dev)  { toast('⚠️ Informe as datas','#b45309'); return; }
   if (dev <= ret)    { toast('⚠️ Devolução deve ser após a retirada','#b45309'); return; }
 
-  var v = db.veiculos[vIdx];
+  // Pegar todos os veículos selecionados
+  var veicsSelecionados = Array.from(_ctVeicsSelecionados).map(function(i){ return db.veiculos[i]; }).filter(Boolean);
+  var v = veicsSelecionados[0]; // veículo principal (para passdata)
   if (!v) return;
 
-  // Apenas passa os dados para o contrato via localStorage — NÃO registra ativo
+  // Passa dados ao contrato — NÃO registra ativo
   var passData = {
     nome:  cl.nome||'', cpf: cl.cpf||'', tel: cl.telefone||'',
     end:   [cl.endereco,cl.bairro,cl.cidade].filter(Boolean).join(', ')||'',
     placa: v.placa, modelo: v.modelo, marca: v.marca, cor: v.cor, km: km,
-    retirada: ret, devolucao: dev, valor: val, caucao: cau, tipo: _ctTipo
+    retirada: ret, devolucao: dev, valor: val, caucao: cau, tipo: _ctTipo,
+    // múltiplos veículos
+    veiculos: veicsSelecionados.map(function(vv){ return {placa:vv.placa,marca:vv.marca,modelo:vv.modelo,cor:vv.cor}; })
   };
   try { localStorage.setItem('loka_contrato_client', JSON.stringify(passData)); } catch(e) {}
   if (typeof LokaDB !== 'undefined') LokaDB.setClientPass(passData).catch(function(){});
@@ -1369,8 +1438,10 @@ function gerarERegistrarContrato() {
   if (!db.contratos) db.contratos = [];
   db.contratos.unshift({
     id: 'ct'+Date.now(), clienteNome: cl.nome||'',
-    clienteId: cl.id||'', veiculoNome: v.marca+' '+v.modelo,
-    placa: v.placa, tipo: _ctTipo,
+    clienteId: cl.id||'',
+    veiculoNome: veicsSelecionados.map(function(vv){return vv.marca+' '+vv.modelo;}).join(', '),
+    placa: veicsSelecionados.map(function(vv){return vv.placa;}).join(', '),
+    tipo: _ctTipo,
     retirada: ret, devolucao: dev, valor: val, caucao: cau,
     geradoEm: new Date().toISOString()
   });
@@ -1391,16 +1462,10 @@ function abrirMContrato() {
   var cl = db.clients[_curCli];
   var el = document.getElementById('mContratoNome');
   if (el) el.textContent = cl.nome;
-  // Popular select de veículos disponíveis
-  var sel = document.getElementById('ctVeiculo');
-  if (sel) {
-    sel.innerHTML = '<option value="">— Selecione o veículo —</option>'+
-      db.veiculos.filter(function(v){return v.status==='disponivel';}).map(function(v){
-        var i = db.veiculos.indexOf(v);
-        return '<option value="'+i+'">'+v.marca+' '+v.modelo+' · '+v.placa+
-          (v.diaria?' · Diária: R$'+v.diaria.toLocaleString('pt-BR'):'')+'</option>';
-      }).join('');
-  }
+  // Popular lista de veículos disponíveis com checkboxes
+  _ctVeicsSelecionados = new Set();
+  renderVeicsModal('');
+  var srch = document.getElementById('ctVeicSearch'); if(srch) srch.value='';
   // Datas padrão
   var hoje = new Date().toISOString().split('T')[0];
   var ret = document.getElementById('ctRetirada'); if(ret) ret.value=hoje;
