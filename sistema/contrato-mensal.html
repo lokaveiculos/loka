@@ -818,7 +818,7 @@ function calcTotalMensal() {
     total = mensal + condutor;
   }
   var totalEl = document.getElementById('tarTotal');
-  if (totalEl && !totalEl.readOnly) {
+  if (totalEl) {
     totalEl.value = total.toLocaleString('pt-BR', {minimumFractionDigits:2});
   }
   // Atualizar tarMensal com a soma se vValUnitM estiver preenchido

@@ -1282,7 +1282,7 @@ function calcTotalDiaria() {
   var precoBase = totalVeic > 0 ? totalVeic : diaria;
   var base = (precoBase + condutor) * dias;
   var totalEl = document.getElementById('tarTotal');
-  if (totalEl && !totalEl.readOnly) {
+  if (totalEl) {
     totalEl.value = base.toLocaleString('pt-BR', {minimumFractionDigits:2});
   }
 }
