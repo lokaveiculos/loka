@@ -2715,7 +2715,7 @@ function renderVeiculos() {
       var mensal = v.mensal ? 'R$ '+Number(v.mensal).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
       var manutBtn = st==='manutencao'
         ? '<button class="icon-btn" onclick="openRetornoManut(\''+v.id+'\')" title="Dar Baixa" style="color:var(--purple);border-color:var(--purple)">✅</button>'
-        : '<button class="icon-btn" onclick="openManutencao(\''+v.id+'\')" title="Manutenção">🔧</button>';
+        : '';
       var inatBtn = st==='inativo'
         ? '<button class="icon-btn" onclick="inativarVeiculo(\''+v.id+'\')" title="Reativar" style="color:#0d7a3e;border-color:#0d7a3e">▶</button>'
         : '<button class="icon-btn" onclick="inativarVeiculo(\''+v.id+'\')" title="Inativar" style="color:#c0392b;border-color:#f5c6cb">⛔</button>';
@@ -2816,15 +2816,18 @@ function renderManutencao() {
         + '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px">'+(m.custo?'R$ '+m.custo:'—')+'</td>'
         + '<td style="padding:9px 12px"><span style="background:'+(stBg[st]||'#f0f2f9')+';color:'+(stCor[st]||'#555')+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+(stLbl[st]||st)+'</span></td>'
         + '<td style="padding:9px 12px;text-align:center">'
+          + '<button class="icon-btn manut-view-btn" data-mid="'+m.id+'" title="Consultar / Comprovantes" style="color:#0d7a3e;border-color:#0d7a3e">🔍</button>'
           + '<button class="icon-btn manut-edit-btn" data-mid="'+m.id+'" title="Editar" style="color:#2B4BF2;border-color:#2B4BF2">✏️</button>'
         + '</td>'
       + '</tr>';
     }).join('')
     + '</tbody></table></div>';
-  // Event delegation para edição
+  // Event delegation para edição e consulta
   grid.addEventListener('click', function(e) {
-    var btn = e.target.closest('.manut-edit-btn');
-    if (btn) openManutRegistro(btn.dataset.mid);
+    var btnV = e.target.closest('.manut-view-btn');
+    if (btnV) { consultarManutencao(btnV.dataset.mid); return; }
+    var btnE = e.target.closest('.manut-edit-btn');
+    if (btnE) openManutRegistro(btnE.dataset.mid);
   });
 
   if (_manutFiltroVeiculo) {
@@ -2964,6 +2967,75 @@ function salvarManutencao() {
   renderManutencao(); renderVeiculos(); renderFrota(); renderDashboard();
   toast(_manutEditId ? '✅ Manutenção atualizada!' : '✅ Manutenção registrada!','#7c3aed');
 }
+
+// ── CONSULTAR MANUTENÇÃO (somente leitura + comprovantes) ───
+function consultarManutencao(id) {
+  var m = (db.manutencoes||[]).find(function(x){ return x.id===id; });
+  if (!m) return;
+  var tipoLbl = {preventiva:'Preventiva',corretiva:'Corretiva',revisao:'Revisão',pneu:'Pneu/Borracharia',funilaria:'Funilaria/Pintura',eletrica:'Elétrica',outro:'Outro'};
+  var stLbl   = {em_andamento:'🔧 Em andamento',concluida:'✅ Concluída',orcamento:'📋 Orçamento'};
+  var pgtoLbl = {pix:'PIX',dinheiro:'Dinheiro',cartao:'Cartão',transferencia:'Transferência',boleto:'Boleto'};
+
+  function row(label, val) {
+    if (!val) return '';
+    return '<div style="display:grid;grid-template-columns:140px 1fr;gap:4px;padding:7px 0;border-bottom:1px solid #f0f2f8">'
+      + '<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'+label+'</span>'
+      + '<span style="font-size:12px;font-weight:600;color:#0E1B4D">'+val+'</span>'
+      + '</div>';
+  }
+
+  var comps = m.comprovantes && m.comprovantes.length
+    ? '<div style="margin-top:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📎 Comprovantes ('+m.comprovantes.length+')</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+      + m.comprovantes.map(function(c, i) {
+          var isImg = c.startsWith('data:image');
+          return isImg
+            ? '<a href="'+c+'" target="_blank"><img src="'+c+'" style="height:80px;width:80px;object-fit:cover;border-radius:8px;border:2px solid var(--border);cursor:pointer" title="Clique para ampliar"></a>'
+            : '<a href="'+c+'" download="comprovante_'+(i+1)+'.pdf" style="height:80px;width:80px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:2px solid var(--border);font-size:28px;text-decoration:none" title="Baixar PDF">📄</a>';
+        }).join('')
+      + '</div></div>'
+    : '<div style="margin-top:12px;padding:10px;background:#f4f6fc;border-radius:6px;font-size:11px;color:var(--muted);text-align:center">Nenhum comprovante anexado</div>';
+
+  var existing = document.getElementById('mConsultaManut');
+  if (existing) existing.remove();
+  var panel = document.createElement('div');
+  panel.id = 'mConsultaManut';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  panel.innerHTML = '<div style="background:#fff;border-radius:12px;width:520px;max-width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">'
+    + '<div style="background:#7c3aed;padding:14px 18px;color:#fff;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">'
+    + '<div><div style="font-weight:800;font-size:13px">🔍 Consulta de Manutenção</div>'
+    + '<div style="font-size:10px;opacity:.7;margin-top:2px">'+m.veiculoNome+' · '+m.placa+'</div></div>'
+    + '<button id="btnFecharConsulta" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:14px;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div style="padding:16px 18px">'
+    + row('Veículo',  m.veiculoNome+' · '+(m.placa||''))
+    + row('Status',   stLbl[m.status]||m.status)
+    + row('Tipo',     tipoLbl[m.tipo]||m.tipo)
+    + row('Serviço',  m.descricao)
+    + row('Oficina',  m.oficina)
+    + row('Entrada',  m.data ? new Date(m.data+'T00:00').toLocaleDateString('pt-BR') : '')
+    + row('Retorno',  m.retorno ? new Date(m.retorno+'T00:00').toLocaleDateString('pt-BR') : '')
+    + row('KM',       m.km ? m.km+' km' : '')
+    + row('Custo',    m.custo ? 'R$ '+m.custo : '')
+    + row('Pagamento',pgtoLbl[m.pgto]||m.pgto)
+    + row('Obs.',     m.obs)
+    + comps
+    + '</div>'
+    + '<div style="padding:12px 18px;border-top:1px solid #f0f2f8;display:flex;justify-content:space-between;align-items:center">'
+    + '<span style="font-size:10px;color:var(--muted)">Registrado: '+(m.criadoEm ? new Date(m.criadoEm).toLocaleString('pt-BR') : '—')+'</span>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button id="btnConsultaEditar" style="padding:8px 14px;background:#EEF1FD;color:#2B4BF2;border:1.5px solid #2B4BF2;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✏️ Editar</button>'
+    + '<button id="btnFecharConsulta2" style="padding:8px 18px;background:#0E1B4D;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">Fechar</button>'
+    + '</div></div>'
+    + '</div>';
+  document.body.appendChild(panel);
+  panel.querySelector('#btnFecharConsulta').onclick  = function(){ panel.remove(); };
+  panel.querySelector('#btnFecharConsulta2').onclick = function(){ panel.remove(); };
+  var bEdit = panel.querySelector('#btnConsultaEditar');
+  if (bEdit) bEdit.onclick = function(){ panel.remove(); openManutRegistro(id); };
+  panel.addEventListener('click', function(e){ if(e.target===panel) panel.remove(); });
+}
+
 
 function excluirManutencao() {
   if (!_manutEditId) return;
