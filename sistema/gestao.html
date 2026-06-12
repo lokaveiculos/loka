@@ -1623,6 +1623,82 @@ function renderAtivos() {
 }
 
 
+// ── EXCLUIR ATIVO ────────────────────────────────────────────
+function excluirAtivo(idxOrId) {
+  var a = typeof idxOrId==='number'
+    ? (db.ativos||[])[idxOrId]
+    : (db.ativos||[]).find(function(x){ return x.id===idxOrId; });
+  if (!a) { toast('Registro não encontrado','#c0392b'); return; }
+  if (!confirm('Excluir: ' + a.clienteNome + ' / ' + (a.placa||a.veiculoNome||'') + '?')) return;
+  db.ativos = (db.ativos||[]).filter(function(x){ return x!==a; });
+  if (a.placa && db.veiculos) {
+    var vi = db.veiculos.findIndex(function(v){ return v&&v.placa===a.placa; });
+    if (vi>=0) db.veiculos[vi].status='disponivel';
+  }
+  saveDB(); renderAtivos(); renderFrota(); renderDashboard();
+  toast('🗑 Aluguel excluído.','#7c3aed');
+}
+
+// ── GERENCIAR VEÍCULOS MULTI-CONTRATO ───────────────────────
+function gerenciarVeiculosAtivo(id) {
+  var a = (db.ativos||[]).find(function(x){ return x.id===id; });
+  if (!a) return;
+  var placas = a.placas || (a.placa ? [a.placa] : []);
+  if (!placas.length) { toast('Nenhum veículo registrado','#b45309'); return; }
+  var stLbl = {alugado:'🔑 Alugado',disponivel:'✅ Disponível',manutencao:'🔧 Manutenção',inativo:'⛔ Inativo'};
+  var linhas = placas.map(function(placa) {
+    var v = (db.veiculos||[]).find(function(vv){ return vv&&vv.placa===placa; });
+    var nome = v ? v.marca+' '+v.modelo : placa;
+    var st   = v ? v.status : 'disponivel';
+    var btn  = st==='alugado'
+      ? '<button class="baixar-btn" data-ativo="'+id+'" data-placa="'+placa+'" style="padding:5px 10px;background:#e8f5ef;color:#0d7a3e;border:1.5px solid #0d7a3e;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">✅ Dar Baixa</button>'
+      : '<span style="font-size:10px;color:#aaa">Já baixado</span>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #f0f2f8;gap:10px">'
+      + '<div><strong style="font-size:12px">'+nome+'</strong><br>'
+      + '<span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+placa+'</span>'
+      + ' <span style="font-size:10px;color:#888">'+(stLbl[st]||st)+'</span></div>'
+      + '<div>'+btn+'</div></div>';
+  }).join('');
+  var existing = document.getElementById('mGerirVeics');
+  if (existing) existing.remove();
+  var panel = document.createElement('div');
+  panel.id = 'mGerirVeics';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+  panel.innerHTML = '<div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:80vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,.2)">'
+    + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0">🚗 '+a.clienteNome+'</div>'
+    + '<div style="padding:8px 14px;font-size:11px;color:#888;border-bottom:1px solid #eee">'+placas.length+' veículo(s) neste contrato</div>'
+    + linhas
+    + '<div style="padding:12px 14px;text-align:right;border-top:1px solid #eee">'
+    + '<button id="btnFecharGerir" style="padding:8px 18px;background:#0E1B4D;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Fechar</button>'
+    + '</div></div>';
+  panel.addEventListener('click', function(e) {
+    var btn = e.target.closest('.baixar-btn');
+    if (btn) { baixarVeiculoAtivo(btn.dataset.ativo, btn.dataset.placa); panel.remove(); }
+    if (e.target===panel) panel.remove();
+  });
+  document.body.appendChild(panel);
+  var bFch = panel.querySelector('#btnFecharGerir');
+  if (bFch) bFch.onclick = function(){ panel.remove(); };
+}
+
+// ── DAR BAIXA EM VEÍCULO INDIVIDUAL ─────────────────────────
+function baixarVeiculoAtivo(ativoId, placa) {
+  if (!confirm('Dar baixa no veículo '+placa+'? Ele voltará para Disponível.')) return;
+  var idx = (db.ativos||[]).findIndex(function(a){ return a.id===ativoId; });
+  if (idx<0) return;
+  var a = db.ativos[idx];
+  if (a.placas) a.placas = a.placas.filter(function(p){ return p!==placa; });
+  if (a.placa===placa) a.placa = a.placas&&a.placas[0]||'';
+  if (!a.placas||!a.placas.length) {
+    if (confirm('Sem veículos restantes. Encerrar o contrato?')) db.ativos.splice(idx,1);
+  }
+  var vi = (db.veiculos||[]).findIndex(function(v){ return v&&v.placa===placa; });
+  if (vi>=0) db.veiculos[vi].status='disponivel';
+  saveDB(); renderAtivos(); renderFrota(); renderDashboard();
+  toast('✅ '+placa+' devolvido — Disponível','#0d7a3e');
+}
+
+
 function openAluguel() {
   var cSel = document.getElementById('aCliente');
   if (cSel) cSel.innerHTML = '<option value="">— Selecione —</option>'+
