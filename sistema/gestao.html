@@ -2306,6 +2306,30 @@ function excluirVeiculo() {
   toast('🗑 Veículo excluído.', '#c0392b');
 }
 
+// ── LIBERAR VEÍCULO (forçar status para disponível) ─────────
+function liberarVeiculo(vId) {
+  var v = (db.veiculos||[]).find(function(x){ return x.id===vId; });
+  if (!v) return;
+  // Verificar se há ativo vinculado
+  var ativo = (db.ativos||[]).find(function(a){
+    return a && (a.placa===v.placa || a.veiculoId===vId);
+  });
+  var aviso = ativo
+    ? '⚠️ ATENÇÃO: Este veículo está vinculado ao aluguel de '+ativo.clienteNome+'.\n\nForçar liberação irá apenas alterar o status — o registro de aluguel continua ativo.\n\n'
+    : '';
+  if (!confirm(aviso+'Liberar o veículo '+v.marca+' '+v.modelo+' ('+v.placa+')?\nStatus será alterado para Disponível.')) return;
+  var idx = db.veiculos.findIndex(function(x){ return x.id===vId; });
+  if (idx >= 0) {
+    db.veiculos[idx].status = 'disponivel';
+    saveDB();
+    renderVeiculos();
+    renderFrota();
+    renderDashboard();
+    toast('✅ '+v.placa+' liberado — status: Disponível','#0d7a3e');
+  }
+}
+
+
 function inativarVeiculo(vId) {
   var idx = db.veiculos.findIndex(function(v){return v.id===vId;});
   if (idx < 0) return;
@@ -2539,6 +2563,7 @@ function renderFrota() {
           '<button class="icon-btn" onclick="openVeiculo(\''+v.id+'\')" title="Editar">✏️</button>'+
           '<button class="icon-btn" onclick="abrirPrecos(\''+v.id+'\')" title="Preços" style="color:#7c3aed;border-color:#7c3aed">💰</button>'+
           manutBtn + inatBtn +
+          (st==='alugado' ? '<button class="icon-btn" onclick="liberarVeiculo(\''+v.id+'\')" title="Forçar Disponível" style="color:#0d7a3e;border-color:#0d7a3e;font-size:10px;padding:3px 7px">🔓 Liberar</button>' : '')+
         '</div></td>'+
       '</tr>';
       } catch(_e) { console.error('renderFrota row:', _e); return '<tr><td colspan="7" style="color:#c0392b;font-size:11px;padding:8px">⚠️ Linha com erro: ' + (_e.message||'') + '</td></tr>'; }
@@ -2601,6 +2626,7 @@ function renderVeiculos() {
           '<button class="icon-btn" onclick="openVeiculo(\''+v.id+'\')" title="Editar">✏️</button>'+
           '<button class="icon-btn" onclick="abrirPrecos(\''+v.id+'\')" title="Preços" style="color:#7c3aed;border-color:#7c3aed">💰</button>'+
           manutBtn + inatBtn +
+          (st==='alugado' ? '<button class="icon-btn" onclick="liberarVeiculo(\''+v.id+'\')" title="Forçar Disponível" style="color:#0d7a3e;border-color:#0d7a3e;font-size:10px;padding:3px 7px">🔓 Liberar</button>' : '')+
         '</div></td>'+
       '</tr>';
     }).join('')
