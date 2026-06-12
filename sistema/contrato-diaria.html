@@ -471,12 +471,12 @@
 
   /* ── Print / A4 ── */
   @media print {
-  @page { size: A4 portrait; margin: 6mm 8mm; }
+  @page { size: A4 portrait; margin: 5mm 7mm; }
   body { background: #fff !important; padding: 0 !important; font-size: 9px !important; }
 
   /* Ocultar elementos de UI */
   .action-bar, .modal-bg, .sig-canvas-wrap, .sig-actions,
-  button:not(.nenhum), #dateRow input { display: none !important; }
+  button:not(.nenhum), #dateRow input, #lokaAuthBar, .no-print { display: none !important; }
 
   /* Container */
   .contract { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
@@ -491,13 +491,18 @@
   .section { padding: 3px 14px !important; margin: 0 !important; }
   .section-title { font-size: 7px !important; padding: 2px 0 !important; margin-bottom: 2px !important; letter-spacing: 1px !important; }
 
-  /* Campos do locatário */
-  .field-label { font-size: 6.5px !important; margin-bottom: 0 !important; }
+  /* Campos do locatário — compacto 3 colunas */
+  .field-label { font-size: 6px !important; margin-bottom: 0 !important; line-height:1 !important; }
   .field-input { border: none !important; background: transparent !important;
     border-bottom: 0.5px solid #999 !important; border-radius: 0 !important;
-    font-size: 9px !important; padding: 1px 0 !important; height: auto !important; }
-  .field-group { margin-bottom: 2px !important; }
-  .field-row { gap: 6px !important; margin-bottom: 2px !important; }
+    font-size: 8.5px !important; padding: 0 !important; height: auto !important; line-height:1.2 !important; }
+  .field-group { margin-bottom: 1px !important; padding: 0 !important; }
+  .field-row { gap: 4px !important; margin-bottom: 1px !important; }
+  .field-grid { gap: 4px !important; margin-bottom: 3px !important; }
+  .field-grid.col-2 { grid-template-columns: repeat(3,1fr) !important; }
+  .field-grid.col-3 { grid-template-columns: repeat(3,1fr) !important; }
+  .locatario-row { gap: 6px !important; }
+  .photo-box { display: none !important; }
 
   /* Tabelas compactas */
   .data-table { margin: 2px 0 !important; }
@@ -522,11 +527,11 @@
   .clause strong { font-weight: 700 !important; }
 
   /* Observações compactas */
-  .obs-area { min-height: 16px !important; font-size: 8px !important; }
-  .obs-input { min-height: 16px !important; padding: 2px !important; font-size: 8px !important; }
+  .obs-area { min-height: 10px !important; font-size: 7.5px !important; }
+  .obs-input { min-height: 10px !important; padding: 1px !important; font-size: 7.5px !important; max-height:18px !important; }
 
   /* Assinaturas */
-  .signatures { margin-top: 6px !important; gap: 20px !important; }
+  .signatures { margin-top: 4px !important; gap: 12px !important; }
   .sig-block { gap: 3px !important; }
   .sig-canvas-wrap { display: none !important; }
   /* Mostrar linha de assinatura manual */
@@ -534,15 +539,15 @@
     content: '';
     display: block;
     width: 100%;
-    height: 42px;
+    height: 30px;
     border: 0.5px dashed #aaa;
     border-radius: 4px;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
   .sig-name-label { font-size: 7px !important; }
   .sig-company { font-size: 8px !important; }
   .sig-cnpj { font-size: 7px !important; }
-  .sig-fixed-wrap { height: 50px !important; }
+  .sig-fixed-wrap { height: 38px !important; }
 
   /* Rodapé compacto */
   .contract-footer { padding: 5px 14px !important; font-size: 7px !important; }
@@ -705,7 +710,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>KM/Diária</th><th>Valor Unit. (R$)</th><th style="width:32px"></th>
+            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>KM/Diária</th><th>Valor Unit. (R$)</th><th class="no-print" style="width:32px"></th>
           </tr>
         </thead>
         <tbody id="veiculosBodyD">
@@ -716,7 +721,7 @@
             <td><input placeholder="Cor"></td>
             <td><input placeholder="100 km" value="100 km"></td>
             <td><input class="vValUnitD" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalDiaria()" style="text-align:right;width:90px"></td>
-            <td style="text-align:center;background:#fdecea;cursor:pointer" onclick="removeVeiculoDiaria(this)" title="Remover">
+            <td class="no-print" style="text-align:center;background:#fdecea;cursor:pointer" onclick="removeVeiculoDiaria(this)" title="Remover">
               <span style="font-size:14px;color:#c0392b;font-weight:700">×</span>
             </td>
           </tr>
@@ -1211,7 +1216,7 @@ if (document.readyState === 'loading') {
   <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;
     border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;
     display:flex;align-items:center;justify-content:space-between;z-index:9999;
-    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
+    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);" id="lokaAuthBar">
     <span id="lokaUserName">LOKÁ Sistema</span>
     <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
       color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;
@@ -1257,7 +1262,7 @@ function addVeiculoDiaria() {
     '<td><input placeholder="Cor"></td>' +
     '<td><input placeholder="100 km" value="100 km"></td>' +
     '<td><input class="vValUnitD" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalDiaria()" style="text-align:right;width:90px"></td>' +
-    '<td style="text-align:center;background:#fdecea;cursor:pointer" onclick="removeVeiculoDiaria(this)" title="Remover">' +
+    '<td class="no-print" style="text-align:center;background:#fdecea;cursor:pointer" onclick="removeVeiculoDiaria(this)" title="Remover">' +
     '<span style="font-size:14px;color:#c0392b;font-weight:700">×</span></td>';
   tbody.appendChild(tr);
 }

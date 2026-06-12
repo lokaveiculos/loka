@@ -144,7 +144,7 @@
 
   /* Ocultar elementos de UI */
   .action-bar, .modal-bg, .sig-canvas-wrap, .sig-actions,
-  button:not(.nenhum), #dateRow input { display: none !important; }
+  button:not(.nenhum), #dateRow input, #lokaAuthBar, .no-print { display: none !important; }
 
   /* Container */
   .contract { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
@@ -355,7 +355,7 @@
       <table class="data-table" id="veiculosTable">
         <thead>
           <tr>
-            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>Franquia KM</th><th>Diária (R$)</th><th>Qtd. Dias</th><th>Total Veíc. (R$)</th><th style="width:36px;"></th>
+            <th>Marca</th><th>Modelo</th><th>Placa</th><th>Cor</th><th>Franquia KM</th><th>Valor Unit. (R$)</th><th class="no-print" style="width:36px;"></th>
           </tr>
         </thead>
         <tbody id="veiculosBody">
@@ -365,11 +365,8 @@
             <td><input placeholder="AAA-0000" style="text-transform:uppercase"></td>
             <td><input placeholder=""></td>
             <td><input placeholder="0000 km"></td>
-            <td><input class="vDiariaM" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalMensal()" style="text-align:right;width:90px"></td>
-            <td><input class="vQtdM" type="number" placeholder="30" min="1" oninput="calcTotalMensal()" style="text-align:center;width:60px"></td>
-            <td><input class="vValUnitM" type="text" placeholder="0,00" readonly style="text-align:right;width:100px;background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>
-            <td style="text-align:center;background:#fdecea;cursor:pointer;" onclick="removeVeiculo(this)" title="Remover">
-              <span style="font-size:14px;color:#c0392b;font-weight:700;">×</span>
+            <td class="no-print" style="text-align:center;background:#fdecea;cursor:pointer;" onclick="removeVeiculo(this)" title="Remover">
+              <span style="font-size:14px;color:#c0392b;font-weight:700;line-height:1;">×</span>
             </td>
           </tr>
         </tbody>
@@ -398,7 +395,7 @@
           <tr>
             <td><input id="tarMensal" oninput="maskBRL(this);calcTotalMensal()" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
             <td><input id="tarCondutor" oninput="maskBRL(this);calcTotalMensal()" placeholder="R$ 0,00" oninput="maskBRL(this); calcTotalMensal()"></td>
-            <td><input id="tarTotal" placeholder="0,00" style="background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>
+            <td><input id="tarTotal" placeholder="0,00" readonly style="background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>
             <td><input id="tarCaucao" placeholder="R$ 0,00" oninput="maskBRL(this)"></td>
             <td><input id="dtInicio" placeholder="Ex: 11 (dia)"></td>
             <td><input id="dtVigencia" placeholder="Ex: 90 dias"></td>
@@ -535,10 +532,8 @@ function addVeiculo() {
     '<td><input placeholder="AAA-0000" style="text-transform:uppercase"></td>' +
     '<td><input placeholder=""></td>' +
     '<td><input placeholder="0000 km"></td>' +
-    '<td><input class="vDiariaM" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalMensal()" style="text-align:right;width:90px"></td>' +
-    '<td><input class="vQtdM" type="number" placeholder="30" min="1" oninput="calcTotalMensal()" style="text-align:center;width:60px"></td>' +
-    '<td><input class="vValUnitM" type="text" placeholder="0,00" readonly style="text-align:right;width:100px;background:#EEF1FD;font-weight:700;color:#0E1B4D;cursor:default;"></td>' +
-    '<td style="text-align:center;background:#fdecea;cursor:pointer;" onclick="removeVeiculo(this)" title="Remover">' +
+    '<td><input class="vValUnitM" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalMensal()" style="text-align:right;width:90px"></td>' +
+    '<td class="no-print" style="text-align:center;background:#fdecea;cursor:pointer;" onclick="removeVeiculo(this)" title="Remover">' +
     '<span style="font-size:14px;color:#c0392b;font-weight:700;">×</span></td>';
   document.getElementById('veiculosBody').appendChild(row);
 }
@@ -771,7 +766,7 @@ if (document.readyState === 'loading') {
   <div id="lokaUserBar" style="position:fixed;bottom:0;left:0;right:0;background:#07102e;
     border-top:1px solid rgba(255,255,255,.08);padding:6px 16px;
     display:flex;align-items:center;justify-content:space-between;z-index:9999;
-    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);">
+    font-family:Montserrat,sans-serif;font-size:10px;color:rgba(255,255,255,.4);" id="lokaAuthBar">
     <span id="lokaUserName">LOKÁ Sistema</span>
     <button onclick="lokaLogout()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
       color:rgba(255,255,255,.5);border-radius:4px;padding:3px 10px;font-family:Montserrat,sans-serif;
@@ -808,23 +803,13 @@ function maskBRL(el) {
   el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 }
 function calcTotalMensal() {
-  // Calcula diária × quantidade de dias para cada veículo
+  // Somar valores unitários de todos os veículos
   var totalVeic = 0;
-  document.querySelectorAll('#veiculosBody tr').forEach(function(row) {
-    var diaria  = row.querySelector('.vDiariaM');
-    var qtd     = row.querySelector('.vQtdM');
-    var valUnit = row.querySelector('.vValUnitM');
-    if (diaria && qtd && valUnit) {
-      var vlrDiaria = parseBRLLocal(diaria.value);
-      var qtdDias   = parseInt(qtd.value) || 0;
-      var subtotal  = vlrDiaria * qtdDias;
-      valUnit.value = subtotal > 0 ? subtotal.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '';
-      totalVeic += subtotal;
-    } else if (valUnit) {
-      totalVeic += parseBRLLocal(valUnit.value);
-    }
+  document.querySelectorAll('.vValUnitM').forEach(function(el) {
+    totalVeic += parseBRLLocal(el.value);
   });
   var condutor = parseBRLLocal(document.getElementById('tarCondutor') && document.getElementById('tarCondutor').value);
+  // Se tiver valores por veículo, usar eles; senão pegar tarMensal
   var total;
   if (totalVeic > 0) {
     total = totalVeic + condutor;
@@ -836,9 +821,10 @@ function calcTotalMensal() {
   if (totalEl) {
     totalEl.value = total.toLocaleString('pt-BR', {minimumFractionDigits:2});
   }
+  // Atualizar tarMensal com a soma se vValUnitM estiver preenchido
   if (totalVeic > 0) {
     var mensalEl = document.getElementById('tarMensal');
-    if (mensalEl) {
+    if (mensalEl && !mensalEl.readOnly) {
       mensalEl.value = totalVeic.toLocaleString('pt-BR', {minimumFractionDigits:2});
     }
   }
