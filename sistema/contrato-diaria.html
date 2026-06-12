@@ -1079,15 +1079,27 @@ function fillFields(data) {
     dtRetirada:    data.retirada,
     dtDevolucao:   data.devolucao,
   };
-  // Preencher primeira linha do tbody de veículos
-  const firstRow = document.querySelector('#veiculosBodyD tr');
-  if (firstRow) {
-    const inputs = firstRow.querySelectorAll('input');
-    if (inputs[0] && data.marca)  inputs[0].value = data.marca;
-    if (inputs[1] && data.modelo) inputs[1].value = data.modelo;
-    if (inputs[2] && data.placa)  inputs[2].value = data.placa;
-    if (inputs[3] && data.cor)    inputs[3].value = data.cor;
-    if (inputs[4] && data.km)     inputs[4].value = data.km;
+  // Preencher veículos — suporta array de múltiplos veículos
+  const veicsData = (data.veiculos && data.veiculos.length) ? data.veiculos
+    : (data.placa||data.modelo||data.marca) ? [{placa:data.placa,marca:data.marca,modelo:data.modelo,cor:data.cor}]
+    : [];
+  if (veicsData.length) {
+    // Garantir linhas suficientes no tbody
+    const tbody = document.getElementById('veiculosBodyD');
+    if (tbody) {
+      const existingRows = tbody.querySelectorAll('tr').length;
+      for (let r = existingRows; r < veicsData.length; r++) addVeiculoDiaria();
+      // Preencher cada linha
+      tbody.querySelectorAll('tr').forEach(function(row, ri) {
+        const vd = veicsData[ri]; if (!vd) return;
+        const inp = row.querySelectorAll('input');
+        if (inp[0]) inp[0].value = vd.marca  || '';
+        if (inp[1]) inp[1].value = vd.modelo || '';
+        if (inp[2]) inp[2].value = vd.placa  || '';
+        if (inp[3]) inp[3].value = vd.cor    || '';
+        if (inp[4] && data.km && ri===0) inp[4].value = data.km;
+      });
+    }
   }
   // Preencher valor e caução se fornecidos
   if (data.valor) {

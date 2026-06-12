@@ -1586,6 +1586,7 @@ function renderAtivos() {
         '<button class="icon-btn" data-act="pgto" data-idx="'+ri+'" title="Pagamento" style="color:#0d7a3e;border-color:#0d7a3e">💳</button>'+
         '<button class="icon-btn" data-act="enc"  data-idx="'+ri+'" title="Encerrar"  style="color:#c0392b;border-color:#c0392b">🔴</button>'+
         '<button class="icon-btn" data-act="del"  data-idx="'+ri+'" title="Excluir"   style="color:#7c3aed;border-color:#7c3aed">🗑</button>'+
+        ((a.placas && a.placas.length > 1) ? '<button class="icon-btn" data-act="veics" data-idx="'+ri+'" title="Gerir Veículos" style="color:#0d7a3e;border-color:#0d7a3e">🚗</button>+' : '')+
       '</div></td>'+
     '</tr>';
   }).join('');
@@ -1613,10 +1614,11 @@ function renderAtivos() {
     var a   = db.ativos[idx];
     if (!a) return;
     var act = btn.dataset.act;
-    if (act==='pror') openProrrogacao(a.id);
-    if (act==='pgto') openPagamento(a.id);
-    if (act==='enc')  openEncerramento(a.id);
-    if (act==='del')  excluirAtivo(idx);
+    if (act==='pror')  openProrrogacao(a.id);
+    if (act==='pgto')  openPagamento(a.id);
+    if (act==='enc')   openEncerramento(a.id);
+    if (act==='del')   excluirAtivo(idx);
+    if (act==='veics') gerenciarVeiculosAtivo(a.id);
   });
 }
 

@@ -615,6 +615,26 @@ function fillFields(data) {
     dtRetirada:    data.retirada,
     dtDevolucao:   data.devolucao,
   };
+  // Preencher veículos na tabela — suporta múltiplos
+  const veicsMD = (data.veiculos && data.veiculos.length) ? data.veiculos
+    : (data.placa||data.modelo||data.marca) ? [{placa:data.placa,marca:data.marca,modelo:data.modelo,cor:data.cor}]
+    : [];
+  if (veicsMD.length) {
+    const tbodyM = document.getElementById('veiculosBody');
+    if (tbodyM) {
+      const existM = tbodyM.querySelectorAll('tr').length;
+      for (let r = existM; r < veicsMD.length; r++) addVeiculo();
+      tbodyM.querySelectorAll('tr').forEach(function(row, ri) {
+        const vd = veicsMD[ri]; if (!vd) return;
+        const inp = row.querySelectorAll('input');
+        if (inp[0]) inp[0].value = vd.marca  || '';
+        if (inp[1]) inp[1].value = vd.modelo || '';
+        if (inp[2]) inp[2].value = vd.placa  || '';
+        if (inp[3]) inp[3].value = vd.cor    || '';
+      });
+    }
+  }
+
   // Preencher valor e caução se fornecidos
   if (data.valor) {
     var ve = document.getElementById('tarTotal') || document.getElementById('tarMensal');
