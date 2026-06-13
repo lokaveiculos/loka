@@ -471,48 +471,58 @@
 
   /* ── Print / A4 ── */
   @media print {
-  @page { size: A4 portrait; margin: 8mm 10mm; }
+  @page { size: A4 portrait; margin: 7mm 9mm; }
 
-  /* ── Ocultar UI ── */
+  /* ── Ocultar toda a UI do sistema ── */
   .action-bar, .modal-bg, .sig-canvas-wrap, .sig-actions,
   button, input[type=file], #dateRow input[type=date],
-  #lokaAuthBar, .no-print, .photo-box, .calc-note-wrap { display: none !important; }
+  .no-print, .photo-box, .calc-note-wrap,
+  /* auth bar com position:fixed */
+  #lokaAuthBar {
+    display: none !important;
+    visibility: hidden !important;
+  }
 
-  body { background:#fff !important; padding:0 !important; font-size:8px !important; line-height:1.25 !important; }
-  .contract { box-shadow:none !important; border-radius:0 !important; max-width:100% !important; }
+  /* Forçar ocultar via múltiplos seletores */
+  [id="lokaAuthBar"],
+  div[style*="z-index:9999"][style*="lokaUserName"],
+  div[style*="z-index: 9999"] { display:none !important; visibility:hidden !important; }
+
+  body { background:#fff !important; padding:0 !important;
+    font-size:8px !important; line-height:1.25 !important; }
+  .contract { box-shadow:none !important; border-radius:0 !important;
+    max-width:100% !important; }
 
   /* ── Cabeçalho ── */
   .contract-header { padding:5px 12px !important; }
-  .logo-wrap img { height:28px !important; }
-  .header-title h1 { font-size:10px !important; }
-  .header-title p  { font-size:6.5px !important; margin-top:1px !important; }
+  .logo-wrap img { height:26px !important; }
+  .header-title h1 { font-size:9.5px !important; }
+  .header-title p  { font-size:6px !important; margin-top:1px !important; }
 
   /* ── Seções ── */
   .section { padding:2px 12px !important; margin:0 !important; }
   .section-title { font-size:6.5px !important; padding:1px 0 !important;
     margin-bottom:2px !important; letter-spacing:.8px !important; }
 
-  /* ── Locatário: inline, sem grid ── */
+  /* ── Locatário compacto ── */
   .locatario-row { display:block !important; }
   .photo-box     { display:none !important; }
-
-  /* Forçar todos os field-grids em linha única */
   .field-grid { display:flex !important; flex-wrap:wrap !important;
-    gap:0 6px !important; margin-bottom:0 !important; }
-  .field-group { flex:1 !important; min-width:60px !important;
+    gap:0 5px !important; margin-bottom:0 !important; }
+  .field-group { flex:1 !important; min-width:55px !important;
     margin-bottom:1px !important; padding:0 !important; }
   .field-label { font-size:5.5px !important; line-height:1 !important;
     margin-bottom:0 !important; display:block !important; }
-  .field-input  { border:none !important; background:transparent !important;
+  .field-input { border:none !important; background:transparent !important;
     border-bottom:0.4px solid #888 !important; border-radius:0 !important;
     font-size:8px !important; padding:0 !important; height:auto !important;
-    width:100% !important; display:block !important; }
+    width:100% !important; display:block !important; line-height:1.2 !important; }
 
   /* ── Tabelas ── */
   .data-table { margin:2px 0 !important; font-size:7.5px !important; }
-  .data-table th { font-size:6px !important; padding:2px 4px !important; }
-  .data-table td { font-size:8px !important; padding:2px 4px !important; }
-  .data-table input { font-size:8px !important; padding:0 2px !important;
+  .data-table th { font-size:6px !important; padding:2px 3px !important; }
+  .data-table td { font-size:7.5px !important; padding:2px 3px !important; }
+  .data-table input { font-size:7.5px !important; padding:0 2px !important;
     border:none !important; background:transparent !important; width:100% !important; }
 
   /* ── Cláusulas 2 colunas ── */
@@ -521,28 +531,35 @@
   .clause { font-size:6.5px !important; line-height:1.25 !important;
     margin:1px 0 !important; padding:0 !important; break-inside:avoid !important; }
   .clause strong, .clause b { font-weight:700 !important; }
-  .section-title.clause-title { column-span:all !important; }
 
   /* ── Observações ── */
-  .obs-area, .obs-input { min-height:8px !important; max-height:12px !important;
+  .obs-area, .obs-input { min-height:6px !important; max-height:10px !important;
     font-size:7px !important; padding:0 !important; border:none !important;
     border-bottom:0.4px solid #888 !important; border-radius:0 !important;
     background:transparent !important; resize:none !important; }
 
   /* ── Data ── */
-  .date-row { font-size:8px !important; margin:3px 0 !important; }
+  .date-row { font-size:8px !important; margin:3px 0 2px !important; }
 
-  /* ── Assinaturas ── */
-  .signatures { margin-top:4px !important; gap:10px !important; }
-  .sig-block   { gap:2px !important; }
+  /* ── Assinaturas — compactar ao máximo ── */
+  .signatures { margin-top:4px !important; gap:8px !important;
+    break-inside:avoid !important; page-break-inside:avoid !important; }
+  .sig-block  { gap:1px !important; break-inside:avoid !important; }
+
+  /* Ocultar assinatura digital (SVG/img) — mostrar só linha */
+  .sig-fixed-wrap { display:none !important; }
+  .sig-canvas-wrap { display:none !important; }
+
+  /* Linha de assinatura manual */
   .sig-block::before { content:''; display:block; width:100%;
-    height:28px; border:0.4px dashed #aaa; border-radius:3px; margin-bottom:2px; }
-  .sig-name-label { font-size:6.5px !important; }
-  .sig-company    { font-size:7.5px !important; }
-  .sig-cnpj       { font-size:6.5px !important; }
-  .sig-fixed-wrap { height:32px !important; }
+    height:22px; border:0.4px dashed #aaa; border-radius:3px; margin-bottom:2px; }
 
-  /* ── Nota de cálculo ── */
+  .sig-line       { display:none !important; }
+  .sig-name-label { font-size:6.5px !important; margin:1px 0 0 !important; }
+  .sig-company    { font-size:7.5px !important; margin:0 !important; }
+  .sig-cnpj       { font-size:6.5px !important; margin:0 !important; }
+
+  /* Nota de cálculo */
   .calc-note { font-size:6px !important; }
 
   /* ── Rodapé ── */
