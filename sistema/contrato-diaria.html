@@ -471,94 +471,84 @@
 
   /* ── Print / A4 ── */
   @media print {
-  @page { size: A4 portrait; margin: 5mm 7mm; }
-  body { background: #fff !important; padding: 0 !important; font-size: 9px !important; }
+  @page { size: A4 portrait; margin: 8mm 10mm; }
 
-  /* Ocultar elementos de UI */
+  /* ── Ocultar UI ── */
   .action-bar, .modal-bg, .sig-canvas-wrap, .sig-actions,
-  button:not(.nenhum), #dateRow input, #lokaAuthBar, .no-print { display: none !important; }
+  button, input[type=file], #dateRow input[type=date],
+  #lokaAuthBar, .no-print, .photo-box, .calc-note-wrap { display: none !important; }
 
-  /* Container */
-  .contract { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+  body { background:#fff !important; padding:0 !important; font-size:8px !important; line-height:1.25 !important; }
+  .contract { box-shadow:none !important; border-radius:0 !important; max-width:100% !important; }
 
-  /* Cabeçalho compacto */
-  .contract-header { padding: 7px 14px !important; }
-  .logo-wrap img { height: 34px !important; }
-  .header-title h1 { font-size: 11px !important; }
-  .header-title p { font-size: 7px !important; margin-top: 2px !important; }
+  /* ── Cabeçalho ── */
+  .contract-header { padding:5px 12px !important; }
+  .logo-wrap img { height:28px !important; }
+  .header-title h1 { font-size:10px !important; }
+  .header-title p  { font-size:6.5px !important; margin-top:1px !important; }
 
-  /* Seções */
-  .section { padding: 3px 14px !important; margin: 0 !important; }
-  .section-title { font-size: 7px !important; padding: 2px 0 !important; margin-bottom: 2px !important; letter-spacing: 1px !important; }
+  /* ── Seções ── */
+  .section { padding:2px 12px !important; margin:0 !important; }
+  .section-title { font-size:6.5px !important; padding:1px 0 !important;
+    margin-bottom:2px !important; letter-spacing:.8px !important; }
 
-  /* Campos do locatário — compacto 3 colunas */
-  .field-label { font-size: 6px !important; margin-bottom: 0 !important; line-height:1 !important; }
-  .field-input { border: none !important; background: transparent !important;
-    border-bottom: 0.5px solid #999 !important; border-radius: 0 !important;
-    font-size: 8.5px !important; padding: 0 !important; height: auto !important; line-height:1.2 !important; }
-  .field-group { margin-bottom: 1px !important; padding: 0 !important; }
-  .field-row { gap: 4px !important; margin-bottom: 1px !important; }
-  .field-grid { gap: 4px !important; margin-bottom: 3px !important; }
-  .field-grid.col-2 { grid-template-columns: repeat(3,1fr) !important; }
-  .field-grid.col-3 { grid-template-columns: repeat(3,1fr) !important; }
-  .locatario-row { gap: 6px !important; }
-  .photo-box { display: none !important; }
+  /* ── Locatário: inline, sem grid ── */
+  .locatario-row { display:block !important; }
+  .photo-box     { display:none !important; }
 
-  /* Tabelas compactas */
-  .data-table { margin: 2px 0 !important; }
-  .data-table th { font-size: 6.5px !important; padding: 3px 5px !important; }
-  .data-table td { font-size: 8.5px !important; padding: 3px 5px !important; }
-  .data-table input { font-size: 8.5px !important; padding: 1px 3px !important;
-    border: none !important; background: transparent !important; }
+  /* Forçar todos os field-grids em linha única */
+  .field-grid { display:flex !important; flex-wrap:wrap !important;
+    gap:0 6px !important; margin-bottom:0 !important; }
+  .field-group { flex:1 !important; min-width:60px !important;
+    margin-bottom:1px !important; padding:0 !important; }
+  .field-label { font-size:5.5px !important; line-height:1 !important;
+    margin-bottom:0 !important; display:block !important; }
+  .field-input  { border:none !important; background:transparent !important;
+    border-bottom:0.4px solid #888 !important; border-radius:0 !important;
+    font-size:8px !important; padding:0 !important; height:auto !important;
+    width:100% !important; display:block !important; }
 
-  /* ★ CLÁUSULAS EM 2 COLUNAS — economiza ~50% de espaço vertical */
-  .clauses {
-    column-count: 2 !important;
-    column-gap: 10px !important;
-    column-rule: 0.5px solid #ddd !important;
-  }
-  .clause {
-    font-size: 7px !important;
-    line-height: 1.3 !important;
-    margin: 2px 0 !important;
-    padding: 0 !important;
-    break-inside: avoid !important;
-  }
-  .clause strong { font-weight: 700 !important; }
+  /* ── Tabelas ── */
+  .data-table { margin:2px 0 !important; font-size:7.5px !important; }
+  .data-table th { font-size:6px !important; padding:2px 4px !important; }
+  .data-table td { font-size:8px !important; padding:2px 4px !important; }
+  .data-table input { font-size:8px !important; padding:0 2px !important;
+    border:none !important; background:transparent !important; width:100% !important; }
 
-  /* Observações compactas */
-  .obs-area { min-height: 10px !important; font-size: 7.5px !important; }
-  .obs-input { min-height: 10px !important; padding: 1px !important; font-size: 7.5px !important; max-height:18px !important; }
+  /* ── Cláusulas 2 colunas ── */
+  .clauses { column-count:2 !important; column-gap:8px !important;
+    column-rule:0.4px solid #ccc !important; margin-top:2px !important; }
+  .clause { font-size:6.5px !important; line-height:1.25 !important;
+    margin:1px 0 !important; padding:0 !important; break-inside:avoid !important; }
+  .clause strong, .clause b { font-weight:700 !important; }
+  .section-title.clause-title { column-span:all !important; }
 
-  /* Assinaturas */
-  .signatures { margin-top: 4px !important; gap: 12px !important; }
-  .sig-block { gap: 3px !important; }
-  .sig-canvas-wrap { display: none !important; }
-  /* Mostrar linha de assinatura manual */
-  .sig-block::before {
-    content: '';
-    display: block;
-    width: 100%;
-    height: 30px;
-    border: 0.5px dashed #aaa;
-    border-radius: 4px;
-    margin-bottom: 2px;
-  }
-  .sig-name-label { font-size: 7px !important; }
-  .sig-company { font-size: 8px !important; }
-  .sig-cnpj { font-size: 7px !important; }
-  .sig-fixed-wrap { height: 38px !important; }
+  /* ── Observações ── */
+  .obs-area, .obs-input { min-height:8px !important; max-height:12px !important;
+    font-size:7px !important; padding:0 !important; border:none !important;
+    border-bottom:0.4px solid #888 !important; border-radius:0 !important;
+    background:transparent !important; resize:none !important; }
 
-  /* Rodapé compacto */
-  .contract-footer { padding: 5px 14px !important; font-size: 7px !important; }
+  /* ── Data ── */
+  .date-row { font-size:8px !important; margin:3px 0 !important; }
 
-  /* Data */
-  .date-row { font-size: 9px !important; margin-bottom: 4px !important; }
+  /* ── Assinaturas ── */
+  .signatures { margin-top:4px !important; gap:10px !important; }
+  .sig-block   { gap:2px !important; }
+  .sig-block::before { content:''; display:block; width:100%;
+    height:28px; border:0.4px dashed #aaa; border-radius:3px; margin-bottom:2px; }
+  .sig-name-label { font-size:6.5px !important; }
+  .sig-company    { font-size:7.5px !important; }
+  .sig-cnpj       { font-size:6.5px !important; }
+  .sig-fixed-wrap { height:32px !important; }
 
-  /* Nota de total */
-  .calc-note { font-size: 6.5px !important; }
+  /* ── Nota de cálculo ── */
+  .calc-note { font-size:6px !important; }
 
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  /* ── Rodapé ── */
+  .contract-footer { padding:4px 12px !important; font-size:6.5px !important; }
+
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
 }
 </style>
   <!-- Firebase SDK -->
