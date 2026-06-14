@@ -291,10 +291,15 @@ tr:hover td{background:#f8f9fe;}
 
     <!-- ══ ALUGUÉIS ATIVOS ══ -->
     <div class="panel" id="panel-ativos">
-      <div class="toolbar">
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px">
         <div class="search-box" style="flex:1;min-width:180px;">
           <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input class="filter-input" id="qAtivos" type="text" placeholder="Buscar cliente ou veículo..." oninput="renderAtivos()">
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button id="fAtTodos"  class="btn btn-blue"    onclick="setFiltroAtivos('')"       style="font-size:11px;padding:7px 14px">Todos</button>
+          <button id="fAtDiaria" class="btn btn-outline" onclick="setFiltroAtivos('diaria')"  style="font-size:11px;padding:7px 14px">🚗 Diária</button>
+          <button id="fAtMensal" class="btn btn-outline" onclick="setFiltroAtivos('mensal')"  style="font-size:11px;padding:7px 14px">📅 Mensal</button>
         </div>
         <button class="btn btn-blue" onclick="openAluguel()">+ Registrar Aluguel</button>
       </div>
@@ -1603,12 +1608,31 @@ function ativoCard(a) {
   '</div>';
 }
 
+var _filtroAtivos = '';
+function setFiltroAtivos(tipo) {
+  _filtroAtivos = tipo;
+  // Atualizar visual dos botões
+  ['fAtTodos','fAtDiaria','fAtMensal'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'btn btn-outline';
+    el.style.cssText = 'font-size:11px;padding:7px 14px';
+  });
+  var ativo = tipo==='' ? 'fAtTodos' : tipo==='diaria' ? 'fAtDiaria' : 'fAtMensal';
+  var el = document.getElementById(ativo);
+  if (el) { el.className = 'btn btn-blue'; el.style.cssText = 'font-size:11px;padding:7px 14px'; }
+  renderAtivos();
+}
+
+
 function renderAtivos() {
   if (!db) return;
   db.ativos   = cleanArr(db.ativos);
   db.veiculos = cleanVeics(db.veiculos);
   var q = (document.getElementById('qAtivos').value||'').toLowerCase();
   var list = db.ativos.filter(function(a){
+    if (!a) return false;
+    if (_filtroAtivos && a.tipo !== _filtroAtivos) return false;
     return !q || (a.clienteNome+' '+a.veiculoNome+' '+(a.placa||'')).toLowerCase().indexOf(q)>=0;
   });
 

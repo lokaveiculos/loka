@@ -869,6 +869,17 @@ function registrarContratoMensal() {
     });
     if (!db_data.ativos) db_data.ativos = [];
     db_data.ativos.push(ativo);
+    // Salvar em contratos gerados
+    if (!db_data.contratos) db_data.contratos = [];
+    db_data.contratos.unshift({
+      id: 'ct_reg_'+Date.now(),
+      clienteNome: nome, placa: placas[0]||'',
+      veiculoNome: veicNomes.join(', '),
+      tipo: 'mensal',
+      retirada: hoje, devolucao: '', vigencia: vigencia,
+      valor: valor, caucao: caucao,
+      geradoEm: new Date().toISOString()
+    });
     return db_data;
   };
 
