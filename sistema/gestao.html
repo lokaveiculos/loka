@@ -2591,7 +2591,12 @@ function renderFrota() {
   var q = (document.getElementById('qFrota').value || '').toLowerCase();
   var f = document.getElementById('fFrota').value;
   var list = db.veiculos.filter(function(v) {
-    if (q && (v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')).toLowerCase().indexOf(q)<0) return false;
+    if (q) {
+      var ativoF = (db.ativos||[]).find(function(a){ return a && (a.placa===v.placa || a.veiculoId===v.id); });
+      var clienteF = ativoF ? (ativoF.clienteNome||'').toLowerCase() : '';
+      var textoF = (v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')+' '+clienteF).toLowerCase();
+      if (textoF.indexOf(q)<0) return false;
+    }
     if (f && v.status !== f) return false;
     return true;
   });
@@ -2683,7 +2688,12 @@ function renderVeiculos() {
   var q = (document.getElementById('qVeiculos').value||'').toLowerCase();
   var f = document.getElementById('fVeiculos').value;
   var list = db.veiculos.filter(function(v){
-    if (q && (v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')).toLowerCase().indexOf(q)<0) return false;
+    if (q) {
+      var ativoV = (db.ativos||[]).find(function(a){ return a && (a.placa===v.placa || a.veiculoId===v.id); });
+      var clienteV = ativoV ? (ativoV.clienteNome||'').toLowerCase() : '';
+      var textoV = (v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')+' '+clienteV).toLowerCase();
+      if (textoV.indexOf(q)<0) return false;
+    }
     if (f && v.status!==f) return false;
     return true;
   });
