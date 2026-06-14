@@ -2604,7 +2604,10 @@ function renderFrota() {
     // Filtro por cliente
     var qfc = (document.getElementById('qFrotaCliente') && document.getElementById('qFrotaCliente').value||'').toLowerCase();
     if (qfc) {
-      var ativoFc = (db.ativos||[]).find(function(a){ return a && (a.placa===v.placa || a.veiculoId===v.id); });
+      var ativoFc = (db.ativos||[]).find(function(a){
+        return a && (a.placa===v.placa || a.veiculoId===v.id ||
+          (a.placas && a.placas.indexOf(v.placa)>=0));
+      });
       var nomeFc  = ativoFc ? (ativoFc.clienteNome||'').toLowerCase() : '';
       if (nomeFc.indexOf(qfc)<0) return false;
     }
@@ -2648,7 +2651,10 @@ function renderFrota() {
     + list.map(function(v) {
       try {
       var st = v.status || 'disponivel';
-      var ativo = db.ativos.find(function(a){ return a && (a.placa===v.placa || a.veiculoId===v.id); });
+      var ativo = db.ativos.find(function(a){
+        return a && (a.placa===v.placa || a.veiculoId===v.id ||
+          (a.placas && a.placas.indexOf(v.placa)>=0));
+      });
       var infoCell = '—';
       if (ativo) {
         var d = Math.ceil((new Date(ativo.devolucao+'T00:00') - new Date()) / 86400000);
@@ -2703,7 +2709,10 @@ function renderVeiculos() {
     // Filtro por cliente
     var qc = (document.getElementById('qVeiculosCliente') && document.getElementById('qVeiculosCliente').value||'').toLowerCase();
     if (qc) {
-      var ativoVc = (db.ativos||[]).find(function(a){ return a && (a.placa===v.placa || a.veiculoId===v.id); });
+      var ativoVc = (db.ativos||[]).find(function(a){
+        return a && (a.placa===v.placa || a.veiculoId===v.id ||
+          (a.placas && a.placas.indexOf(v.placa)>=0));
+      });
       var nomeVc  = ativoVc ? (ativoVc.clienteNome||'').toLowerCase() : '';
       if (nomeVc.indexOf(qc)<0) return false;
     }
