@@ -2779,6 +2779,7 @@ function renderVeiculos() {
       var manutBtn = st==='manutencao'
         ? '<button class="icon-btn" onclick="openRetornoManut(\''+v.id+'\')" title="Dar Baixa" style="color:var(--purple);border-color:var(--purple)">✅</button>'
         : '';
+      var histManutBtn = '<button class="icon-btn" onclick="abrirHistoricoManutencao(\''+v.id+'\')" title="Histórico Manutenção" style="color:#7c3aed;border-color:#7c3aed">🔧</button>';
       var inatBtn = st==='inativo'
         ? '<button class="icon-btn" onclick="inativarVeiculo(\''+v.id+'\')" title="Reativar" style="color:#0d7a3e;border-color:#0d7a3e">▶</button>'
         : '<button class="icon-btn" onclick="inativarVeiculo(\''+v.id+'\')" title="Inativar" style="color:#c0392b;border-color:#f5c6cb">⛔</button>';
