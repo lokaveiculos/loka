@@ -2754,13 +2754,20 @@ function renderVeiculos() {
         '<td style="padding:9px 12px"><strong>'+v.marca+' '+v.modelo+'</strong></td>'+
         '<td style="padding:9px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;background:#f0f2f9;padding:2px 7px;border-radius:4px">'+v.placa+'</span></td>'+
         '<td style="padding:9px 12px;font-size:11px;color:var(--muted)">'+(v.cor||'—')+' · '+(v.ano||'—')+'</td>'+
-        '<td style="padding:9px 12px"><span class="badge '+(stCls[st]||'bm')+'">'+(stLbl[st]||st)+'</span></td>'+
+        '<td style="padding:9px 12px">'+
+          '<span class="badge '+(stCls[st]||'bm')+'">'+(stLbl[st]||st)+'</span>'+
+          (function(){
+            if(st!=='alugado') return '';
+            var a=(db.ativos||[]).find(function(a){return a&&(a.placa===v.placa||a.veiculoId===v.id||(a.placas&&a.placas.indexOf(v.placa)>=0));});
+            return a?'<br><span style="font-size:9px;color:var(--blue);font-weight:600">👤 '+a.clienteNome+'</span>':'';
+          })()+
+        '</td>'+
         '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px">'+diaria+'</td>'+
         '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px;color:var(--green)">'+mensal+'</td>'+
         '<td style="padding:9px 12px"><div style="display:flex;gap:4px;justify-content:center">'+
           '<button class="icon-btn" onclick="openVeiculo(\''+v.id+'\')" title="Editar">✏️</button>'+
           '<button class="icon-btn" onclick="abrirPrecos(\''+v.id+'\')" title="Preços" style="color:#7c3aed;border-color:#7c3aed">💰</button>'+
-          histManutBtn2 +
+          histManutBtn +
           manutBtn + inatBtn +
           (st==='alugado' ? '<button class="icon-btn" onclick="liberarVeiculo(\''+v.id+'\')" title="Forçar Disponível" style="color:#0d7a3e;border-color:#0d7a3e;font-size:10px;padding:3px 7px">🔓 Liberar</button>' : '')+
         '</div></td>'+
