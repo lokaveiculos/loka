@@ -980,10 +980,18 @@ function saveDB() {
   try {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && navigator.onLine) {
       _isSaving = true;
+      _mostrarSyncBadge('💾 Salvando...');
       firebase.database().ref('loka_db').set(db).then(function() {
-        // Libera flag após Firebase confirmar (2s de margem)
-        setTimeout(function() { _isSaving = false; }, 2000);
-      }).catch(function() { _isSaving = false; });
+        _mostrarSyncBadge('✅ Salvo');
+        // Libera flag após Firebase confirmar (1.5s de margem)
+        setTimeout(function() { _isSaving = false; }, 1500);
+      }).catch(function(e) {
+        _isSaving = false;
+        _mostrarSyncBadge('⚠️ Erro ao salvar');
+        console.error('saveDB error:', e);
+      });
+      // Failsafe: liberar após 8s mesmo se Promise não resolver
+      setTimeout(function() { _isSaving = false; }, 8000);
     }
   } catch(e) { _isSaving = false; }
 }
@@ -1007,13 +1015,24 @@ function setupRealtimeSync() {
     var nFbAtv = (fbData.ativos||[]).length;
     var nDbAtv = (db.ativos||[]).length;
 
-    // Compara para detectar mudança real
-    var mudou = (fbData.clients||[]).length !== (db.clients||[]).length
-      || nFbAtv   !== nDbAtv
-      || (fbData.veiculos||[]).length !== (db.veiculos||[]).length
-      || (fbData.historico||[]).length !== (db.historico||[]).length
-      || JSON.stringify(fbData.ativos) !== JSON.stringify(db.ativos)
-      || JSON.stringify(fbData.clients).length !== JSON.stringify(db.clients).length;
+    // Comparação robusta — detecta mudanças de conteúdo, não só de tamanho
+    function quickHash(arr) {
+      if (!arr || !arr.length) return '0';
+      // Hash simples: comprimento total do JSON (detecta adições/remoções/edições)
+      var s = JSON.stringify(arr);
+      var h = 0;
+      for (var i = 0; i < Math.min(s.length, 2000); i++) {
+        h = (h * 31 + s.charCodeAt(i)) & 0x7fffffff;
+      }
+      return h + ':' + s.length;
+    }
+
+    var mudou = quickHash(fbData.ativos)    !== quickHash(db.ativos)
+      || quickHash(fbData.veiculos)         !== quickHash(db.veiculos)
+      || quickHash(fbData.clients)          !== quickHash(db.clients)
+      || quickHash(fbData.historico)        !== quickHash(db.historico)
+      || quickHash(fbData.manutencoes)      !== quickHash(db.manutencoes)
+      || quickHash(fbData.contratos)        !== quickHash(db.contratos);
 
     if (!mudou) return;
 
@@ -1042,29 +1061,42 @@ function _reRenderPainelAtivo() {
     var painel = document.querySelector('.panel[style*="display: block"], .panel[style*="display:block"]');
     if (!painel) return;
     var nome = painel.id.replace('panel-', '');
-    if (nome === 'dashboard')  renderDashboard();
-    if (nome === 'clientes')   { renderClientes(); preencherCliSel(); }
-    if (nome === 'ativos')     renderAtivos();
-    if (nome === 'veiculos')   renderVeiculos();
-    if (nome === 'frota')      renderFrota();
-    if (nome === 'historico')  renderHistorico();
-    if (nome === 'contratos')  renderContratos();
+    if (nome === 'dashboard')   renderDashboard();
+    if (nome === 'clientes')    { renderClientes(); preencherCliSel(); }
+    if (nome === 'ativos')      renderAtivos();
+    if (nome === 'veiculos')    renderVeiculos();
+    if (nome === 'frota')       renderFrota();
+    if (nome === 'historico')   renderHistorico();
+    if (nome === 'contratos')   renderContratos();
+    if (nome === 'manutencao')  renderManutencao();
+    if (nome === 'faturas')     { if(typeof renderFaturas==='function') renderFaturas(); }
+    // Sempre atualizar stats do dashboard em background
+    try { renderDashboard(); } catch(e) {}
   } catch(e) {}
 }
 
-function _mostrarSyncBadge(texto) {
-  var badge = document.getElementById('syncBadge');
-  var txt   = document.getElementById('syncText');
-  if (!badge) return;
-  if (txt) txt.textContent = texto || '🔄 Sincronizado';
-  badge.style.display = 'flex';
-  clearTimeout(_syncTimeout);
-  _syncTimeout = setTimeout(function() {
-    badge.style.display = 'none';
-  }, 3000);
+function _mostrarSyncBadge(msg) {
+  var el = document.getElementById('syncBadge');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  el.style.transform = 'translateY(0)';
+  el.style.background = msg.includes('✅') ? '#e8f5ef'
+    : msg.includes('⚠️') ? '#fef3cd'
+    : msg.includes('💾') ? '#EEF1FD'
+    : '#EEF1FD';
+  el.style.color = msg.includes('✅') ? '#0d7a3e'
+    : msg.includes('⚠️') ? '#b45309'
+    : '#2B4BF2';
+  clearTimeout(window._syncBadgeTimer);
+  if (!msg.includes('💾')) { // não esconder "Salvando..."
+    window._syncBadgeTimer = setTimeout(function() {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-4px)';
+    }, 3000);
+  }
 }
 
-// ── UTILIDADES ─────────────────────────────────────────────────
 function fmt(s) {
   if (!s) return '—';
   var d = new Date(s + 'T00:00');
