@@ -770,6 +770,7 @@ function renderVeiculosArea(lista) {
       + '<td class="num-cell"><input class="veic-fin" id="vqtd-'+i+'" type="text" value="1" placeholder="1" oninput="calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="max-width:50px;text-align:center"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vseg-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
+      + '<td class="num-cell"><input class="veic-fin" id="vdesc-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="color:var(--red)"></td>'
       + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px;font-weight:700">—</td>'
     + '</tr>';
   }).join('');
@@ -786,11 +787,12 @@ function renderVeiculosArea(lista) {
     + '<th>Qtd dias/meses</th>'
     + '<th>Valor Unit. (R$)</th>'
     + '<th>Seguro (R$)</th>'
+    + '<th>Desconto (R$)</th>'
     + '<th>Subtotal</th>'
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
     + '<tfoot><tr>'
-    + '<td colspan="4" class="total-lbl">Total dos veículos selecionados</td>'
+    + '<td colspan="6" class="total-lbl">Total dos veículos selecionados</td>'
     + '<td></td>'
     + '<td class="total-val" id="veicTotalDisplay">R$ 0,00</td>'
     + '</tr></tfoot>'
@@ -864,13 +866,14 @@ function toggleVeiculo(i) {
 function calcTotalVeic() {
   var total = 0;
   _veicSelecionados.forEach(function(i) {
-    var qtd = parseFloat(document.getElementById('vqtd-'+i) && document.getElementById('vqtd-'+i).value) || 1;
-    var val = parseBRL(document.getElementById('vfin-'+i) && document.getElementById('vfin-'+i).value);
-    var seg = parseBRL(document.getElementById('vseg-'+i) && document.getElementById('vseg-'+i).value);
-    var sub = (val * qtd) + seg;
+    var qtd  = parseFloat(document.getElementById('vqtd-'+i) && document.getElementById('vqtd-'+i).value) || 1;
+    var val  = parseBRL(document.getElementById('vfin-'+i)  && document.getElementById('vfin-'+i).value);
+    var seg  = parseBRL(document.getElementById('vseg-'+i)  && document.getElementById('vseg-'+i).value);
+    var desc = parseBRL(document.getElementById('vdesc-'+i) && document.getElementById('vdesc-'+i).value);
+    var sub = (val * qtd) + seg - desc;
     total += sub;
     var subEl = document.getElementById('vsub-'+i);
-    if (subEl) subEl.textContent = sub > 0 ? fmtBRL(sub) : '—';
+    if (subEl) subEl.textContent = sub !== 0 ? fmtBRL(sub) : '—';
   });
   var el = document.getElementById('veicTotalDisplay');
   if (el) el.textContent = fmtBRL(total);
@@ -1015,6 +1018,19 @@ function salvarFatura() {
     status: document.getElementById('fatStatus').value,
     pgto: document.getElementById('fatPgto').value,
     veiculos: veics.map(function(v){return v.marca+' '+v.modelo+' '+v.placa;}),
+    // Detalhamento por veículo (formato G7 com desconto)
+    veiculosDetalhado: Array.from(_veicSelecionados).map(function(i){
+      var v = _veiculos[i]; if(!v) return null;
+      return {
+        carro:    v.marca+' '+v.modelo,
+        placa:    v.placa,
+        qtd:      (document.getElementById('vqtd-'+i)||{}).value || '1',
+        aluguel:  (document.getElementById('vfin-'+i)||{}).value || '',
+        seguro:   (document.getElementById('vseg-'+i)||{}).value || '',
+        desconto: (document.getElementById('vdesc-'+i)||{}).value || '',
+        subtotal: (document.getElementById('vsub-'+i)||{}).textContent || ''
+      };
+    }).filter(Boolean),
     vlMensal: document.getElementById('vlMensal').value,
     vlSeguro: document.getElementById('vlSeguro').value,
     vlDesconto: document.getElementById('vlDesconto').value,
