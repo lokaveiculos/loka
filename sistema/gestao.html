@@ -255,9 +255,13 @@ tr:hover td{background:#f8f9fe;}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel" id="panel-dashboard">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button class="btn btn-outline" onclick="auditarStatusVeiculos()" style="font-size:11px;padding:6px 12px">🔍 Auditar Status dos Veículos</button>
+      </div>
       <div class="stats">
         <div class="stat"><div class="stat-value" id="sClientes">0</div><div class="stat-label">Clientes</div></div>
-        <div class="stat" style="border-left-color:var(--amber)"><div class="stat-value" id="sAtivos">0</div><div class="stat-label">Aluguéis Ativos</div></div>
+        <div class="stat" style="border-left-color:var(--amber)"><div class="stat-value" id="sAtivos">0</div><div class="stat-label">Contratos Ativos</div></div>
+        <div class="stat" style="border-left-color:#f59e0b"><div class="stat-value" id="sAlugados">0</div><div class="stat-label">Veículos Alugados</div></div>
         <div class="stat" style="border-left-color:var(--green)"><div class="stat-value" id="sDisponiveis">0</div><div class="stat-label">Disponíveis</div></div>
         <div class="stat" style="border-left-color:var(--red)"><div class="stat-value" id="sVencendo">0</div><div class="stat-label">Vencendo</div></div>
         <div class="stat"><div class="stat-value" id="sVeiculos">0</div><div class="stat-label">Veículos</div></div>
@@ -1055,7 +1059,8 @@ function setupRealtimeSync() {
     if (modalAberto) return;
 
     // Re-renderiza o painel ativo sem alterar navegação
-    _reRenderPainelAtivo();
+    clearTimeout(window._rerenderTimer);
+    window._rerenderTimer = setTimeout(_reRenderPainelAtivo, 150);
     checkAlertas();
     _mostrarSyncBadge('🔄 Dados atualizados');
   });
@@ -1075,8 +1080,15 @@ function _reRenderPainelAtivo() {
     if (nome === 'contratos')   renderContratos();
     if (nome === 'manutencao')  renderManutencao();
     if (nome === 'faturas')     { if(typeof renderFaturas==='function') renderFaturas(); }
-    // Sempre atualizar stats do dashboard em background
-    try { renderDashboard(); } catch(e) {}
+    // Atualizar stats do dashboard só se NÃO estiver nele (evita render duplo)
+    if (nome !== 'dashboard') {
+      try {
+        // Atualização leve: só os números, sem re-render completo
+        var sa = document.getElementById('sAtivos'); if(sa) sa.textContent = (db.ativos||[]).length;
+        var sal= document.getElementById('sAlugados'); if(sal) sal.textContent = (db.veiculos||[]).filter(function(v){return v&&v.status==='alugado';}).length;
+        var sd = document.getElementById('sDisponiveis'); if(sd) sd.textContent = (db.veiculos||[]).filter(function(v){return v&&v.status==='disponivel';}).length;
+      } catch(e) {}
+    }
   } catch(e) {}
 }
 
@@ -1248,6 +1260,96 @@ function globalSearch(q) {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────
+// ── AUDITORIA DE STATUS (Bloco 3B) ──────────────────────────
+function auditarStatusVeiculos() {
+  if (!db) return;
+  db.ativos   = cleanArr(db.ativos);
+  db.veiculos = cleanVeics(db.veiculos);
+
+  // Coletar todas as placas em contratos ativos
+  var placasAtivas = new Set();
+  db.ativos.forEach(function(a) {
+    if (!a) return;
+    if (a.placa) placasAtivas.add(a.placa.toUpperCase());
+    if (a.placas) a.placas.forEach(function(p){ if(p) placasAtivas.add(p.toUpperCase()); });
+  });
+
+  var problemas = [];
+  db.veiculos.forEach(function(v) {
+    if (!v || !v.placa) return;
+    var temContrato = placasAtivas.has(v.placa.toUpperCase());
+    // Caso 1: status alugado mas sem contrato ativo
+    if (v.status === 'alugado' && !temContrato) {
+      problemas.push({tipo:'alugado_sem_contrato', placa:v.placa, nome:v.marca+' '+v.modelo, v:v});
+    }
+    // Caso 2: tem contrato ativo mas status não é alugado
+    if (v.status !== 'alugado' && v.status !== 'manutencao' && v.status !== 'inativo' && temContrato) {
+      problemas.push({tipo:'contrato_sem_alugado', placa:v.placa, nome:v.marca+' '+v.modelo, v:v});
+    }
+  });
+
+  if (!problemas.length) {
+    toast('✅ Auditoria OK — todos os status estão corretos','#0d7a3e');
+    return;
+  }
+
+  // Montar modal com os problemas
+  var existing = document.getElementById('mAuditoria');
+  if (existing) existing.remove();
+  var panel = document.createElement('div');
+  panel.id = 'mAuditoria';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  var linhas = problemas.map(function(p, i) {
+    var acao = p.tipo==='alugado_sem_contrato'
+      ? 'Liberar (→ Disponível)'
+      : 'Marcar como Alugado';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #f0f2f8;gap:10px">'
+      + '<div><strong style="font-size:12px">'+p.nome+'</strong> '
+      + '<span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+p.placa+'</span><br>'
+      + '<span style="font-size:10px;color:'+(p.tipo==='alugado_sem_contrato'?'#c0392b':'#b45309')+'">'
+      + (p.tipo==='alugado_sem_contrato'?'⚠️ Alugado sem contrato ativo':'⚠️ Tem contrato mas não está alugado')+'</span></div>'
+      + '<button class="audit-fix" data-placa="'+p.placa+'" data-tipo="'+p.tipo+'" style="padding:5px 10px;background:#EEF1FD;color:#2B4BF2;border:1.5px solid #2B4BF2;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap">'+acao+'</button>'
+      + '</div>';
+  }).join('');
+
+  panel.innerHTML = '<div style="background:#fff;border-radius:12px;width:520px;max-width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)">'
+    + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0">🔍 Auditoria de Status — '+problemas.length+' inconsistência(s)</div>'
+    + linhas
+    + '<div style="padding:12px 14px;text-align:right;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end">'
+    + '<button id="auditFixAll" style="padding:8px 16px;background:#0d7a3e;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">✅ Corrigir Todos</button>'
+    + '<button id="auditClose" style="padding:8px 16px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">Fechar</button>'
+    + '</div></div>';
+  document.body.appendChild(panel);
+
+  function corrigir(placa, tipo) {
+    var vi = db.veiculos.findIndex(function(v){ return v && v.placa===placa; });
+    if (vi<0) return;
+    if (tipo==='alugado_sem_contrato') db.veiculos[vi].status = 'disponivel';
+    else db.veiculos[vi].status = 'alugado';
+  }
+
+  panel.addEventListener('click', function(e) {
+    var btn = e.target.closest('.audit-fix');
+    if (btn) {
+      corrigir(btn.dataset.placa, btn.dataset.tipo);
+      saveDB(); renderVeiculos(); renderFrota(); renderDashboard();
+      btn.textContent = '✅ Corrigido';
+      btn.disabled = true; btn.style.opacity = '.5';
+      return;
+    }
+    if (e.target.id==='auditFixAll') {
+      problemas.forEach(function(p){ corrigir(p.placa, p.tipo); });
+      saveDB(); renderVeiculos(); renderFrota(); renderDashboard();
+      panel.remove();
+      toast('✅ '+problemas.length+' status corrigido(s)','#0d7a3e');
+      return;
+    }
+    if (e.target.id==='auditClose' || e.target===panel) panel.remove();
+  });
+}
+
+
 function renderDashboard() {
   if (!db) return;
   db.ativos    = cleanArr(db.ativos);
@@ -1256,9 +1358,13 @@ function renderDashboard() {
   db.historico = cleanArr(db.historico);
   function set(id, val) { var e=document.getElementById(id); if(e) e.textContent=val; }
   set('sClientes', db.clients.length);
+  // Contratos ativos (não veículos)
   set('sAtivos',   db.ativos.length);
   set('sVeiculos', db.veiculos.length);
   set('sDisponiveis', db.veiculos.filter(function(v){return v.status==='disponivel';}).length);
+  // Veículos efetivamente alugados (para comparar com contratos)
+  var nAlugados = db.veiculos.filter(function(v){return v.status==='alugado';}).length;
+  set('sAlugados', nAlugados);
   set('sVencendo',    db.ativos.filter(function(a){var d=dias(a.devolucao);return d!==null&&d<=3&&d>=0;}).length);
   set('sManutencao',  db.veiculos.filter(function(v){return v.status==='manutencao';}).length);
   var cont = document.getElementById('dashAtivos');
@@ -1268,6 +1374,20 @@ function renderDashboard() {
 }
 
 // ── CLIENTES ──────────────────────────────────────────────────
+// ── CONTAGEM REAL DE LOCAÇÕES DO CLIENTE (Bloco 5) ──────────
+function contarLocacoesCliente(cl) {
+  if (!cl) return {total:0, ativas:0, encerradas:0};
+  var nome = cl.nome, id = cl.id;
+  var ativas = (db.ativos||[]).filter(function(a){
+    return a && (a.clienteNome===nome || (id && a.clienteId===id));
+  }).length;
+  var encerradas = (db.historico||[]).filter(function(h){
+    return h && (h.clienteNome===nome || (id && h.clienteId===id));
+  }).length;
+  return {total: ativas+encerradas, ativas: ativas, encerradas: encerradas};
+}
+
+
 function renderClientes() {
   if (!db) return;
   db.clients   = cleanArr(db.clients);
@@ -1292,7 +1412,7 @@ function renderClientes() {
         '</td>'+
       '<td style="font-size:11px">'+(c.cpf||'—')+'</td>'+
       '<td style="font-size:11px">'+(c.telefone||'—')+'</td>'+
-      '<td><span class="badge bb">'+(c.alugueis||0)+'</span></td>'+
+      '<td><span class="badge bb" title="'+(function(){var ct=contarLocacoesCliente(c);return ct.ativas+' ativa(s) + '+ct.encerradas+' encerrada(s)';})()+'">'+contarLocacoesCliente(c).total+'</span></td>'+
       '<td><span class="badge '+(c.status==='bloqueado'?'br':'bg')+'">'+((c.status||'ativo'))+'</span></td>'+
       '<td><div class="td-actions">'+
         '<button class="icon-btn" title="Editar" onclick="openCliente('+idx+')">✏️</button>'+
@@ -2647,7 +2767,6 @@ function limparFormUsuario() {
 }
 
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
-    var histManutBtn2 = '<button class="icon-btn" onclick="abrirHistoricoManutencao(\\\''+v.id+'\\\')" title="Histórico Manutenção" style="color:#7c3aed;border-color:#7c3aed">🔧</button>';
 function renderFrota() {
   if (!db) return;
   db.ativos    = cleanArr(db.ativos);

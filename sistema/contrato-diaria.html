@@ -724,7 +724,7 @@
           <tr>
             <td><input class="vModD" placeholder="Marca"></td>
             <td><input class="vModD" placeholder="Modelo"></td>
-            <td><input class="vPlaD" placeholder="AAA-0000" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></td>
+            <td><input class="vPlaD" list="listaVeiculos" placeholder="AAA-0000" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onchange="autocompletarVeiculo(this)"></td>
             <td><input placeholder="Cor"></td>
             <td><input placeholder="100 km" value="100 km"></td>
             <td><input class="vValUnitD" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalDiaria()" style="text-align:right;width:90px"></td>
@@ -734,6 +734,7 @@
           </tr>
         </tbody>
       </table>
+      <datalist id="listaVeiculos"></datalist>
       <button type="button" onclick="addVeiculoDiaria()" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer">
         <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Adicionar Veículo
@@ -1265,7 +1266,7 @@ function addVeiculoDiaria() {
   tr.innerHTML =
     '<td><input class="vModD" placeholder="Marca"></td>' +
     '<td><input class="vModD" placeholder="Modelo"></td>' +
-    '<td><input class="vPlaD" placeholder="AAA-0000" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></td>' +
+    '<td><input class="vPlaD" list="listaVeiculos" placeholder="AAA-0000" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onchange="autocompletarVeiculo(this)"></td>' +
     '<td><input placeholder="Cor"></td>' +
     '<td><input placeholder="100 km" value="100 km"></td>' +
     '<td><input class="vValUnitD" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalDiaria()" style="text-align:right;width:90px"></td>' +
@@ -1280,6 +1281,76 @@ function removeVeiculoDiaria(cell) {
   cell.closest('tr').remove();
   calcTotalDiaria();
 }
+
+// ══════════════════════════════════════════════════════════════
+// BLOCO 1: AUTOCOMPLETAR DADOS DO VEÍCULO PELA PLACA
+// ══════════════════════════════════════════════════════════════
+var _frotaCache = [];
+
+function carregarFrotaCache() {
+  if (typeof firebase==='undefined' || !firebase.apps || !firebase.apps.length) return;
+  firebase.database().ref('loka_db/veiculos').once('value').then(function(snap) {
+    var v = snap.val();
+    _frotaCache = (v||[]).filter(function(x){ return x && x.placa; });
+    // Popular datalist
+    var dl = document.getElementById('listaVeiculos');
+    if (dl) {
+      dl.innerHTML = _frotaCache.map(function(vv) {
+        return '<option value="'+vv.placa+'">'+vv.marca+' '+vv.modelo+' · '+vv.cor+'</option>';
+      }).join('');
+    }
+  }).catch(function(){});
+}
+
+function autocompletarVeiculo(input) {
+  var placa = (input.value||'').toUpperCase().trim();
+  var v = _frotaCache.find(function(x){ return x.placa && x.placa.toUpperCase()===placa; });
+  if (!v) return;
+  var row = input.closest('tr');
+  if (!row) return;
+  var inps = row.querySelectorAll('input');
+  // inps: [0]marca [1]modelo [2]placa [3]cor [4]km [5]valorUnit
+  if (inps[0] && !inps[0].value) inps[0].value = v.marca || '';
+  if (inps[1] && !inps[1].value) inps[1].value = v.modelo || '';
+  if (inps[3] && !inps[3].value) inps[3].value = v.cor || '';
+  // Preencher valor unitário com a diária do veículo
+  if (inps[5] && v.diaria) {
+    inps[5].value = Number(v.diaria).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  }
+  // Preencher tarifa diária se vazia
+  var tarDiaria = document.getElementById('tarDiaria');
+  if (tarDiaria && !tarDiaria.value && v.diaria) {
+    tarDiaria.value = Number(v.diaria).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  }
+  calcTotalDiaria();
+}
+
+// ══════════════════════════════════════════════════════════════
+// BLOCO 2: CÁLCULO AUTOMÁTICO DE DIÁRIAS PELAS DATAS
+// ══════════════════════════════════════════════════════════════
+function calcDiariasPorDatas() {
+  var ret = document.getElementById('dtRetirada');
+  var dev = document.getElementById('dtDevolucao');
+  var diasInput = document.getElementById('tarDias');
+  if (!ret || !dev || !diasInput) return;
+  if (ret.value && dev.value) {
+    var d1 = new Date(ret.value+'T00:00');
+    var d2 = new Date(dev.value+'T00:00');
+    var dias = Math.max(1, Math.ceil((d2-d1)/86400000));
+    diasInput.value = dias;
+    calcTotalDiaria();
+  }
+}
+
+// Inicializar ao carregar
+window.addEventListener('load', function() {
+  setTimeout(carregarFrotaCache, 800);
+  var ret = document.getElementById('dtRetirada');
+  var dev = document.getElementById('dtDevolucao');
+  if (ret) ret.addEventListener('change', calcDiariasPorDatas);
+  if (dev) dev.addEventListener('change', calcDiariasPorDatas);
+});
+
 
 function calcTotalDiaria() {
   var diaria   = parseBRLLocal(document.getElementById('tarDiaria')   && document.getElementById('tarDiaria').value);
