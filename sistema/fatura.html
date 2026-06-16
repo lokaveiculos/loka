@@ -1006,6 +1006,9 @@ function salvarFatura() {
 
   if (!cli)  { status('⚠️ Selecione um cliente antes de salvar', '#b45309'); return; }
   if (!num)  { status('⚠️ Informe o número da fatura', '#b45309'); return; }
+  if (!veics.length) { status('⚠️ Selecione ao menos um veículo', '#b45309'); return; }
+  var totalNum = parseBRL(total);
+  if (totalNum <= 0) { status('⚠️ O total deve ser maior que zero', '#b45309'); return; }
 
   var fatura = {
     id: 'fat_' + Date.now(),
@@ -1031,9 +1034,9 @@ function salvarFatura() {
         subtotal: (document.getElementById('vsub-'+i)||{}).textContent || ''
       };
     }).filter(Boolean),
-    vlMensal: document.getElementById('vlMensal').value,
-    vlSeguro: document.getElementById('vlSeguro').value,
-    vlDesconto: document.getElementById('vlDesconto').value,
+    vlMensal: (document.getElementById('vlMensal')||{}).value || '',
+    vlSeguro: (document.getElementById('vlSeguro')||{}).value || '',
+    vlDesconto: (document.getElementById('vlDesconto')||{}).value || '',
     total: total,
     obs: document.getElementById('fatObs').value,
     criadoEm: new Date().toISOString()
