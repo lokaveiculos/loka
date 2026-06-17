@@ -459,7 +459,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#EEF1FD"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div><div class="form-card-title">Contrato Diária</div><div class="form-card-sub">Locação por diária</div></div></div><div class="form-card-body">Contrato padrão para locações por diária.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="window.open('contrato-diaria.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('diaria')">Com Cliente</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#e8f5ef"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div><div class="form-card-title">Contrato Mensal</div><div class="form-card-sub">Locação mensal / longo prazo</div></div></div><div class="form-card-body">Contrato para locações mensais com múltiplos veículos.</div><div class="form-card-foot"><button class="btn btn-green" onclick="window.open('contrato-mensal.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('mensal')">Com Cliente</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#fef3cd"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><div class="form-card-title">Recibo de Reserva</div><div class="form-card-sub">Confirmação de reserva</div></div></div><div class="form-card-body">Documento de confirmação de reserva.</div><div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('recibo-reserva.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('reserva')">Com Cliente</button></div></div>
-        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div><div><div class="form-card-title">Checklist Vistoria</div><div class="form-card-sub">Inspeção do veículo</div></div></div><div class="form-card-body">Formulário de vistoria com assinatura digital.</div><div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('checklist.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('checklist')">Com Cliente</button></div></div>
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div><div><div class="form-card-title">Checklist Vistoria</div><div class="form-card-sub">Inspeção do veículo</div></div></div><div class="form-card-body">Formulário de vistoria com assinatura digital. Versão compartilhável para uso externo (sem login).</div><div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('checklist.html','_blank')">Abrir</button><button class="btn" style="background:#0d7a3e;color:#fff" onclick="window.open('checklist-compartilhavel.html','_blank')">📤 Compartilhável</button><button class="btn btn-outline" onclick="copiarLinkChecklist()">📋 Copiar Link</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div><div><div class="form-card-title">Manutenção (Oficina)</div><div class="form-card-sub">Formulário para oficinas</div></div></div><div class="form-card-body">Formulário para as oficinas preencherem os serviços realizados e gerarem o código para importação no sistema.</div><div class="form-card-foot"><button class="btn" style="background:#7c3aed;color:#fff" onclick="window.open('manutencao-oficina.html','_blank')">Abrir Formulário</button><button class="btn btn-outline" onclick="copiarLinkFormManutencao()">📋 Copiar Link</button></div></div>
       </div>
       <div style="margin-top:20px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
@@ -2938,6 +2938,13 @@ function renderFrota() {
           '<button class="icon-btn" onclick="openVeiculo(\''+v.id+'\')" title="Editar">✏️</button>'+
           '<button class="icon-btn" onclick="abrirPrecos(\''+v.id+'\')" title="Preços" style="color:#7c3aed;border-color:#7c3aed">💰</button>'+
           histManutBtn +
+          (function(){
+            var ckPend = (db.checklists||[]).find(function(c){ return c && c.veiculoId===v.id && c.status==='aguardando_devolucao'; });
+            var cor = ckPend ? '#f59e0b' : '#0891b2';
+            var titulo = ckPend ? 'Checklist aguardando devolução' : 'Checklist de Vistoria';
+            var badge = ckPend ? '⏳' : '📋';
+            return '<button class="icon-btn" onclick="abrirChecklistVeiculo(\''+v.id+'\')" title="'+titulo+'" style="color:'+cor+';border-color:'+cor+'">'+badge+'</button>';
+          })()+
           manutBtn + inatBtn +
           (st==='alugado' ? '<button class="icon-btn" onclick="liberarVeiculo(\''+v.id+'\')" title="Forçar Disponível" style="color:#0d7a3e;border-color:#0d7a3e;font-size:10px;padding:3px 7px">🔓 Liberar</button>' : '')+
         '</div></td>'+
@@ -3544,6 +3551,17 @@ function excluirManutencao() {
 
 // Abrir histórico de manutenção filtrando por veículo (botão 🔧)
 // ── IMPORTAR MANUTENÇÃO (código da oficina) ─────────────────
+// ── COPIAR LINK DO CHECKLIST COMPARTILHÁVEL ─────────────────
+function copiarLinkChecklist() {
+  var url = window.location.origin + window.location.pathname.replace('gestao.html','') + 'checklist-compartilhavel.html';
+  navigator.clipboard.writeText(url).then(function() {
+    toast('📋 Link do checklist copiado!','#0d7a3e');
+  }).catch(function() {
+    prompt('Copie o link do checklist:', url);
+  });
+}
+
+
 // ── COPIAR LINK DO FORMULÁRIO DE MANUTENÇÃO ─────────────────
 function copiarLinkFormManutencao() {
   var url = window.location.origin + window.location.pathname.replace('gestao.html','') + 'manutencao-oficina.html';
@@ -3650,6 +3668,151 @@ function abrirImportarManutencao() {
   panel.addEventListener('click', function(e){ if(e.target===panel) panel.remove(); });
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// CHECKLIST DE VISTORIA (Saída + Devolução) — salvo no Firebase
+// ══════════════════════════════════════════════════════════════
+var _ckEditId = null;
+var _ckVeiculoId = null;
+
+function abrirChecklistVeiculo(vId) {
+  var v = (db.veiculos||[]).find(function(x){ return x && x.id===vId; });
+  if (!v) return;
+  _ckVeiculoId = vId;
+
+  // Verificar se já existe checklist aberto para este veículo
+  if (!db.checklists) db.checklists = [];
+  var existente = db.checklists.find(function(c){
+    return c && c.veiculoId===vId && c.status!=='concluido';
+  });
+
+  if (existente) {
+    openChecklist(existente.id);
+  } else {
+    // Novo checklist — buscar aluguel ativo para vincular
+    var ativo = (db.ativos||[]).find(function(a){
+      return a && (a.placa===v.placa || a.veiculoId===v.id || (a.placas && a.placas.indexOf(v.placa)>=0));
+    });
+    openChecklist(null, v, ativo);
+  }
+}
+
+function openChecklist(id, veiculo, ativo) {
+  _ckEditId = id;
+  if (!db.checklists) db.checklists = [];
+  var ck = id ? db.checklists.find(function(x){ return x.id===id; }) : null;
+
+  var v = veiculo || (ck ? (db.veiculos||[]).find(function(x){ return x && x.id===ck.veiculoId; }) : null) || {};
+  _ckVeiculoId = ck ? ck.veiculoId : (v.id||null);
+
+  var info = document.getElementById('ckInfoVeiculo');
+  var infoCli = document.getElementById('ckInfoCliente');
+  if (info) info.textContent = '📋 ' + (v.marca||'') + ' ' + (v.modelo||'') + ' · ' + (v.placa||'');
+  if (infoCli) {
+    var cliNome = ck ? ck.clienteNome : (ativo ? ativo.clienteNome : '');
+    infoCli.textContent = cliNome ? '👤 ' + cliNome : 'Sem aluguel vinculado (avulso)';
+  }
+
+  var btnDel = document.getElementById('btnDelChecklist');
+  if (btnDel) btnDel.style.display = ck ? 'flex' : 'none';
+  var titulo = document.getElementById('mChecklistTitulo');
+  if (titulo) titulo.textContent = ck ? 'Checklist — ' + (v.placa||'') : 'Novo Checklist — ' + (v.placa||'');
+
+  // Preencher campos
+  var hoje = new Date().toISOString().split('T')[0];
+  function set(elId, val){ var e=document.getElementById(elId); if(e) e.value = val||''; }
+  set('ckSaidaData',  ck ? ck.saidaData : hoje);
+  set('ckSaidaKm',    ck ? ck.saidaKm : '');
+  set('ckSaidaComb',  ck ? ck.saidaComb : '');
+  set('ckSaidaCond',  ck ? ck.saidaCond : '');
+  set('ckSaidaObs',   ck ? ck.saidaObs : '');
+  set('ckDevData',    ck ? ck.devData : '');
+  set('ckDevKm',      ck ? ck.devKm : '');
+  set('ckDevComb',    ck ? ck.devComb : '');
+  set('ckDevCond',    ck ? ck.devCond : '');
+  set('ckDevObs',     ck ? ck.devObs : '');
+
+  // Guardar dados de vínculo
+  _ckClienteNome = ck ? ck.clienteNome : (ativo ? ativo.clienteNome : '');
+  _ckClienteId   = ck ? ck.clienteId : (ativo ? (ativo.clienteId||'') : '');
+  _ckPlaca = v.placa || (ck ? ck.placa : '');
+  _ckVeicNome = (v.marca||'') + ' ' + (v.modelo||'');
+
+  calcKmRodado();
+  ckMostrarFase('saida');
+  openM('mChecklist');
+}
+
+var _ckClienteNome='', _ckClienteId='', _ckPlaca='', _ckVeicNome='';
+
+function ckMostrarFase(fase) {
+  document.getElementById('ckFaseSaida').style.display = fase==='saida' ? 'block' : 'none';
+  document.getElementById('ckFaseDevolucao').style.display = fase==='devolucao' ? 'block' : 'none';
+  var ts = document.getElementById('ckTabSaida'), td = document.getElementById('ckTabDevolucao');
+  ts.className = fase==='saida' ? 'btn btn-blue' : 'btn btn-outline';
+  td.className = fase==='devolucao' ? 'btn btn-blue' : 'btn btn-outline';
+  ts.style.flex='1'; ts.style.fontSize='12px'; td.style.flex='1'; td.style.fontSize='12px';
+}
+
+function calcKmRodado() {
+  var s = parseFloat(document.getElementById('ckSaidaKm').value)||0;
+  var d = parseFloat(document.getElementById('ckDevKm').value)||0;
+  var el = document.getElementById('ckKmRodado');
+  if (el) el.value = (d>s && s>0) ? (d-s).toLocaleString('pt-BR')+' km' : '—';
+}
+
+function salvarChecklist() {
+  if (!_ckVeiculoId && !_ckPlaca) { toast('⚠️ Veículo não identificado','#b45309'); return; }
+  if (!db.checklists) db.checklists = [];
+  var g = function(id){ var e=document.getElementById(id); return e?e.value:''; };
+
+  var temDevolucao = g('ckDevData') || g('ckDevKm');
+  var registro = {
+    id: _ckEditId || 'ck_'+Date.now(),
+    veiculoId: _ckVeiculoId || '',
+    placa: _ckPlaca,
+    veiculoNome: _ckVeicNome,
+    clienteNome: _ckClienteNome,
+    clienteId: _ckClienteId,
+    saidaData: g('ckSaidaData'), saidaKm: g('ckSaidaKm'), saidaComb: g('ckSaidaComb'),
+    saidaCond: g('ckSaidaCond'), saidaObs: g('ckSaidaObs'),
+    devData: g('ckDevData'), devKm: g('ckDevKm'), devComb: g('ckDevComb'),
+    devCond: g('ckDevCond'), devObs: g('ckDevObs'),
+    status: temDevolucao ? 'concluido' : 'aguardando_devolucao',
+    atualizadoEm: new Date().toISOString()
+  };
+  if (_ckEditId) {
+    var old = db.checklists.find(function(x){ return x.id===_ckEditId; });
+    registro.criadoEm = old ? old.criadoEm : registro.atualizadoEm;
+    var idx = db.checklists.findIndex(function(x){ return x.id===_ckEditId; });
+    if (idx>=0) db.checklists[idx] = registro; else db.checklists.push(registro);
+  } else {
+    registro.criadoEm = registro.atualizadoEm;
+    db.checklists.push(registro);
+  }
+
+  saveDB(); closeM('mChecklist');
+  if (typeof renderFrota==='function') renderFrota();
+  toast(registro.status==='concluido' ? '✅ Checklist concluído (saída + devolução)!' : '✅ Checklist de saída salvo!','#0891b2');
+}
+
+function excluirChecklist() {
+  if (!_ckEditId) return;
+  if (!confirm('Excluir este checklist permanentemente?')) return;
+  db.checklists = (db.checklists||[]).filter(function(x){ return x.id!==_ckEditId; });
+  saveDB(); closeM('mChecklist');
+  if (typeof renderFrota==='function') renderFrota();
+  toast('🗑 Checklist excluído.','#c0392b');
+}
+
+
+// Listeners de checklist (km rodado)
+document.addEventListener('DOMContentLoaded', function(){
+  ['ckSaidaKm','ckDevKm'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcKmRodado);
+  });
+});
 
 function abrirHistoricoManutencao(vId) {
   _manutFiltroVeiculo = vId;
@@ -4122,6 +4285,75 @@ function renderFormularios() { preencherCliSel(); } // alias
     <button class="btn btn-outline" onclick="closeM('mManutRegistro')">Cancelar</button>
     <button class="btn" id="btnDelManut" style="display:none;background:#fdecea;color:#c0392b;border:1.5px solid #f5c6cb" onclick="excluirManutencao()">🗑 Excluir</button>
     <button class="btn btn-blue" onclick="salvarManutencao()">💾 Salvar</button>
+  </div>
+</div></div>
+
+<!-- MODAL: CHECKLIST DE VISTORIA (Saída + Devolução) -->
+<div class="modal-bg" id="mChecklist"><div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto">
+  <div class="modal-head" style="background:#0891b2">
+    <h3 id="mChecklistTitulo">Checklist de Vistoria</h3>
+    <button class="modal-close" onclick="closeM('mChecklist')">✕</button>
+  </div>
+  <div class="modal-body">
+    <!-- Info do veículo/cliente -->
+    <div style="background:#f0fbfd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
+      <div id="ckInfoVeiculo" style="font-weight:700;color:#0E1B4D"></div>
+      <div id="ckInfoCliente" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
+    </div>
+
+    <!-- Seletor de fase -->
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button id="ckTabSaida" class="btn btn-blue" onclick="ckMostrarFase('saida')" style="flex:1;font-size:12px">🚗 SAÍDA (Entrega)</button>
+      <button id="ckTabDevolucao" class="btn btn-outline" onclick="ckMostrarFase('devolucao')" style="flex:1;font-size:12px">🔄 DEVOLUÇÃO</button>
+    </div>
+
+    <!-- FASE SAÍDA -->
+    <div id="ckFaseSaida">
+      <div class="g2">
+        <div class="fg"><label class="fl">Data da Saída</label><input class="fi" id="ckSaidaData" type="date"></div>
+        <div class="fg"><label class="fl">KM na Saída</label><input class="fi" id="ckSaidaKm" type="number" placeholder="0"></div>
+        <div class="fg"><label class="fl">Combustível na Saída</label>
+          <select class="fs" id="ckSaidaComb">
+            <option value="">—</option><option>Reserva</option><option>1/4</option><option>1/2</option><option>3/4</option><option>Cheio</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Condições Gerais</label>
+          <select class="fs" id="ckSaidaCond">
+            <option value="">—</option><option>Ótimo</option><option>Bom</option><option>Regular</option><option>Com avarias</option>
+          </select>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Avarias / Observações na Saída</label>
+          <textarea class="fi" id="ckSaidaObs" rows="3" placeholder="Descreva riscos, amassados, estado dos pneus, acessórios..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASE DEVOLUÇÃO -->
+    <div id="ckFaseDevolucao" style="display:none">
+      <div class="g2">
+        <div class="fg"><label class="fl">Data da Devolução</label><input class="fi" id="ckDevData" type="date"></div>
+        <div class="fg"><label class="fl">KM na Devolução</label><input class="fi" id="ckDevKm" type="number" placeholder="0"></div>
+        <div class="fg"><label class="fl">Combustível na Devolução</label>
+          <select class="fs" id="ckDevComb">
+            <option value="">—</option><option>Reserva</option><option>1/4</option><option>1/2</option><option>3/4</option><option>Cheio</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Condições na Devolução</label>
+          <select class="fs" id="ckDevCond">
+            <option value="">—</option><option>Ótimo</option><option>Bom</option><option>Regular</option><option>Com avarias novas</option>
+          </select>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Novas Avarias / Observações na Devolução</label>
+          <textarea class="fi" id="ckDevObs" rows="3" placeholder="Avarias surgidas durante a locação, multas, danos..."></textarea>
+        </div>
+        <div class="fg"><label class="fl">KM Rodado</label><input class="fi" id="ckKmRodado" readonly style="background:#f0f2f9" placeholder="—"></div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mChecklist')">Cancelar</button>
+    <button class="btn" id="btnDelChecklist" style="display:none;background:#fdecea;color:#c0392b;border:1.5px solid #f5c6cb" onclick="excluirChecklist()">🗑 Excluir</button>
+    <button class="btn btn-blue" onclick="salvarChecklist()">💾 Salvar Checklist</button>
   </div>
 </div></div>
 
