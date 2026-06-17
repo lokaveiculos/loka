@@ -394,6 +394,8 @@ tr:hover td{background:#f8f9fe;}
           <option value="orcamento">📋 Orçamento</option>
         </select>
         <button class="btn btn-blue" onclick="openManutRegistro(null)">+ Nova Manutenção</button>
+        <button class="btn btn-outline" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
+        <button class="btn btn-outline" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
       </div>
 
       <!-- Resumo -->
@@ -3256,7 +3258,7 @@ function openManutRegistro(id) {
   if (titulo) titulo.textContent = m ? 'Editar Manutenção' : 'Nova Manutenção';
   if (btnDel) btnDel.style.display = m ? 'flex' : 'none';
 
-  // Popular select de veículos
+  // Popular select de veículos + datalist de placas
   var sel = document.getElementById('mrVeiculo');
   if (sel) {
     sel.innerHTML = '<option value="">— Selecione o veículo —</option>'
@@ -3264,6 +3266,13 @@ function openManutRegistro(id) {
         return '<option value="'+v.id+'">'+v.marca+' '+v.modelo+' · '+v.placa+'</option>';
       }).join('');
   }
+  var dl = document.getElementById('mrListaPlacas');
+  if (dl) {
+    dl.innerHTML = (db.veiculos||[]).filter(function(v){ return v && v.placa; }).map(function(v) {
+      return '<option value="'+v.placa+'">'+v.marca+' '+v.modelo+'</option>';
+    }).join('');
+  }
+  var bp = document.getElementById('mrBuscaPlaca'); if(bp) bp.value='';
 
   // Preencher campos
   var fields = {
@@ -3318,6 +3327,22 @@ function anexarComprovante(input) {
   });
   input.value = '';
 }
+
+// ── BUSCA POR PLACA NO MODAL DE MANUTENÇÃO ──────────────────
+function selecionarVeiculoPorPlaca(placa) {
+  placa = (placa||'').toUpperCase().trim();
+  var v = (db.veiculos||[]).find(function(x){ return x && x.placa && x.placa.toUpperCase()===placa; });
+  var sel = document.getElementById('mrVeiculo');
+  if (v && sel) sel.value = v.id;
+}
+function sincronizarBuscaPlaca() {
+  var sel = document.getElementById('mrVeiculo');
+  var bp = document.getElementById('mrBuscaPlaca');
+  if (!sel || !bp) return;
+  var v = (db.veiculos||[]).find(function(x){ return x && x.id===sel.value; });
+  bp.value = v ? v.placa : '';
+}
+
 
 function salvarManutencao() {
   var veicId = document.getElementById('mrVeiculo').value;
@@ -3453,6 +3478,103 @@ function excluirManutencao() {
 }
 
 // Abrir histórico de manutenção filtrando por veículo (botão 🔧)
+// ── IMPORTAR MANUTENÇÃO (código da oficina) ─────────────────
+function abrirImportarManutencao() {
+  var existing = document.getElementById('mImportManut');
+  if (existing) existing.remove();
+  var panel = document.createElement('div');
+  panel.id = 'mImportManut';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  panel.innerHTML = '<div style="background:#fff;border-radius:12px;width:520px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25)">'
+    + '<div style="background:#7c3aed;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0">📥 Importar Manutenção da Oficina</div>'
+    + '<div style="padding:18px">'
+    + '<p style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.5">Cole abaixo o código enviado pela oficina (começa com <strong>LOKA-MANUT::</strong>). Você pode colar vários códigos, um por linha.</p>'
+    + '<textarea id="importCodigo" placeholder="LOKA-MANUT::..." style="width:100%;min-height:120px;padding:12px;border:1.5px solid #d5dae8;border-radius:8px;font-family:monospace;font-size:11px;outline:none;resize:vertical"></textarea>'
+    + '<div id="importPreview" style="margin-top:12px"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+    + '<button id="importCancel" style="padding:9px 18px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>'
+    + '<button id="importPreviewBtn" style="padding:9px 18px;background:#EEF1FD;color:#2B4BF2;border:1.5px solid #2B4BF2;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">👁 Pré-visualizar</button>'
+    + '<button id="importConfirm" style="padding:9px 18px;background:#0d7a3e;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;display:none">✅ Importar</button>'
+    + '</div></div></div>';
+  document.body.appendChild(panel);
+
+  var _decodificados = [];
+
+  function decodificar() {
+    var raw = document.getElementById('importCodigo').value.trim();
+    if (!raw) { toast('Cole ao menos um código','#b45309'); return; }
+    var linhas = raw.split(/\n+/).map(function(l){return l.trim();}).filter(Boolean);
+    _decodificados = [];
+    var erros = 0;
+    linhas.forEach(function(linha) {
+      try {
+        if (linha.indexOf('LOKA-MANUT::') !== 0) { erros++; return; }
+        var b64 = linha.replace('LOKA-MANUT::','');
+        var json = decodeURIComponent(escape(atob(b64)));
+        var dados = JSON.parse(json);
+        if (dados.placa) _decodificados.push(dados);
+      } catch(e) { erros++; }
+    });
+    var prev = document.getElementById('importPreview');
+    if (!_decodificados.length) {
+      prev.innerHTML = '<div style="padding:10px;background:#fdecea;color:#c0392b;border-radius:7px;font-size:12px">❌ Nenhum código válido encontrado'+(erros?' ('+erros+' com erro)':'')+'</div>';
+      document.getElementById('importConfirm').style.display = 'none';
+      return;
+    }
+    prev.innerHTML = '<div style="border:1.5px solid #e2e5f0;border-radius:8px;overflow:hidden">'
+      + _decodificados.map(function(d) {
+        var v = (db.veiculos||[]).find(function(x){ return x && x.placa && x.placa.toUpperCase()===d.placa.toUpperCase(); });
+        return '<div style="padding:10px 14px;border-bottom:1px solid #f0f2f8;font-size:12px">'
+          + '<strong>'+d.placa+'</strong> '+(v?'<span style="color:#0d7a3e">✓ '+v.marca+' '+v.modelo+'</span>':'<span style="color:#b45309">⚠ não cadastrado</span>')+'<br>'
+          + '<span style="font-size:11px;color:#666">'+(d.descricao||'').substring(0,60)+' · R$ '+(d.custo||'0')+' · '+(d.oficina||'')+'</span>'
+          + '</div>';
+      }).join('')
+      + '</div>'
+      + '<div style="font-size:11px;color:#0d7a3e;font-weight:700;margin-top:8px">'+_decodificados.length+' manutenção(ões) pronta(s) para importar'+(erros?' · '+erros+' código(s) com erro':'')+'</div>';
+    document.getElementById('importConfirm').style.display = 'inline-block';
+  }
+
+  function importar() {
+    if (!_decodificados.length) return;
+    if (!db.manutencoes) db.manutencoes = [];
+    var add = 0;
+    _decodificados.forEach(function(d) {
+      var v = (db.veiculos||[]).find(function(x){ return x && x.placa && x.placa.toUpperCase()===d.placa.toUpperCase(); });
+      var custoFmt = d.custo ? Number(d.custo).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+      db.manutencoes.push({
+        id: 'manut_imp_'+Date.now()+'_'+add,
+        veiculoId:   v ? v.id : '',
+        veiculoNome: v ? v.marca+' '+v.modelo : (d.modelo||d.placa),
+        placa:       d.placa.toUpperCase(),
+        data:        d.data || new Date().toISOString().split('T')[0],
+        retorno:     d.retorno || '',
+        tipo:        d.tipo || 'corretiva',
+        status:      'concluida',
+        descricao:   d.descricao || '',
+        oficina:     d.oficina || '',
+        km:          d.km || '',
+        custo:       custoFmt,
+        pgto:        '',
+        obs:         d.obs || '',
+        comprovantes: [],
+        criadoEm:    new Date().toISOString(),
+        importadoOficina: true
+      });
+      add++;
+    });
+    saveDB();
+    renderManutencao();
+    panel.remove();
+    toast('✅ '+add+' manutenção(ões) importada(s)!','#0d7a3e');
+  }
+
+  document.getElementById('importCancel').onclick = function(){ panel.remove(); };
+  document.getElementById('importPreviewBtn').onclick = decodificar;
+  document.getElementById('importConfirm').onclick = importar;
+  panel.addEventListener('click', function(e){ if(e.target===panel) panel.remove(); });
+}
+
+
 function abrirHistoricoManutencao(vId) {
   _manutFiltroVeiculo = vId;
   var el = document.getElementById('qManut'); if(el) el.value='';
@@ -3865,8 +3987,10 @@ function renderFormularios() { preencherCliSel(); } // alias
   <div class="modal-body">
     <div class="g2">
       <div class="fg" style="grid-column:1/-1">
-        <label class="fl">Veículo *</label>
-        <select class="fs" id="mrVeiculo">
+        <label class="fl">Veículo * <span style="font-weight:400;color:var(--muted);font-size:10px">(digite a placa ou selecione)</span></label>
+        <input class="fi" id="mrBuscaPlaca" list="mrListaPlacas" placeholder="🔍 Digite a placa..." style="text-transform:uppercase;margin-bottom:6px" oninput="this.value=this.value.toUpperCase()" onchange="selecionarVeiculoPorPlaca(this.value)">
+        <datalist id="mrListaPlacas"></datalist>
+        <select class="fs" id="mrVeiculo" onchange="sincronizarBuscaPlaca()">
           <option value="">— Selecione —</option>
         </select>
       </div>
