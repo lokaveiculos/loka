@@ -835,14 +835,15 @@ var TITLES = {
 function showPanel(name) {
   // Bloqueio de acesso: financeiro só admin/master
   if (name === 'financeiro') {
+    var _p = '';
     try {
-      var _s = JSON.parse(atob(sessionStorage.getItem('loka_session')));
-      var _p = (_s.perfil||'').toLowerCase();
-      if (_p !== 'admin' && _p !== 'master') {
-        toast('🔒 Acesso restrito a Administradores','#c0392b');
-        return;
-      }
-    } catch(e) { return; }
+      var _u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
+      _p = (_u.perfil || '').toLowerCase();
+    } catch(e) {}
+    if (_p !== 'admin' && _p !== 'master') {
+      toast('🔒 Acesso restrito a Administradores','#c0392b');
+      return;
+    }
   }
   // Mostra/oculta painéis
   for (var i = 0; i < PANELS.length; i++) {
