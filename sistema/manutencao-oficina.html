@@ -88,7 +88,10 @@ textarea{resize:vertical;min-height:60px}
       <span class="val" id="totalDisplay">R$ 0,00</span>
     </div>
 
-    <button class="btn btn-gerar" onclick="gerarCodigo()">✅ Gerar Código para Enviar à LOKÁ</button>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-gerar" onclick="gerarCodigo()" style="flex:1;margin-top:0">✅ Gerar Código para Enviar à LOKÁ</button>
+      <button class="btn" onclick="limparFormulario()" style="background:#f0f2f9;color:#6b7280;border:1.5px solid #d5dae8;padding:14px 20px">🔄 Limpar</button>
+    </div>
 
     <div id="codigoArea">
       <label style="margin-top:14px">📋 Código gerado — copie e envie para a LOKÁ:</label>
@@ -172,6 +175,32 @@ function copiarCodigo(){
     document.getElementById('copyMsg').style.display='block';
   });
 }
+
+function limparFormulario(){
+  if(!confirm('Limpar todos os campos para lançar um novo veículo?')) return;
+  document.getElementById('placa').value='';
+  document.getElementById('modelo').value='';
+  document.getElementById('retorno').value='';
+  document.getElementById('tipo').value='preventiva';
+  document.getElementById('km').value='';
+  document.getElementById('oficina').value='';
+  document.getElementById('obs').value='';
+  document.getElementById('data').value=new Date().toISOString().split('T')[0];
+  // Resetar lista de serviços para apenas uma linha
+  var lista=document.getElementById('servList');
+  lista.innerHTML='<div class="serv-item">'
+    +'<input placeholder="Descrição do serviço/peça" class="serv-desc">'
+    +'<input placeholder="0,00" class="serv-val" oninput="mask(this);calcTotal()" style="text-align:right">'
+    +'<button class="btn-x" onclick="removeServ(this)">×</button>'
+    +'</div>';
+  calcTotal();
+  // Esconder área do código
+  document.getElementById('codigoArea').style.display='none';
+  document.getElementById('codigoOutput').value='';
+  document.getElementById('copyMsg').style.display='none';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 // Data de hoje por padrão
 document.getElementById('data').value=new Date().toISOString().split('T')[0];
 </script>
