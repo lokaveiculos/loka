@@ -3715,7 +3715,7 @@ function brl(v){ return 'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFrac
 function finParse(s){ if(typeof s==='number')return s; if(!s)return 0; return parseFloat(String(s).replace(/[R$\s.]/g,'').replace(',','.'))||0; }
 
 // Cabeçalho com texto BRANCO explícito (corrige fonte invisível)
-function finTH(h){ return '<th style="padding:8px 8px;color:#ffffff !important;font-size:9px;text-transform:uppercase;text-align:left;font-weight:700">'+h+'</th>'; }
+function finTH(h){ return '<th style="background:#0E1B4D !important;padding:8px 8px;color:#ffffff !important;font-size:9px;text-transform:uppercase;text-align:left;font-weight:700;letter-spacing:.5px">'+h+'</th>'; }
 
 function finRender(aba) {
   finInit();
