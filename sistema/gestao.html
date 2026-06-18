@@ -408,49 +408,43 @@ tr:hover td{background:#f8f9fe;}
 
     <!-- ══ FINANCEIRO (Admin/Master) ══ -->
     <div class="panel" id="panel-financeiro" style="display:none;width:100%">
-      <div style="background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid #c0392b">
+      <div style="background:#fff;border-radius:10px;padding:12px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid #c0392b">
         <div style="font-size:13px;font-weight:800;color:var(--dark)">🔒 Área Financeira — Acesso Restrito</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">Documentos confidenciais · Visível apenas para Administradores e Master</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Dados salvos online (Firebase) · Visível apenas para Admin e Master</div>
       </div>
 
-      <div class="form-cards">
-        <div class="form-card">
-          <div class="form-card-head">
-            <div class="form-card-icon" style="background:#e8f5ef"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-            <div><div class="form-card-title">Acertos Loká — Auto Mais</div><div class="form-card-sub">Controle de acertos financeiros</div></div>
-          </div>
-          <div class="form-card-body">Entradas e saídas financeiras entre Loká e Auto Mais. Saldo calculado automaticamente.</div>
-          <div class="form-card-foot"><button class="btn btn-green" onclick="window.open('financeiro/Acertos_Loka_AutoMais.xlsx','_blank')">📥 Abrir Planilha</button></div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-head">
-            <div class="form-card-icon" style="background:#EEF1FD"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-            <div><div class="form-card-title">Relação de Bens</div><div class="form-card-sub">Veículos financiados</div></div>
-          </div>
-          <div class="form-card-body">Relação completa dos veículos financiados por contrato (Bradesco e Itaú), com placas e observações.</div>
-          <div class="form-card-foot"><button class="btn btn-blue" onclick="window.open('financeiro/Relacao_de_Bens.xlsx','_blank')">📥 Abrir Planilha</button></div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-head">
-            <div class="form-card-icon" style="background:#fef3cd"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#b45309" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg></div>
-            <div><div class="form-card-title">Endividamento</div><div class="form-card-sub">Financiamentos e saldo devedor</div></div>
-          </div>
-          <div class="form-card-body">Planilha de endividamento com fórmulas: valor principal, parcelas, amortização e saldo devedor por contrato.</div>
-          <div class="form-card-foot"><button class="btn" style="background:#b45309;color:#fff" onclick="window.open('financeiro/Endividamento_Loka.xlsx','_blank')">📥 Abrir Planilha</button></div>
-        </div>
+      <!-- Sub-abas -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+        <button id="finTabAcertos" class="btn btn-blue"    onclick="finMostrarAba('acertos')"  style="font-size:11px;padding:8px 14px">💵 Acertos Auto Mais</button>
+        <button id="finTabBens"    class="btn btn-outline" onclick="finMostrarAba('bens')"     style="font-size:11px;padding:8px 14px">🚙 Relação de Bens</button>
+        <button id="finTabDivida"  class="btn btn-outline" onclick="finMostrarAba('divida')"   style="font-size:11px;padding:8px 14px">📊 Endividamento</button>
       </div>
 
-      <div style="margin-top:18px;background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-        <div style="font-size:12px;font-weight:800;color:var(--dark);margin-bottom:10px">📊 Resumo Financeiro</div>
-        <div class="stats">
-          <div class="stat" style="border-left-color:#c0392b"><div class="stat-value" style="font-size:15px">R$ 5,41 mi</div><div class="stat-label">Saldo Devedor Atual</div></div>
-          <div class="stat" style="border-left-color:#b45309"><div class="stat-value" style="font-size:15px">R$ 6,77 mi</div><div class="stat-label">Total Financiado (Principal)</div></div>
-          <div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">R$ 272 mil</div><div class="stat-label">Receita Mensal Estimada</div></div>
-          <div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">R$ 33,2 mil</div><div class="stat-label">Saldo Acertos Auto Mais</div></div>
+      <!-- ABA ACERTOS -->
+      <div id="finAbaAcertos">
+        <div class="toolbar" style="margin-bottom:10px">
+          <div style="flex:1"><strong style="font-size:13px;color:var(--dark)">Acertos Loká — Auto Mais</strong><div style="font-size:10px;color:var(--muted)">Entradas (+) e saídas (−) · saldo automático</div></div>
+          <button class="btn btn-green" onclick="finAddLinha('acertos')">+ Nova Linha</button>
         </div>
-        <div style="font-size:9px;color:var(--muted);margin-top:8px;font-style:italic">Valores de referência conforme planilhas · Data base 31/01/2026. Para detalhes, abra as planilhas acima.</div>
+        <div id="finGridAcertos"></div>
+      </div>
+
+      <!-- ABA BENS -->
+      <div id="finAbaBens" style="display:none">
+        <div class="toolbar" style="margin-bottom:10px">
+          <div style="flex:1"><strong style="font-size:13px;color:var(--dark)">Relação de Bens Financiados</strong><div style="font-size:10px;color:var(--muted)">Veículos por contrato (Bradesco/Itaú)</div></div>
+          <button class="btn btn-blue" onclick="finAddLinha('bens')">+ Novo Bem</button>
+        </div>
+        <div id="finGridBens"></div>
+      </div>
+
+      <!-- ABA DÍVIDA -->
+      <div id="finAbaDivida" style="display:none">
+        <div class="toolbar" style="margin-bottom:10px">
+          <div style="flex:1"><strong style="font-size:13px;color:var(--dark)">Endividamento — Financiamentos</strong><div style="font-size:10px;color:var(--muted)">Saldo devedor e amortização (cálculo automático)</div></div>
+          <button class="btn" style="background:#b45309;color:#fff" onclick="finAddLinha('divida')">+ Novo Financiamento</button>
+        </div>
+        <div id="finGridDivida"></div>
       </div>
     </div>
     <!-- ══ FORMULÁRIOS ══ -->
@@ -879,6 +873,7 @@ function showPanel(name) {
     if (name === 'historico')   renderHistorico();
     if (name === 'manutencao')  { _manutFiltroVeiculo=null; renderManutencao(); }
     if (name === 'faturas')     { setFiltroFaturas(''); carregarFaturas(); }
+    if (name === 'financeiro')  { finInit(); finMostrarAba('acertos'); }
   } catch(e) {
     console.error('showPanel[' + name + ']:', e);
     // Exibir erro visual para debug
@@ -1117,7 +1112,9 @@ function setupRealtimeSync() {
       || quickHash(fbData.clients)          !== quickHash(db.clients)
       || quickHash(fbData.historico)        !== quickHash(db.historico)
       || quickHash(fbData.manutencoes)      !== quickHash(db.manutencoes)
-      || quickHash(fbData.contratos)        !== quickHash(db.contratos);
+      || quickHash(fbData.contratos)        !== quickHash(db.contratos)
+      || quickHash(fbData.checklists)       !== quickHash(db.checklists)
+      || JSON.stringify(fbData.financeiro)  !== JSON.stringify(db.financeiro);
 
     if (!mudou) return;
 
@@ -1156,6 +1153,7 @@ function _reRenderPainelAtivo() {
     if (nome === 'contratos')   renderContratos();
     if (nome === 'manutencao')  renderManutencao();
     if (nome === 'faturas')     { if(typeof renderFaturas==='function') renderFaturas(); }
+    if (nome === 'financeiro')  { if(typeof finRender==='function') finRender(_finAbaAtual); }
     // Atualizar stats do dashboard só se NÃO estiver nele (evita render duplo)
     if (nome !== 'dashboard') {
       try {
@@ -3674,6 +3672,174 @@ function abrirImportarManutencao() {
 // ══════════════════════════════════════════════════════════════
 var _ckEditId = null;
 var _ckVeiculoId = null;
+
+
+// ══════════════════════════════════════════════════════════════
+// MÓDULO FINANCEIRO — Tabelas editáveis online (Firebase)
+// ══════════════════════════════════════════════════════════════
+var FIN_SEED_ACERTOS = [{"data": "2026-01-12", "valor": 53000, "banco": "Bradesco"}, {"data": "2026-01-28", "valor": 33000, "banco": "Bradesco"}, {"data": "2026-01-28", "valor": 20000, "banco": "Itau"}, {"data": "2026-01-22", "valor": 27000, "banco": "Itau"}, {"data": "2026-02-02", "valor": 5000, "banco": "Bradesco"}, {"data": "2026-02-06", "valor": 27000, "banco": "Jarbas/Angelo"}, {"data": "2026-01-30", "valor": 8000, "banco": "Jarbas/Angelo"}, {"data": "2026-02-02", "valor": 45000, "banco": "Bradesco"}, {"data": "2026-02-02", "valor": 3000, "banco": "Bradesco"}, {"data": "2026-02-09", "valor": 15000, "banco": "Bradesco"}, {"data": "2026-02-11", "valor": 4000, "banco": "Bradesco"}, {"data": "2026-02-12", "valor": -55000, "banco": "Ranger G7"}, {"data": "2026-02-19", "valor": 8000, "banco": ""}, {"data": "2026-02-26", "valor": 40000, "banco": ""}, {"data": "2026-03-09", "valor": 66545, "banco": ""}, {"data": "2026-03-28", "valor": 11000, "banco": "s10"}, {"data": "2026-03-27", "valor": 14000, "banco": "Bradesco"}, {"data": "2026-03-31", "valor": 46000, "banco": "Bradesco"}, {"data": "2026-03-26", "valor": 32000, "banco": ""}, {"data": "2026-03-30", "valor": 15000, "banco": ""}, {"data": "2026-05-12", "valor": 104073, "banco": "Renegade+emprestimos"}, {"data": "", "valor": -58000, "banco": "Argo SYQ2A52"}, {"data": "", "valor": -55000, "banco": "Onix SJA7D59"}, {"data": "", "valor": -55000, "banco": "HB20 SHP2B83"}, {"data": "", "valor": -40000, "banco": "Gol RBV3F29"}, {"data": "", "valor": -40000, "banco": "Mobi RVO7F21"}, {"data": "", "valor": -100000, "banco": "AmaroK"}, {"data": "", "valor": -45000, "banco": "Strada 20/20"}, {"data": "", "valor": -60437, "banco": "Renegade"}, {"data": "2026-06-03", "valor": -15000, "banco": "Bradesco"}, {"data": "2026-06-05", "valor": -20000, "banco": "jurandi"}];
+var FIN_SEED_BENS = [{"contrato": "2917539471", "banco": "Bradesco", "carro": "Renegade", "ano": "22/23", "placa": "RVI0D04", "valor": 95000, "obs": "Substituiu RUQ0G09"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RVD8J06", "valor": 70000, "obs": "Substituiu HB20 SHP2B83"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Polo Track", "ano": "24/24", "placa": "STF4F32", "valor": 65000, "obs": "Substituiu Onix Plus RUV5G98"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Polo Track", "ano": "23/23", "placa": "FYQ2B92", "valor": 65000, "obs": "Substituiu Onix SIO9A51"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "HB20", "ano": "23/24", "placa": "FCN9G63", "valor": 60000, "obs": "Substituiu Mobi RVO7F21"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Onix Plus MT", "ano": "22/23", "placa": "EUE8A81", "valor": 55000, "obs": "Substituiu Gol RBV3F29"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Onix LT", "ano": "23/24", "placa": "SIO9A51", "valor": 55000, "obs": "Substituiu RCJ2B03/SHO1J60/RNR2F30"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Mobi", "ano": "22/23", "placa": "RUZ9J78", "valor": 46000, "obs": "Substituiu RME4H44/RVS9D71"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHV7B26", "valor": 46000, "obs": "EYA5J14"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Mobi", "ano": "22/23", "placa": "RVO7F21", "valor": 46000, "obs": "SYQ2A52"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Gol", "ano": "21/22", "placa": "RBV3F29", "valor": 44000, "obs": "EYA5J14"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "SCO5B72", "valor": 46000, "obs": "SUBST ONIX SJA7D59"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Montana", "ano": "23/24", "placa": "SIM2G50", "valor": 100000, "obs": "ok"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Fiorino", "ano": "20/21", "placa": "RCY8H74", "valor": 65000, "obs": "ok"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Spin", "ano": "23/24", "placa": "SEV0J14", "valor": 74000, "obs": "QNH1J95"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Strada", "ano": "22/23", "placa": "RVO5A91", "valor": 65000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHW9G83", "valor": 50000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHW9G84", "valor": 50000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHG3D40", "valor": 50000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "C3", "ano": "22/23", "placa": "RVV7E29", "valor": 56000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "EXN2A36", "valor": 65000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "HB20", "ano": "23/24", "placa": "SJC3A29", "valor": 65000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "FCH1I73", "valor": 67000, "obs": "SUBSTITUIR"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Onix Plus LTZ", "ano": "22/23", "placa": "RVC9A19", "valor": 75000, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Onix Plus LTZ", "ano": "22/23", "placa": "RUQ2J15", "valor": 75000, "obs": "Substituiu 2008 RTO6B55"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "EQQ2J61", "valor": 50000, "obs": "substituiu RFE8D72"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "GIR7i93", "valor": 50000, "obs": "substituiu T-Cross FFQ7C42"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "DFT8I72", "valor": 50000, "obs": "substituiu HB20 RVE9D75"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "FOY3F87", "valor": 50000, "obs": "Substituiu S10 RPC9F55"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GCi9i23", "valor": 63000, "obs": "Substituiu S10 RPC9F55"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FDZ9G34", "valor": 63000, "obs": ""}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FVJ7F62", "valor": 63000, "obs": ""}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RTE3J85", "valor": 63000, "obs": ""}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FCC6E35", "valor": 63000, "obs": ""}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RTE3J75", "valor": 63000, "obs": ""}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RTE3j91", "valor": 63000, "obs": ""}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Strada", "ano": "21/22", "placa": "RNU7E72", "valor": 63000, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GCQ2G23", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GJO0D71", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FTI3F81", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "GEZ8H54", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "RPR1G73", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RUE5F30", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RUE5F40", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RUE5F24", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GJU9H02", "valor": 67500, "obs": ""}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GEH4i81", "valor": 67500, "obs": ""}, {"contrato": "2920448163", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "FLR6J14", "valor": 65000, "obs": ""}, {"contrato": "2920448163", "banco": "Bradesco", "carro": "Fiorino", "ano": "21/21", "placa": "RDK5G66", "valor": 65000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SIC2G45", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHU8B53", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHH1C11", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHG1J02", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHF6F29", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVT2A34", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVT2A32", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVT1A74", "valor": 72000, "obs": ""}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVD9I67", "valor": 72000, "obs": ""}, {"contrato": "2917050154", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "RUE0E26", "valor": 65000, "obs": ""}, {"contrato": "2916787056", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RND5I98", "valor": 51000, "obs": ""}, {"contrato": "2916787056", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RMP0A86", "valor": 51000, "obs": ""}, {"contrato": "2916787056", "banco": "Bradesco", "carro": "SAVEIRO", "ano": "21/22", "placa": "RML9D09", "valor": 50000, "obs": ""}, {"contrato": "2916578848", "banco": "Bradesco", "carro": "Fiorino", "ano": "24/24", "placa": "SYO1G57", "valor": 100000, "obs": ""}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Argo", "ano": "23/24", "placa": "SIL2E59", "valor": 65000, "obs": ""}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Peugeot 208", "ano": "22/23", "placa": "RVN9D70", "valor": 65000, "obs": ""}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Peugeot 208", "ano": "23/23", "placa": "SIA6F77", "valor": 55000, "obs": ""}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RVD9I71", "valor": 55000, "obs": ""}, {"contrato": "2918527070", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "EJD9E52", "valor": 158000, "obs": ""}, {"contrato": "2918527070", "banco": "Bradesco", "carro": "Saveiro", "ano": "24/24", "placa": "SDF3C81", "valor": 0, "obs": ""}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "23/23", "placa": "FCQ8B73", "valor": 0, "obs": ""}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "23/23", "placa": "EBL7E41", "valor": 0, "obs": ""}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "23/23", "placa": "EKU9D72", "valor": 0, "obs": ""}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RVD9I55", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUI8I24", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUJ4A55", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUL7A99", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUL7B03", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUP3D82", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUP8F63", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUT7D45", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUX8G52", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RVD9I60", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RVT2A51", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHF6F23", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHF6F28", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHH6B15", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHU8B66", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G39", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G42", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G46", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G48", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G51", "valor": 0, "obs": ""}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G52", "valor": 0, "obs": ""}];
+var FIN_SEED_DIVIDA = [{"banco": "Bradesco Fin", "contrato": "2916787056", "principal": 158044.63, "liberacao": "", "parcelas": 48, "cet": 0.0148, "valorParcela": 4643.31, "amortizado": 47129.90999999999, "garantia": "2 Saveiros/strada", "receita": 8400}, {"banco": "Bradesco Fin", "contrato": "2917050154", "principal": 69386.85, "liberacao": "", "parcelas": 48, "cet": 0.0174, "valorParcela": 2153.42, "amortizado": 18529.560000000005, "garantia": "Gol 2023", "receita": 2500}, {"banco": "Bradesco Fin", "contrato": "2917207630", "principal": 478301.72, "liberacao": "", "parcelas": 48, "cet": 0.0148, "valorParcela": 14052.41, "amortizado": 124859.73000000001, "garantia": "Diversos 9 carro", "receita": 14300}, {"banco": "BV", "contrato": "920312070", "principal": 141000, "liberacao": "", "parcelas": 48, "cet": 0.017, "valorParcela": 4297.77, "amortizado": 47594.14, "garantia": "3 Mobis", "receita": 6900}, {"banco": "Bradesco Fin", "contrato": "2916578848", "principal": 100000, "liberacao": "", "parcelas": 48, "cet": 0.017, "valorParcela": 3061.24, "amortizado": 30229.21, "garantia": "T-Cross", "receita": 3000}, {"banco": "Bradesco Fin", "contrato": "2917539471", "principal": 465000, "liberacao": "", "parcelas": 48, "cet": 0.0159, "valorParcela": 13903.38, "amortizado": 109302.26000000001, "garantia": "7 Diversos ", "receita": 12000}, {"banco": "Bradesco Fin", "contrato": "2918060463", "principal": 240000, "liberacao": "", "parcelas": 48, "cet": 0.0144, "valorParcela": 7225.83, "amortizado": 58013.74999999999, "garantia": "4 DIVERSOS", "receita": 10300}, {"banco": "Bradesco Fin", "contrato": "2918527078", "principal": 158000, "liberacao": "", "parcelas": 48, "cet": 0.0144, "valorParcela": 4897.01, "amortizado": 34077.06, "garantia": "S10 2022", "receita": 8000}, {"banco": "Bradesco Fin", "contrato": "2918912281", "principal": 618000, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 18831.9, "amortizado": 105110.88, "garantia": "10 Diversos ", "receita": 50000}, {"banco": "Bradesco Fin", "contrato": "J Carlos ", "principal": 129980, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 3985.82, "amortizado": 0, "garantia": "2 Mobis", "receita": 4600}, {"banco": "Bradesco Fin", "contrato": "2919297963", "principal": 704000, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 21155.9, "amortizado": 116905.827, "garantia": "10 diversos", "receita": 25000}, {"banco": "Bradesco Fin", "contrato": "4217013747", "principal": 460000, "liberacao": "", "parcelas": 24, "cet": 0.0145, "valorParcela": 23903.45, "amortizado": 184025.36000000002, "garantia": "2 Ranger XLT", "receita": 4500}, {"banco": "Bradesco Fin", "contrato": "2920001274", "principal": 675000, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 20406.26, "amortizado": 101303.51000000001, "garantia": "10 saveiros", "receita": 30000}, {"banco": "Bradesco Fin", "contrato": "2920448163", "principal": 137606.06, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 4019.49, "amortizado": 17038.68, "garantia": "saveiro/fiorino", "receita": 5800}, {"banco": "Itau", "contrato": "28798367", "principal": 675535.5, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 19718.21, "amortizado": 83531.26999999999, "garantia": "9 Saveiros", "receita": 27000}, {"banco": "Itau", "contrato": "29418875", "principal": 1262296.13, "liberacao": "", "parcelas": 48, "cet": 0.0145, "valorParcela": 37100.55, "amortizado": 116952.20000000001, "garantia": "20 saveiros", "receita": 60000}, {"banco": "Itau Melina", "contrato": "29651382", "principal": 119528.12, "liberacao": "", "parcelas": 48, "cet": 0.0146, "valorParcela": 3466.23, "amortizado": 10711.06, "garantia": "Amarok", "receita": 0}, {"banco": "Cartao Itaú Rogel", "contrato": "", "principal": 118425, "liberacao": "", "parcelas": 12, "cet": 0, "valorParcela": 9868.75, "amortizado": 39475, "garantia": "2 saveiros", "receita": 0}, {"banco": "Cartao Itaú Rogel", "contrato": "", "principal": 62892, "liberacao": "", "parcelas": 12, "cet": 0, "valorParcela": 5241, "amortizado": 10482, "garantia": "1 saveiro", "receita": 0}];
+
+function finInit() {
+  if (!db.financeiro) db.financeiro = {};
+  if (!db.financeiro.acertos) db.financeiro.acertos = FIN_SEED_ACERTOS.slice();
+  if (!db.financeiro.bens)    db.financeiro.bens    = FIN_SEED_BENS.slice();
+  if (!db.financeiro.divida)  db.financeiro.divida  = FIN_SEED_DIVIDA.slice();
+}
+
+var _finAbaAtual = 'acertos';
+function finMostrarAba(aba) {
+  _finAbaAtual = aba;
+  ['Acertos','Bens','Divida'].forEach(function(a){
+    var el = document.getElementById('finAba'+a);
+    if (el) el.style.display = 'none';
+    var tab = document.getElementById('finTab'+a);
+    if (tab) { tab.className='btn btn-outline'; tab.style.cssText='font-size:11px;padding:8px 14px'; }
+  });
+  var cap = aba.charAt(0).toUpperCase()+aba.slice(1);
+  var el = document.getElementById('finAba'+cap);
+  if (el) el.style.display='block';
+  var tab = document.getElementById('finTab'+cap);
+  if (tab) {
+    var cor = aba==='divida' ? 'background:#b45309;color:#fff' : aba==='bens' ? '' : '';
+    tab.className = aba==='bens' ? 'btn btn-blue' : 'btn btn-blue';
+    if (aba==='divida') { tab.className='btn'; tab.style.cssText='font-size:11px;padding:8px 14px;background:#b45309;color:#fff'; }
+    else tab.style.cssText='font-size:11px;padding:8px 14px';
+  }
+  finRender(aba);
+}
+
+function brl(v){ return 'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+function finParse(s){ if(typeof s==='number')return s; if(!s)return 0; return parseFloat(String(s).replace(/[R$\s.]/g,'').replace(',','.'))||0; }
+
+function finRender(aba) {
+  finInit();
+  if (aba==='acertos') finRenderAcertos();
+  else if (aba==='bens') finRenderBens();
+  else if (aba==='divida') finRenderDivida();
+}
+
+// ── ACERTOS ──────────────────────────────────────────────────
+function finRenderAcertos() {
+  var grid = document.getElementById('finGridAcertos');
+  if (!grid) return;
+  var rows = db.financeiro.acertos;
+  var total = rows.reduce(function(s,r){ return s+(Number(r.valor)||0); },0);
+  var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">'
+    + '<thead><tr style="background:var(--dark)">'
+    + ['Data','Valor (R$)','Banco/Destino','Tipo',''].map(function(h){return '<th style="padding:8px 10px;color:#fff;font-size:9px;text-transform:uppercase">'+h+'</th>';}).join('')
+    + '</tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    var pos = (Number(r.valor)||0)>=0;
+    html += '<tr style="border-bottom:1px solid #f0f2f8">'
+      + '<td style="padding:4px 6px"><input type="date" value="'+(r.data||'')+'" onchange="finEdit(\'acertos\','+i+',\'data\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:130px"></td>'
+      + '<td style="padding:4px 6px"><input type="text" value="'+(r.valor||0)+'" onchange="finEdit(\'acertos\','+i+',\'valor\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:110px;text-align:right;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700"></td>'
+      + '<td style="padding:4px 6px"><input type="text" value="'+(r.banco||'').replace(/"/g,'&quot;')+'" onchange="finEdit(\'acertos\','+i+',\'banco\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:100%"></td>'
+      + '<td style="padding:4px 6px;font-size:10px;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700">'+(pos?'Entrada':'Saída')+'</td>'
+      + '<td style="padding:4px 6px;text-align:center"><button onclick="finDel(\'acertos\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700">🗑</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:#EEF1FD"><td style="padding:9px 10px;font-weight:800">SALDO</td><td style="padding:9px 10px;text-align:right;font-weight:800;font-family:monospace;color:'+(total>=0?'#0d7a3e':'#c0392b')+'">'+brl(total)+'</td><td colspan="3"></td></tr></tfoot>';
+  html += '</table></div>';
+  grid.innerHTML = html;
+}
+
+// ── BENS ─────────────────────────────────────────────────────
+function finRenderBens() {
+  var grid = document.getElementById('finGridBens');
+  if (!grid) return;
+  var rows = db.financeiro.bens;
+  var total = rows.reduce(function(s,r){ return s+(Number(r.valor)||0); },0);
+  var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:780px">'
+    + '<thead><tr style="background:var(--dark)">'
+    + ['Contrato','Banco','Carro','Ano','Placa','Valor (R$)','Obs',''].map(function(h){return '<th style="padding:8px 8px;color:#fff;font-size:9px;text-transform:uppercase">'+h+'</th>';}).join('')
+    + '</tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'bens\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';'+(extra||'')+'">'; }
+    html += '<tr style="border-bottom:1px solid #f0f2f8">'
+      + '<td style="padding:3px 5px">'+inp('contrato','90px')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('banco','70px')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('carro','100px')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('ano','50px')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('placa','75px','font-family:monospace;text-transform:uppercase')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('valor','90px','text-align:right')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('obs','140px')+'</td>'
+      + '<td style="padding:3px 5px;text-align:center"><button onclick="finDel(\'bens\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700">🗑</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:#EEF1FD"><td colspan="5" style="padding:9px 10px;font-weight:800;text-align:right">TOTAL FINANCIADO</td><td style="padding:9px 10px;text-align:right;font-weight:800;font-family:monospace">'+brl(total)+'</td><td colspan="2"></td></tr></tfoot>';
+  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">'+rows.length+' veículos</div>';
+  grid.innerHTML = html;
+}
+
+// ── DÍVIDA (com cálculo de saldo devedor) ────────────────────
+function finRenderDivida() {
+  var grid = document.getElementById('finGridDivida');
+  if (!grid) return;
+  var rows = db.financeiro.divida;
+  var tPrinc=0, tAmort=0, tSaldo=0, tReceita=0;
+  var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:880px">'
+    + '<thead><tr style="background:var(--dark)">'
+    + ['Banco','Contrato','Principal','Nº Parc','Amortizado','Saldo Devedor','Receita','Garantia',''].map(function(h){return '<th style="padding:8px 8px;color:#fff;font-size:9px;text-transform:uppercase">'+h+'</th>';}).join('')
+    + '</tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    var princ = Number(r.principal)||0;
+    var amort = Number(r.amortizado)||0;
+    var saldo = princ - amort;  // SALDO DEVEDOR = principal - amortizado
+    tPrinc+=princ; tAmort+=amort; tSaldo+=saldo; tReceita+=Number(r.receita)||0;
+    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'divida\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';'+(extra||'')+'">'; }
+    html += '<tr style="border-bottom:1px solid #f0f2f8">'
+      + '<td style="padding:3px 5px">'+inp('banco','85px')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('contrato','90px')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('principal','95px','text-align:right')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('parcelas','50px','text-align:center')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('amortizado','95px','text-align:right')+'</td>'
+      + '<td style="padding:3px 5px;text-align:right;font-weight:700;font-family:monospace;color:#c0392b">'+brl(saldo)+'</td>'
+      + '<td style="padding:3px 5px">'+inp('receita','85px','text-align:right')+'</td>'
+      + '<td style="padding:3px 5px">'+inp('garantia','90px')+'</td>'
+      + '<td style="padding:3px 5px;text-align:center"><button onclick="finDel(\'divida\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700">🗑</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800">'
+    + '<td colspan="2" style="padding:9px 10px">TOTAIS</td>'
+    + '<td style="padding:9px 10px;text-align:right;font-family:monospace">'+brl(tPrinc)+'</td>'
+    + '<td></td>'
+    + '<td style="padding:9px 10px;text-align:right;font-family:monospace">'+brl(tAmort)+'</td>'
+    + '<td style="padding:9px 10px;text-align:right;font-family:monospace;color:#c0392b">'+brl(tSaldo)+'</td>'
+    + '<td style="padding:9px 10px;text-align:right;font-family:monospace;color:#0d7a3e">'+brl(tReceita)+'</td>'
+    + '<td colspan="2"></td></tr></tfoot>';
+  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">Saldo Devedor = Principal − Amortizado · '+rows.length+' financiamentos</div>';
+  grid.innerHTML = html;
+}
+
+// ── EDIÇÃO / ADIÇÃO / EXCLUSÃO ───────────────────────────────
+function finEdit(aba, idx, campo, valor) {
+  finInit();
+  var numericos = ['valor','principal','amortizado','receita','parcelas','cet','valorParcela'];
+  if (numericos.indexOf(campo)>=0) valor = finParse(valor);
+  db.financeiro[aba][idx][campo] = valor;
+  saveDB();
+  finRender(aba);
+}
+function finAddLinha(aba) {
+  finInit();
+  var nova = aba==='acertos' ? {data:new Date().toISOString().split('T')[0],valor:0,banco:''}
+    : aba==='bens' ? {contrato:'',banco:'',carro:'',ano:'',placa:'',valor:0,obs:''}
+    : {banco:'',contrato:'',principal:0,parcelas:0,amortizado:0,receita:0,garantia:''};
+  db.financeiro[aba].push(nova);
+  saveDB();
+  finRender(aba);
+  toast('✅ Linha adicionada','#0d7a3e');
+}
+function finDel(aba, idx) {
+  if (!confirm('Excluir esta linha?')) return;
+  finInit();
+  db.financeiro[aba].splice(idx,1);
+  saveDB();
+  finRender(aba);
+  toast('🗑 Linha excluída','#c0392b');
+}
 
 function abrirChecklistVeiculo(vId) {
   var v = (db.veiculos||[]).find(function(x){ return x && x.id===vId; });
