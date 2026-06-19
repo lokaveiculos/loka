@@ -394,6 +394,13 @@ tr:hover td{background:#f8f9fe;}
           <option value="concluida">✅ Concluída</option>
           <option value="orcamento">📋 Orçamento</option>
         </select>
+        <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">📅 De</span>
+          <input class="filter-input" id="fManutDataIni" type="date" onchange="renderManutencao()" style="width:140px;padding:5px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">até</span>
+          <input class="filter-input" id="fManutDataFim" type="date" onchange="renderManutencao()" style="width:140px;padding:5px">
+          <button onclick="limparFiltroDataManut()" title="Limpar datas" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
+        </div>
         <button class="btn btn-blue" onclick="openManutRegistro(null)">+ Nova Manutenção</button>
         <button class="btn btn-outline" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
         <button class="btn btn-outline" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
@@ -3241,10 +3248,15 @@ function renderManutencao() {
   if (!db.manutencoes) db.manutencoes = [];
   var q  = (document.getElementById('qManut').value||'').toLowerCase();
   var fs = document.getElementById('fManutStatus').value;
+  var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
+  var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
   var list = db.manutencoes.filter(function(m) {
     if (!m) return false;
     if (fs && m.status !== fs) return false;
     if (_manutFiltroVeiculo && m.veiculoId !== _manutFiltroVeiculo && m.placa !== _manutFiltroVeiculo) return false;
+    // Filtro por intervalo de data (usa a data de entrada da manutenção)
+    if (dataIni && (!m.data || m.data < dataIni)) return false;
+    if (dataFim && (!m.data || m.data > dataFim)) return false;
     if (!q) return true;
     return (m.veiculoNome+' '+m.placa+' '+(m.oficina||'')+' '+(m.descricao||'')).toLowerCase().indexOf(q) >= 0;
   });
@@ -3321,6 +3333,13 @@ function renderManutencao() {
       + '</div>');
   }
 }
+
+function limparFiltroDataManut() {
+  var i = document.getElementById('fManutDataIni'); if(i) i.value='';
+  var f = document.getElementById('fManutDataFim'); if(f) f.value='';
+  renderManutencao();
+}
+
 
 function openManutRegistro(id) {
   _manutEditId = id;
