@@ -223,6 +223,9 @@ tr.vsel .veic-fin { pointer-events: auto; }
 
   /* CORREÇÃO CRÍTICA: só ocultar linhas NÃO selecionadas da tabela de veículos */
   .veic-table tbody tr:not(.vsel) { display: none !important; }
+  .veic-table tbody tr { page-break-inside: avoid !important; }
+  .veic-table tfoot { display: table-row-group !important; }
+  .veic-table tbody td { white-space: nowrap !important; }
 
   /* Veic table — compactar para caber no A4 */
   .veic-table-wrap { overflow: visible !important; border: 1px solid #ccc !important; }
@@ -230,13 +233,15 @@ tr.vsel .veic-fin { pointer-events: auto; }
   .veic-table .chk-cell { display: none !important; width: 0 !important; }
   .veic-table thead th { padding: 5px 6px !important; font-size: 8px !important; }
   .veic-table tbody td { padding: 5px 6px !important; }
-  .veic-table thead th:nth-child(2) { width: 32% !important; }  /* Veículo */
-  .veic-table thead th:nth-child(3) { width: 12% !important; }  /* Placa */
-  .veic-table thead th:nth-child(4) { width: 10% !important; }  /* Status */
+  .veic-table thead th:nth-child(2) { width: 26% !important; }  /* Veículo */
+  .veic-table thead th:nth-child(3) { width: 11% !important; }  /* Placa */
+  .veic-table thead th:nth-child(4) { width: 9% !important;  }  /* Status */
   .veic-table thead th:nth-child(5) { width: 8% !important;  }  /* Qtd */
-  .veic-table thead th:nth-child(6) { width: 15% !important; }  /* Valor Unit */
-  .veic-table thead th:nth-child(7) { width: 12% !important; }  /* Seguro */
-  .veic-table thead th:nth-child(8) { width: 11% !important; }  /* Subtotal */
+  .veic-table thead th:nth-child(6) { width: 12% !important; }  /* Valor Unit */
+  .veic-table thead th:nth-child(7) { width: 11% !important; }  /* Seguro */
+  .veic-table thead th:nth-child(8) { width: 11% !important; }  /* Desconto */
+  .veic-table thead th:nth-child(9) { width: 12% !important; }  /* Subtotal */
+  .veic-table thead th, .veic-table tbody td { word-break: normal !important; overflow: hidden !important; }
   .veic-fin { font-size: 10px !important; padding: 2px 0 !important; }
   .placa-badge { font-size: 8px !important; padding: 1px 4px !important; }
   .st-badge { font-size: 8px !important; padding: 1px 4px !important; }
@@ -786,12 +791,18 @@ function stBadge(st) {
   return map[st] || '<span class="st-badge">'+st+'</span>';
 }
 
+var _veicExibidos = [];
 function renderVeiculosArea(lista) {
   var area = document.getElementById('veiculosArea');
+  // Limpar seleção ao trocar a lista exibida (índices mudam)
+  _veicSelecionados.clear();
+  if (typeof atualizarContadorVeic==='function') atualizarContadorVeic();
   if (!lista || !lista.length) {
-    area.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:16px 0">Nenhum veículo cadastrado no banco de dados.</p>';
+    area.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:16px 0">Nenhum veículo para exibir.</p>';
+    _veicExibidos = [];
     return;
   }
+  _veicExibidos = lista;
 
   var rows = lista.map(function(v, i) {
     var mensal = v.mensal || 0;
@@ -827,8 +838,7 @@ function renderVeiculosArea(lista) {
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
     + '<tfoot><tr>'
-    + '<td colspan="6" class="total-lbl">Total dos veículos selecionados</td>'
-    + '<td></td>'
+    + '<td colspan="8" class="total-lbl">Total dos veículos selecionados</td>'
     + '<td class="total-val" id="veicTotalDisplay">R$ 0,00</td>'
     + '</tr></tfoot>'
     + '</table></div>';
@@ -1037,7 +1047,7 @@ function salvarFatura() {
   var num   = document.getElementById('faturaNum').value;
   var cli   = _clienteSelecionado;
   var total = document.getElementById('totalDisplay').textContent;
-  var veics = Array.from(_veicSelecionados).map(function(i){return _veiculos[i];}).filter(Boolean);
+  var veics = Array.from(_veicSelecionados).map(function(i){return _veicExibidos[i];}).filter(Boolean);
 
   if (!cli)  { status('⚠️ Selecione um cliente antes de salvar', '#b45309'); return; }
   if (!num)  { status('⚠️ Informe o número da fatura', '#b45309'); return; }
@@ -1058,7 +1068,7 @@ function salvarFatura() {
     veiculos: veics.map(function(v){return v.marca+' '+v.modelo+' '+v.placa;}),
     // Detalhamento por veículo (formato G7 com desconto)
     veiculosDetalhado: Array.from(_veicSelecionados).map(function(i){
-      var v = _veiculos[i]; if(!v) return null;
+      var v = _veicExibidos[i]; if(!v) return null;
       return {
         carro:    v.marca+' '+v.modelo,
         placa:    v.placa,
