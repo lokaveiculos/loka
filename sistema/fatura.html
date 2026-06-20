@@ -658,6 +658,7 @@ function carregarDados() {
     if (data) {
       _clients  = data.clients  || [];
       _veiculos = data.veiculos || [];
+      _ativos   = data.ativos   || [];
     }
     renderVeiculosArea(_veiculos);
   }).catch(function(e) {
@@ -665,7 +666,7 @@ function carregarDados() {
     // Tenta localStorage
     try {
       const local = JSON.parse(localStorage.getItem('loka_db') || 'null');
-      if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; }
+      if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; _ativos=local.ativos||[]; }
     } catch(e2) {}
     renderVeiculosArea(_veiculos);
   });
@@ -729,8 +730,42 @@ function selecionarCliente(idx) {
   var periodo = document.getElementById('periodoRef').value;
   var nomeMes = periodo ? new Date(periodo+'-01').toLocaleString('pt-BR',{month:'long',year:'numeric'}) : '';
   document.getElementById('refMensal').placeholder = 'Mensalidade ' + nomeMes;
+  // Filtrar veículos alugados a este cliente
+  filtrarVeiculosDoCliente(c);
   // Carrega faturas anteriores do cliente
   if (c.id) carregarFaturasCliente(c.id);
+}
+
+function filtrarVeiculosDoCliente(c) {
+  if (!c) { renderVeiculosArea(_veiculos); return; }
+  // Buscar contratos ativos do cliente
+  var placasCliente = {};
+  (_ativos||[]).forEach(function(a) {
+    if (!a) return;
+    var mesmoCliente = (a.clienteNome===c.nome) || (c.id && a.clienteId===c.id);
+    if (!mesmoCliente) return;
+    if (a.placa) placasCliente[a.placa.toUpperCase()] = true;
+    if (a.placas) a.placas.forEach(function(p){ if(p) placasCliente[p.toUpperCase()] = true; });
+  });
+
+  var veicCliente = (_veiculos||[]).filter(function(v){
+    return v && v.placa && placasCliente[v.placa.toUpperCase()];
+  });
+
+  var area = document.getElementById('veiculosArea');
+  if (!veicCliente.length) {
+    // Sem veículos vinculados — oferecer ver todos
+    area.innerHTML = '<div style="padding:16px;text-align:center;background:#fff8e1;border-radius:8px;font-size:12px;color:#b45309">'
+      + '⚠️ Nenhum veículo alugado encontrado para <strong>'+c.nome+'</strong>.<br>'
+      + '<button onclick="renderVeiculosArea(_veiculos)" style="margin-top:8px;padding:6px 14px;background:#2B4BF2;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">Mostrar todos os veículos</button></div>';
+    return;
+  }
+  renderVeiculosArea(veicCliente);
+  // Botão para ver todos, caso precise
+  var btn = document.createElement('div');
+  btn.style.cssText = 'margin-top:8px;text-align:center';
+  btn.innerHTML = '<button onclick="renderVeiculosArea(_veiculos)" style="padding:5px 12px;background:none;border:1px solid #d5dae8;color:var(--muted);border-radius:6px;font-size:10px;cursor:pointer">+ Mostrar todos os veículos</button>';
+  area.appendChild(btn);
 }
 function limparCliente() {
   _clienteSelecionado = null;
