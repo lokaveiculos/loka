@@ -466,8 +466,9 @@ tr:hover td{background:#f8f9fe;}
 
       <!-- ABA BENS -->
       <div id="finAbaBens" style="display:none">
-        <div class="toolbar" style="margin-bottom:10px">
-          <div style="flex:1"><strong style="font-size:13px;color:var(--dark)">Relação de Bens Financiados</strong><div style="font-size:10px;color:var(--muted)">Veículos por contrato (Bradesco/Itaú)</div></div>
+        <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="flex:1;min-width:160px"><strong style="font-size:13px;color:var(--dark)">Relação de Bens Financiados</strong><div style="font-size:10px;color:var(--muted)">Veículos por contrato (Bradesco/Itaú)</div></div>
+          <input class="filter-input" id="qBens" type="text" placeholder="🔍 Contrato, carro ou placa..." oninput="finRenderBens()" style="min-width:200px">
           <button class="btn btn-outline" onclick="finRestaurarSeed('bens')" style="font-size:11px" title="Recarregar dados originais da planilha">🔄 Restaurar Original</button>
           <button class="btn btn-blue" onclick="finAddLinha('bens')">+ Novo Bem</button>
         </div>
@@ -3924,12 +3925,24 @@ function finRenderBens() {
   var grid = document.getElementById('finGridBens');
   if (!grid) return;
   var rows = db.financeiro.bens;
-  var total = rows.reduce(function(s,r){ return s+(Number(r.valor)||0); },0);
+  var q = (document.getElementById('qBens')&&document.getElementById('qBens').value||'').toLowerCase().trim();
+
+  // Filtrar por contrato, carro ou placa — preservando o índice real (i) para edição
+  var visiveis = rows.map(function(r,i){ return {r:r,i:i}; }).filter(function(o){
+    if (!q) return true;
+    var r = o.r;
+    return ((r.contrato||'')+' '+(r.carro||'')+' '+(r.placa||'')).toLowerCase().indexOf(q) >= 0;
+  });
+
+  var totalFiltrado = visiveis.reduce(function(s,o){ return s+(Number(o.r.valor)||0); },0);
+  var totalGeral = rows.reduce(function(s,r){ return s+(Number(r.valor)||0); },0);
+
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:820px">'
     + '<thead><tr style="background:#0E1B4D">'
     + ['Contrato','Banco','Carro','Ano','Placa','Valor (R$)','Observação',''].map(finTH).join('')
     + '</tr></thead><tbody>';
-  rows.forEach(function(r,i){
+  visiveis.forEach(function(o){
+    var r = o.r, i = o.i;
     function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'bens\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
     html += '<tr style="border-bottom:1px solid #f0f2f8">'
       + '<td style="padding:3px 5px">'+inp('contrato','90px')+'</td>'
@@ -3942,12 +3955,14 @@ function finRenderBens() {
       + '<td style="padding:3px 5px;text-align:center"><button onclick="finDel(\'bens\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700">🗑</button></td>'
       + '</tr>';
   });
-  html += '</tbody><tfoot><tr style="background:#EEF1FD"><td colspan="5" style="padding:9px 10px;font-weight:800;text-align:right;color:#0E1B4D">TOTAL FINANCIADO</td><td style="padding:9px 10px;text-align:right;font-weight:800;font-family:monospace;color:#0E1B4D">'+brl(total)+'</td><td colspan="2"></td></tr></tfoot>';
-  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">'+rows.length+' veículos</div>';
+  if (!visiveis.length) {
+    html += '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhum bem encontrado para "'+q+'"</td></tr>';
+  }
+  html += '</tbody><tfoot><tr style="background:#EEF1FD"><td colspan="5" style="padding:9px 10px;font-weight:800;text-align:right;color:#0E1B4D">'+(q?'TOTAL FILTRADO':'TOTAL FINANCIADO')+'</td><td style="padding:9px 10px;text-align:right;font-weight:800;font-family:monospace;color:#0E1B4D">'+brl(q?totalFiltrado:totalGeral)+'</td><td colspan="2"></td></tr></tfoot>';
+  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">'+(q ? visiveis.length+' de '+rows.length+' veículos' : rows.length+' veículos')+'</div>';
   grid.innerHTML = html;
 }
 
-// ── DÍVIDA (17 colunas, com fórmulas) ────────────────────────
 function finRenderDivida() {
   var grid = document.getElementById('finGridDivida');
   if (!grid) return;
