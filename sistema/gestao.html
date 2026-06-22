@@ -469,6 +469,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <div style="flex:1;min-width:160px"><strong style="font-size:13px;color:var(--dark)">Relação de Bens Financiados</strong><div style="font-size:10px;color:var(--muted)">Veículos por contrato (Bradesco/Itaú)</div></div>
           <input class="filter-input" id="qBens" type="text" placeholder="🔍 Contrato, carro ou placa..." oninput="finRenderBens()" style="min-width:200px">
+          <button class="btn btn-outline" onclick="finAtualizarObsBens()" style="font-size:11px" title="Atualizar apenas a coluna Observação">📝 Atualizar Obs</button>
           <button class="btn btn-outline" onclick="finRestaurarSeed('bens')" style="font-size:11px" title="Recarregar dados originais da planilha">🔄 Restaurar Original</button>
           <button class="btn btn-blue" onclick="finAddLinha('bens')">+ Novo Bem</button>
         </div>
@@ -3921,6 +3922,25 @@ function finRenderAcertos() {
 }
 
 // ── BENS ─────────────────────────────────────────────────────
+// ── ATUALIZAR OBSERVAÇÕES DOS BENS (por placa) ──────────────
+function finAtualizarObsBens() {
+  if (!confirm('Atualizar a coluna OBSERVAÇÃO de todos os bens conforme a planilha mais recente?\n\nIsso ajusta apenas as observações, mantendo o resto dos dados.')) return;
+  finInit();
+  var mapaObs = {};
+  FIN_SEED_BENS.forEach(function(b){ if(b.placa) mapaObs[b.placa.toUpperCase().trim()] = b.obs; });
+  var atualizados = 0;
+  db.financeiro.bens.forEach(function(b){
+    if (b && b.placa) {
+      var key = b.placa.toUpperCase().trim();
+      if (mapaObs.hasOwnProperty(key)) { b.obs = mapaObs[key]; atualizados++; }
+    }
+  });
+  saveDB();
+  finRenderBens();
+  toast('✅ '+atualizados+' observações atualizadas','#0d7a3e');
+}
+
+
 function finRenderBens() {
   var grid = document.getElementById('finGridBens');
   if (!grid) return;
