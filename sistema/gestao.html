@@ -451,6 +451,7 @@ tr:hover td{background:#f8f9fe;}
         <button id="finTabBens"    class="btn btn-outline" onclick="finMostrarAba('bens')"     style="font-size:11px;padding:8px 14px">🚙 Relação de Bens</button>
         <button id="finTabDivida"  class="btn btn-outline" onclick="finMostrarAba('divida')"   style="font-size:11px;padding:8px 14px">📊 Endividamento</button>
         <button id="finTabReceber" class="btn btn-outline" onclick="finMostrarAba('receber')"  style="font-size:11px;padding:8px 14px">💰 Contas a Receber</button>
+        <button id="finTabPagar"   class="btn btn-outline" onclick="finMostrarAba('pagar')"    style="font-size:11px;padding:8px 14px">📤 Contas a Pagar</button>
       </div>
 
       <!-- ABA ACERTOS -->
@@ -514,6 +515,37 @@ tr:hover td{background:#f8f9fe;}
         </div>
         <div class="stats" id="receberStats" style="margin-bottom:12px"></div>
         <div id="finGridReceber"></div>
+      </div>
+
+      <!-- ABA CONTAS A PAGAR -->
+      <div id="finAbaPagar" style="display:none">
+        <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="flex:1;min-width:160px"><strong style="font-size:13px;color:var(--dark)">Contas a Pagar</strong><div style="font-size:10px;color:var(--muted)">Despesas e pagamentos a fornecedores</div></div>
+          <input class="filter-input" id="qPagar" type="text" placeholder="🔍 Fornecedor ou placa..." oninput="finRenderPagar()" style="min-width:160px">
+          <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+            <span style="font-size:10px;font-weight:700;color:var(--muted)">📅</span>
+            <input class="filter-input" id="pagDataIni" type="date" onchange="finRenderPagar()" style="width:130px;padding:5px">
+            <span style="font-size:10px;color:var(--muted)">até</span>
+            <input class="filter-input" id="pagDataFim" type="date" onchange="finRenderPagar()" style="width:130px;padding:5px">
+            <button onclick="finLimparDataPagar()" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">✕</button>
+          </div>
+          <select class="filter-sel" id="pagStatus" onchange="finRenderPagar()">
+            <option value="">Todos status</option>
+            <option value="pendente">⏳ Pendentes</option>
+            <option value="pago">✅ Pagos</option>
+          </select>
+          <select class="filter-sel" id="pagOrdenar" onchange="finRenderPagar()">
+            <option value="">Ordenar por...</option>
+            <option value="fornecedor">Fornecedor (A-Z)</option>
+            <option value="venc">Vencimento (antigo→novo)</option>
+            <option value="venc_desc">Vencimento (novo→antigo)</option>
+            <option value="valor">Maior valor</option>
+          </select>
+          <button class="btn btn-outline" onclick="finRestaurarSeed('pagar')" style="font-size:11px" title="Limpar tudo">🔄 Restaurar</button>
+          <button class="btn" style="background:#c0392b;color:#fff" onclick="finAddLinha('pagar')">+ Nova Conta</button>
+        </div>
+        <div class="stats" id="pagarStats" style="margin-bottom:12px"></div>
+        <div id="finGridPagar"></div>
       </div>
     </div>
     <!-- ══ FORMULÁRIOS ══ -->
@@ -3814,6 +3846,7 @@ var FIN_SEED_ACERTOS = [{"data": "2026-01-12", "valor": 53000, "banco": "Bradesc
 var FIN_SEED_BENS = [{"contrato": "2917539471", "banco": "Bradesco", "carro": "Renegade", "ano": "22/23", "placa": "RVI0D04", "valor": 95000.0, "obs": "ok"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RVD8J06", "valor": 70000.0, "obs": "Substituiu RUQ0G09"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Polo Track", "ano": "24/24", "placa": "STF4F32", "valor": 65000.0, "obs": "ok"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Polo Track", "ano": "23/23", "placa": "FYQ2B92", "valor": 65000.0, "obs": "ok"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "HB20", "ano": "23/24", "placa": "FCN9G63", "valor": 60000.0, "obs": "Substituiu HB20 SHP2B83"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Onix Plus MT", "ano": "22/23", "placa": "EUE8A81", "valor": 55000.0, "obs": "Substituiu Onix Plus RUV5G98"}, {"contrato": "2917539471", "banco": "Bradesco", "carro": "Onix LT", "ano": "23/24", "placa": "SIO9A51", "valor": 55000.0, "obs": "Substituiu Onix SIO9A51"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Mobi", "ano": "22/23", "placa": "RUZ9J78", "valor": 46000.0, "obs": "ok"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHV7B26", "valor": 46000.0, "obs": "ok"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Mobi", "ano": "22/23", "placa": "RVO7F21", "valor": 46000.0, "obs": "Substituiu Mobi RVO7F21"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Gol", "ano": "21/22", "placa": "RBV3F29", "valor": 44000.0, "obs": "Substituiu Gol RBV3F29"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "SCO5B72", "valor": 46000.0, "obs": "ok"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Montana", "ano": "23/24", "placa": "SIM2G50", "valor": 100000.0, "obs": "Substituiu RCJ2B03/SHO1J60/RNR2F30"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Fiorino", "ano": "20/21", "placa": "RCY8H74", "valor": 65000.0, "obs": "ok"}, {"contrato": "2917207630", "banco": "Bradesco", "carro": "Spin", "ano": "23/24", "placa": "SEV0J14", "valor": 74000.0, "obs": "Substituiu RME4H44/RVS9D71"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Strada", "ano": "22/23", "placa": "RVO5A91", "valor": 65000.0, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHW9G83", "valor": 50000.0, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHW9G84", "valor": 50000.0, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Mobi", "ano": "23/23", "placa": "SHG3D40", "valor": 50000.0, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "C3", "ano": "22/23", "placa": "RVV7E29", "valor": 56000.0, "obs": "EYA5J14"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "EXN2A36", "valor": 65000.0, "obs": "SYQ2A52"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "HB20", "ano": "23/24", "placa": "SJC3A29", "valor": 65000.0, "obs": "EYA5J14"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "FCH1I73", "valor": 67000.0, "obs": "SUBST ONIX SJA7D59"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Onix Plus LTZ", "ano": "22/23", "placa": "RVC9A19", "valor": 75000.0, "obs": "ok"}, {"contrato": "2918912281", "banco": "Bradesco", "carro": "Onix Plus LTZ", "ano": "22/23", "placa": "RUQ2J15", "valor": 75000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "EQQ2J61", "valor": 50000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "GIR7i93", "valor": 50000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "DFT8I72", "valor": 50000.0, "obs": "QNH1J95"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "FOY3F87", "valor": 50000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GCi9i23", "valor": 63000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FDZ9G34", "valor": 63000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FVJ7F62", "valor": 63000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RTE3J85", "valor": 63000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FCC6E35", "valor": 63000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RTE3J75", "valor": 63000.0, "obs": "ok"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RTE3j91", "valor": 63000.0, "obs": "SUBSTITUIR"}, {"contrato": "2919297963", "banco": "Bradesco", "carro": "Strada", "ano": "21/22", "placa": "RNU7E72", "valor": 63000.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GCQ2G23", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GJO0D71", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "FTI3F81", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "GEZ8H54", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "RPR1G73", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RUE5F30", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RUE5F40", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RUE5F24", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GJU9H02", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920001274", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "GEH4i81", "valor": 67500.0, "obs": "ok"}, {"contrato": "2920448163", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "FLR6J14", "valor": 65000.0, "obs": "ok"}, {"contrato": "2920448163", "banco": "Bradesco", "carro": "Fiorino", "ano": "21/21", "placa": "RDK5G66", "valor": 65000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SIC2G45", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHU8B53", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHH1C11", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHG1J02", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "23/23", "placa": "SHF6F29", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVT2A34", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVT2A32", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVT1A74", "valor": 72000.0, "obs": "ok"}, {"contrato": "28798367", "banco": "Itaú", "carro": "Saveiro", "ano": "22/23", "placa": "RVD9I67", "valor": 72000.0, "obs": "ok"}, {"contrato": "2917050154", "banco": "Bradesco", "carro": "Gol", "ano": "22/23", "placa": "RUE0E26", "valor": 65000.0, "obs": "Substituiu 2008 RTO6B55"}, {"contrato": "2916787056", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RND5I98", "valor": 51000.0, "obs": "ok"}, {"contrato": "2916787056", "banco": "Bradesco", "carro": "Saveiro", "ano": "21/22", "placa": "RMP0A86", "valor": 51000.0, "obs": "ok"}, {"contrato": "2916787056", "banco": "Bradesco", "carro": "SAVEIRO", "ano": "21/22", "placa": "RML9D09", "valor": 50000.0, "obs": "substituiu RFE8D72"}, {"contrato": "2916578848", "banco": "Bradesco", "carro": "Fiorino", "ano": "24/24", "placa": "SYO1G57", "valor": 100000.0, "obs": "substituiu T-Cross FFQ7C42"}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Argo", "ano": "23/24", "placa": "SIL2E59", "valor": 65000.0, "obs": "ok"}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Peugeot 208", "ano": "22/23", "placa": "RVN9D70", "valor": 65000.0, "obs": "ok"}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Peugeot 208", "ano": "23/23", "placa": "SIA6F77", "valor": 55000.0, "obs": "ok"}, {"contrato": "2918060463", "banco": "Bradesco", "carro": "Saveiro", "ano": "22/23", "placa": "RVD9I71", "valor": 55000.0, "obs": "substituiu HB20 RVE9D75"}, {"contrato": "2918527070", "banco": "Bradesco", "carro": "Saveiro", "ano": "23/23", "placa": "EJD9E52", "valor": 158000.0, "obs": "Substituiu S10 RPC9F55"}, {"contrato": "2918527070", "banco": "Bradesco", "carro": "Saveiro", "ano": "24/24", "placa": "SDF3C81", "valor": 0, "obs": "Substituiu S10 RPC9F55"}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "23/23", "placa": "FCQ8B73", "valor": 0, "obs": "ok"}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "23/23", "placa": "EBL7E41", "valor": 0, "obs": "ok"}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "23/23", "placa": "EKU9D72", "valor": 0, "obs": "ok"}, {"contrato": "CG Bradesco", "banco": "Bradesco", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RVD9I55", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUI8I24", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUJ4A55", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUL7A99", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUL7B03", "valor": 0, "obs": "PT"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUP3D82", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUP8F63", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUT7D45", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RUX8G52", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RVD9I60", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "22/23", "placa": "RVT2A51", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHF6F23", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHF6F28", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHH6B15", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SHU8B66", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G39", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G42", "valor": 0, "obs": "CARLOS JT"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G46", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G48", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G51", "valor": 0, "obs": "ok"}, {"contrato": "29418875", "banco": "Itaú", "carro": "Saveiro Baú", "ano": "23/23", "placa": "SIC2G52", "valor": 0, "obs": "ok"}];
 var FIN_SEED_DIVIDA = [{"banco": "Bradesco Fin", "contrato": "2916787056", "principal": 158044.63, "liberacao": "2024-11-13", "primParcela": "2024-12-25", "ultParcela": "2028-11-25", "pago": 18, "totParcelas": 48, "cet": 0.0148, "sistema": "Price", "valorParcela": 4643.31, "amortizado": 47129.91, "garantia": "2 Saveiros/strada", "receita": 8400}, {"banco": "Bradesco Fin", "contrato": "2917050154", "principal": 69386.85, "liberacao": "2024-12-19", "primParcela": "2025-01-19", "ultParcela": "2028-12-19", "pago": 17, "totParcelas": 48, "cet": 0.0174, "sistema": "Price", "valorParcela": 2153.42, "amortizado": 18529.56, "garantia": "Gol 2023", "receita": 2500}, {"banco": "Bradesco Fin", "contrato": "2917207630", "principal": 478301.72, "liberacao": "2025-01-09", "primParcela": "2025-02-17", "ultParcela": "2029-01-17", "pago": 16, "totParcelas": 48, "cet": 0.0148, "sistema": "Price", "valorParcela": 14052.41, "amortizado": 124859.73, "garantia": "Diversos 9 carro", "receita": 14300}, {"banco": "BV", "contrato": "920312070", "principal": 141000, "liberacao": "2024-10-03", "primParcela": "2024-11-03", "ultParcela": "2028-10-03", "pago": 19, "totParcelas": 48, "cet": 0.017, "sistema": "Price", "valorParcela": 4297.77, "amortizado": 47594.14, "garantia": "3 Mobis", "receita": 6900}, {"banco": "Bradesco Fin", "contrato": "2916578848", "principal": 100000, "liberacao": "2024-10-18", "primParcela": "2024-11-16", "ultParcela": "2028-10-16", "pago": 19, "totParcelas": 48, "cet": 0.017, "sistema": "Price", "valorParcela": 3061.24, "amortizado": 30229.21, "garantia": "T-Cross", "receita": 3000}, {"banco": "Bradesco Fin", "contrato": "2917539471", "principal": 465000, "liberacao": "2025-02-11", "primParcela": "2025-03-11", "ultParcela": "2029-02-11", "pago": 15, "totParcelas": 48, "cet": 0.0159, "sistema": "Price", "valorParcela": 13903.38, "amortizado": 109302.26, "garantia": "7 Diversos ", "receita": 12000}, {"banco": "Bradesco Fin", "contrato": "2918060463", "principal": 240000, "liberacao": "2025-03-29", "primParcela": "2025-04-29", "ultParcela": "2029-03-29", "pago": 14, "totParcelas": 48, "cet": 0.0144, "sistema": "Price", "valorParcela": 7225.83, "amortizado": 58013.75, "garantia": "4 DIVERSOS", "receita": 10300}, {"banco": "Bradesco Fin", "contrato": "2918527078", "principal": 158000, "liberacao": "2025-05-07", "primParcela": "2025-06-07", "ultParcela": "2029-05-07", "pago": 12, "totParcelas": 48, "cet": 0.0144, "sistema": "Price", "valorParcela": 4897.01, "amortizado": 34077.06, "garantia": "S10 2022", "receita": 8000}, {"banco": "Bradesco Fin", "contrato": "2918912281", "principal": 618000, "liberacao": "2025-06-17", "primParcela": "2025-08-01", "ultParcela": "2029-07-01", "pago": 10, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 18831.9, "amortizado": 105110.88, "garantia": "10 Diversos ", "receita": 50000}, {"banco": "Bradesco Fin", "contrato": "J Carlos ", "principal": 129980, "liberacao": "2022-11-30", "primParcela": "2022-12-30", "ultParcela": "2026-11-30", "pago": 42, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 3985.82, "amortizado": 0, "garantia": "2 Mobis", "receita": 4600}, {"banco": "Bradesco Fin", "contrato": "2919297963", "principal": 704000, "liberacao": "2025-07-04", "primParcela": "2025-08-17", "ultParcela": "2029-07-17", "pago": 10, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 21155.9, "amortizado": 116905.827, "garantia": "10 diversos", "receita": 25000}, {"banco": "Bradesco Fin", "contrato": "4217013747", "principal": 460000, "liberacao": "2025-07-28", "primParcela": "2025-08-28", "ultParcela": "2027-07-28", "pago": 10, "totParcelas": 24, "cet": 0.0145, "sistema": "Price", "valorParcela": 23903.45, "amortizado": 184025.36, "garantia": "2 Ranger XLT", "receita": 4500}, {"banco": "Bradesco Fin", "contrato": "2920001274", "principal": 675000, "liberacao": "2025-08-27", "primParcela": "2025-09-27", "ultParcela": "2029-08-27", "pago": 9, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 20406.26, "amortizado": 101303.51, "garantia": "10 saveiros", "receita": 30000}, {"banco": "Bradesco Fin", "contrato": "2920448163", "principal": 137606.06, "liberacao": "2025-09-24", "primParcela": "2025-10-24", "ultParcela": "2029-09-24", "pago": 8, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 4019.49, "amortizado": 17038.68, "garantia": "saveiro/fiorino", "receita": 5800}, {"banco": "Itau", "contrato": "28798367", "principal": 675535.5, "liberacao": "2025-09-29", "primParcela": "2025-10-29", "ultParcela": "2029-09-29", "pago": 8, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 19718.21, "amortizado": 83531.27, "garantia": "9 Saveiros", "receita": 27000}, {"banco": "Itau", "contrato": "29418875", "principal": 1262296.13, "liberacao": "2025-11-10", "primParcela": "2025-12-26", "ultParcela": "2029-11-26", "pago": 6, "totParcelas": 48, "cet": 0.0145, "sistema": "Price", "valorParcela": 37100.55, "amortizado": 116952.2, "garantia": "20 saveiros", "receita": 60000}, {"banco": "Itau Melina", "contrato": "29651382", "principal": 119528.12, "liberacao": "2025-12-01", "primParcela": "2025-12-31", "ultParcela": "2029-12-01", "pago": 6, "totParcelas": 48, "cet": 0.0146, "sistema": "Price", "valorParcela": 3466.23, "amortizado": 10711.06, "garantia": "Amarok", "receita": 0}, {"banco": "Cartao Itaú Rogel", "contrato": "", "principal": 118425, "liberacao": "2026-01-27", "primParcela": "2026-02-06", "ultParcela": "2027-01-06", "pago": 4, "totParcelas": 12, "cet": 0, "sistema": "Price", "valorParcela": 9868.75, "amortizado": 39475, "garantia": "2 saveiros", "receita": 0}, {"banco": "Cartao Itaú Rogel", "contrato": "", "principal": 62892, "liberacao": "2026-02-27", "primParcela": "2026-04-06", "ultParcela": "2027-03-26", "pago": 2, "totParcelas": 12, "cet": 0, "sistema": "Price", "valorParcela": 5241, "amortizado": 10482, "garantia": "1 saveiro", "receita": 0}];
 var FIN_SEED_RECEBER = [{"cliente": "Jeandson", "valor": 5500.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Nonato", "valor": 730.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Rodrigo Gesso", "valor": 2950.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Amon", "valor": 8270.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Darlan", "valor": 5173.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Rodrigo Benção", "valor": 1290.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Transsouza", "valor": 238417.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "RSC", "valor": 92320.0, "vencimento": "", "historico": "3620 dif fatura+ 37000 avarias", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "G7", "valor": 353034.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "BRJ", "valor": 10050.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Diversos", "valor": 20677.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Pericles venc 11", "valor": 3750.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Elsinho Venc 08", "valor": 6500.0, "vencimento": "", "historico": "", "status": "pendente", "recebidoEm": "", "recebido": 0}, {"cliente": "Danilo Venc 13", "valor": 5000.0, "vencimento": "", "historico": "Pagando sempre no final do mês", "status": "pendente", "recebidoEm": "", "recebido": 0}];
+var FIN_SEED_PAGAR = [];
 
 function finInit() {
   if (!db.financeiro) db.financeiro = {};
@@ -3821,12 +3854,13 @@ function finInit() {
   if (!db.financeiro.bens    || !db.financeiro.bens.length)    db.financeiro.bens    = FIN_SEED_BENS.slice();
   if (!db.financeiro.divida  || !db.financeiro.divida.length)  db.financeiro.divida  = FIN_SEED_DIVIDA.slice();
   if (!db.financeiro.receber || !db.financeiro.receber.length) db.financeiro.receber = FIN_SEED_RECEBER.slice();
+  if (!db.financeiro.pagar) db.financeiro.pagar = FIN_SEED_PAGAR.slice();
 }
 
 var _finAbaAtual = 'acertos';
 function finMostrarAba(aba) {
   _finAbaAtual = aba;
-  ['Acertos','Bens','Divida','Receber'].forEach(function(a){
+  ['Acertos','Bens','Divida','Receber','Pagar'].forEach(function(a){
     var el = document.getElementById('finAba'+a);
     if (el) el.style.display = 'none';
     var tab = document.getElementById('finTab'+a);
@@ -3839,6 +3873,7 @@ function finMostrarAba(aba) {
   if (tab) {
     if (aba==='divida') { tab.className='btn'; tab.style.cssText='font-size:11px;padding:8px 14px;background:#b45309;color:#fff'; }
     else if (aba==='receber') { tab.className='btn btn-green'; tab.style.cssText='font-size:11px;padding:8px 14px'; }
+    else if (aba==='pagar') { tab.className='btn'; tab.style.cssText='font-size:11px;padding:8px 14px;background:#c0392b;color:#fff'; }
     else { tab.className='btn btn-blue'; tab.style.cssText='font-size:11px;padding:8px 14px'; }
   }
   finRender(aba);
@@ -3856,6 +3891,7 @@ function finRender(aba) {
   else if (aba==='bens') finRenderBens();
   else if (aba==='divida') finRenderDivida();
   else if (aba==='receber') finRenderReceber();
+  else if (aba==='pagar') finRenderPagar();
 }
 
 // ── ACERTOS ──────────────────────────────────────────────────
@@ -3982,6 +4018,7 @@ function finAddLinha(aba) {
   var nova = aba==='acertos' ? {data:new Date().toISOString().split('T')[0],valor:0,banco:''}
     : aba==='bens' ? {contrato:'',banco:'',carro:'',ano:'',placa:'',valor:0,obs:''}
     : aba==='receber' ? {cliente:'',valor:0,recebido:0,vencimento:'',historico:'',status:'pendente',recebidoEm:''}
+    : aba==='pagar' ? {vencimento:'',fornecedor:'',placa:'',valor:0,descricao:'',status:'pendente',pagoEm:''}
     : {banco:'',contrato:'',principal:0,liberacao:'',primParcela:'',ultParcela:'',pago:0,totParcelas:0,cet:0,sistema:'Price',valorParcela:0,amortizado:0,garantia:'',receita:0};
   db.financeiro[aba].push(nova);
   saveDB();
@@ -4170,6 +4207,115 @@ function finReceberParcial(idx) {
 }
 
 
+// ── CONTAS A PAGAR (filtros + dar baixa) ────────────────────
+function finLimparDataPagar() {
+  var i=document.getElementById('pagDataIni'); if(i)i.value='';
+  var f=document.getElementById('pagDataFim'); if(f)f.value='';
+  finRenderPagar();
+}
+function finRenderPagar() {
+  var grid = document.getElementById('finGridPagar');
+  if (!grid) return;
+  finInit();
+  var rows = db.financeiro.pagar;
+  var q = (document.getElementById('qPagar')&&document.getElementById('qPagar').value||'').toLowerCase();
+  var di = (document.getElementById('pagDataIni')||{}).value||'';
+  var df = (document.getElementById('pagDataFim')||{}).value||'';
+  var fst = (document.getElementById('pagStatus')||{}).value||'';
+  var ordem = (document.getElementById('pagOrdenar')||{}).value||'';
+
+  var visiveis = rows.map(function(r,idx){ return {r:r,idx:idx}; }).filter(function(o){
+    var r=o.r; if(!r) return false;
+    var st = r.status||'pendente';
+    if (fst && st!==fst) return false;
+    if (q && ((r.fornecedor||'')+' '+(r.placa||'')).toLowerCase().indexOf(q)<0) return false;
+    var dref = st==='pago' ? (r.pagoEm||r.vencimento) : r.vencimento;
+    if (di && (!dref || dref < di)) return false;
+    if (df && (!dref || dref > df)) return false;
+    return true;
+  });
+
+  if (ordem==='fornecedor') visiveis.sort(function(a,b){ return (a.r.fornecedor||'').localeCompare(b.r.fornecedor||'','pt'); });
+  else if (ordem==='venc') visiveis.sort(function(a,b){ return (a.r.vencimento||'9999').localeCompare(b.r.vencimento||'9999'); });
+  else if (ordem==='venc_desc') visiveis.sort(function(a,b){ return (b.r.vencimento||'').localeCompare(a.r.vencimento||''); });
+  else if (ordem==='valor') visiveis.sort(function(a,b){ return (Number(b.r.valor)||0)-(Number(a.r.valor)||0); });
+
+  // Stats
+  var stats = document.getElementById('pagarStats');
+  if (stats) {
+    var tPend=0, tPago=0, nPend=0, nPago=0;
+    var hoje = new Date(); hoje.setHours(0,0,0,0);
+    var nVenc=0, tVenc=0;
+    rows.forEach(function(r){
+      if(!r) return;
+      var v=Number(r.valor)||0;
+      if ((r.status||'pendente')==='pago') { tPago+=v; nPago++; }
+      else {
+        tPend+=v; nPend++;
+        if (r.vencimento && new Date(r.vencimento+'T00:00')<hoje) { nVenc++; tVenc+=v; }
+      }
+    });
+    stats.innerHTML =
+      '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value" style="font-size:15px">'+brl(tPend)+'</div><div class="stat-label">A Pagar ('+nPend+')</div></div>'+
+      '<div class="stat" style="border-left-color:#7c2d12"><div class="stat-value" style="font-size:15px">'+brl(tVenc)+'</div><div class="stat-label">⚠️ Vencidas ('+nVenc+')</div></div>'+
+      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+brl(tPago)+'</div><div class="stat-label">Pago ('+nPago+')</div></div>'+
+      '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">'+brl(tPend+tPago)+'</div><div class="stat-label">Total Geral</div></div>';
+  }
+
+  var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px">'
+    + '<thead><tr>' + ['Vencimento','Fornecedor','Placa','Valor (R$)','Descrição','Status','Pago em',''].map(finTH).join('') + '</tr></thead><tbody>';
+  var totalVis=0;
+  var hoje2 = new Date(); hoje2.setHours(0,0,0,0);
+  visiveis.forEach(function(o){
+    var r=o.r, i=o.idx;
+    var st = r.status||'pendente';
+    totalVis += Number(r.valor)||0;
+    var vencido = st==='pendente' && r.vencimento && new Date(r.vencimento+'T00:00')<hoje2;
+    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'pagar\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
+    var stBadge = st==='pago' ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">✅ Pago</span>'
+      : vencido ? '<span style="background:#fde2e2;color:#7c2d12;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">❌ Vencida</span>'
+      : '<span style="background:#fef3cd;color:#b45309;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">⏳ Pendente</span>';
+    var bg = st==='pago' ? 'background:#f5fdf8' : vencido ? 'background:#fff5f5' : '';
+    html += '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
+      + '<td style="padding:4px 6px"><input type="date" value="'+(r.vencimento||'')+'" onchange="finEdit(\'pagar\','+i+',\'vencimento\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0E1B4D"></td>'
+      + '<td style="padding:4px 6px">'+inp('fornecedor','130px')+'</td>'
+      + '<td style="padding:4px 6px">'+inp('placa','80px','font-family:monospace;text-transform:uppercase')+'</td>'
+      + '<td style="padding:4px 6px">'+inp('valor','100px','text-align:right;font-weight:700;color:#c0392b')+'</td>'
+      + '<td style="padding:4px 6px">'+inp('descricao','180px')+'</td>'
+      + '<td style="padding:4px 6px">'+stBadge+'</td>'
+      + '<td style="padding:4px 6px">'+(st==='pago'
+          ? '<input type="date" value="'+(r.pagoEm||'')+'" onchange="finEdit(\'pagar\','+i+',\'pagoEm\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0d7a3e">'
+          : '<span style="color:#ccc;font-size:10px">—</span>')+'</td>'
+      + '<td style="padding:4px 6px;text-align:center;white-space:nowrap">'
+        + (st==='pago'
+            ? '<button onclick="finPagarToggle('+i+',false)" title="Reverter" style="background:#fef3cd;color:#b45309;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">↩</button>'
+            : '<button onclick="finPagarToggle('+i+',true)" title="Marcar como pago" style="background:#e8f5ef;color:#0d7a3e;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">✅ Pagar</button>')
+        + ' <button onclick="finDel(\'pagar\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑</button>'
+      + '</td></tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D"><td colspan="3" style="padding:9px 10px">TOTAL FILTRADO ('+visiveis.length+')</td><td style="padding:9px 10px;text-align:right;font-family:monospace;color:#c0392b">'+brl(totalVis)+'</td><td colspan="4"></td></tr></tfoot>';
+  html += '</table></div>';
+  grid.innerHTML = html;
+}
+
+function finPagarToggle(idx, pagar) {
+  finInit();
+  var r = db.financeiro.pagar[idx];
+  if (!r) return;
+  if (pagar) {
+    r.status = 'pago';
+    r.pagoEm = new Date().toISOString().split('T')[0];
+  } else {
+    if (!confirm('Reverter para pendente?')) return;
+    r.status = 'pendente';
+    r.pagoEm = '';
+  }
+  saveDB();
+  finRenderPagar();
+  toast(pagar ? '✅ '+(r.fornecedor||'Conta')+' marcada como paga' : '↩ Revertido para pendente', pagar?'#0d7a3e':'#b45309');
+}
+
+
 function finRestaurarSeed(aba) {
   if (!confirm('Restaurar os dados ORIGINAIS desta planilha?\n\nIsso substitui o conteúdo atual pelos dados da planilha enviada. Edições feitas aqui serão perdidas.')) return;
   finInit();
@@ -4177,6 +4323,7 @@ function finRestaurarSeed(aba) {
   else if (aba==='bens') db.financeiro.bens = FIN_SEED_BENS.slice();
   else if (aba==='divida') db.financeiro.divida = FIN_SEED_DIVIDA.slice();
   else if (aba==='receber') db.financeiro.receber = FIN_SEED_RECEBER.slice();
+  else if (aba==='pagar') db.financeiro.pagar = FIN_SEED_PAGAR.slice();
   saveDB();
   finRender(aba);
   toast('🔄 Dados originais restaurados','#0d7a3e');
