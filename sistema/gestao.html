@@ -3748,7 +3748,7 @@ function abrirImportarManutencao() {
     + '<div style="background:#7c3aed;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0">📥 Importar Manutenção da Oficina</div>'
     + '<div style="padding:18px">'
     + '<p style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.5">Cole abaixo o código enviado pela oficina (começa com <strong>LOKA-MANUT::</strong>). Você pode colar vários códigos, um por linha.</p>'
-    + '<textarea id="importCodigo" placeholder="LOKA-MANUT::..." style="width:100%;min-height:120px;padding:12px;border:1.5px solid #d5dae8;border-radius:8px;font-family:monospace;font-size:11px;outline:none;resize:vertical"></textarea>'
+    + '<textarea id="importCodigo" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="LOKA-MANUT::..." style="width:100%;min-height:120px;padding:12px;border:1.5px solid #d5dae8;border-radius:8px;font-family:monospace;font-size:11px;outline:none;resize:vertical"></textarea>'
     + '<div id="importPreview" style="margin-top:12px"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
     + '<button id="importCancel" style="padding:9px 18px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>'
@@ -3765,13 +3765,12 @@ function abrirImportarManutencao() {
     _decodificados = [];
     var erros = 0;
 
-    // Estratégia: separar por ocorrência do prefixo, remover TODO espaço/quebra de cada bloco.
-    // Isso resolve o caso do WhatsApp quebrar o base64 no meio com espaços/quebras.
-    var partes = raw.split('LOKA-MANUT::');
+    // Separar pelo prefixo de forma CASE-INSENSITIVE (celular às vezes autocorrige p/ minúsculas)
+    // e remover TODO espaço/quebra de cada bloco (WhatsApp pode quebrar o base64 no meio).
+    var partes = raw.split(/LOKA-MANUT::/i);
     partes.forEach(function(parte, idx) {
-      if (idx === 0) return; // antes do primeiro prefixo
+      if (idx === 0) return; // texto antes do primeiro prefixo
       try {
-        // Pegar só caracteres válidos de base64 do início do bloco (para até onde o b64 for válido)
         var m = parte.replace(/[\r\n\t ]/g, '').match(/^[A-Za-z0-9+/=]+/);
         if (!m) { erros++; return; }
         var b64 = m[0];
