@@ -202,7 +202,12 @@ tr.vsel .veic-fin { pointer-events: auto; }
 .veic-count { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
 @media print {
   @page { size: A4 portrait; margin: 10mm 8mm; }
-  body { background: #fff !important; padding: 0 !important; font-size: 11px !important; }
+  body { background: #fff !important; padding: 0 !important; font-size: 11px !important; min-height: 0 !important; height: auto !important; }
+  html { height: auto !important; }
+  /* Evitar página em branco no final */
+  .fatura, .fatura-body, .fatura-footer, .sec { page-break-after: auto !important; }
+  .fatura:last-child, .sec:last-child { page-break-after: avoid !important; }
+  *:last-child { page-break-after: avoid !important; }
 
   /* Ocultar elementos de UI */
   .action-bar, .cli-search-wrap, .veic-search-bar, .add-outro,
@@ -221,26 +226,41 @@ tr.vsel .veic-fin { pointer-events: auto; }
   .input[readonly] { border: none !important; background: transparent !important; font-size: 11px !important; }
   .fin-input { border: none !important; background: transparent !important; color: #111 !important; padding: 2px 0 !important; text-align: right; }
 
-  /* CORREÇÃO CRÍTICA: só ocultar linhas NÃO selecionadas da tabela de veículos */
+  /* ═══ FORMATO PLANILHA LIMPO (impressão) ═══ */
+  /* Só linhas selecionadas */
   .veic-table tbody tr:not(.vsel) { display: none !important; }
   .veic-table tbody tr { page-break-inside: avoid !important; }
-  .veic-table tfoot { display: table-row-group !important; }
-  .veic-table tbody td { white-space: nowrap !important; }
+  .veic-table thead { display: table-header-group !important; }
+  .veic-table tfoot { display: table-footer-group !important; }
 
-  /* Veic table — compactar para caber no A4 */
-  .veic-table-wrap { overflow: visible !important; border: 1px solid #ccc !important; }
-  .veic-table { font-size: 10px !important; width: 100% !important; table-layout: fixed !important; }
-  .veic-table .chk-cell { display: none !important; width: 0 !important; }
-  .veic-table thead th { padding: 5px 6px !important; font-size: 8px !important; }
-  .veic-table tbody td { padding: 5px 6px !important; }
-  .veic-table thead th:nth-child(2) { width: 26% !important; }  /* Veículo */
-  .veic-table thead th:nth-child(3) { width: 11% !important; }  /* Placa */
-  .veic-table thead th:nth-child(4) { width: 9% !important;  }  /* Status */
-  .veic-table thead th:nth-child(5) { width: 8% !important;  }  /* Qtd */
-  .veic-table thead th:nth-child(6) { width: 12% !important; }  /* Valor Unit */
-  .veic-table thead th:nth-child(7) { width: 11% !important; }  /* Seguro */
-  .veic-table thead th:nth-child(8) { width: 11% !important; }  /* Desconto */
-  .veic-table thead th:nth-child(9) { width: 12% !important; }  /* Subtotal */
+  .veic-table-wrap { overflow: visible !important; border: 1px solid #bbb !important; border-radius: 0 !important; }
+  .veic-table { font-size: 9px !important; width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+  .veic-table .chk-cell { display: none !important; width: 0 !important; padding: 0 !important; }
+  .veic-table thead th { padding: 4px 5px !important; font-size: 8px !important; background: #0E1B4D !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; text-align: left !important; border: 0.5px solid #1a2a5e !important; }
+  .veic-table tbody td { padding: 4px 5px !important; border: 0.5px solid #e0e0e0 !important; vertical-align: middle !important; }
+  .veic-table tbody tr:nth-child(even) td { background: #f7f8fc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Nome do veículo: uma linha compacta, permite quebra natural sem cortar */
+  .veic-table tbody td:nth-child(2) { white-space: normal !important; line-height: 1.2 !important; }
+  .veic-table tbody td:nth-child(2) strong { font-weight: 600 !important; font-size: 9px !important; }
+  .veic-table tbody td:nth-child(2) span { display: none !important; }  /* ocultar cor/ano para compactar */
+
+  /* Demais células sem quebra */
+  .veic-table tbody td:not(:nth-child(2)) { white-space: nowrap !important; }
+
+  /* Larguras das 9 colunas (chk oculto) */
+  .veic-table th:nth-child(2), .veic-table td:nth-child(2) { width: 22% !important; }  /* Veículo */
+  .veic-table th:nth-child(3), .veic-table td:nth-child(3) { width: 13% !important; }  /* Placa */
+  .veic-table th:nth-child(4), .veic-table td:nth-child(4) { width: 11% !important; }  /* Status */
+  .veic-table th:nth-child(5), .veic-table td:nth-child(5) { width: 7% !important; text-align: center !important; }  /* Qtd */
+  .veic-table th:nth-child(6), .veic-table td:nth-child(6) { width: 13% !important; text-align: right !important; }  /* Valor Unit */
+  .veic-table th:nth-child(7), .veic-table td:nth-child(7) { width: 11% !important; text-align: right !important; }  /* Seguro */
+  .veic-table th:nth-child(8), .veic-table td:nth-child(8) { width: 11% !important; text-align: right !important; }  /* Desconto */
+  .veic-table th:nth-child(9), .veic-table td:nth-child(9) { width: 12% !important; text-align: right !important; }  /* Subtotal */
+
+  /* Inputs viram texto puro na impressão */
+  .veic-table .veic-fin { border: none !important; background: transparent !important; padding: 0 !important; font-size: 9px !important; text-align: inherit !important; width: 100% !important; -webkit-appearance: none; }
+  .veic-table .placa-badge { background: transparent !important; border: none !important; padding: 0 !important; font-family: monospace !important; font-size: 9px !important; font-weight: 700 !important; }
   .veic-table thead th, .veic-table tbody td { word-break: normal !important; overflow: hidden !important; }
   .veic-fin { font-size: 10px !important; padding: 2px 0 !important; }
   .placa-badge { font-size: 8px !important; padding: 1px 4px !important; }
@@ -1044,16 +1064,22 @@ function delFat(n) {
 }
 
 function salvarFatura() {
+  // Recalcular tudo antes de validar (garante total atualizado)
+  if (typeof calcTotal === 'function') calcTotal();
+
   var num   = document.getElementById('faturaNum').value;
   var cli   = _clienteSelecionado;
-  var total = document.getElementById('totalDisplay').textContent;
   var veics = Array.from(_veicSelecionados).map(function(i){return _veicExibidos[i];}).filter(Boolean);
+
+  // Total: usa a composição; se vier zerado, usa o total dos veículos direto
+  var totalNum = parseBRL(document.getElementById('totalDisplay').textContent);
+  if (totalNum <= 0 && typeof calcTotalVeic === 'function') totalNum = calcTotalVeic();
+  var total = fmtBRL(totalNum);
 
   if (!cli)  { status('⚠️ Selecione um cliente antes de salvar', '#b45309'); return; }
   if (!num)  { status('⚠️ Informe o número da fatura', '#b45309'); return; }
   if (!veics.length) { status('⚠️ Selecione ao menos um veículo', '#b45309'); return; }
-  var totalNum = parseBRL(total);
-  if (totalNum <= 0) { status('⚠️ O total deve ser maior que zero', '#b45309'); return; }
+  if (totalNum <= 0) { status('⚠️ O total deve ser maior que zero. Verifique os valores dos veículos.', '#b45309'); return; }
 
   var fatura = {
     id: 'fat_' + Date.now(),
@@ -1083,6 +1109,7 @@ function salvarFatura() {
     vlSeguro: (document.getElementById('vlSeguro')||{}).value || '',
     vlDesconto: (document.getElementById('vlDesconto')||{}).value || '',
     total: total,
+    obs: (document.getElementById('fatObs')||{}).value || '',
     obs: document.getElementById('fatObs').value,
     criadoEm: new Date().toISOString()
   };
