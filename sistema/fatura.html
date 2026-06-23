@@ -792,7 +792,11 @@ function fmtBRL(n) {
 }
 function parseBRL(s) {
   if (!s) return 0;
-  return parseFloat(String(s).replace(/\./g,'').replace(',','.')) || 0;
+  // Remove "R$", espaços e qualquer caractere que não seja dígito, vírgula ou ponto
+  var limpo = String(s).replace(/[^0-9.,]/g,'');
+  if (!limpo) return 0;
+  // Formato brasileiro: ponto = milhar, vírgula = decimal
+  return parseFloat(limpo.replace(/\./g,'').replace(',','.')) || 0;
 }
 function maskFin(el) {
   var v = el.value.replace(/\D/g,'');
