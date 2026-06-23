@@ -730,6 +730,23 @@ function preencherFaturaParaEdicao(fat, editId) {
   set('fatPgto', fat.pgto);
   set('fatObs', fat.obs);
 
+  // Recriar linhas "outros" (juros, multas, etc.) salvas
+  if (fat.outros && fat.outros.length) {
+    fat.outros.forEach(function(o) {
+      addOutroValor();
+      var rows = document.querySelectorAll('#finBody .fin-row-outro');
+      var row = rows[rows.length-1];
+      if (row) {
+        var inputs = row.querySelectorAll('.fin-input');
+        if (inputs.length >= 3) {
+          inputs[0].value = o.descricao || '';
+          inputs[1].value = o.referencia || '';
+          inputs[2].value = o.valor || '';
+        }
+      }
+    });
+  }
+
   // Atualizar título e número exibido
   var titEl = document.getElementById('fatNumDisplay');
   if (titEl) titEl.textContent = fat.numero || '';
@@ -1138,6 +1155,18 @@ function salvarFatura() {
   var cli   = _clienteSelecionado;
   var veics = Array.from(_veicSelecionados).map(function(i){return _veicExibidos[i];}).filter(Boolean);
 
+  // Coletar linhas "outros" (juros, multas, KM excedente, etc.)
+  var outros = [];
+  document.querySelectorAll('#finBody .fin-row-outro').forEach(function(row) {
+    var inputs = row.querySelectorAll('.fin-input');
+    if (inputs.length >= 3) {
+      var desc = inputs[0].value || '';
+      var ref  = inputs[1].value || '';
+      var val  = inputs[2].value || '';
+      if (desc || val) outros.push({ descricao: desc, referencia: ref, valor: val });
+    }
+  });
+
   // Total: usa a composição; se vier zerado, usa o total dos veículos direto
   var totalNum = parseBRL(document.getElementById('totalDisplay').textContent);
   if (totalNum <= 0 && typeof calcTotalVeic === 'function') totalNum = calcTotalVeic();
@@ -1175,9 +1204,9 @@ function salvarFatura() {
     vlMensal: (document.getElementById('vlMensal')||{}).value || '',
     vlSeguro: (document.getElementById('vlSeguro')||{}).value || '',
     vlDesconto: (document.getElementById('vlDesconto')||{}).value || '',
+    outros: outros,
     total: total,
     obs: (document.getElementById('fatObs')||{}).value || '',
-    obs: document.getElementById('fatObs').value,
     criadoEm: new Date().toISOString()
   };
 
