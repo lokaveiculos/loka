@@ -3760,18 +3760,25 @@ function abrirImportarManutencao() {
   var _decodificados = [];
 
   function decodificar() {
-    var raw = document.getElementById('importCodigo').value.trim();
-    if (!raw) { toast('Cole ao menos um código','#b45309'); return; }
-    var linhas = raw.split(/\n+/).map(function(l){return l.trim();}).filter(Boolean);
+    var raw = document.getElementById('importCodigo').value || '';
+    if (!raw.trim()) { toast('Cole ao menos um código','#b45309'); return; }
     _decodificados = [];
     var erros = 0;
-    linhas.forEach(function(linha) {
+
+    // Estratégia: separar por ocorrência do prefixo, remover TODO espaço/quebra de cada bloco.
+    // Isso resolve o caso do WhatsApp quebrar o base64 no meio com espaços/quebras.
+    var partes = raw.split('LOKA-MANUT::');
+    partes.forEach(function(parte, idx) {
+      if (idx === 0) return; // antes do primeiro prefixo
       try {
-        if (linha.indexOf('LOKA-MANUT::') !== 0) { erros++; return; }
-        var b64 = linha.replace('LOKA-MANUT::','');
+        // Pegar só caracteres válidos de base64 do início do bloco (para até onde o b64 for válido)
+        var m = parte.replace(/[\r\n\t ]/g, '').match(/^[A-Za-z0-9+/=]+/);
+        if (!m) { erros++; return; }
+        var b64 = m[0];
         var json = decodeURIComponent(escape(atob(b64)));
         var dados = JSON.parse(json);
         if (dados.placa) _decodificados.push(dados);
+        else erros++;
       } catch(e) { erros++; }
     });
     var prev = document.getElementById('importPreview');
