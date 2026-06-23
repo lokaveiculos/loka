@@ -686,15 +686,82 @@ function carregarDados() {
       _ativos   = data.ativos   || [];
     }
     renderVeiculosArea(_veiculos);
+    verificarModoEdicao();
   }).catch(function(e) {
     console.warn('Firebase read error:', e);
-    // Tenta localStorage
     try {
       const local = JSON.parse(localStorage.getItem('loka_db') || 'null');
       if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; _ativos=local.ativos||[]; }
     } catch(e2) {}
     renderVeiculosArea(_veiculos);
+    verificarModoEdicao();
   });
+}
+
+// ── MODO EDIÇÃO: carregar fatura existente ──────────────────
+var _editandoFaturaId = null;
+function verificarModoEdicao() {
+  var params = new URLSearchParams(window.location.search);
+  var editId = params.get('edit');
+  var cliId = params.get('cli');
+  if (!editId) return;
+
+  // Buscar a fatura no Firebase
+  var path = 'faturas/' + (cliId||'') + '/' + editId;
+  db.ref(path).once('value').then(function(snap) {
+    var fat = snap.val();
+    if (!fat) { status('⚠️ Fatura não encontrada para edição', '#b45309'); return; }
+    preencherFaturaParaEdicao(fat, editId);
+  }).catch(function(e) {
+    status('❌ Erro ao carregar fatura: '+e.message, '#c0392b');
+  });
+}
+
+function preencherFaturaParaEdicao(fat, editId) {
+  _editandoFaturaId = editId;
+
+  // Campos de identificação
+  function set(id, val){ var el=document.getElementById(id); if(el && val!=null) el.value = val; }
+  set('faturaNum', fat.numero);
+  set('periodoRef', fat.periodo);
+  set('dataEmissao', fat.emissao);
+  set('dataVenc', fat.vencimento);
+  set('fatStatus', fat.status);
+  set('fatPgto', fat.pgto);
+  set('fatObs', fat.obs);
+
+  // Atualizar título e número exibido
+  var titEl = document.getElementById('fatNumDisplay');
+  if (titEl) titEl.textContent = fat.numero || '';
+
+  // Selecionar o cliente (selecionarCliente espera o índice)
+  if (fat.clienteId || fat.cliente) {
+    var cIdx = _clients.findIndex(function(x){ return x && (x.id===fat.clienteId || x.nome===fat.cliente); });
+    if (cIdx >= 0 && typeof selecionarCliente === 'function') {
+      selecionarCliente(cIdx);
+    }
+  }
+
+  // Mostrar TODOS os veículos e marcar os que estão na fatura (mais robusto que depender do filtro)
+  setTimeout(function() {
+    renderVeiculosArea(_veiculos);
+    setTimeout(function() {
+      if (fat.veiculosDetalhado && fat.veiculosDetalhado.length) {
+        fat.veiculosDetalhado.forEach(function(vd) {
+          var idx = _veicExibidos.findIndex(function(v){ return v && v.placa===vd.placa; });
+          if (idx >= 0) {
+            if (!_veicSelecionados.has(idx)) toggleVeiculo(idx);
+            var q = document.getElementById('vqtd-'+idx); if(q) q.value = vd.qtd||'1';
+            var fin = document.getElementById('vfin-'+idx); if(fin) fin.value = vd.aluguel||'';
+            var seg = document.getElementById('vseg-'+idx); if(seg) seg.value = vd.seguro||'';
+            var desc = document.getElementById('vdesc-'+idx); if(desc) desc.value = vd.desconto||'';
+          }
+        });
+      }
+      calcTotalVeic(); calcTotal();
+      status('✏️ Editando fatura '+(fat.numero||'')+' — altere e clique em Salvar', '#2B4BF2');
+    }, 400);
+  }, 600);
 }
 
 // ── UTILS ─────────────────────────────────────────────────────
@@ -1082,7 +1149,7 @@ function salvarFatura() {
   if (totalNum <= 0) { status('⚠️ O total deve ser maior que zero. Verifique os valores dos veículos.', '#b45309'); return; }
 
   var fatura = {
-    id: 'fat_' + Date.now(),
+    id: _editandoFaturaId || ('fat_' + Date.now()),
     numero: num,
     cliente: cli.nome,
     clienteId: cli.id,
@@ -1119,7 +1186,7 @@ function salvarFatura() {
     var path = 'faturas/' + (fatura.clienteId || 'sem_cliente') + '/' + fatura.id;
     if (db) {
       db.ref(path).set(fatura).then(function() {
-        status('✅ Fatura salva para ' + fatura.cliente + '!', '#0d7a3e');
+        status((_editandoFaturaId ? '✅ Fatura atualizada para ' : '✅ Fatura salva para ') + fatura.cliente + '!', '#0d7a3e');
         carregarFaturasCliente(fatura.clienteId);
       }).catch(function(e) { status('❌ Erro Firebase: '+e.message, '#c0392b'); });
     } else {
