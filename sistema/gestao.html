@@ -486,6 +486,15 @@ tr:hover td{background:#f8f9fe;}
             onde voc&ecirc; pode <strong>ajustar o locat&aacute;rio</strong> antes de gravar.<br>
             <span style="color:var(--amber)">O PDF precisa ter texto selecion&aacute;vel — digitalizados/foto n&atilde;o funcionam.</span>
           </div>
+          <div class="fg" style="margin-top:14px;max-width:380px">
+            <label class="fl">Associar as multas a um cliente</label>
+            <select class="fs" id="mltImpClientePadrao"></select>
+            <div style="font-size:9px;color:var(--muted);margin-top:3px">
+              Deixe no padr&atilde;o para o sistema identificar pela data de cada loca&ccedil;&atilde;o.
+              Escolha um cliente se todo o PDF for de um &uacute;nico locat&aacute;rio.
+            </div>
+          </div>
+
           <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <button class="btn btn-blue" onclick="document.getElementById('mltPdfFile').click()">&#128193; Escolher PDF(s)</button>
             <input type="file" id="mltPdfFile" accept="application/pdf,.pdf" multiple style="display:none" onchange="mltImportarArquivo(this)">
@@ -5059,6 +5068,15 @@ function mltMostrarAba(aba){
     if (bt) bt.className = 'btn ' + (a === aba ? 'btn-blue' : 'btn-outline');
   });
   if (aba === 'lista') mltRender();
+  if (aba === 'importar') mltPreencherClientePadrao();
+}
+
+function mltPreencherClientePadrao(){
+  var sel = document.getElementById('mltImpClientePadrao');
+  if (!sel) return;
+  var atual = sel.value;
+  sel.innerHTML = mltOpcoesClientes(atual, 'Identificar pela data da locação (padrão)');
+  sel.value = atual;
 }
 
 function mltPreencherFiltroClientes(){
@@ -5740,8 +5758,10 @@ function mltImportarArquivo(input){
             }
             var achadas = mltParsePDF(texto);
             if (!achadas.length) throw new Error('nenhuma infração reconhecida');
+            var padrao = (document.getElementById('mltImpClientePadrao')||{}).value || '';
             achadas.forEach(function(r){
               r._arquivo = f.name;
+              mltAplicarClientePadrao(r, padrao);
               // evita repetir o que já está no buffer desta sessão
               var jaNoBuffer = _mltImport.some(function(x){
                 return (r.ait && x.ait && x.ait.toUpperCase() === r.ait.toUpperCase())
@@ -5759,7 +5779,12 @@ function mltImportarArquivo(input){
     return seq;
   }).then(function(){
     var msg = '';
-    if (ok) msg += '<span style="color:var(--green)">✓ '+ok+' arquivo(s) lido(s) · '+novas+' infração(ões) nova(s)</span>';
+    if (ok) {
+      msg += '<span style="color:var(--green)">✓ '+ok+' arquivo(s) lido(s) · '+novas+' infração(ões) nova(s)</span>';
+      var semAit = _mltImport.filter(function(r){ return !String(r.ait||'').trim(); }).length;
+      if (semAit) msg += '<br><span style="color:var(--red)">⚠ '+semAit
+        + ' sem AIT — preencha na tabela para poder gravar</span>';
+    }
     if (falhas.length) {
       msg += (msg ? '<br>' : '') + '<span style="color:var(--red)">⚠ '+falhas.length+' falhou(ram):</span>'
         + '<div style="font-size:10px;color:var(--muted)">' + falhas.join('<br>') + '</div>';
@@ -5783,14 +5808,19 @@ function mltRenderConferencia(){
     + '<th>Infração</th><th>Valor</th><th>Vencimento</th><th>Locatário</th><th>Arquivo</th></tr></thead><tbody>';
 
   _mltImport.forEach(function(r, i){
+    var bloqueio = mltImpBloqueada(r);
     var aviso = '';
-    if (r._dup) aviso = '<div style="font-size:9px;color:var(--red);font-weight:700">já cadastrada</div>';
+    if (bloqueio === 'duplicada') aviso = '<div style="font-size:9px;color:var(--red);font-weight:700">já cadastrada</div>';
+    else if (bloqueio === 'sem_ait') aviso = '<div style="font-size:9px;color:var(--red);font-weight:700">AIT obrigatório</div>';
     else if (!r._naFrota) aviso = '<div style="font-size:9px;color:var(--amber);font-weight:700">fora da frota</div>';
 
-    h += '<tr style="'+(r._dup?'opacity:.55':'')+'">'
-      + '<td><input type="checkbox" '+(r._sel && !r._dup ? 'checked':'')+' onchange="_mltImport['+i+']._sel=this.checked"></td>'
+    h += '<tr style="'+(bloqueio?'opacity:.6;background:#fff8f7':'')+'">'
+      + '<td><input type="checkbox" '+(r._sel && !bloqueio ? 'checked':'')+' '+(bloqueio?'disabled':'')
+        + ' onchange="_mltImport['+i+']._sel=this.checked"></td>'
       + '<td><strong style="font-size:11px">'+mltFmtPlaca(r.placa)+'</strong>'+aviso+'</td>'
-      + '<td><input class="fi" style="font-size:10px;padding:4px 6px;width:110px" value="'+(r.ait||'')+'" onchange="_mltImport['+i+'].ait=this.value"></td>'
+      + '<td><input class="fi" style="font-size:10px;padding:4px 6px;width:110px'
+        + (bloqueio==='sem_ait'?';border-color:var(--red);background:#fff0ef':'')
+        + '" value="'+(r.ait||'')+'" placeholder="obrigatório" onchange="mltImpAit('+i+',this.value)"></td>'
       + '<td><input class="fi" style="font-size:10px;padding:4px 6px;width:120px" type="date" value="'+(r.dataInfracao||'')+'" onchange="_mltImport['+i+'].dataInfracao=this.value;mltRevincular('+i+')"></td>'
       + '<td><input class="fi" style="font-size:10px;padding:4px 6px;width:70px" value="'+(r.horaInfracao||'')+'" onchange="_mltImport['+i+'].horaInfracao=this.value"></td>'
       + '<td><input class="fi" style="font-size:10px;padding:4px 6px;min-width:180px" value="'+(r.descricao||'').replace(/"/g,'&quot;')+'" onchange="_mltImport['+i+'].descricao=this.value"></td>'
@@ -5804,18 +5834,52 @@ function mltRenderConferencia(){
       + '</tr>';
   });
 
-  var nSel = _mltImport.filter(function(r){ return r._sel && !r._dup; }).length;
+  var nSel   = _mltImport.filter(function(r){ return r._sel && !mltImpBloqueada(r); }).length;
+  var nSemAit = _mltImport.filter(function(r){ return mltImpBloqueada(r) === 'sem_ait'; }).length;
+  var nDup    = _mltImport.filter(function(r){ return mltImpBloqueada(r) === 'duplicada'; }).length;
+
+  var rodape = nSel + ' de ' + _mltImport.length + ' selecionada(s) para gravar';
+  if (nSemAit) rodape += ' · <span style="color:var(--red);font-weight:700">' + nSemAit
+    + ' bloqueada(s) sem AIT — preencha para liberar</span>';
+  if (nDup) rodape += ' · <span style="color:var(--muted)">' + nDup + ' duplicada(s)</span>';
+
   h += '</tbody></table></div></div>'
     + '<div class="toolbar" style="margin-top:10px">'
-    + '<div style="flex:1;font-size:11px;color:var(--muted)">'+nSel+' de '+_mltImport.length+' selecionada(s) para gravar</div>'
+    + '<div style="flex:1;font-size:11px;color:var(--muted)">'+rodape+'</div>'
     + '<button class="btn btn-outline" onclick="_mltImport=[];mltRenderConferencia();document.getElementById(\'mltImpStatus\').innerHTML=\'\'">Cancelar</button>'
     + '<button class="btn btn-green" onclick="mltConfirmarImportacao()">✓ Gravar selecionadas</button>'
     + '</div>';
   el.innerHTML = h;
 }
 
+// Linha só pode ser gravada com AIT preenchido e sem duplicidade
+function mltImpBloqueada(r){
+  if (r._dup) return 'duplicada';
+  if (!String(r.ait || '').trim()) return 'sem_ait';
+  return '';
+}
+
 function mltSelTodas(v){
-  _mltImport.forEach(function(r){ if (!r._dup) r._sel = v; });
+  _mltImport.forEach(function(r){ if (!mltImpBloqueada(r)) r._sel = v; });
+  mltRenderConferencia();
+}
+
+// Edição do AIT na conferência: revalida duplicidade e libera a linha
+function mltImpAit(i, val){
+  var r = _mltImport[i];
+  if (!r) return;
+  r.ait = String(val || '').trim().toUpperCase();
+
+  var dupBanco = r.ait && mltMultas().some(function(x){
+    return (x.ait || '').toUpperCase() === r.ait;
+  });
+  var dupBuffer = r.ait && _mltImport.some(function(x, j){
+    return j !== i && (x.ait || '').toUpperCase() === r.ait;
+  });
+  r._dup = !!(dupBanco || dupBuffer);
+  if (r._dup) r._sel = false;
+  else if (r.ait) r._sel = true;
+
   mltRenderConferencia();
 }
 
@@ -5845,6 +5909,18 @@ function mltTxtLoc(r){
   return '<span style="color:var(--amber)">⚠ não identificado</span>';
 }
 
+// Aplica o cliente escolhido antes da importação a uma linha lida
+function mltAplicarClientePadrao(r, padrao){
+  if (!padrao) return r;
+  if (padrao === '__sem__') {
+    r.clienteId = null; r.clienteNome = ''; r.locacaoId = null; r.cruzamento = 'manual';
+    return r;
+  }
+  var c = (db.clients||[]).find(function(x){ return String(x.id) === String(padrao); });
+  r.clienteId = padrao; r.clienteNome = c ? c.nome : ''; r.locacaoId = null; r.cruzamento = 'manual';
+  return r;
+}
+
 function mltRevincular(i){
   var r = _mltImport[i];
   if (!r) return;
@@ -5858,8 +5934,15 @@ function mltRevincular(i){
 }
 
 function mltConfirmarImportacao(){
-  var sel = _mltImport.filter(function(r){ return r._sel && !r._dup; });
-  if (!sel.length) { toast('⚠️ Nenhuma multa selecionada','#b45309'); return; }
+  var semAit = _mltImport.filter(function(r){ return r._sel && mltImpBloqueada(r) === 'sem_ait'; }).length;
+  var sel = _mltImport.filter(function(r){ return r._sel && !mltImpBloqueada(r); });
+  if (!sel.length) {
+    toast(semAit ? '⚠️ Preencha o AIT das multas selecionadas' : '⚠️ Nenhuma multa selecionada', '#b45309');
+    return;
+  }
+  if (semAit) {
+    if (!confirm(semAit + ' multa(s) sem AIT serão ignoradas. Gravar as ' + sel.length + ' restantes?')) return;
+  }
 
   var n = 0;
   sel.forEach(function(r){
