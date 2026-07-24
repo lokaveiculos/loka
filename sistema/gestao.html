@@ -455,6 +455,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <input class="filter-input" id="mltFBusca" placeholder="Buscar AIT, placa, cliente, infra&ccedil;&atilde;o..." oninput="mltAplicarFiltro()" style="flex:1;min-width:160px">
           <select class="filter-sel" id="mltFPlaca" onchange="mltAplicarFiltro()"><option value="">Todos os ve&iacute;culos</option></select>
+          <select class="filter-sel" id="mltFCliente" onchange="mltAplicarFiltro()"><option value="">Todos os clientes</option></select>
           <select class="filter-sel" id="mltFStatus" onchange="mltAplicarFiltro()">
             <option value="">Todos os status</option>
             <option value="pendente">Pendente</option>
@@ -480,13 +481,14 @@ tr:hover td{background:#f8f9fe;}
         <div style="background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid var(--blue)">
           <div style="font-size:13px;font-weight:800;color:var(--dark)">Importar multas de um PDF</div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6">
-            Envie o PDF extra&iacute;do do portal (DETRAN, SENATRAN ou &oacute;rg&atilde;o municipal). O sistema l&ecirc; as infra&ccedil;&otilde;es,
-            cruza a data com as loca&ccedil;&otilde;es e mostra tudo para confer&ecirc;ncia <strong>antes</strong> de gravar.<br>
+            Envie um ou v&aacute;rios PDFs extra&iacute;dos do portal (DETRAN, SENATRAN ou &oacute;rg&atilde;o municipal). O sistema l&ecirc; as infra&ccedil;&otilde;es
+            de todos os arquivos, cruza a data com as loca&ccedil;&otilde;es e mostra tudo numa &uacute;nica tabela de confer&ecirc;ncia,
+            onde voc&ecirc; pode <strong>ajustar o locat&aacute;rio</strong> antes de gravar.<br>
             <span style="color:var(--amber)">O PDF precisa ter texto selecion&aacute;vel — digitalizados/foto n&atilde;o funcionam.</span>
           </div>
           <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-blue" onclick="document.getElementById('mltPdfFile').click()">&#128193; Escolher PDF</button>
-            <input type="file" id="mltPdfFile" accept="application/pdf,.pdf" style="display:none" onchange="mltImportarArquivo(this)">
+            <button class="btn btn-blue" onclick="document.getElementById('mltPdfFile').click()">&#128193; Escolher PDF(s)</button>
+            <input type="file" id="mltPdfFile" accept="application/pdf,.pdf" multiple style="display:none" onchange="mltImportarArquivo(this)">
             <span id="mltImpStatus" style="font-size:11px;font-weight:600"></span>
           </div>
         </div>
@@ -766,6 +768,8 @@ tr:hover td{background:#f8f9fe;}
       <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="mltValor" placeholder="0,00"></div>
       <div class="fg"><label class="fl">Vencimento do Boleto</label><input class="fi" id="mltVencimento" type="date"></div>
       <div class="fg"><label class="fl" style="color:var(--red)">Prazo p/ Indicar Condutor</label><input class="fi" id="mltPrazoInd" type="date"></div>
+      <div class="fg"><label class="fl" style="color:var(--green)">Data do Pagamento</label><input class="fi" id="mltDataPgto" type="date" onchange="mltPgtoMudou()"></div>
+      <div class="fg"><label class="fl" style="color:var(--green)">Valor Pago (R$)</label><input class="fi" id="mltValorPago" placeholder="0,00"></div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Status</label><select class="fs" id="mltStatus">
         <option value="pendente">Pendente</option><option value="indicada">Condutor Indicado</option>
         <option value="recurso">Em Recurso</option><option value="paga">Paga</option>
@@ -774,6 +778,8 @@ tr:hover td{background:#f8f9fe;}
       <div class="fg" style="grid-column:1/-1">
         <label class="fl">Locat&aacute;rio na data da infra&ccedil;&atilde;o</label>
         <div id="mltLocatarioBox" style="background:var(--field);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:12px;min-height:38px"></div>
+        <select class="fs" id="mltClienteManual" onchange="mltClienteManualMudou()" style="margin-top:6px"></select>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">Use este campo para corrigir ou definir o respons&aacute;vel quando o sistema n&atilde;o identificar.</div>
       </div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Observa&ccedil;&otilde;es</label><input class="fi" id="mltObs" placeholder="Anota&ccedil;&otilde;es internas"></div>
     </div>
@@ -4922,9 +4928,22 @@ var MLT_GRAV = {
 
 var _mltEdit   = null;   // id em edição
 var _mltImport = [];     // buffer de conferência da importação
-var _mltFiltro = {q:'', status:'', placa:'', de:'', ate:''};
+var _mltFiltro = {q:'', status:'', placa:'', cliente:'', de:'', ate:''};
 
 // ── Helpers ────────────────────────────────────────────────────
+// Options de cliente reutilizadas no modal e na conferência
+function mltOpcoesClientes(sel, rotuloAuto){
+  var h = '<option value="">' + (rotuloAuto || 'Usar o identificado automaticamente') + '</option>';
+  h += '<option value="__sem__">Sem locatário — responsabilidade da Loká</option>';
+  var cls = (db && db.clients) ? db.clients.slice() : [];
+  cls.sort(function(a,b){ return String(a.nome||'').localeCompare(String(b.nome||'')); });
+  cls.forEach(function(c){
+    if (!c || !c.id) return;
+    h += '<option value="'+c.id+'"'+(String(sel||'')===String(c.id)?' selected':'')+'>'+(c.nome||'(sem nome)')+'</option>';
+  });
+  return h;
+}
+
 function mltNormPlaca(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
 function mltFmtPlaca(p){
@@ -5028,6 +5047,7 @@ function mltInit(){
   if (!db) return;
   if (!Array.isArray(db.multas)) db.multas = [];
   mltPreencherFiltroPlacas();
+  mltPreencherFiltroClientes();
   mltRender();
 }
 
@@ -5039,6 +5059,20 @@ function mltMostrarAba(aba){
     if (bt) bt.className = 'btn ' + (a === aba ? 'btn-blue' : 'btn-outline');
   });
   if (aba === 'lista') mltRender();
+}
+
+function mltPreencherFiltroClientes(){
+  var sel = document.getElementById('mltFCliente');
+  if (!sel) return;
+  var ids = {};
+  mltMultas().forEach(function(m){ if (m.clienteId) ids[m.clienteId] = m.clienteNome || m.clienteId; });
+  var atual = sel.value;
+  var h = '<option value="">Todos os clientes</option>';
+  Object.keys(ids).sort(function(a,b){ return String(ids[a]).localeCompare(String(ids[b])); })
+    .forEach(function(id){ h += '<option value="'+id+'">'+ids[id]+'</option>'; });
+  h += '<option value="__sem__">— Sem locatário (Loká) —</option>';
+  sel.innerHTML = h;
+  sel.value = atual;
 }
 
 function mltPreencherFiltroPlacas(){
@@ -5061,16 +5095,17 @@ function mltAplicarFiltro(){
   _mltFiltro.q      = (document.getElementById('mltFBusca')||{}).value || '';
   _mltFiltro.status = (document.getElementById('mltFStatus')||{}).value || '';
   _mltFiltro.placa  = (document.getElementById('mltFPlaca')||{}).value || '';
+  _mltFiltro.cliente= (document.getElementById('mltFCliente')||{}).value || '';
   _mltFiltro.de     = (document.getElementById('mltFDe')||{}).value || '';
   _mltFiltro.ate    = (document.getElementById('mltFAte')||{}).value || '';
   mltRender();
 }
 
 function mltLimparFiltro(){
-  ['mltFBusca','mltFStatus','mltFPlaca','mltFDe','mltFAte'].forEach(function(id){
+  ['mltFBusca','mltFStatus','mltFPlaca','mltFCliente','mltFDe','mltFAte'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  _mltFiltro = {q:'', status:'', placa:'', de:'', ate:''};
+  _mltFiltro = {q:'', status:'', placa:'', cliente:'', de:'', ate:''};
   mltRender();
 }
 
@@ -5080,6 +5115,10 @@ function mltFiltradas(){
   return mltMultas().filter(function(m){
     if (f.status && m.status !== f.status) return false;
     if (f.placa && mltNormPlaca(m.placa) !== f.placa) return false;
+    if (f.cliente) {
+      if (f.cliente === '__sem__') { if (m.clienteId) return false; }
+      else if (String(m.clienteId||'') !== f.cliente) return false;
+    }
     var d = mltISO(m.dataInfracao);
     if (f.de  && (!d || d < f.de))  return false;
     if (f.ate && (!d || d > f.ate)) return false;
@@ -5104,7 +5143,7 @@ function mltAlertas(){
       var d = mltDiasAte(m.prazoIndicacao);
       if (d !== null && d <= 10) indic.push({m:m, dias:d});
     }
-    if (m.status !== 'paga' && m.vencimento) {
+    if (m.status !== 'paga' && !m.dataPagamento && m.vencimento) {
       var v = mltDiasAte(m.vencimento);
       if (v !== null && v <= 7) venc.push({m:m, dias:v});
     }
@@ -5152,12 +5191,13 @@ function mltRender(){
   var lista = mltFiltradas();
 
   // Resumo
-  var tot = 0, aberto = 0, repassar = 0;
+  var tot = 0, aberto = 0, repassar = 0, pago = 0;
   lista.forEach(function(m){
     var v = mltNum(m.valor);
     tot += v;
     if (m.status !== 'paga' && m.status !== 'cancelada') aberto += v;
     if (m.clienteId && m.status !== 'cobrada' && m.status !== 'cancelada') repassar += v;
+    if (m.dataPagamento) pago += (mltNum(m.valorPago) || v);
   });
   var res = document.getElementById('mltResumo');
   if (res) {
@@ -5165,7 +5205,8 @@ function mltRender(){
       '<div class="stat"><div class="stat-label">Multas</div><div class="stat-value">'+lista.length+'</div></div>'
     + '<div class="stat"><div class="stat-label">Valor total</div><div class="stat-value">'+brl(tot)+'</div></div>'
     + '<div class="stat"><div class="stat-label">Em aberto</div><div class="stat-value" style="color:var(--red)">'+brl(aberto)+'</div></div>'
-    + '<div class="stat"><div class="stat-label">A repassar</div><div class="stat-value" style="color:var(--blue)">'+brl(repassar)+'</div></div>';
+    + '<div class="stat"><div class="stat-label">A repassar</div><div class="stat-value" style="color:var(--blue)">'+brl(repassar)+'</div></div>'
+    + '<div class="stat"><div class="stat-label">Pago</div><div class="stat-value" style="color:var(--green)">'+brl(pago)+'</div></div>';
   }
 
   if (!lista.length) {
@@ -5176,7 +5217,7 @@ function mltRender(){
   var h = '<div class="table-card"><div class="table-scroll"><table>'
     + '<thead><tr>'
     + '<th>Veículo</th><th>AIT / Infração</th><th>Data</th>'
-    + '<th>Locatário</th><th>Valor</th><th>Prazos</th><th>Status</th><th></th>'
+    + '<th>Locatário</th><th>Valor</th><th>Pagamento</th><th>Prazos</th><th>Status</th><th></th>'
     + '</tr></thead><tbody>';
 
   lista.forEach(function(m){
@@ -5197,10 +5238,18 @@ function mltRender(){
     }
     if (!prazos) prazos = '<span style="color:var(--muted);font-size:10px">—</span>';
 
+    var pgto = '<span style="color:var(--muted);font-size:10px">—</span>';
+    if (m.dataPagamento) {
+      var vp = mltNum(m.valorPago) || mltNum(m.valor);
+      pgto = '<div style="font-size:11px;font-weight:700;color:var(--green)">'+brl(vp)+'</div>'
+           + '<div style="font-size:10px;color:var(--muted)">'+mltBR(m.dataPagamento)+'</div>';
+      var econ = mltNum(m.valor) - vp;
+      if (econ > 0.5) pgto += '<div style="font-size:9px;color:var(--green)">desc. '+brl(econ)+'</div>';
+    }
     var loc = m.clienteNome
       ? '<div style="font-size:11px;font-weight:600">'+m.clienteNome+'</div>'
-        + '<div style="font-size:9px;color:'+(m.cruzamento==='auto'?'var(--green)':'var(--muted)')+'">'
-        + (m.cruzamento==='auto'?'✓ identificado pela data':'definido manualmente')+'</div>'
+        + '<div style="font-size:9px;color:'+(m.cruzamento==='auto'?'var(--green)':'var(--blue)')+'">'
+        + (m.cruzamento==='auto'?'✓ identificado pela data':'✎ definido manualmente')+'</div>'
       : '<span style="font-size:10px;color:var(--amber);font-weight:600">⚠ não identificado</span>';
 
     var grav = m.gravidade && MLT_GRAV[m.gravidade]
@@ -5216,6 +5265,7 @@ function mltRender(){
         + (m.horaInfracao?'<div style="font-size:10px;color:var(--muted)">'+m.horaInfracao+'</div>':'')+'</td>'
       + '<td>'+loc+'</td>'
       + '<td style="font-size:11px;font-weight:700;white-space:nowrap">'+brl(mltNum(m.valor))+'</td>'
+      + '<td style="white-space:nowrap">'+pgto+'</td>'
       + '<td>'+prazos+'</td>'
       + '<td><span class="badge" style="background:'+st.bg+';color:'+st.cor+'">'+st.rot+'</span></td>'
       + '<td class="td-actions">'
@@ -5255,8 +5305,18 @@ function mltAbrir(id){
   set('mltValor',      m ? String(mltNum(m.valor).toFixed(2)).replace('.',',') : '');
   set('mltVencimento', m ? mltISO(m.vencimento) : '');
   set('mltPrazoInd',   m ? mltISO(m.prazoIndicacao) : '');
+  set('mltDataPgto',   m ? mltISO(m.dataPagamento) : '');
+  set('mltValorPago',  m && m.valorPago ? String(mltNum(m.valorPago).toFixed(2)).replace('.',',') : '');
   set('mltStatus',     m ? m.status : 'pendente');
   set('mltObs',        m && m.obs);
+
+  var cm = document.getElementById('mltClienteManual');
+  if (cm) {
+    var escolhido = '';
+    if (m && m.cruzamento === 'manual') escolhido = m.clienteId ? m.clienteId : '__sem__';
+    cm.innerHTML = mltOpcoesClientes(escolhido);
+    cm.value = escolhido;
+  }
 
   var t = document.getElementById('mltModalTitulo');
   if (t) t.textContent = m ? 'Editar Multa' : 'Nova Multa';
@@ -5272,21 +5332,66 @@ function mltAtualizarLocatario(){
   var box   = document.getElementById('mltLocatarioBox');
   if (!box) return;
 
-  if (!placa || !data) {
-    box.innerHTML = '<span style="color:var(--muted)">Informe veículo e data da infração para identificar o locatário.</span>';
-    box._loc = null;
+  var loc = (placa && data) ? mltLocatario(placa, data) : null;
+  box._auto = loc;
+
+  var manual = (document.getElementById('mltClienteManual')||{}).value || '';
+  if (manual === '__sem__') {
+    box.innerHTML = '<strong style="color:var(--dark)">Sem locatário — responsabilidade da Loká</strong>'
+      + '<div style="font-size:10px;color:var(--muted)">Definido manualmente.</div>';
     return;
   }
-  var loc = mltLocatario(placa, data);
-  box._loc = loc;
+  if (manual) {
+    var c = (db.clients||[]).find(function(x){ return String(x.id) === String(manual); });
+    box.innerHTML = '<strong style="color:var(--blue)">✎ '+(c ? c.nome : 'Cliente')+'</strong>'
+      + '<div style="font-size:10px;color:var(--muted)">Definido manualmente'
+      + (loc && String(loc.clienteId) !== String(manual) ? ' · o sistema havia identificado ' + loc.clienteNome : '')
+      + '</div>';
+    return;
+  }
+  if (!placa || !data) {
+    box.innerHTML = '<span style="color:var(--muted)">Informe veículo e data da infração para identificar o locatário.</span>';
+    return;
+  }
   if (!loc) {
     box.innerHTML = '<span style="color:var(--amber);font-weight:700">⚠ Nenhuma locação encontrada nessa data</span>'
-      + '<div style="font-size:10px;color:var(--muted)">A multa fica como responsabilidade da Loká.</div>';
+      + '<div style="font-size:10px;color:var(--muted)">Sem escolha manual, fica como responsabilidade da Loká.</div>';
     return;
   }
   box.innerHTML = '<strong style="color:var(--green)">✓ '+loc.clienteNome+'</strong>'
     + '<div style="font-size:10px;color:var(--muted)">'+loc.origem+' · '+mltBR(loc.ini)+' a '+mltBR(loc.fim)+'</div>'
-    + (loc.conflito ? '<div style="font-size:10px;color:var(--amber);font-weight:700">⚠ '+loc.conflito+' locações coincidem nessa data — confira</div>' : '');
+    + (loc.conflito ? '<div style="font-size:10px;color:var(--amber);font-weight:700">⚠ '+loc.conflito+' locações coincidem nessa data — use o campo abaixo para escolher</div>' : '');
+}
+
+// Informar a data de pagamento já marca a multa como paga
+function mltPgtoMudou(){
+  var d = (document.getElementById('mltDataPgto')||{}).value;
+  if (!d) return;
+  var st = document.getElementById('mltStatus');
+  if (st && (st.value === 'pendente' || st.value === 'indicada' || st.value === 'recurso')) st.value = 'paga';
+  var vp = document.getElementById('mltValorPago');
+  var v  = document.getElementById('mltValor');
+  if (vp && !vp.value && v && v.value) vp.value = v.value;
+}
+
+function mltClienteManualMudou(){
+  mltAtualizarLocatario();
+}
+
+// Resolve o responsável final: manual tem prioridade sobre o automático
+function mltResolverLocatario(){
+  var manual = (document.getElementById('mltClienteManual')||{}).value || '';
+  if (manual === '__sem__') {
+    return {clienteId:null, clienteNome:'', locacaoId:null, cruzamento:'manual', _manual:true};
+  }
+  if (manual) {
+    var c = (db.clients||[]).find(function(x){ return String(x.id) === String(manual); });
+    return {clienteId: manual, clienteNome: c ? c.nome : '', locacaoId:null, cruzamento:'manual', _manual:true};
+  }
+  var box = document.getElementById('mltLocatarioBox');
+  var loc = box ? box._auto : null;
+  if (!loc) return {clienteId:null, clienteNome:'', locacaoId:null, cruzamento:'nenhum'};
+  return {clienteId:loc.clienteId, clienteNome:loc.clienteNome, locacaoId:loc.locacaoId, cruzamento:'auto'};
 }
 
 function mltGravidadeMudou(){
@@ -5305,8 +5410,7 @@ function mltSalvar(){
   if (!placa) { toast('⚠️ Selecione o veículo','#b45309'); return; }
   if (!data)  { toast('⚠️ Informe a data da infração','#b45309'); return; }
 
-  var box = document.getElementById('mltLocatarioBox');
-  var loc = box ? box._loc : null;
+  var loc = mltResolverLocatario();
   var v = (db.veiculos || []).find(function(x){ return mltNormPlaca(x.placa) === placa; });
 
   var obj = {
@@ -5325,23 +5429,19 @@ function mltSalvar(){
     vencimento: get('mltVencimento'),
     prazoIndicacao: get('mltPrazoInd'),
     status: get('mltStatus') || 'pendente',
+    dataPagamento: get('mltDataPgto'),
+    valorPago: mltNum(get('mltValorPago')),
     obs: get('mltObs').trim(),
-    clienteId:   loc ? loc.clienteId   : null,
-    clienteNome: loc ? loc.clienteNome : '',
-    locacaoId:   loc ? loc.locacaoId   : null,
-    cruzamento:  loc ? 'auto' : 'nenhum'
+    clienteId:   loc.clienteId,
+    clienteNome: loc.clienteNome,
+    locacaoId:   loc.locacaoId,
+    cruzamento:  loc.cruzamento
   };
 
   if (_mltEdit) {
     var i = mltMultas().findIndex(function(x){ return x.id === _mltEdit; });
     if (i >= 0) {
-      // preserva vínculo manual já ajustado
-      var ant = db.multas[i];
-      if (ant.cruzamento === 'manual' && !loc) {
-        obj.clienteId = ant.clienteId; obj.clienteNome = ant.clienteNome;
-        obj.locacaoId = ant.locacaoId; obj.cruzamento = 'manual';
-      }
-      db.multas[i] = Object.assign({}, ant, obj);
+      db.multas[i] = Object.assign({}, db.multas[i], obj);
     }
   } else {
     // duplicidade por AIT
@@ -5356,6 +5456,7 @@ function mltSalvar(){
   saveDB();
   closeM('mMulta');
   mltPreencherFiltroPlacas();
+  mltPreencherFiltroClientes();
   mltRender();
   toast('✅ Multa salva','#0d7a3e');
 }
@@ -5371,6 +5472,15 @@ function mltExcluir(id){
 }
 
 // ── RELATÓRIO ──────────────────────────────────────────────────
+function mltSitRel(m){
+  var st = MLT_STATUS[m.status] || MLT_STATUS.pendente;
+  if (m.dataPagamento) {
+    var vp = mltNum(m.valorPago) || mltNum(m.valor);
+    return 'Pago ' + mltBR(m.dataPagamento) + (vp !== mltNum(m.valor) ? ' (' + brl(vp) + ')' : '');
+  }
+  return st.rot;
+}
+
 function mltRelatorio(){
   var lista = mltFiltradas();
   if (!lista.length) { toast('Nenhuma multa no filtro atual','#b45309'); return; }
@@ -5388,22 +5498,24 @@ function mltRelatorio(){
   Object.keys(porCliente).sort().forEach(function(nome){
     var ms = porCliente[nome];
     var sub = ms.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
-    linhas += '<tr style="background:#EEF1FD"><td colspan="5"><strong>'+nome+'</strong> — '+ms.length+' multa(s) · '+brl(sub)+'</td></tr>';
+    linhas += '<tr style="background:#EEF1FD"><td colspan="6"><strong>'+nome+'</strong> — '+ms.length+' multa(s) · '+brl(sub)+'</td></tr>';
     ms.forEach(function(m){
       linhas += '<tr><td>'+mltFmtPlaca(m.placa)+'</td><td>'+(m.ait||'—')+'</td><td>'+mltBR(m.dataInfracao)
-        +'</td><td>'+(m.descricao||'—')+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
+        +'</td><td>'+(m.descricao||'—')+'</td><td>'+mltSitRel(m)+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
     });
   });
   if (semCliente.length) {
     var subS = semCliente.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
-    linhas += '<tr style="background:#fff4e5"><td colspan="5"><strong>Sem locatário identificado (responsabilidade Loká)</strong> — '+semCliente.length+' · '+brl(subS)+'</td></tr>';
+    linhas += '<tr style="background:#fff4e5"><td colspan="6"><strong>Sem locatário identificado (responsabilidade Loká)</strong> — '+semCliente.length+' · '+brl(subS)+'</td></tr>';
     semCliente.forEach(function(m){
       linhas += '<tr><td>'+mltFmtPlaca(m.placa)+'</td><td>'+(m.ait||'—')+'</td><td>'+mltBR(m.dataInfracao)
-        +'</td><td>'+(m.descricao||'—')+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
+        +'</td><td>'+(m.descricao||'—')+'</td><td>'+mltSitRel(m)+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
     });
   }
 
   var total = lista.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
+  var totPago = lista.reduce(function(s,m){ return s + (m.dataPagamento ? (mltNum(m.valorPago) || mltNum(m.valor)) : 0); }, 0);
+  var totAberto = total - totPago;
   var w = window.open('', '_blank');
   if (!w) { toast('⚠️ Libere pop-ups para gerar o relatório','#b45309'); return; }
   w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório de Multas — LOKÁ</title>'
@@ -5415,10 +5527,13 @@ function mltRelatorio(){
     + '@media print{@page{size:A4;margin:14mm}}</style></head><body>'
     + '<h1>Relatório de Multas — LOKÁ Aluguel de Veículos</h1>'
     + '<div style="font-size:11px;color:#666">Emitido em '+new Date().toLocaleString('pt-BR')+' · '+lista.length+' registro(s)</div>'
-    + '<table><thead><tr><th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th><th style="text-align:right">Valor</th></tr></thead>'
+    + '<table><thead><tr><th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th><th>Situação</th><th style="text-align:right">Valor</th></tr></thead>'
     + '<tbody>'+linhas+'</tbody>'
-    + '<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700;padding-top:10px">TOTAL</td>'
-    + '<td style="text-align:right;font-weight:700;padding-top:10px">'+brl(total)+'</td></tr></tfoot></table>'
+    + '<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;padding-top:10px">TOTAL</td>'
+    + '<td style="text-align:right;font-weight:700;padding-top:10px">'+brl(total)+'</td></tr>'
+    + '<tr><td colspan="5" style="text-align:right;color:#0d7a3e">Pago</td><td style="text-align:right;color:#0d7a3e">'+brl(totPago)+'</td></tr>'
+    + '<tr><td colspan="5" style="text-align:right;color:#c0392b;font-weight:700">Em aberto</td><td style="text-align:right;color:#c0392b;font-weight:700">'+brl(totAberto)+'</td></tr>'
+    + '</tfoot></table>'
     + '<script>window.onload=function(){window.print()}<\/script></body></html>');
   w.document.close();
 }
@@ -5599,30 +5714,62 @@ function mltParsePDF(texto){
 
 // ── FLUXO DE IMPORTAÇÃO ────────────────────────────────────────
 function mltImportarArquivo(input){
-  var f = input.files && input.files[0];
-  if (!f) return;
-  var st = document.getElementById('mltImpStatus');
-  if (st) st.innerHTML = '<span style="color:var(--blue)">⏳ Lendo o PDF…</span>';
-
-  mltCarregarPdfJs()
-    .then(function(){ return f.arrayBuffer(); })
-    .then(mltExtrairTexto)
-    .then(function(texto){
-      if (!texto || texto.trim().length < 30) {
-        throw new Error('O PDF não tem texto selecionável (provavelmente é digitalizado). Nesse caso, cadastre manualmente.');
-      }
-      _mltImport = mltParsePDF(texto);
-      if (!_mltImport.length) {
-        throw new Error('Nenhuma infração reconhecida neste layout. Me envie o PDF que eu ajusto o leitor.');
-      }
-      if (st) st.innerHTML = '<span style="color:var(--green)">✓ '+_mltImport.length+' infração(ões) encontrada(s) — confira antes de gravar</span>';
-      mltRenderConferencia();
-    })
-    .catch(function(e){
-      if (st) st.innerHTML = '<span style="color:var(--red)">⚠ '+e.message+'</span>';
-      var c = document.getElementById('mltConferencia'); if (c) c.innerHTML = '';
-    });
+  var arquivos = Array.prototype.slice.call(input.files || []);
   input.value = '';
+  if (!arquivos.length) return;
+
+  var st = document.getElementById('mltImpStatus');
+  var ok = 0, falhas = [], novas = 0;
+
+  function status(txt, cor){
+    if (st) st.innerHTML = '<span style="color:var(--'+(cor||'blue')+')">'+txt+'</span>';
+  }
+
+  status('⏳ Carregando leitor de PDF…');
+
+  mltCarregarPdfJs().then(function(){
+    var seq = Promise.resolve();
+    arquivos.forEach(function(f, i){
+      seq = seq.then(function(){
+        status('⏳ Lendo ' + (i+1) + ' de ' + arquivos.length + ' — ' + f.name);
+        return f.arrayBuffer()
+          .then(mltExtrairTexto)
+          .then(function(texto){
+            if (!texto || texto.trim().length < 30) {
+              throw new Error('sem texto selecionável (digitalizado)');
+            }
+            var achadas = mltParsePDF(texto);
+            if (!achadas.length) throw new Error('nenhuma infração reconhecida');
+            achadas.forEach(function(r){
+              r._arquivo = f.name;
+              // evita repetir o que já está no buffer desta sessão
+              var jaNoBuffer = _mltImport.some(function(x){
+                return (r.ait && x.ait && x.ait.toUpperCase() === r.ait.toUpperCase())
+                  || (x.placa === r.placa && x.dataInfracao === r.dataInfracao && r.dataInfracao);
+              });
+              if (jaNoBuffer) r._dup = true;
+              _mltImport.push(r);
+              if (!r._dup) novas++;
+            });
+            ok++;
+          })
+          .catch(function(e){ falhas.push(f.name + ' — ' + e.message); });
+      });
+    });
+    return seq;
+  }).then(function(){
+    var msg = '';
+    if (ok) msg += '<span style="color:var(--green)">✓ '+ok+' arquivo(s) lido(s) · '+novas+' infração(ões) nova(s)</span>';
+    if (falhas.length) {
+      msg += (msg ? '<br>' : '') + '<span style="color:var(--red)">⚠ '+falhas.length+' falhou(ram):</span>'
+        + '<div style="font-size:10px;color:var(--muted)">' + falhas.join('<br>') + '</div>';
+    }
+    if (!ok && !falhas.length) msg = '<span style="color:var(--amber)">Nada encontrado.</span>';
+    if (st) st.innerHTML = msg;
+    mltRenderConferencia();
+  }).catch(function(e){
+    status('⚠ ' + e.message, 'red');
+  });
 }
 
 function mltRenderConferencia(){
@@ -5631,8 +5778,9 @@ function mltRenderConferencia(){
   if (!_mltImport.length) { el.innerHTML = ''; return; }
 
   var h = '<div class="table-card" style="margin-top:12px"><div class="table-scroll"><table>'
-    + '<thead><tr><th style="width:34px"></th><th>Placa</th><th>AIT</th><th>Data</th><th>Hora</th>'
-    + '<th>Infração</th><th>Valor</th><th>Vencimento</th><th>Locatário</th></tr></thead><tbody>';
+    + '<thead><tr><th style="width:34px"><input type="checkbox" checked onchange="mltSelTodas(this.checked)" title="Selecionar todas"></th>'
+    + '<th>Placa</th><th>AIT</th><th>Data</th><th>Hora</th>'
+    + '<th>Infração</th><th>Valor</th><th>Vencimento</th><th>Locatário</th><th>Arquivo</th></tr></thead><tbody>';
 
   _mltImport.forEach(function(r, i){
     var aviso = '';
@@ -5648,7 +5796,11 @@ function mltRenderConferencia(){
       + '<td><input class="fi" style="font-size:10px;padding:4px 6px;min-width:180px" value="'+(r.descricao||'').replace(/"/g,'&quot;')+'" onchange="_mltImport['+i+'].descricao=this.value"></td>'
       + '<td><input class="fi" style="font-size:10px;padding:4px 6px;width:90px" value="'+String(mltNum(r.valor).toFixed(2)).replace('.',',')+'" onchange="_mltImport['+i+'].valor=mltNum(this.value)"></td>'
       + '<td><input class="fi" style="font-size:10px;padding:4px 6px;width:120px" type="date" value="'+(r.vencimento||'')+'" onchange="_mltImport['+i+'].vencimento=this.value"></td>'
-      + '<td id="mltImpLoc'+i+'" style="font-size:10px">'+mltTxtLoc(r)+'</td>'
+      + '<td style="min-width:190px"><div id="mltImpLoc'+i+'" style="font-size:10px;margin-bottom:3px">'+mltTxtLoc(r)+'</div>'
+        + '<select class="fs" style="font-size:10px;padding:3px 5px" onchange="mltImpCliente('+i+',this.value)">'
+        + mltOpcoesClientes(r.cruzamento==='manual' ? (r.clienteId || '__sem__') : '', 'Manter identificado')
+        + '</select></td>'
+      + '<td style="font-size:9px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(r._arquivo||'—')+'</td>'
       + '</tr>';
   });
 
@@ -5662,8 +5814,34 @@ function mltRenderConferencia(){
   el.innerHTML = h;
 }
 
+function mltSelTodas(v){
+  _mltImport.forEach(function(r){ if (!r._dup) r._sel = v; });
+  mltRenderConferencia();
+}
+
+// Ajuste manual do locatário direto na conferência
+function mltImpCliente(i, val){
+  var r = _mltImport[i];
+  if (!r) return;
+  if (val === '__sem__') {
+    r.clienteId = null; r.clienteNome = ''; r.locacaoId = null; r.cruzamento = 'manual';
+  } else if (val) {
+    var c = (db.clients||[]).find(function(x){ return String(x.id) === String(val); });
+    r.clienteId = val; r.clienteNome = c ? c.nome : ''; r.locacaoId = null; r.cruzamento = 'manual';
+  } else {
+    mltRevincular(i); return;
+  }
+  var el = document.getElementById('mltImpLoc' + i);
+  if (el) el.innerHTML = mltTxtLoc(r);
+}
+
 function mltTxtLoc(r){
-  if (r.clienteNome) return '<span style="color:var(--green);font-weight:600">✓ '+r.clienteNome+'</span>';
+  if (r.clienteNome) {
+    var manual = (r.cruzamento === 'manual');
+    return '<span style="color:var(--'+(manual?'blue':'green')+');font-weight:600">'
+      + (manual?'✎ ':'✓ ') + r.clienteNome + '</span>';
+  }
+  if (r.cruzamento === 'manual') return '<span style="color:var(--dark);font-weight:600">Loká (sem locatário)</span>';
   return '<span style="color:var(--amber)">⚠ não identificado</span>';
 }
 
@@ -5686,7 +5864,7 @@ function mltConfirmarImportacao(){
   var n = 0;
   sel.forEach(function(r){
     var o = Object.assign({}, r);
-    delete o._sel; delete o._dup; delete o._naFrota;
+    delete o._sel; delete o._dup; delete o._naFrota; delete o._arquivo;
     o.id = 'm' + Date.now() + '_' + (n++);
     o.criadoEm = new Date().toISOString();
     db.multas.push(o);
@@ -5698,6 +5876,7 @@ function mltConfirmarImportacao(){
   var st = document.getElementById('mltImpStatus');
   if (st) st.innerHTML = '<span style="color:var(--green)">✓ '+n+' multa(s) importada(s)</span>';
   mltPreencherFiltroPlacas();
+  mltPreencherFiltroClientes();
   mltMostrarAba('lista');
   toast('✅ '+n+' multa(s) importada(s)','#0d7a3e');
 }
