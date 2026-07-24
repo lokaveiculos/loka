@@ -355,7 +355,7 @@ tr:hover td{background:#f8f9fe;}
           <option value="manutencao">🔧 Manutenção</option>
           <option value="inativo">⛔ Inativos</option>
         </select>
-        <button class="btn btn-blue" onclick="openVeiculo(null)">+ Adicionar Veículo</button>
+        
       </div>
       <div id="veiculosGrid"></div>
     </div>
@@ -380,7 +380,13 @@ tr:hover td{background:#f8f9fe;}
           <option value="manutencao">🔧 Em Manutenção</option>
           <option value="inativo">⛔ Inativos</option>
         </select>
-        <button class="btn btn-blue" onclick="openVeiculo(null)" style="white-space:nowrap">+ Adicionar</button>
+        <select class="filter-sel" id="fFrotaAlienado" onchange="renderFrota()">
+          <option value="">Alienação: todas</option>
+          <option value="Sim">🔒 Alienados</option>
+          <option value="Não">🔓 Livres</option>
+          <option value="__vazio">❔ Não informado</option>
+        </select>
+        <button class="btn btn-blue" onclick="openVeiculo(null)" style="white-space:nowrap">+ Adicionar Veículo</button>
       </div>
       <div id="frotaGrid"></div>
     </div>
@@ -2877,7 +2883,8 @@ function openVeiculo(vId) {
 
   var map = {
     vvMarca:'marca', vvModelo:'modelo', vvPlaca:'placa', vvAno:'ano',
-    vvCor:'cor', vvKm:'km', vvObs:'obs', vvFranquia:'franquia'
+    vvCor:'cor', vvKm:'km', vvObs:'obs', vvFranquia:'franquia',
+    vvRenavam:'renavam', vvChassi:'chassi', vvAnoMod:'anoMod'
   };
   Object.keys(map).forEach(function(id) {
     var el = document.getElementById(id);
@@ -2890,6 +2897,20 @@ function openVeiculo(vId) {
   });
   var st = document.getElementById('vvStatus');
   if (st) st.value = v.status || 'disponivel';
+
+  // Se o veículo ainda não tem documentação salva, sugerir a da tabela oficial
+  if (!isNew && typeof docsDaPlaca === 'function') {
+    var _d = docsDaPlaca(v.placa) || {};
+    ['vvRenavam:renavam','vvChassi:chassi','vvAnoMod:anoMod'].forEach(function(par){
+      var p = par.split(':'), el = document.getElementById(p[0]);
+      if (el && !el.value && _d[p[1]]) el.value = _d[p[1]];
+    });
+    var al = document.getElementById('vvAlienado');
+    if (al) al.value = (v.alienado != null && v.alienado !== '') ? v.alienado : (_d.alienado || '');
+  } else {
+    var al2 = document.getElementById('vvAlienado');
+    if (al2) al2.value = v.alienado || '';
+  }
 
   openM('mVeiculo');
 }
@@ -2926,6 +2947,10 @@ function salvarVeiculo() {
     franquia:        get('vvFranquia'),
     status:          document.getElementById('vvStatus').value || 'disponivel',
     obs:             get('vvObs'),
+    renavam:         get('vvRenavam').trim(),
+    chassi:          get('vvChassi').trim().toUpperCase(),
+    anoMod:          get('vvAnoMod').trim(),
+    alienado:        get('vvAlienado'),
   };
 
   if (_curVeiculoId) {
@@ -3149,6 +3174,7 @@ function renderFrota() {
   db.ativos    = cleanArr(db.ativos);
   db.veiculos  = cleanVeics(db.veiculos);
   var q = (document.getElementById('qFrota').value || '').toLowerCase();
+  var fAli = (document.getElementById('fFrotaAlienado')||{}).value || '';
   var f = document.getElementById('fFrota').value;
   var list = db.veiculos.filter(function(v) {
     if (q) {
@@ -3156,6 +3182,13 @@ function renderFrota() {
       var _busca = v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')+' '
         + (v.renavam||_d.renavam||'')+' '+(v.chassi||_d.chassi||'');
       if (_busca.toLowerCase().indexOf(q)<0) return false;
+    }
+    // Filtro por alienação (cadastro do veículo ou tabela oficial)
+    if (fAli) {
+      var _da = docsDaPlaca(v.placa) || {};
+      var _ali = (v.alienado != null && v.alienado !== '') ? v.alienado : (_da.alienado || '');
+      if (fAli === '__vazio') { if (_ali) return false; }
+      else if (_ali !== fAli) return false;
     }
     if (f && v.status !== f) return false;
     // Filtro por cliente
@@ -6319,6 +6352,17 @@ function mltConfirmarImportacao(){
       <div class="fg"><label class="fl">Ano</label><input class="fi" id="vvAno" placeholder="2024" type="number" min="2000" max="2030"></div>
       <div class="fg"><label class="fl">Cor</label><input class="fi" id="vvCor" placeholder="Ex: Branca, Prata"></div>
       <div class="fg"><label class="fl">KM atual</label><input class="fi" id="vvKm" placeholder="000000" type="number"></div>
+      <div class="sec-label" style="grid-column:1/-1;margin-top:4px">Documentação</div>
+      <div class="fg"><label class="fl">RENAVAM</label><input class="fi" id="vvRenavam" placeholder="00000000000" inputmode="numeric"></div>
+      <div class="fg"><label class="fl">Chassi</label><input class="fi" id="vvChassi" placeholder="9BWXX00X0XX000000" style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="fg"><label class="fl">Ano/Modelo</label><input class="fi" id="vvAnoMod" placeholder="Ex: 23/24"></div>
+      <div class="fg"><label class="fl">Alienado</label>
+        <select class="fs" id="vvAlienado">
+          <option value="">— Não informado —</option>
+          <option value="Sim">Sim</option>
+          <option value="Não">Não</option>
+        </select>
+      </div>
       <div class="sec-label" style="grid-column:1/-1;margin-top:4px">Tarifas</div>
       <div class="fg"><label class="fl">Diária Normal (R$)</label><input class="fi" id="vvDiaria" type="number" step="0.01" placeholder="0.00"></div>
       <div class="fg"><label class="fl">Diária KM Livre (R$)</label><input class="fi" id="vvDiariaKm" type="number" step="0.01" placeholder="0.00"></div>
