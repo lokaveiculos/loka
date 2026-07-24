@@ -5719,95 +5719,168 @@ function mltDetectarOrgao(txt){
 }
 
 // Segmenta o texto por placa: cada bloco vira uma infração candidata
+// ── Formato A: SENATRAN "Infrações do Veículo" (lista) ──
+function mltParseSenatranLista(texto){
+  var out = [], secao = '';
+  var linhas = texto.split('\n');
+  for (var i = 0; i < linhas.length; i++) {
+    var l = linhas[i].trim();
+
+    var ms = l.match(/^(N[ÃA]O PAGAS[^(]*)\((\d+)\)$/i);
+    if (ms) { secao = ms[1].trim().toUpperCase(); continue; }
+
+    // Início de infração: "DD/MM/AAAA HH:MM - DESCRIÇÃO"
+    var m = l.match(/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})\s*[-–]\s*(.+)$/);
+    if (!m) continue;
+
+    var reg = { dataInfracao: mltISO(m[1]), horaInfracao: m[2], descricao: m[3].trim(),
+                placa:'', ait:'', valor:0, local:'', vencida: /VENCIDA/i.test(secao) };
+
+    // Varre as próximas linhas até a próxima infração
+    for (var j = i+1; j < linhas.length && j < i+12; j++) {
+      var nx = linhas[j].trim();
+      if (/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}\s*[-–]/.test(nx)) break;
+      if (/^N[ÃA]O PAGAS/i.test(nx)) break;
+
+      var mp = nx.match(/^Placa:\s*([A-Z0-9]{7})/i);
+      if (mp && !reg.placa) { reg.placa = mltNormPlaca(mp[1]); continue; }
+
+      var ma = nx.match(/Auto de Infra[çc][ãa]o:\s*([A-Z0-9\-]+)/i);
+      if (ma && !reg.ait) { reg.ait = ma[1].replace(/[\s-]/g,'').toUpperCase(); continue; }
+
+      var mv = nx.match(/R\$\s*([\d.]+,\d{2})/);
+      if (mv && !reg.valor) { reg.valor = mltNum(mv[1]); continue; }
+    }
+    if (reg.placa || reg.ait) out.push(reg);
+  }
+  return out;
+}
+
+// ── Formato B: "Detalhes da Infração" (individual) ──
+function mltParseDetalhe(texto){
+  var t = texto.replace(/\r/g,'');
+  var reg = { placa:'', ait:'', valor:0, dataInfracao:'', horaInfracao:'',
+              descricao:'', local:'', orgao:'', prazoIndicacao:'', vencida:false };
+
+  var m;
+  if ((m = t.match(/Placa\s+[àa]\s+[ée]poca\s+da\s+infra[çc][ãa]o:\s*([A-Z0-9]{7})/i))) reg.placa = mltNormPlaca(m[1]);
+  else if ((m = t.match(/Placa:?\s*([A-Z]{3}\d[A-Z0-9]\d{2})/i))) reg.placa = mltNormPlaca(m[1]);
+
+  if ((m = t.match(/N[úu]mero do Auto de Infra[çc][ãa]o\s+([A-Z0-9\-]+)/i))) reg.ait = m[1].replace(/[\s-]/g,'').toUpperCase();
+  if ((m = t.match(/Data\/Hora do Cometimento da Infra[çc][ãa]o\s+(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})?/i))) {
+    reg.dataInfracao = mltISO(m[1]); reg.horaInfracao = m[2] || '';
+  }
+  if ((m = t.match(/Valor Original\s*\n?\s*R\$\s*([\d.]+,\d{2})/i))) reg.valor = mltNum(m[1]);
+  else if ((m = t.match(/R\$\s*([\d.]+,\d{2})/))) reg.valor = mltNum(m[1]);
+  if ((m = t.match(/Local da Infra[çc][ãa]o\s+(.+?)(?=\n[A-ZÀ-Ú][a-zà-ú]|\nData|\nN[úu]mero|$)/is))) {
+    reg.local = m[1].replace(/\s*\n\s*/g,' ').trim().slice(0,160);
+  }
+  if ((m = t.match(/[ÓO]rg[ãa]o Autuador\s+(.+)/i))) reg.orgao = m[1].trim().slice(0,80);
+  if ((m = t.match(/Data Limite para Identifica[çc][ãa]o do\s*(\d{2}\/\d{2}\/\d{4})/i))) reg.prazoIndicacao = mltISO(m[1]);
+  else if ((m = t.match(/Data Limite para Identifica[çc][ãa]o[^\d]*(\d{2}\/\d{2}\/\d{4})/i))) reg.prazoIndicacao = mltISO(m[1]);
+
+  // Descrição: primeira linha significativa após "Detalhes da Infração"
+  var linhas = t.split('\n').map(function(x){return x.trim();}).filter(Boolean);
+  var idx = linhas.findIndex(function(x){ return /Detalhes da Infra/i.test(x); });
+  for (var k = idx+1; k < linhas.length && k < idx+5; k++) {
+    var c = linhas[k];
+    if (/^Placa/i.test(c)) break;
+    if (c.length > 8 && !/^\d/.test(c)) { reg.descricao = c.slice(0,140); break; }
+  }
+  return (reg.placa || reg.ait) ? [reg] : [];
+}
+
+// ── Formato C: DETRAN-BA "Extrato de Multas em Tramitação" ──
+function mltParseDetranBA(texto){
+  var out = [];
+  var linhas = texto.split('\n').map(function(x){return x.trim();});
+  var placa = '';
+  var mp = texto.match(/\n\s*([A-Z]{3}\d[A-Z0-9]\d{2})\s+R\$/);
+  if (mp) placa = mltNormPlaca(mp[1]);
+
+  for (var i = 0; i < linhas.length; i++) {
+    // linha de dados: NºControle AIT R$valor DD/MM/AAAA
+    var m = linhas[i].match(/^(\d{6,12})\s+([A-Z0-9]{6,14})\s+R\$\s*([\d.]+,\d{2})\s+(\d{2}\/\d{2}\/\d{4})/);
+    if (!m) continue;
+    var reg = { placa: placa, ait: m[2].toUpperCase(), valor: mltNum(m[3]),
+                dataInfracao: mltISO(m[4]), horaInfracao:'', descricao:'', local:'',
+                orgao:'', vencida:false };
+    // órgão na linha seguinte
+    for (var j = i+1; j < linhas.length && j < i+4; j++) {
+      var mo = linhas[j].match(/^(PREF\.?\s*DE:?\s*.+?|DETRAN.*?|POL[ÍI]CIA.*?)\s+[A-Z]{2}\s+([A-Z]+)$/i);
+      if (mo) { reg.orgao = mo[1].trim().slice(0,80); reg.descricao = 'Multa ' + mo[2].toLowerCase(); break; }
+    }
+    out.push(reg);
+  }
+  return out;
+}
+
+// ── Roteador principal ──
+function mltParseBruto(texto){
+  if (!texto) return [];
+  if (/CERTIFICADO DE REGISTRO E LICENCIAMENTO/i.test(texto)) return [];  // CRLV, não é multa
+  if (/Detalhes da Infra[çc][ãa]o/i.test(texto)) return mltParseDetalhe(texto);
+  if (/EXTRATO DE MULTAS/i.test(texto))          return mltParseDetranBA(texto);
+  return mltParseSenatranLista(texto);
+}
+// ── Converte os registros brutos no formato do sistema ─────────
 function mltParsePDF(texto){
   var placasConhecidas = {};
   (db.veiculos || []).forEach(function(v){ if (v.placa) placasConhecidas[mltNormPlaca(v.placa)] = v; });
 
-  var linhas = texto.split('\n');
-  var blocos = [], atual = null;
-
-  linhas.forEach(function(l){
-    MLT_RE_PLACA.lastIndex = 0;
-    var m = MLT_RE_PLACA.exec(l);
-    if (m) {
-      var p = mltNormPlaca(m[1] + m[2]);
-      // só inicia bloco novo se a placa for da frota (evita falsos positivos)
-      if (placasConhecidas[p] || Object.keys(placasConhecidas).length === 0) {
-        if (atual) blocos.push(atual);
-        atual = {placa: p, linhas: [l]};
-        return;
-      }
-    }
-    if (atual) atual.linhas.push(l);
-  });
-  if (atual) blocos.push(atual);
-
+  var brutos = mltParseBruto(texto);
   var orgaoGlobal = mltDetectarOrgao(texto);
 
-  return blocos.map(function(b){
-    var txt = b.linhas.join(' ');
-
-    // Datas: a primeira é a infração; se houver mais, a maior costuma ser vencimento
-    MLT_RE_DATA.lastIndex = 0;
-    var datas = [], d;
-    while ((d = MLT_RE_DATA.exec(txt)) !== null) datas.push(mltISO(d[1]));
-    datas = datas.filter(Boolean);
-    var dataInfr = datas[0] || '';
-    var outras = datas.slice(1).sort();
-    var vencimento = outras.length ? outras[outras.length - 1] : '';
-
-    // Valores: o maior costuma ser o valor da multa
-    MLT_RE_VALOR.lastIndex = 0;
-    var valores = [], v;
-    while ((v = MLT_RE_VALOR.exec(txt)) !== null) valores.push(mltNum(v[1]));
-    var valor = valores.length ? Math.max.apply(null, valores) : 0;
-
-    var hora = (txt.match(MLT_RE_HORA) || [])[0] || '';
-    var ait  = '';
-    var aitM = txt.replace(b.placa, '').match(MLT_RE_AIT);
-    if (aitM) ait = aitM[1].replace(/[\s-]/g,'');
-
-    // Descrição: linha mais longa sem números demais
-    var desc = '';
-    b.linhas.forEach(function(l){
-      var limpa = l.replace(/[\d\/:.,R$-]/g,'').trim();
-      if (limpa.length > desc.length && limpa.length > 12) desc = l.trim();
-    });
-    if (desc.length > 120) desc = desc.slice(0, 120);
-
-    var grav = mltDetectarGravidade(txt);
+  return brutos.map(function(b){
     var veic = placasConhecidas[b.placa];
-    var loc  = mltLocatario(b.placa, dataInfr);
+    var loc  = mltLocatario(b.placa, b.dataInfracao);
+    var grav = mltDetectarGravidade((b.descricao||'') + ' ' + (b.local||''));
+    // Fallback: o CTB usa valores padronizados — inferir a gravidade pelo valor
+    if (!grav && b.valor) {
+      for (var g in MLT_GRAV) {
+        if (Math.abs(MLT_GRAV[g].val - b.valor) < 0.05) { grav = g; break; }
+      }
+      // multiplicadores comuns (2x, 3x, 5x, 10x, 20x)
+      if (!grav) {
+        [2,3,5,10,20].forEach(function(mult){
+          if (grav) return;
+          for (var g2 in MLT_GRAV) {
+            if (Math.abs(MLT_GRAV[g2].val * mult - b.valor) < 0.5) { grav = g2; break; }
+          }
+        });
+      }
+    }
+    var ait  = (b.ait||'').toUpperCase();
 
     return {
       _sel: true,
       _dup: mltMultas().some(function(x){
-        return (ait && (x.ait||'').toUpperCase() === ait.toUpperCase())
-          || (mltNormPlaca(x.placa) === b.placa && mltISO(x.dataInfracao) === dataInfr && dataInfr);
+        return (ait && (x.ait||'').toUpperCase() === ait)
+          || (mltNormPlaca(x.placa) === b.placa && mltISO(x.dataInfracao) === b.dataInfracao && b.dataInfracao);
       }),
       _naFrota: !!veic,
       ait: ait,
       placa: b.placa,
-      veiculoId: veic ? veic.id : null,
+      veiculoId:   veic ? veic.id : null,
       veiculoNome: veic ? ((veic.marca||'')+' '+(veic.modelo||'')).trim() : '',
-      orgao: mltDetectarOrgao(txt) || orgaoGlobal,
-      dataInfracao: dataInfr,
-      horaInfracao: hora,
-      local: '',
-      descricao: desc,
+      orgao: b.orgao || orgaoGlobal || '',
+      dataInfracao: b.dataInfracao || '',
+      horaInfracao: b.horaInfracao || '',
+      local: b.local || '',
+      descricao: b.descricao || '',
       gravidade: grav,
       pontos: grav && MLT_GRAV[grav] ? MLT_GRAV[grav].pts : 0,
-      valor: valor,
-      vencimento: vencimento,
-      prazoIndicacao: '',
+      valor: b.valor || 0,
+      vencimento: b.vencimento || '',
+      prazoIndicacao: b.prazoIndicacao || '',
       status: 'pendente',
-      obs: '',
+      obs: b.vencida ? 'Consta como VENCIDA no extrato' : '',
       clienteId:   loc ? loc.clienteId   : null,
       clienteNome: loc ? loc.clienteNome : '',
       locacaoId:   loc ? loc.locacaoId   : null,
       cruzamento:  loc ? 'auto' : 'nenhum'
     };
-  }).filter(function(x){ return x.placa && (x.dataInfracao || x.valor); });
+  }).filter(function(x){ return x.placa && (x.ait || x.valor); });
 }
 
 // ── FLUXO DE IMPORTAÇÃO ────────────────────────────────────────
