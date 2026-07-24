@@ -3178,17 +3178,8 @@ function renderVeiculos() {
     + '</tr></thead><tbody>'
     + list.map(function(v) {
       var st = v.status||'disponivel';
-      // Documentos do veículo: usa o cadastro; se vazio, busca na tabela oficial da frota
-      var _doc = docsDaPlaca(v.placa) || {};
-      var docRenavam = v.renavam || _doc.renavam || '<span style="color:#ccc">—</span>';
-      var docChassi  = v.chassi  || _doc.chassi  || '<span style="color:#ccc">—</span>';
-      var docAnoMod  = v.anoMod  || _doc.anoMod  || (v.ano || '<span style="color:#ccc">—</span>');
-      var _ali = (v.alienado != null && v.alienado !== '') ? v.alienado : _doc.alienado;
-      var docAlienado = _ali === 'Sim'
-        ? '<span style="background:#fef3cd;color:#b45309;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">Sim</span>'
-        : _ali === 'Não'
-        ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">Não</span>'
-        : '<span style="color:#ccc">—</span>';
+      var diaria = v.diaria ? 'R$ '+Number(v.diaria).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
+      var mensal = v.mensal ? 'R$ '+Number(v.mensal).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
       var manutBtn = st==='manutencao'
         ? '<button class="icon-btn" onclick="openRetornoManut(\''+v.id+'\')" title="Dar Baixa" style="color:var(--purple);border-color:var(--purple)">✅</button>'
         : '';
