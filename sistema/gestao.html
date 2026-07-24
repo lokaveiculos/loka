@@ -1385,6 +1385,9 @@ function setupRealtimeSync() {
     db.clients   = cleanArr(db.clients);
     db.historico = cleanArr(db.historico);
     db.contratos = cleanArr(db.contratos);
+    // Normaliza multas/checklists: o Firebase pode devolvê-los como objeto
+    if (typeof mltMultas === 'function') mltMultas();
+    db.checklists = cleanArr(db.checklists);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
 
     // Não re-renderiza se há modal aberto (usuário pode estar digitando)
@@ -5060,7 +5063,23 @@ function mltNum(v){
 
 function mltMultas(){
   if (!db) return [];
-  if (!Array.isArray(db.multas)) db.multas = [];
+  // O Firebase devolve arrays como OBJETO quando há chaves não sequenciais
+  // (acontece após exclusões). Converter em vez de zerar — zerar apagaria tudo.
+  if (!Array.isArray(db.multas)) {
+    if (db.multas && typeof db.multas === 'object') {
+      db.multas = Object.keys(db.multas)
+        .sort(function(a,b){ return Number(a) - Number(b); })
+        .map(function(k){ return db.multas[k]; })
+        .filter(function(x){ return x != null; });
+    } else {
+      db.multas = [];
+    }
+  } else {
+    // remove buracos (null) que o Firebase deixa
+    if (db.multas.indexOf(null) >= 0) {
+      db.multas = db.multas.filter(function(x){ return x != null; });
+    }
+  }
   return db.multas;
 }
 
@@ -6138,13 +6157,21 @@ function mltConfirmarImportacao(){
   }
 
   var n = 0;
-  sel.forEach(function(r){
-    var o = Object.assign({}, r);
-    delete o._sel; delete o._dup; delete o._naFrota; delete o._arquivo;
-    o.id = 'm' + Date.now() + '_' + (n++);
-    o.criadoEm = new Date().toISOString();
-    db.multas.push(o);
-  });
+  try {
+    var lista = mltMultas();   // garante que db.multas seja um array válido
+    sel.forEach(function(r){
+      var o = Object.assign({}, r);
+      delete o._sel; delete o._dup; delete o._naFrota; delete o._arquivo;
+      o.id = 'm' + Date.now() + '_' + (n++);
+      o.criadoEm = new Date().toISOString();
+      lista.push(o);
+    });
+    db.multas = lista;
+  } catch(err) {
+    console.error('Erro ao importar multas:', err);
+    toast('❌ Falha ao gravar a importação: ' + err.message, '#c0392b');
+    return;
+  }
 
   saveDB();
   _mltImport = [];
