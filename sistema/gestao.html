@@ -487,11 +487,10 @@ tr:hover td{background:#f8f9fe;}
             <span style="color:var(--amber)">O PDF precisa ter texto selecion&aacute;vel — digitalizados/foto n&atilde;o funcionam.</span>
           </div>
           <div class="fg" style="margin-top:14px;max-width:380px">
-            <label class="fl">Associar as multas a um cliente</label>
+            <label class="fl">Cliente inicial dos pr&oacute;ximos arquivos</label>
             <select class="fs" id="mltImpClientePadrao"></select>
             <div style="font-size:9px;color:var(--muted);margin-top:3px">
-              Deixe no padr&atilde;o para o sistema identificar pela data de cada loca&ccedil;&atilde;o.
-              Escolha um cliente se todo o PDF for de um &uacute;nico locat&aacute;rio.
+              Valor sugerido ao adicionar arquivos &mdash; voc&ecirc; ajusta o cliente de cada guia na fila abaixo.
             </div>
           </div>
 
@@ -501,6 +500,7 @@ tr:hover td{background:#f8f9fe;}
             <span id="mltImpStatus" style="font-size:11px;font-weight:600"></span>
           </div>
         </div>
+        <div id="mltFila"></div>
         <div id="mltConferencia"></div>
       </div>
 
@@ -5563,6 +5563,7 @@ function mltRelatorio(){
 var MLT_PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 var MLT_PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 var _mltPdfReady = false;
+var _mltFila = [];   // arquivos aguardando leitura: {file, nome, cliente}
 
 function mltCarregarPdfJs(){
   return new Promise(function(resolve, reject){
@@ -5731,10 +5732,74 @@ function mltParsePDF(texto){
 }
 
 // ── FLUXO DE IMPORTAÇÃO ────────────────────────────────────────
+// Passo 1: enfileira os arquivos para o usuário definir o cliente de cada um
 function mltImportarArquivo(input){
   var arquivos = Array.prototype.slice.call(input.files || []);
   input.value = '';
   if (!arquivos.length) return;
+
+  var padrao = (document.getElementById('mltImpClientePadrao')||{}).value || '';
+  arquivos.forEach(function(f){
+    if (_mltFila.some(function(x){ return x.nome === f.name && x.tam === f.size; })) return;
+    _mltFila.push({file: f, nome: f.name, tam: f.size, cliente: padrao});
+  });
+  mltRenderFila();
+}
+
+function mltFilaCliente(i, val){ if (_mltFila[i]) _mltFila[i].cliente = val; }
+
+function mltFilaRemover(i){ _mltFila.splice(i, 1); mltRenderFila(); }
+
+function mltFilaLimpar(){ _mltFila = []; mltRenderFila(); }
+
+// Replica o cliente da primeira linha para todas as demais
+function mltFilaReplicar(){
+  if (!_mltFila.length) return;
+  var c = _mltFila[0].cliente;
+  _mltFila.forEach(function(x){ x.cliente = c; });
+  mltRenderFila();
+}
+
+function mltRenderFila(){
+  var el = document.getElementById('mltFila');
+  if (!el) return;
+  if (!_mltFila.length) { el.innerHTML = ''; return; }
+
+  var h = '<div class="table-card" style="margin-top:12px"><div class="table-scroll"><table>'
+    + '<thead><tr><th>Arquivo</th><th style="min-width:220px">Cliente desta guia</th><th style="width:40px"></th></tr></thead><tbody>';
+
+  _mltFila.forEach(function(f, i){
+    h += '<tr>'
+      + '<td style="font-size:11px;font-weight:600">&#128196; ' + f.nome
+        + '<div style="font-size:9px;color:var(--muted)">' + Math.round(f.tam/1024) + ' KB</div></td>'
+      + '<td><select class="fs" style="font-size:11px;padding:5px 7px" onchange="mltFilaCliente('+i+',this.value)">'
+        + mltOpcoesClientes(f.cliente, 'Identificar pela data da locação') + '</select></td>'
+      + '<td class="td-actions"><button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:var(--red)" onclick="mltFilaRemover('+i+')">&#10005;</button></td>'
+      + '</tr>';
+  });
+
+  h += '</tbody></table></div></div>'
+    + '<div class="toolbar" style="margin-top:10px;flex-wrap:wrap;gap:8px">'
+    + '<div style="flex:1;font-size:11px;color:var(--muted)">' + _mltFila.length + ' arquivo(s) na fila — defina o cliente de cada guia antes de ler</div>'
+    + (_mltFila.length > 1 ? '<button class="btn btn-outline" style="font-size:11px" onclick="mltFilaReplicar()" title="Copia o cliente do primeiro arquivo para todos">&#8681; Repetir p/ todos</button>' : '')
+    + '<button class="btn btn-outline" style="font-size:11px" onclick="mltFilaLimpar()">Limpar fila</button>'
+    + '<button class="btn btn-green" onclick="mltProcessarFila()">&#9654; Ler ' + _mltFila.length + ' arquivo(s)</button>'
+    + '</div>';
+  el.innerHTML = h;
+}
+
+// Passo 2: lê os arquivos da fila aplicando o cliente definido em cada um
+function mltProcessarFila(){
+  if (!_mltFila.length) { toast('⚠️ Nenhum arquivo na fila','#b45309'); return; }
+  var arquivos = _mltFila.slice();
+  _mltFila = [];
+  mltRenderFila();
+  mltLerArquivos(arquivos);
+}
+
+function mltLerArquivos(fila){
+  var arquivos = fila.map(function(x){ return x.file; });
+  var clientes = fila.map(function(x){ return x.cliente; });
 
   var st = document.getElementById('mltImpStatus');
   var ok = 0, falhas = [], novas = 0;
@@ -5758,7 +5823,7 @@ function mltImportarArquivo(input){
             }
             var achadas = mltParsePDF(texto);
             if (!achadas.length) throw new Error('nenhuma infração reconhecida');
-            var padrao = (document.getElementById('mltImpClientePadrao')||{}).value || '';
+            var padrao = clientes[i] || '';
             achadas.forEach(function(r){
               r._arquivo = f.name;
               mltAplicarClientePadrao(r, padrao);
@@ -5802,12 +5867,49 @@ function mltRenderConferencia(){
   if (!el) return;
   if (!_mltImport.length) { el.innerHTML = ''; return; }
 
-  var h = '<div class="table-card" style="margin-top:12px"><div class="table-scroll"><table>'
+  var h = '<div class="toolbar" style="margin-top:12px;flex-wrap:wrap;gap:8px;background:#F7F8FF;border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    + '<span style="font-size:11px;font-weight:700;color:var(--dark)">Associar em lote:</span>'
+    + '<select class="fs" id="mltMassaCliente" style="font-size:11px;padding:5px 7px;max-width:240px">'
+    + mltOpcoesClientes('', '— escolha o cliente —') + '</select>'
+    + '<button class="btn btn-blue" style="font-size:11px" onclick="mltAplicarMassa()">Aplicar &agrave;s selecionadas</button>'
+    + '<span style="font-size:10px;color:var(--muted)">ou use o seletor no cabe&ccedil;alho de cada arquivo</span>'
+    + '</div>'
+    + '<div class="table-card" style="margin-top:10px"><div class="table-scroll"><table>'
     + '<thead><tr><th style="width:34px"><input type="checkbox" checked onchange="mltSelTodas(this.checked)" title="Selecionar todas"></th>'
     + '<th>Placa</th><th>AIT</th><th>Data</th><th>Hora</th>'
     + '<th>Infração</th><th>Valor</th><th>Vencimento</th><th>Locatário</th><th>Arquivo</th></tr></thead><tbody>';
 
-  _mltImport.forEach(function(r, i){
+  // agrupa por arquivo mantendo o índice original
+  var ordem = _mltImport.map(function(_, i){ return i; });
+  ordem.sort(function(a, b){
+    return String(_mltImport[a]._arquivo||'').localeCompare(String(_mltImport[b]._arquivo||''));
+  });
+  var grupoAtual = null;
+
+  ordem.forEach(function(i){
+    var r = _mltImport[i];
+
+    if (r._arquivo !== grupoAtual) {
+      grupoAtual = r._arquivo;
+      var doGrupo = _mltImport.filter(function(x){ return x._arquivo === grupoAtual; });
+      var cliGrupo = '';
+      var todosIguais = doGrupo.every(function(x){
+        return x.cruzamento === 'manual' && String(x.clienteId||'__sem__') === String(doGrupo[0].clienteId||'__sem__');
+      });
+      if (todosIguais && doGrupo.length) cliGrupo = doGrupo[0].clienteId || '__sem__';
+
+      h += '<tr style="background:#EEF1FD"><td colspan="10" style="padding:8px 10px">'
+        + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        + '<strong style="font-size:11px;color:var(--dark)">&#128196; ' + (grupoAtual || 'Sem arquivo')
+        + ' <span style="font-weight:400;color:var(--muted)">(' + doGrupo.length + ')</span></strong>'
+        + '<span style="font-size:10px;color:var(--muted)">Aplicar a todas deste arquivo:</span>'
+        + '<select class="fs" style="font-size:10px;padding:3px 6px;max-width:200px" '
+        + 'onchange="mltAplicarGrupo(this.getAttribute(\'data-arq\'),this.value)" '
+        + 'data-arq="' + String(grupoAtual||'').replace(/"/g,'&quot;') + '">'
+        + mltOpcoesClientes(cliGrupo, '— manter individual —') + '</select>'
+        + '</div></td></tr>';
+    }
+
     var bloqueio = mltImpBloqueada(r);
     var aviso = '';
     if (bloqueio === 'duplicada') aviso = '<div style="font-size:9px;color:var(--red);font-weight:700">já cadastrada</div>';
@@ -5883,8 +5985,36 @@ function mltImpAit(i, val){
   mltRenderConferencia();
 }
 
+// Aplica um cliente a todas as linhas de um arquivo
+function mltAplicarGrupo(arquivo, val){
+  var n = 0;
+  _mltImport.forEach(function(r, i){
+    if (r._arquivo !== arquivo) return;
+    if (!val) return;               // "manter individual" não mexe em nada
+    mltImpCliente(i, val, true);
+    n++;
+  });
+  if (n) toast('✅ ' + n + ' infração(ões) associada(s)', '#0d7a3e');
+  mltRenderConferencia();
+}
+
+// Aplica um cliente a todas as linhas marcadas
+function mltAplicarMassa(){
+  var val = (document.getElementById('mltMassaCliente')||{}).value || '';
+  if (!val) { toast('⚠️ Escolha o cliente','#b45309'); return; }
+  var n = 0;
+  _mltImport.forEach(function(r, i){
+    if (!r._sel || mltImpBloqueada(r)) return;
+    mltImpCliente(i, val, true);
+    n++;
+  });
+  if (!n) { toast('⚠️ Nenhuma linha selecionada','#b45309'); return; }
+  toast('✅ ' + n + ' infração(ões) associada(s)', '#0d7a3e');
+  mltRenderConferencia();
+}
+
 // Ajuste manual do locatário direto na conferência
-function mltImpCliente(i, val){
+function mltImpCliente(i, val, semRender){
   var r = _mltImport[i];
   if (!r) return;
   if (val === '__sem__') {
@@ -5893,8 +6023,11 @@ function mltImpCliente(i, val){
     var c = (db.clients||[]).find(function(x){ return String(x.id) === String(val); });
     r.clienteId = val; r.clienteNome = c ? c.nome : ''; r.locacaoId = null; r.cruzamento = 'manual';
   } else {
-    mltRevincular(i); return;
+    mltRevincular(i);
+    if (semRender) return;
+    return;
   }
+  if (semRender) return;
   var el = document.getElementById('mltImpLoc' + i);
   if (el) el.innerHTML = mltTxtLoc(r);
 }
