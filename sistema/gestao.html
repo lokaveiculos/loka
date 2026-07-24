@@ -1220,6 +1220,30 @@ function loadDB() {
         db.clients   = cleanArr(db.clients);
         db.historico = cleanArr(db.historico);
         db.contratos = cleanArr(db.contratos);
+        db.multas    = cleanArr(db.multas);
+        db.checklists = cleanArr(db.checklists);
+
+        // PROTEÇÃO CONTRA PERDA DE DADOS:
+        // A escolha acima considera apenas clientes/ativos. Módulos como multas,
+        // checklists e financeiro podem estar mais completos no Firebase — se o
+        // localStorage estiver defasado, preservamos a versão do Firebase para
+        // que o próximo saveDB() não apague esses registros.
+        if (fbData) {
+          var _fbMultas = cleanArr(fbData.multas);
+          if (_fbMultas.length > db.multas.length) db.multas = _fbMultas;
+
+          var _fbChecks = cleanArr(fbData.checklists);
+          if (_fbChecks.length > db.checklists.length) db.checklists = _fbChecks;
+
+          var _fbBaixas = cleanArr(fbData.baixasHistorico);
+          if (_fbBaixas.length > cleanArr(db.baixasHistorico).length) db.baixasHistorico = _fbBaixas;
+
+          // Financeiro é objeto: usa o do Firebase se o local estiver vazio/ausente
+          var _lfin = JSON.stringify(db.financeiro || {});
+          var _ffin = JSON.stringify(fbData.financeiro || {});
+          if (_ffin.length > _lfin.length) db.financeiro = fbData.financeiro;
+        }
+
         // Sincronizar Firebase SOMENTE se local tem mais clientes OU mais ativos
         if (nLS > nFB || nLsAtv > nFbAtv) {
           try { firebase.database().ref('loka_db').set(db); } catch(e) {}
@@ -1349,6 +1373,7 @@ function setupRealtimeSync() {
       || quickHash(fbData.manutencoes)      !== quickHash(db.manutencoes)
       || quickHash(fbData.contratos)        !== quickHash(db.contratos)
       || quickHash(fbData.checklists)       !== quickHash(db.checklists)
+      || quickHash(fbData.multas)           !== quickHash(db.multas)
       || JSON.stringify(fbData.financeiro)  !== JSON.stringify(db.financeiro);
 
     if (!mudou) return;
@@ -1389,6 +1414,7 @@ function _reRenderPainelAtivo() {
     if (nome === 'manutencao')  renderManutencao();
     if (nome === 'faturas')     { if(typeof renderFaturas==='function') renderFaturas(); }
     if (nome === 'financeiro')  { if(typeof finRender==='function') finRender(_finAbaAtual); }
+    if (nome === 'multas')      { if(typeof mltRender==='function') mltRender(); }
     // Atualizar stats do dashboard só se NÃO estiver nele (evita render duplo)
     if (nome !== 'dashboard') {
       try {
