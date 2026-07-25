@@ -1007,7 +1007,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v15-20260725-1515';
+var LOKA_BUILD = 'v16-20260725-2200';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -1211,18 +1211,38 @@ function loadDB() {
       var nFB = fbData ? (fbData.clients||[]).length : 0;
       var nLS = local  ? (local.clients||[]).length   : 0;
 
-      if (nFB > nLS && nFB > 64) {
-        // Firebase tem mais clientes reais — usa Firebase e atualiza localStorage
+      // DECISÃO POR RECÊNCIA (carimbo de tempo), não por contagem.
+      // Isso evita que um aluguel encerrado "reapareça" ou um novo "suma":
+      // quem tem o carimbo _ultimaEscrita mais recente é a verdade.
+      var tsFb = (fbData && fbData._ultimaEscrita) || 0;
+      var tsLs = (local && local._ultimaEscrita) || 0;
+
+      if (nFB > nLS && nFB > 64 && tsFb >= tsLs) {
+        // Firebase tem mais clientes reais E não é mais antigo — usa Firebase
         inicializarCom(fbData, null);
         return;
       }
 
       if (nLS > 0) {
+        // Se o localStorage é mais recente, ele vence (você salvou algo há pouco)
+        if (tsLs > tsFb) {
+          local.ativos    = cleanArr(local.ativos);
+          local.veiculos  = cleanVeics(local.veiculos);
+          local.clients   = cleanArr(local.clients);
+          local.historico = cleanArr(local.historico);
+          local.contratos = cleanArr(local.contratos);
+          db = local;
+          inicializarCom(local, null);
+          // Reenvia para o Firebase para garantir que a alteração propague
+          try { firebase.database().ref('loka_db').set(db); } catch(e) {}
+          return;
+        }
+
         var nLsAtv = (local.ativos||[]).length;
         var nFbAtv = fbData ? (fbData.ativos||[]).length : 0;
 
-        // Se Firebase tem mais ativos, usar Firebase (dados mais completos)
-        if (nFbAtv > nLsAtv) {
+        // Empate de carimbo: se Firebase tem mais ativos, usar Firebase
+        if (nFbAtv > nLsAtv && tsFb >= tsLs) {
           inicializarCom(fbData, null);
           return;
         }
@@ -1325,28 +1345,49 @@ function loadDB() {
   }
 }
 
+var _ultimaEscritaLocal = 0;   // timestamp da última alteração local
+var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
+// Garante que um campo do db seja array (Firebase devolve como objeto após exclusões)
+function garantirArray(nome){
+  if (!Array.isArray(db[nome])) {
+    db[nome] = (db[nome] && typeof db[nome] === 'object')
+      ? Object.keys(db[nome]).sort(function(a,b){return Number(a)-Number(b);}).map(function(k){return db[nome][k];}).filter(function(x){return x!=null;})
+      : [];
+  }
+  return db[nome];
+}
+
 function saveDB() {
   if (!db) return;
+  // Marca o momento da alteração local — o sync ignora ecos anteriores a isto
+  _ultimaEscritaLocal = Date.now();
+  db._ultimaEscrita = _ultimaEscritaLocal;   // carimbo viaja junto no Firebase
+
   // Salva no localStorage imediatamente
   try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
-  // Salva no Firebase — levanta flag para não re-renderizar ao receber o próprio save
+
+  // Salva no Firebase
   try {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && navigator.onLine) {
       _isSaving = true;
+      _escritasPendentes++;
       _mostrarSyncBadge('💾 Salvando...');
       firebase.database().ref('loka_db').set(db).then(function() {
-        _mostrarSyncBadge('✅ Salvo');
-        // Libera flag após Firebase confirmar (1.5s de margem)
-        setTimeout(function() { _isSaving = false; }, 1500);
+        _escritasPendentes = Math.max(0, _escritasPendentes - 1);
+        if (_escritasPendentes === 0) {
+          _mostrarSyncBadge('✅ Salvo');
+          setTimeout(function() { if (_escritasPendentes === 0) _isSaving = false; }, 2000);
+        }
       }).catch(function(e) {
-        _isSaving = false;
+        _escritasPendentes = Math.max(0, _escritasPendentes - 1);
+        if (_escritasPendentes === 0) _isSaving = false;
         _mostrarSyncBadge('⚠️ Erro ao salvar');
         console.error('saveDB error:', e);
       });
-      // Failsafe: liberar após 8s mesmo se Promise não resolver
-      setTimeout(function() { _isSaving = false; }, 8000);
+      // Failsafe: se nada resolver em 10s, libera
+      setTimeout(function() { if (_escritasPendentes === 0) _isSaving = false; }, 10000);
     }
-  } catch(e) { _isSaving = false; }
+  } catch(e) { _escritasPendentes = 0; _isSaving = false; }
 }
 
 // ── SINCRONIZAÇÃO EM TEMPO REAL ────────────────────────────────
@@ -1355,13 +1396,18 @@ function setupRealtimeSync() {
   if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
 
   firebase.database().ref('loka_db').on('value', function(snap) {
-    // Ignora se fomos nós que salvamos (evita re-render desnecessário)
-    if (_isSaving) return;
     // Ignora se db ainda não foi inicializado
     if (!db) return;
+    // Ignora enquanto há gravações nossas em voo (evita eco sobrescrever)
+    if (_isSaving || _escritasPendentes > 0) return;
 
     var fbData = snap.val();
     if (!fbData || !fbData.clients) return;
+
+    // PROTEÇÃO PRINCIPAL: se o dado do Firebase é mais ANTIGO que a nossa última
+    // alteração local, é um eco atrasado — ignorar para não perder o que salvamos.
+    var carimboFb = fbData._ultimaEscrita || 0;
+    if (carimboFb < _ultimaEscritaLocal) return;
 
     // Firebase é a fonte de verdade — sempre aceitar dados dele
     // (a lógica de "restaurar" causava conflito com exclusões legítimas)
@@ -1795,6 +1841,7 @@ function openCliente(idx) {
 }
 
 function salvarCliente() {
+  garantirArray('clients'); 
   var nome = (document.getElementById('cNome').value||'').trim();
   if (!nome) { toast('⚠️ Nome é obrigatório','#b45309'); return; }
   var c = {
@@ -2257,6 +2304,7 @@ function gerenciarVeiculosAtivo(id) {
 
 // ── DAR BAIXA EM VEÍCULO INDIVIDUAL ─────────────────────────
 function baixarVeiculoAtivo(ativoId, placa) {
+  garantirArray('ativos'); garantirArray('historico'); 
   if (!confirm('Dar baixa no veículo '+placa+'? Ele voltará para Disponível.')) return;
   var idx = (db.ativos||[]).findIndex(function(a){ return a.id===ativoId; });
   if (idx<0) return;
@@ -2332,12 +2380,7 @@ function salvarAluguel() {
     geradoEm: new Date().toISOString(), status: 'ativo'
   };
   try {
-    // Garante que db.ativos seja um array (Firebase pode devolver como objeto após exclusões)
-    if (!Array.isArray(db.ativos)) {
-      db.ativos = (db.ativos && typeof db.ativos === 'object')
-        ? Object.keys(db.ativos).map(function(k){ return db.ativos[k]; }).filter(Boolean)
-        : [];
-    }
+    garantirArray('ativos');
     db.ativos.push(a);
     if (db.veiculos[vIdx]) db.veiculos[vIdx].status = 'alugado';
     if (db.clients[cIdx]) db.clients[cIdx].alugueis = (db.clients[cIdx].alugueis||0)+1;
@@ -2557,23 +2600,37 @@ function calcEnc() {
 function confirmarEnc() {
   var devDate = (document.getElementById('encData').value||'');
   if (!devDate) { toast('⚠️ Informe a data de devolução','#b45309'); return; }
-  var idx = db.ativos.findIndex(function(x){return x.id===_encId;});
-  if (idx<0) return;
-  var a = db.ativos[idx];
-  var valStr = ((document.getElementById('encValor').value||'0').replace(/\./g,'').replace(',','.'));
-  if (!db.historico) db.historico = [];
-  db.historico.push(Object.assign({}, a, {
-    devolvido: devDate,
-    kmDev: document.getElementById('encKm').value,
-    valorFinal: 'R$ '+parseFloat(valStr||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),
-    condicao: document.getElementById('encCondicao').value,
-    obs: document.getElementById('encObs').value,
-    encerradoEm: new Date().toISOString()
-  }));
-  var vIdx = db.veiculos.findIndex(function(v){return v.id===a.veiculoId;});
-  if (vIdx>=0) { db.veiculos[vIdx].status='disponivel'; var km=document.getElementById('encKm').value; if(km) db.veiculos[vIdx].km=km; }
-  db.ativos.splice(idx,1);
-  saveDB(); renderAtivos(); renderDashboard(); checkAlertas();
+  try {
+    // Garante arrays (Firebase pode devolver como objeto após exclusões)
+    garantirArray('ativos');
+    garantirArray('historico');
+    garantirArray('veiculos');
+
+    var idx = db.ativos.findIndex(function(x){return x && x.id===_encId;});
+    if (idx<0) { toast('⚠️ Locação não encontrada. Recarregue a página.','#b45309'); return; }
+    var a = db.ativos[idx];
+    var valStr = ((document.getElementById('encValor').value||'0').replace(/\./g,'').replace(',','.'));
+
+    db.historico.push(Object.assign({}, a, {
+      devolvido: devDate,
+      kmDev: document.getElementById('encKm').value,
+      valorFinal: 'R$ '+parseFloat(valStr||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),
+      condicao: document.getElementById('encCondicao').value,
+      obs: document.getElementById('encObs').value,
+      encerradoEm: new Date().toISOString()
+    }));
+    var vIdx = db.veiculos.findIndex(function(v){return v && v.id===a.veiculoId;});
+    if (vIdx>=0) { db.veiculos[vIdx].status='disponivel'; var km=document.getElementById('encKm').value; if(km) db.veiculos[vIdx].km=km; }
+    db.ativos.splice(idx,1);
+  } catch(err) {
+    console.error('Erro ao encerrar locação:', err);
+    toast('❌ Falha ao encerrar: '+err.message,'#c0392b');
+    return;
+  }
+  saveDB();
+  if (typeof renderAtivos==='function') renderAtivos();
+  if (typeof renderDashboard==='function') renderDashboard();
+  if (typeof checkAlertas==='function') checkAlertas();
   closeM('mEncerramento');
   toast('✅ Locação encerrada!','#0d7a3e');
 }
@@ -2940,6 +2997,7 @@ function openVeiculo(vId) {
 }
 
 function salvarVeiculo() {
+  garantirArray('veiculos'); 
   var marca  = (document.getElementById('vvMarca').value||'').trim();
   var modelo = (document.getElementById('vvModelo').value||'').trim();
   var placa  = (document.getElementById('vvPlaca').value||'').trim().toUpperCase();
@@ -3825,6 +3883,7 @@ function sincronizarBuscaPlaca() {
 
 
 function salvarManutencao() {
+  garantirArray('manutencoes'); 
   var veicId = document.getElementById('mrVeiculo').value;
   var data   = document.getElementById('mrData').value;
   var desc   = (document.getElementById('mrDescricao').value||'').trim();
@@ -3991,6 +4050,7 @@ function copiarLinkFormManutencao() {
 
 
 function abrirImportarManutencao() {
+  garantirArray('manutencoes'); 
   var existing = document.getElementById('mImportManut');
   if (existing) existing.remove();
   var panel = document.createElement('div');
@@ -4710,6 +4770,7 @@ function calcKmRodado() {
 }
 
 function salvarChecklist() {
+  garantirArray('checklists'); 
   if (!_ckVeiculoId && !_ckPlaca) { toast('⚠️ Veículo não identificado','#b45309'); return; }
   if (!db.checklists) db.checklists = [];
   var g = function(id){ var e=document.getElementById(id); return e?e.value:''; };
@@ -4922,6 +4983,7 @@ function reabrirContrato(n) {
 }
 
 function excluirContrato(n) {
+  garantirArray('contratos'); 
   if (!confirm('Excluir este registro de contrato?')) return;
   var list = (db.contratos||[]).slice().reverse();
   var ct = list[n];
