@@ -201,6 +201,7 @@ tr.vsel .veic-fin { pointer-events: auto; }
 .veic-search-input:focus { border-color:var(--blue); background-color:#fff; }
 .veic-count { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
 @media print {
+  .no-print { display: none !important; }
   @page { size: A4 portrait; margin: 10mm 8mm; }
   body { background: #fff !important; padding: 0 !important; font-size: 11px !important; min-height: 0 !important; height: auto !important; }
   html { height: auto !important; }
@@ -700,21 +701,42 @@ function carregarDados() {
 
 // ── MODO EDIÇÃO: carregar fatura existente ──────────────────
 var _editandoFaturaId = null;
+var _modoConsulta = false;
 function verificarModoEdicao() {
   var params = new URLSearchParams(window.location.search);
   var editId = params.get('edit');
+  var viewId = params.get('view');
   var cliId = params.get('cli');
-  if (!editId) return;
+  var alvo = editId || viewId;
+  if (!alvo) return;
+  _modoConsulta = !!viewId;
 
   // Buscar a fatura no Firebase
-  var path = 'faturas/' + (cliId||'') + '/' + editId;
+  var path = 'faturas/' + (cliId||'') + '/' + alvo;
   db.ref(path).once('value').then(function(snap) {
     var fat = snap.val();
-    if (!fat) { status('⚠️ Fatura não encontrada para edição', '#b45309'); return; }
-    preencherFaturaParaEdicao(fat, editId);
+    if (!fat) { status('⚠️ Fatura não encontrada', '#b45309'); return; }
+    preencherFaturaParaEdicao(fat, alvo);
+    if (_modoConsulta) {
+      // Modo consulta: aguardar preencher e abrir a impressão
+      setTimeout(function(){ aplicarModoConsulta(fat); }, 1200);
+    }
   }).catch(function(e) {
     status('❌ Erro ao carregar fatura: '+e.message, '#c0392b');
   });
+}
+
+function aplicarModoConsulta(fat) {
+  status('👁 Fatura ' + (fat.numero||'') + ' — modo consulta', '#0e7490');
+  // Banner de consulta
+  var banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#0e7490;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;z-index:9998;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+  banner.className = 'no-print';
+  banner.innerHTML = '👁 Consultando fatura ' + (fat.numero||'') + ' &nbsp;·&nbsp; '
+    + '<button onclick="window.print()" style="background:#fff;color:#0e7490;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;margin:0 4px">🖨 Imprimir / PDF</button>'
+    + '<button onclick="location.href=location.pathname+\'?edit=\'+new URLSearchParams(location.search).get(\'view\')+\'&cli=\'+new URLSearchParams(location.search).get(\'cli\')" style="background:transparent;color:#fff;border:1.5px solid #fff;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;margin:0 4px">✏️ Editar</button>';
+  document.body.appendChild(banner);
+  document.body.style.paddingTop = '44px';
 }
 
 function preencherFaturaParaEdicao(fat, editId) {
