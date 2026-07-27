@@ -1007,7 +1007,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v16-20260725-2200';
+var LOKA_BUILD = 'v17-20260727-1058';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -1357,8 +1357,26 @@ function garantirArray(nome){
   return db[nome];
 }
 
+// Remove fotos base64 pesadas de qualquer lugar do db (proteção contra "Write too large")
+function _removerFotosPesadas(obj){
+  if (!obj || typeof obj !== 'object') return;
+  Object.keys(obj).forEach(function(k){
+    var v = obj[k];
+    if (typeof v === 'string' && (v.indexOf('data:image')===0 || v.length>50000)) {
+      delete obj[k];
+    } else if (v && typeof v === 'object') {
+      _removerFotosPesadas(v);
+    }
+  });
+}
+
 function saveDB() {
   if (!db) return;
+  // PROTEÇÃO: nunca gravar fotos/base64 no banco (mantém o tamanho sob controle)
+  try {
+    if (db.manutencoes) _removerFotosPesadas(db.manutencoes);
+    if (db.checklists)  _removerFotosPesadas(db.checklists);
+  } catch(e){}
   // Marca o momento da alteração local — o sync ignora ecos anteriores a isto
   _ultimaEscritaLocal = Date.now();
   db._ultimaEscrita = _ultimaEscritaLocal;   // carimbo viaja junto no Firebase
@@ -3831,7 +3849,7 @@ function openManutRegistro(id) {
   });
 
   // Comprovantes existentes
-  _mrComps = m && m.comprovantes ? m.comprovantes.slice() : [];
+  _mrComps = [];  // comprovantes desativados
   renderMrComps();
   openM('mManutRegistro');
 }
@@ -3839,6 +3857,9 @@ function openManutRegistro(id) {
 function renderMrComps() {
   var el = document.getElementById('mrComprovantes');
   if (!el) return;
+  el.innerHTML = ''; return;  // desativado
+  /* código antigo mantido inativo abaixo */
+  if (true) return;
   if (!_mrComps.length) { el.innerHTML = ''; return; }
   el.innerHTML = _mrComps.map(function(c, i) {
     var isImg = c.startsWith('data:image');
@@ -3854,16 +3875,8 @@ function renderMrComps() {
 function removeMrComp(i) { _mrComps.splice(i,1); renderMrComps(); }
 
 function anexarComprovante(input) {
-  var files = Array.from(input.files);
-  files.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      _mrComps.push(e.target.result);
-      renderMrComps();
-    };
-    reader.readAsDataURL(file);
-  });
-  input.value = '';
+  // Anexo de comprovantes/fotos desativado (evita inflar o banco de dados).
+  if (input) input.value = '';
 }
 
 // ── BUSCA POR PLACA NO MODAL DE MANUTENÇÃO ──────────────────
@@ -3910,7 +3923,6 @@ function salvarManutencao() {
     custo:       get('mrCusto'),
     pgto:        get('mrPgto'),
     obs:         get('mrObs'),
-    comprovantes:_mrComps.slice(),
     criadoEm:    _manutEditId ? undefined : new Date().toISOString(),
     atualizadoEm:new Date().toISOString()
   };
@@ -6599,9 +6611,7 @@ function mltConfirmarImportacao(){
       <!-- Comprovantes -->
       <div class="fg" style="grid-column:1/-1">
         <label class="fl">Comprovantes / Fotos</label>
-        <input type="file" id="mrFotoInput" accept="image/*,application/pdf" multiple style="display:none" onchange="anexarComprovante(this)">
-        <button type="button" onclick="document.getElementById('mrFotoInput').click()" style="padding:8px 14px;background:#f0f2f9;border:1.5px dashed #c5cce0;border-radius:8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;width:100%;margin-bottom:8px">📎 Anexar Comprovante / Foto</button>
-        <div id="mrComprovantes" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        
       </div>
     </div>
   </div>
