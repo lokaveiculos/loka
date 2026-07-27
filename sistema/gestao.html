@@ -376,6 +376,7 @@ tr:hover td{background:#f8f9fe;}
         </div>
         <select class="filter-sel" id="fFrota" onchange="renderFrota()">
           <option value="">Todos os status</option>
+          <option value="__operacao">🚗 Em Operação (ativos)</option>
           <option value="disponivel">✅ Disponíveis</option>
           <option value="alugado">🔑 Alugados</option>
           <option value="manutencao">🔧 Em Manutenção</option>
@@ -1007,7 +1008,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v18-20260727-1124';
+var LOKA_BUILD = 'v19-20260727-1252';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -3290,7 +3291,10 @@ function renderFrota() {
       if (fAli === '__vazio') { if (_ali) return false; }
       else if (_ali !== fAli) return false;
     }
-    if (f && v.status !== f) return false;
+    if (f === '__operacao') {
+      // Em operação = disponível, alugado ou em manutenção (exclui inativos)
+      if (['disponivel','alugado','manutencao'].indexOf(v.status) < 0) return false;
+    } else if (f && v.status !== f) return false;
     // Filtro por cliente
     var qfc = (document.getElementById('qFrotaCliente') && document.getElementById('qFrotaCliente').value||'').toLowerCase();
     if (qfc) {
