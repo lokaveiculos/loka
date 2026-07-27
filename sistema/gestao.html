@@ -1007,7 +1007,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v17-20260727-1058';
+var LOKA_BUILD = 'v18-20260727-1124';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -5863,7 +5863,10 @@ function mltDetectarOrgao(txt){
 // Normaliza: junta "R$\n195,23" → "R$ 195,23" e remove linhas vazias
 function mltNormalizar(texto){
   return String(texto||'')
-    .replace(/R\$\s*\n\s*([\d.]+,\d{2})/g, 'R$ $1')   // valor quebrado
+    // Remove ícones/glyphs da Área de Uso Privado Unicode (setas, alertas do SENATRAN
+    // que grudam no texto e quebram o reconhecimento). Ex.: \ue81d, \uf078, \ue801
+    .replace(/[\ue000-\uf8ff]/g, ' ')
+    .replace(/R\$\s*\n\s*([\d.]+,\d{2})/g, 'R$ $1')   // valor quebrado em 2 linhas
     .replace(/R\$\s+/g, 'R$ ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{2,}/g, '\n');
@@ -5879,11 +5882,20 @@ function mltParseSenatranLista(texto){
     var ms = l.match(/^(N[ÃA]O PAGAS[^(]*)\((\d+)\)$/i);
     if (ms) { secao = ms[1].trim().toUpperCase(); continue; }
 
-    var m = l.match(/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})\s*[-–]\s*(.+)$/);
+    // Aceita data mesmo com lixo/ícone antes dela (não exige início absoluto de linha)
+    var m = l.match(/(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})\s*[-–—]\s*(.+)$/);
     if (!m) continue;
 
     var reg = { dataInfracao: mltISO(m[1]), horaInfracao: m[2], descricao: m[3].trim(),
                 placa:'', ait:'', valor:0, local:'', vencida: /VENCIDA/i.test(secao) };
+
+    // A própria linha da infração pode já conter placa/AIT/valor (quando vêm tudo junto)
+    var mpL = m[3].match(/Placa:\s*([A-Z0-9]{7})/i);
+    if (mpL) { reg.placa = mltNormPlaca(mpL[1]); reg.descricao = m[3].slice(0, m[3].indexOf(mpL[0])).trim(); }
+    var maL = m[3].match(/Auto de Infra[çc][ãa]o:\s*([A-Z0-9\-]+)/i);
+    if (maL) reg.ait = maL[1].replace(/[\s-]/g,'').toUpperCase();
+    var mvL = m[3].match(/R\$\s*([\d.]+,\d{2})/);
+    if (mvL) reg.valor = mltNum(mvL[1]);
 
     // Junta as próximas linhas até a próxima infração num só texto
     var buffer = [];
