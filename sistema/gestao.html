@@ -388,6 +388,19 @@ tr:hover td{background:#f8f9fe;}
           <option value="Não">🔓 Livres</option>
           <option value="__vazio">❔ Não informado</option>
         </select>
+        <select class="filter-sel" id="fFrotaFinal" onchange="renderFrota()">
+          <option value="">Final de placa: todos</option>
+          <option value="0">Final 0</option>
+          <option value="1">Final 1</option>
+          <option value="2">Final 2</option>
+          <option value="3">Final 3</option>
+          <option value="4">Final 4</option>
+          <option value="5">Final 5</option>
+          <option value="6">Final 6</option>
+          <option value="7">Final 7</option>
+          <option value="8">Final 8</option>
+          <option value="9">Final 9</option>
+        </select>
         <button class="btn btn-blue" onclick="openVeiculo(null)" style="white-space:nowrap">+ Adicionar Veículo</button>
       </div>
       <div id="frotaGrid"></div>
@@ -463,6 +476,19 @@ tr:hover td{background:#f8f9fe;}
         <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <input class="filter-input" id="mltFBusca" placeholder="Buscar AIT, placa, cliente, infra&ccedil;&atilde;o..." oninput="mltAplicarFiltro()" style="flex:1;min-width:160px">
           <select class="filter-sel" id="mltFPlaca" onchange="mltAplicarFiltro()"><option value="">Todos os ve&iacute;culos</option></select>
+          <select class="filter-sel" id="mltFFinal" onchange="mltAplicarFiltro()">
+            <option value="">Final de placa: todos</option>
+            <option value="0">Final 0</option>
+            <option value="1">Final 1</option>
+            <option value="2">Final 2</option>
+            <option value="3">Final 3</option>
+            <option value="4">Final 4</option>
+            <option value="5">Final 5</option>
+            <option value="6">Final 6</option>
+            <option value="7">Final 7</option>
+            <option value="8">Final 8</option>
+            <option value="9">Final 9</option>
+          </select>
           <select class="filter-sel" id="mltFCliente" onchange="mltAplicarFiltro()"><option value="">Todos os clientes</option></select>
           <select class="filter-sel" id="mltFStatus" onchange="mltAplicarFiltro()">
             <option value="">Todos os status</option>
@@ -1008,7 +1034,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v19-20260727-1252';
+var LOKA_BUILD = 'v21-20260727-1404';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -3276,6 +3302,7 @@ function renderFrota() {
   db.veiculos  = cleanVeics(db.veiculos);
   var q = (document.getElementById('qFrota').value || '').toLowerCase();
   var fAli = (document.getElementById('fFrotaAlienado')||{}).value || '';
+  var fFinal = (document.getElementById('fFrotaFinal')||{}).value || '';
   var f = document.getElementById('fFrota').value;
   var list = db.veiculos.filter(function(v) {
     if (q) {
@@ -3290,6 +3317,12 @@ function renderFrota() {
       var _ali = (v.alienado != null && v.alienado !== '') ? v.alienado : (_da.alienado || '');
       if (fAli === '__vazio') { if (_ali) return false; }
       else if (_ali !== fAli) return false;
+    }
+    // Filtro por final de placa (último dígito) — útil p/ IPVA, rodízio
+    if (fFinal) {
+      var _digitos = String(v.placa||'').replace(/[^0-9]/g,'');
+      var _ultimo = _digitos.slice(-1);
+      if (_ultimo !== fFinal) return false;
     }
     if (f === '__operacao') {
       // Em operação = disponível, alugado ou em manutenção (exclui inativos)
@@ -5145,7 +5178,7 @@ var MLT_GRAV = {
 
 var _mltEdit   = null;   // id em edição
 var _mltImport = [];     // buffer de conferência da importação
-var _mltFiltro = {q:'', status:'', placa:'', cliente:'', de:'', ate:''};
+var _mltFiltro = {q:'', status:'', placa:'', finalPlaca:'', cliente:'', de:'', ate:''};
 
 // ── Helpers ────────────────────────────────────────────────────
 // Options de cliente reutilizadas no modal e na conferência
@@ -5337,6 +5370,7 @@ function mltAplicarFiltro(){
   _mltFiltro.q      = (document.getElementById('mltFBusca')||{}).value || '';
   _mltFiltro.status = (document.getElementById('mltFStatus')||{}).value || '';
   _mltFiltro.placa  = (document.getElementById('mltFPlaca')||{}).value || '';
+  _mltFiltro.finalPlaca = (document.getElementById('mltFFinal')||{}).value || '';
   _mltFiltro.cliente= (document.getElementById('mltFCliente')||{}).value || '';
   _mltFiltro.de     = (document.getElementById('mltFDe')||{}).value || '';
   _mltFiltro.ate    = (document.getElementById('mltFAte')||{}).value || '';
@@ -5357,6 +5391,10 @@ function mltFiltradas(){
   return mltMultas().filter(function(m){
     if (f.status && m.status !== f.status) return false;
     if (f.placa && mltNormPlaca(m.placa) !== f.placa) return false;
+    if (f.finalPlaca) {
+      var _dig = String(m.placa||'').replace(/[^0-9]/g,'');
+      if (_dig.slice(-1) !== f.finalPlaca) return false;
+    }
     if (f.cliente) {
       if (f.cliente === '__sem__') { if (m.clienteId) return false; }
       else if (String(m.clienteId||'') !== f.cliente) return false;
