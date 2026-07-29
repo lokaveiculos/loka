@@ -659,6 +659,9 @@ tr:hover td{background:#f8f9fe;}
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#fef3cd"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><div class="form-card-title">Recibo de Reserva</div><div class="form-card-sub">Confirmação de reserva</div></div></div><div class="form-card-body">Documento de confirmação de reserva.</div><div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('recibo-reserva.html','_blank')">Abrir</button><button class="btn btn-outline" onclick="abrirContratoComCliente('reserva')">Com Cliente</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div><div><div class="form-card-title">Checklist Vistoria</div><div class="form-card-sub">Inspeção do veículo</div></div></div><div class="form-card-body">Formulário de vistoria com assinatura digital. Versão compartilhável para uso externo (sem login).</div><div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('checklist.html','_blank')">Abrir</button><button class="btn" style="background:#0d7a3e;color:#fff" onclick="window.open('checklist-compartilhavel.html','_blank')">📤 Compartilhável</button><button class="btn" style="background:#1a1a1a;color:#fff" onclick="window.open('checklist-offline.html','_blank')" title="Funciona sem internet — ideal para vistoria em campo">📶 Offline</button><button class="btn btn-outline" onclick="copiarLinkChecklistOffline()">📋 Copiar Link Offline</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div><div><div class="form-card-title">Manutenção (Oficina)</div><div class="form-card-sub">Formulário para oficinas</div></div></div><div class="form-card-body">Formulário para as oficinas preencherem os serviços realizados e gerarem o código para importação no sistema.</div><div class="form-card-foot"><button class="btn" style="background:#7c3aed;color:#fff" onclick="window.open('manutencao-oficina.html','_blank')">Abrir Formulário</button><button class="btn btn-outline" onclick="copiarLinkFormManutencao()">📋 Copiar Link</button></div></div>
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#e6f5ec"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="form-card-title">Tabela de Preços</div><div class="form-card-sub">Valores por categoria</div></div></div><div class="form-card-body">Tabela de preços por categoria (diária e mensal). Compartilhável com o cliente por link.</div><div class="form-card-foot"><button class="btn" style="background:#0d7a3e;color:#fff" onclick="window.open('precos.html','_blank')">Abrir Tabela</button><button class="btn btn-outline" onclick="copiarLinkPrecos()">📋 Copiar Link</button></div></div>
+
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#EEF1FD"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><div class="form-card-title">Orçamento Online</div><div class="form-card-sub">Cliente cota e envia pedido</div></div></div><div class="form-card-body">Formulário mobile: o cliente escolhe categoria e período, vê o preço na hora e envia o pedido pelo WhatsApp.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="window.open('orcamento.html','_blank')">Abrir Orçamento</button><button class="btn btn-outline" onclick="copiarLinkOrcamento()">📋 Copiar Link</button></div></div>
       </div>
       <div style="margin-top:20px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
         <div class="sec-label" style="margin-top:0">Gerar com Cliente</div>
@@ -1034,7 +1037,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v21-20260727-1404';
+var LOKA_BUILD = 'v23-20260729-1150';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -1259,6 +1262,7 @@ function loadDB() {
           local.historico = cleanArr(local.historico);
           local.contratos = cleanArr(local.contratos);
           db = local;
+        normalizarDB();
           inicializarCom(local, null);
           // Reenvia para o Firebase para garantir que a alteração propague
           try { firebase.database().ref('loka_db').set(db); } catch(e) {}
@@ -1375,6 +1379,27 @@ function loadDB() {
 var _ultimaEscritaLocal = 0;   // timestamp da última alteração local
 var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // Garante que um campo do db seja array (Firebase devolve como objeto após exclusões)
+// Normaliza TODOS os arrays do db de uma vez (Firebase devolve arrays como objeto
+// quando há chaves não sequenciais, após exclusões). Chamado ao carregar/sincronizar.
+function normalizarDB(){
+  if (!db) return;
+  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico'].forEach(function(nome){
+    if (db[nome] === undefined || db[nome] === null) { db[nome] = []; return; }
+    if (!Array.isArray(db[nome])) {
+      if (typeof db[nome] === 'object') {
+        db[nome] = Object.keys(db[nome])
+          .sort(function(a,b){ return Number(a)-Number(b); })
+          .map(function(k){ return db[nome][k]; })
+          .filter(function(x){ return x != null; });
+      } else {
+        db[nome] = [];
+      }
+    } else if (db[nome].indexOf(null) >= 0) {
+      db[nome] = db[nome].filter(function(x){ return x != null; });
+    }
+  });
+}
+
 function garantirArray(nome){
   if (!Array.isArray(db[nome])) {
     db[nome] = (db[nome] && typeof db[nome] === 'object')
@@ -1399,6 +1424,7 @@ function _removerFotosPesadas(obj){
 
 function saveDB() {
   if (!db) return;
+  if (typeof normalizarDB === 'function') normalizarDB();
   // PROTEÇÃO: nunca gravar fotos/base64 no banco (mantém o tamanho sob controle)
   try {
     if (db.manutencoes) _removerFotosPesadas(db.manutencoes);
@@ -1485,14 +1511,8 @@ function setupRealtimeSync() {
 
     // Atualiza db e localStorage silenciosamente — filtra nulls do Firebase
     db = fbData;
-    db.ativos    = cleanArr(db.ativos);
+    normalizarDB();  // converte todos os arrays de uma vez
     db.veiculos  = cleanVeics(db.veiculos);
-    db.clients   = cleanArr(db.clients);
-    db.historico = cleanArr(db.historico);
-    db.contratos = cleanArr(db.contratos);
-    // Normaliza multas/checklists: o Firebase pode devolvê-los como objeto
-    if (typeof mltMultas === 'function') mltMultas();
-    db.checklists = cleanArr(db.checklists);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
 
     // Não re-renderiza se há modal aberto (usuário pode estar digitando)
@@ -2606,6 +2626,7 @@ function gerarTermoProrrogacao(a, datAnterior, novaData, motivo, valor, pgtoStat
   if (w) { w.document.write(html); w.document.close(); }
 }
 function openEncerramento(id) {
+  garantirArray('ativos'); garantirArray('veiculos'); 
   _encId = id;
   var a = db.ativos.find(function(x){return x.id===id;});
   if (!a) return;
@@ -4086,6 +4107,20 @@ function copiarLinkChecklistOffline() {
   });
 }
 
+function copiarLinkPrecos() {
+  var url = window.location.origin + window.location.pathname.replace('gestao.html','') + 'precos.html';
+  navigator.clipboard.writeText(url).then(function() {
+    toast('📋 Link da tabela de preços copiado!','#0d7a3e');
+  }).catch(function() { prompt('Copie o link da tabela de preços:', url); });
+}
+
+function copiarLinkOrcamento() {
+  var url = window.location.origin + window.location.pathname.replace('gestao.html','') + 'orcamento.html';
+  navigator.clipboard.writeText(url).then(function() {
+    toast('📋 Link do orçamento copiado!','#0d7a3e');
+  }).catch(function() { prompt('Copie o link do orçamento:', url); });
+}
+
 
 // ── COPIAR LINK DO FORMULÁRIO DE MANUTENÇÃO ─────────────────
 function copiarLinkFormManutencao() {
@@ -4930,6 +4965,7 @@ function confirmarRetornoManut() {
 
 // ── PAGAMENTOS ───────────────────────────────────────────────
 function openPagamento(id) {
+  garantirArray('ativos'); 
   _pagtoAId = id;
   var a = db.ativos.find(function(x){return x.id===id;})||{};
   var pg = a.pagamento||{};
@@ -4943,6 +4979,7 @@ function openPagamento(id) {
   openM('mPagamento');
 }
 function confirmarPagamento() {
+  garantirArray('ativos'); 
   var idx = db.ativos.findIndex(function(x){return x.id===_pagtoAId;});
   if (idx<0) return;
   db.ativos[idx].pagamento = {
