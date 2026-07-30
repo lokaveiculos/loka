@@ -617,6 +617,7 @@ tr:hover td{background:#f8f9fe;}
             <option value="valor">Maior valor</option>
           </select>
           <button class="btn btn-outline" onclick="finRestaurarSeed('receber')" style="font-size:11px" title="Recarregar dados originais">🔄 Restaurar</button>
+          <button class="btn" style="background:#0d7a3e;color:#fff;font-size:11px;white-space:nowrap" onclick="relatorioReceber()" title="Gerar relatório para imprimir ou PDF">📄 Relatório</button>
           <button class="btn btn-green" onclick="finAddLinha('receber')">+ Nova Conta</button>
         </div>
         <div class="stats" id="receberStats" style="margin-bottom:12px"></div>
@@ -1040,7 +1041,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v27-20260730-1532';
+var LOKA_BUILD = 'v28-20260730-1712';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4596,6 +4597,137 @@ function tipoSelect(r, i){
   return '<select onchange="finEdit(\'receber\','+i+',\'tipo\',this.value); finRenderReceber();" '
     + 'style="border:1px solid '+cor+';border-radius:5px;padding:4px;font-size:11px;width:90px;'
     + 'color:'+cor+';font-weight:700;background:#fff">'+opts+'</select>';
+}
+
+
+// ── RELATÓRIO DE CONTAS A RECEBER ──────────────────────────────
+function relatorioReceber(){
+  finInit();
+  var rows = db.financeiro.receber || [];
+  if (!rows.length) { toast('Nenhuma conta a receber cadastrada','#b45309'); return; }
+
+  // Reaproveita os MESMOS filtros da tela
+  var q = (document.getElementById('qReceber')&&document.getElementById('qReceber').value||'').toLowerCase();
+  var di = (document.getElementById('recDataIni')||{}).value||'';
+  var df = (document.getElementById('recDataFim')||{}).value||'';
+  var fst = (document.getElementById('recStatus')||{}).value||'';
+  var fTipo = (document.getElementById('recTipo')||{}).value||'';
+
+  function statusReal(r){
+    var receb = Number(r.recebido)||0, val = Number(r.valor)||0;
+    if (r.status==='recebido' || (val>0 && receb>=val)) return 'recebido';
+    if (receb>0 && receb<val) return 'parcial';
+    return 'pendente';
+  }
+
+  var lista = rows.filter(function(r){
+    if (!r) return false;
+    var st = statusReal(r);
+    if (fst && st!==fst) return false;
+    if (q && (r.cliente||'').toLowerCase().indexOf(q)<0) return false;
+    if (fTipo && (r.tipo||'Outros')!==fTipo) return false;
+    var dref = st==='recebido' ? (r.recebidoEm||r.vencimento) : r.vencimento;
+    if (di && (!dref || dref < di)) return false;
+    if (df && (!dref || dref > df)) return false;
+    return true;
+  });
+  if (!lista.length) { toast('Nenhuma conta com os filtros atuais','#b45309'); return; }
+
+  function fmt(n){ return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+  function fmtData(d){
+    if (!d) return '—';
+    var m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3]+'/'+m[2]+'/'+m[1] : d;
+  }
+  function stLabel(s){ return s==='recebido'?'Recebido':s==='parcial'?'Parcial':'Pendente'; }
+  function stCor(s){ return s==='recebido'?'#0d7a3e':s==='parcial'?'#b45309':'#c0392b'; }
+
+  // Agrupar por tipo
+  var porTipo = {};
+  lista.forEach(function(r){
+    var t = r.tipo || 'Outros';
+    if (!porTipo[t]) porTipo[t] = [];
+    porTipo[t].push(r);
+  });
+
+  var totGeral=0, recGeral=0, saldoGeral=0;
+  var blocos = '';
+  var ordemTipos = (typeof REC_TIPOS!=='undefined' ? REC_TIPOS : Object.keys(porTipo));
+  ordemTipos.forEach(function(tipo){
+    var arr = porTipo[tipo];
+    if (!arr || !arr.length) return;
+    var subTot=0, subRec=0;
+    var linhas = arr.map(function(r){
+      var val=Number(r.valor)||0, rec=Number(r.recebido)||0, saldo=val-rec;
+      var st=statusReal(r);
+      subTot+=val; subRec+=rec;
+      return '<tr>'
+        + '<td>'+(r.cliente||'—')+'</td>'
+        + '<td>'+(r.historico||'—')+'</td>'
+        + '<td style="text-align:right">'+fmt(val)+'</td>'
+        + '<td style="text-align:right">'+fmt(rec)+'</td>'
+        + '<td style="text-align:right;font-weight:700">'+fmt(saldo)+'</td>'
+        + '<td>'+fmtData(r.vencimento)+'</td>'
+        + '<td style="color:'+stCor(st)+';font-weight:700">'+stLabel(st)+'</td>'
+        + '</tr>';
+    }).join('');
+    totGeral+=subTot; recGeral+=subRec; saldoGeral+=(subTot-subRec);
+    var cor = (typeof REC_TIPO_COR!=='undefined' && REC_TIPO_COR[tipo]) ? REC_TIPO_COR[tipo] : '#0E1B4D';
+    blocos += '<div class="bloco">'
+      + '<div class="bloco-head" style="background:'+cor+'">'+tipo+' <span>'+arr.length+' conta(s) · Total '+fmt(subTot)+' · Saldo '+fmt(subTot-subRec)+'</span></div>'
+      + '<table><thead><tr><th>Cliente</th><th>Histórico</th><th style="text-align:right">Valor</th><th style="text-align:right">Recebido</th><th style="text-align:right">Saldo</th><th>Vencimento</th><th>Status</th></tr></thead>'
+      + '<tbody>'+linhas+'</tbody></table></div>';
+  });
+
+  // Descrição dos filtros aplicados
+  var filtros = [];
+  if (fTipo) filtros.push('Tipo: '+fTipo);
+  if (fst) filtros.push('Status: '+stLabel(fst));
+  if (di||df) filtros.push('Período: '+(di?fmtData(di):'…')+' a '+(df?fmtData(df):'…'));
+  if (q) filtros.push('Busca: "'+q+'"');
+  var filtroTxt = filtros.length ? filtros.join(' · ') : 'Todas as contas';
+
+  var hoje = new Date().toLocaleDateString('pt-BR');
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Relatório — Contas a Receber</title><style>'
+    + '*{margin:0;padding:0;box-sizing:border-box}'
+    + 'body{font-family:system-ui,-apple-system,Arial,sans-serif;color:#1a2340;padding:24px;font-size:12px}'
+    + '.cab{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0E1B4D;padding-bottom:14px;margin-bottom:8px}'
+    + '.cab h1{font-size:20px;color:#0E1B4D}.cab .sub{font-size:12px;color:#5a607a;margin-top:3px}'
+    + '.cab .meta{text-align:right;font-size:11px;color:#5a607a}'
+    + '.filtros{background:#EEF1FD;border-radius:6px;padding:8px 12px;font-size:11px;color:#0E1B4D;margin-bottom:18px}'
+    + '.bloco{margin-bottom:18px;page-break-inside:avoid}'
+    + '.bloco-head{color:#fff;padding:8px 12px;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center}'
+    + '.bloco-head span{font-weight:400;font-size:11px;opacity:.9}'
+    + 'table{width:100%;border-collapse:collapse}'
+    + 'th{background:#EEF1FD;color:#0E1B4D;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;border:1px solid #d5dcf5}'
+    + 'td{padding:6px 8px;border:1px solid #e8ebf5;font-size:11px}'
+    + 'tr:nth-child(even) td{background:#f7f8fc}'
+    + '.totais{margin-top:16px;border-top:2px solid #0E1B4D;padding-top:12px;display:flex;justify-content:flex-end;gap:30px;font-size:13px}'
+    + '.totais div{text-align:right}.totais .lbl{font-size:10px;color:#5a607a;text-transform:uppercase}'
+    + '.totais .num{font-size:17px;font-weight:800;color:#0E1B4D}'
+    + '.totais .num.saldo{color:#c0392b}'
+    + '.rodape{margin-top:24px;text-align:center;font-size:10px;color:#9099bf;border-top:1px solid #e8ebf5;padding-top:12px}'
+    + '@media print{body{padding:0}.no-print{display:none}}'
+    + '.btns{text-align:center;margin-bottom:16px}'
+    + '.btns button{background:#2B4BF2;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-weight:700;cursor:pointer;margin:0 4px;font-size:13px}'
+    + '</style></head><body>'
+    + '<div class="btns no-print"><button onclick="window.print()">🖨 Imprimir / Salvar PDF</button><button onclick="window.close()" style="background:#5a607a">Fechar</button></div>'
+    + '<div class="cab"><div><h1>Contas a Receber</h1><div class="sub">Relatório financeiro</div></div>'
+    + '<div class="meta">LOKÁ Aluguel de Veículos<br>Emitido em '+hoje+'</div></div>'
+    + '<div class="filtros"><b>Filtros:</b> '+filtroTxt+' · <b>'+lista.length+' conta(s)</b></div>'
+    + blocos
+    + '<div class="totais">'
+    + '<div><div class="lbl">Total</div><div class="num">'+fmt(totGeral)+'</div></div>'
+    + '<div><div class="lbl">Recebido</div><div class="num" style="color:#0d7a3e">'+fmt(recGeral)+'</div></div>'
+    + '<div><div class="lbl">Saldo a Receber</div><div class="num saldo">'+fmt(saldoGeral)+'</div></div>'
+    + '</div>'
+    + '<div class="rodape">LOKÁ Aluguel de Veículos · CNPJ 39.911.638/0001-10 · Feira de Santana — BA</div>'
+    + '</body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 function finRenderReceber() {
