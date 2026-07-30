@@ -641,6 +641,12 @@ tr:hover td{background:#f8f9fe;}
             <option value="pendente">⏳ Pendentes</option>
             <option value="pago">✅ Pagos</option>
           </select>
+          <select class="filter-sel" id="pagDia" onchange="finRenderPagar()" title="Filtrar pelo dia do vencimento">
+            <option value="">Todos os dias</option><option value="1">Dia 1</option><option value="2">Dia 2</option><option value="3">Dia 3</option><option value="4">Dia 4</option><option value="5">Dia 5</option><option value="6">Dia 6</option><option value="7">Dia 7</option><option value="8">Dia 8</option><option value="9">Dia 9</option><option value="10">Dia 10</option><option value="11">Dia 11</option><option value="12">Dia 12</option><option value="13">Dia 13</option><option value="14">Dia 14</option><option value="15">Dia 15</option><option value="16">Dia 16</option><option value="17">Dia 17</option><option value="18">Dia 18</option><option value="19">Dia 19</option><option value="20">Dia 20</option><option value="21">Dia 21</option><option value="22">Dia 22</option><option value="23">Dia 23</option><option value="24">Dia 24</option><option value="25">Dia 25</option><option value="26">Dia 26</option><option value="27">Dia 27</option><option value="28">Dia 28</option><option value="29">Dia 29</option><option value="30">Dia 30</option><option value="31">Dia 31</option>
+          </select>
+          <select class="filter-sel" id="pagDia" onchange="finRenderPagar()">
+            <option value="">Todos os dias</option><option value="1">Dia 1</option><option value="2">Dia 2</option><option value="3">Dia 3</option><option value="4">Dia 4</option><option value="5">Dia 5</option><option value="6">Dia 6</option><option value="7">Dia 7</option><option value="8">Dia 8</option><option value="9">Dia 9</option><option value="10">Dia 10</option><option value="11">Dia 11</option><option value="12">Dia 12</option><option value="13">Dia 13</option><option value="14">Dia 14</option><option value="15">Dia 15</option><option value="16">Dia 16</option><option value="17">Dia 17</option><option value="18">Dia 18</option><option value="19">Dia 19</option><option value="20">Dia 20</option><option value="21">Dia 21</option><option value="22">Dia 22</option><option value="23">Dia 23</option><option value="24">Dia 24</option><option value="25">Dia 25</option><option value="26">Dia 26</option><option value="27">Dia 27</option><option value="28">Dia 28</option><option value="29">Dia 29</option><option value="30">Dia 30</option><option value="31">Dia 31</option>
+          </select>
           <select class="filter-sel" id="pagOrdenar" onchange="finRenderPagar()">
             <option value="">Ordenar por...</option>
             <option value="fornecedor">Fornecedor (A-Z)</option>
@@ -1041,7 +1047,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v29-20260730-2258';
+var LOKA_BUILD = 'v30-20260730-2321';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4558,8 +4564,68 @@ function finEdit(aba, idx, campo, valor) {
   finRender(aba);
 }
 
+
 // ══ MODAL NOVA CONTA A PAGAR ═══════════════════════════════════
+
+// ── EDITAR CONTA-MÃE (afeta todos os meses) ────────────────────
+var _editandoPagarIdx = null;
+function editarPagar(idx){
+  finInit();
+  var r = db.financeiro.pagar[idx];
+  if (!r) return;
+  _editandoPagarIdx = idx;
+
+  var parcelada = r.parcelas && r.parcelas > 1;
+  document.getElementById('npTipo').value = parcelada ? 'parcelada' : 'avulsa';
+  document.getElementById('npFornecedor').value = r.fornecedor || '';
+  document.getElementById('npDescricao').value = r.descricao || '';
+  document.getElementById('npValor').value = r.valor || '';
+  document.getElementById('npDia').value = r.diaVenc || parseInt((r.vencimento||'').slice(8,10)) || 10;
+  document.getElementById('npMesIni').value = r.mesInicial || (r.vencimento||'').slice(0,7) || pagMesRef();
+  document.getElementById('npParcelas').value = r.parcelas || 1;
+  document.getElementById('npAvulsaVenc').value = parcelada ? '' : (r.vencimento || '');
+
+  // Título e botão do modal em modo edição
+  var head = document.querySelector('#mNovaPagar .modal-head h3');
+  if (head) head.textContent = 'Editar Conta a Pagar';
+  var btn = document.querySelector('#mNovaPagar .modal-foot .btn-blue');
+  if (btn) { btn.textContent = 'Salvar Alterações'; }
+
+  // Aviso se tem pagamentos registrados
+  var info = document.getElementById('npFinalInfo');
+
+  npToggleTipo();
+  npCalcFinal();
+
+  // Aviso sobre pagamentos já feitos
+  var nPagos = r.pagamentos ? Object.keys(r.pagamentos).length : 0;
+  if (nPagos > 0) {
+    var aviso = document.getElementById('npAvisoEdit');
+    if (!aviso) {
+      aviso = document.createElement('div');
+      aviso.id = 'npAvisoEdit';
+      aviso.style.cssText = 'grid-column:1/-1;background:#fef3cd;border-radius:8px;padding:10px;font-size:11px;color:#7c5010';
+      var body = document.querySelector('#mNovaPagar .modal-body');
+      if (body) body.appendChild(aviso);
+    }
+    aviso.style.display = 'block';
+    aviso.innerHTML = '⚠️ Esta conta tem <b>'+nPagos+' parcela(s) já paga(s)</b>. As alterações valem para todos os meses, mas os pagamentos registrados são mantidos.';
+  } else {
+    var av = document.getElementById('npAvisoEdit');
+    if (av) av.style.display = 'none';
+  }
+
+  openM('mNovaPagar');
+}
+
 function abrirNovaPagar(){
+  _editandoPagarIdx = null;
+  var head = document.querySelector('#mNovaPagar .modal-head h3');
+  if (head) head.textContent = 'Nova Conta a Pagar';
+  var btn = document.querySelector('#mNovaPagar .modal-foot .btn-blue');
+  if (btn) btn.textContent = 'Adicionar Conta';
+  var av = document.getElementById('npAvisoEdit');
+  if (av) av.style.display = 'none';
   document.getElementById('npTipo').value = 'parcelada';
   document.getElementById('npFornecedor').value = '';
   document.getElementById('npDescricao').value = '';
@@ -4626,14 +4692,28 @@ function salvarNovaPagar(){
       parcelas: 1, pagamentos: {}, status: 'pendente'
     };
   }
-  db.financeiro.pagar.push(nova);
-  saveDB();
-  closeM('mNovaPagar');
-  // Ir para o mês inicial da conta criada
-  if (tipo === 'parcelada') pagSetMesRef(nova.mesInicial);
-  else pagSetMesRef(nova.vencimento.slice(0,7));
-  finRenderPagar();
-  toast('✅ Conta adicionada','#0d7a3e');
+  if (_editandoPagarIdx != null && db.financeiro.pagar[_editandoPagarIdx]) {
+    // EDIÇÃO: preservar os pagamentos já registrados
+    var antiga = db.financeiro.pagar[_editandoPagarIdx];
+    nova.pagamentos = antiga.pagamentos || {};
+    nova.status = antiga.status;
+    nova.pagoEm = antiga.pagoEm;
+    db.financeiro.pagar[_editandoPagarIdx] = nova;
+    saveDB();
+    closeM('mNovaPagar');
+    _editandoPagarIdx = null;
+    finRenderPagar();
+    toast('✅ Conta atualizada','#0d7a3e');
+  } else {
+    // CRIAÇÃO
+    db.financeiro.pagar.push(nova);
+    saveDB();
+    closeM('mNovaPagar');
+    if (tipo === 'parcelada') pagSetMesRef(nova.mesInicial);
+    else pagSetMesRef(nova.vencimento.slice(0,7));
+    finRenderPagar();
+    toast('✅ Conta adicionada','#0d7a3e');
+  }
 }
 
 function finAddLinha(aba) {
@@ -5085,7 +5165,9 @@ function finRenderPagar() {
   var ymRef = pagMesRef();
   var q = (document.getElementById('qPagar')&&document.getElementById('qPagar').value||'').toLowerCase();
   var fst = (document.getElementById('pagStatus')||{}).value||'';
+  var fDia = (document.getElementById('pagDia')||{}).value||'';
   var ordem = (document.getElementById('pagOrdenar')||{}).value||'';
+  var fDia = (document.getElementById('pagDia')||{}).value||'';
 
   // Monta a lista do mês: cada conta que tem parcela no mês de referência
   var visiveis = [];
@@ -5099,6 +5181,12 @@ function finRenderPagar() {
       if (fst==='pendente' && st==='pago') return;
     }
     if (q && ((r.fornecedor||'')+' '+(r.descricao||'')).toLowerCase().indexOf(q)<0) return;
+    if (fDia) {
+      var _diaConta = r.diaVenc || parseInt((r.vencimento||'').slice(8,10)) || 0;
+      if (String(_diaConta) !== fDia) return;
+    }
+    var diaConta = r.diaVenc || parseInt((r.vencimento||'').slice(8,10)) || 0;
+    if (fDia && String(diaConta) !== fDia) return;
     visiveis.push({ r:r, idx:idx, np:np, st:st, venc:pagVencNoMes(r,ymRef) });
   });
 
@@ -5167,7 +5255,8 @@ function finRenderPagar() {
         + (st==='pago'
             ? '<button onclick="pagToggleParcela('+i+',\''+ymRef+'\',false)" title="Reverter" style="background:#fef3cd;color:#b45309;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">↩</button>'
             : '<button onclick="pagToggleParcela('+i+',\''+ymRef+'\',true)" title="Marcar como pago" style="background:#e8f5ef;color:#0d7a3e;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">✅ Pagar</button>')
-        + ' <button onclick="finDel(\'pagar\','+i+')" title="Excluir conta" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑<\/button>'
+        + ' <button onclick="editarPagar('+i+')" title="Editar conta (afeta todos os meses)" style="background:#eef1fd;color:#2B4BF2;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">✏️</button>'
+        + ' <button onclick="editarPagar('+i+')" title="Editar conta" style="background:#EEF1FD;color:#2B4BF2;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">✏️</button> <button onclick="finDel(\'pagar\','+i+')" title="Excluir conta" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑<\/button>'
       + '</td></tr>';
   });
 
