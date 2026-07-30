@@ -629,13 +629,13 @@ tr:hover td{background:#f8f9fe;}
         <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <div style="flex:1;min-width:160px"><strong style="font-size:13px;color:var(--dark)">Contas a Pagar</strong><div style="font-size:10px;color:var(--muted)">Despesas e pagamentos a fornecedores</div></div>
           <input class="filter-input" id="qPagar" type="text" placeholder="🔍 Fornecedor ou placa..." oninput="finRenderPagar()" style="min-width:160px">
-          <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
-            <span style="font-size:10px;font-weight:700;color:var(--muted)">📅</span>
-            <input class="filter-input" id="pagDataIni" type="date" onchange="finRenderPagar()" style="width:130px;padding:5px">
-            <span style="font-size:10px;color:var(--muted)">até</span>
-            <input class="filter-input" id="pagDataFim" type="date" onchange="finRenderPagar()" style="width:130px;padding:5px">
-            <button onclick="finLimparDataPagar()" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">✕</button>
+          <div style="display:flex;align-items:center;gap:5px;background:#0E1B4D;padding:5px 10px;border-radius:8px">
+            <button onclick="pagMudarMes(-1)" style="background:none;border:none;color:#fff;cursor:pointer;font-size:15px;font-weight:700;padding:0 4px">‹</button>
+            <input type="month" id="pagMesRef" onchange="finRenderPagar()" style="border:none;border-radius:5px;padding:4px 6px;font-size:12px;font-weight:700;color:#0E1B4D;background:#fff">
+            <button onclick="pagMudarMes(1)" style="background:none;border:none;color:#fff;cursor:pointer;font-size:15px;font-weight:700;padding:0 4px">›</button>
+            <button onclick="pagMesAtual()" title="Mês atual" style="background:#2B4BF2;border:none;color:#fff;cursor:pointer;font-size:10px;font-weight:700;border-radius:4px;padding:3px 8px;margin-left:4px">Hoje</button>
           </div>
+          
           <select class="filter-sel" id="pagStatus" onchange="finRenderPagar()">
             <option value="">Todos status</option>
             <option value="pendente">⏳ Pendentes</option>
@@ -649,7 +649,7 @@ tr:hover td{background:#f8f9fe;}
             <option value="valor">Maior valor</option>
           </select>
           <button class="btn btn-outline" onclick="finRestaurarSeed('pagar')" style="font-size:11px" title="Limpar tudo">🔄 Restaurar</button>
-          <button class="btn" style="background:#c0392b;color:#fff" onclick="finAddLinha('pagar')">+ Nova Conta</button>
+          <button class="btn" style="background:#c0392b;color:#fff" onclick="abrirNovaPagar()">+ Nova Conta</button>
         </div>
         <div class="stats" id="pagarStats" style="margin-bottom:12px"></div>
         <div id="finGridPagar"></div>
@@ -1041,7 +1041,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v28-20260730-1712';
+var LOKA_BUILD = 'v29-20260730-2258';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4557,6 +4557,85 @@ function finEdit(aba, idx, campo, valor) {
   saveDB();
   finRender(aba);
 }
+
+// ══ MODAL NOVA CONTA A PAGAR ═══════════════════════════════════
+function abrirNovaPagar(){
+  document.getElementById('npTipo').value = 'parcelada';
+  document.getElementById('npFornecedor').value = '';
+  document.getElementById('npDescricao').value = '';
+  document.getElementById('npValor').value = '';
+  document.getElementById('npDia').value = '10';
+  document.getElementById('npMesIni').value = pagMesRef();
+  document.getElementById('npParcelas').value = '12';
+  document.getElementById('npAvulsaVenc').value = '';
+  npToggleTipo();
+  npCalcFinal();
+  openM('mNovaPagar');
+}
+
+function npToggleTipo(){
+  var tipo = document.getElementById('npTipo').value;
+  var parcelada = tipo === 'parcelada';
+  document.getElementById('npMesIniWrap').style.display = parcelada ? '' : 'none';
+  document.getElementById('npParcelasWrap').style.display = parcelada ? '' : 'none';
+  document.getElementById('npAvulsaVencWrap').style.display = parcelada ? 'none' : '';
+  npCalcFinal();
+}
+
+function npCalcFinal(){
+  var info = document.getElementById('npFinalInfo');
+  var tipo = document.getElementById('npTipo').value;
+  if (tipo !== 'parcelada') { info.style.display = 'none'; return; }
+  var mesIni = document.getElementById('npMesIni').value;
+  var np = parseInt(document.getElementById('npParcelas').value) || 0;
+  if (!mesIni || np < 1) { info.style.display = 'none'; return; }
+  var final = pagAddMeses(mesIni, np - 1);
+  info.style.display = 'block';
+  info.innerHTML = '📅 <b>'+np+' parcela(s)</b> · de <b>'+pagFmtMesAno(mesIni)+'</b> até <b>'+pagFmtMesAno(final)+'</b> (vencimento final)';
+}
+
+function salvarNovaPagar(){
+  finInit();
+  var tipo = document.getElementById('npTipo').value;
+  var fornecedor = (document.getElementById('npFornecedor').value||'').trim();
+  var descricao = (document.getElementById('npDescricao').value||'').trim();
+  var valor = finParse(document.getElementById('npValor').value);
+  if (!fornecedor) { toast('⚠️ Informe o fornecedor','#b45309'); return; }
+  if (!valor) { toast('⚠️ Informe o valor','#b45309'); return; }
+
+  garantirArray('financeiro');  // segurança (financeiro é objeto, mas pagar é array)
+  if (!Array.isArray(db.financeiro.pagar)) db.financeiro.pagar = [];
+
+  var nova;
+  if (tipo === 'parcelada') {
+    var dia = parseInt(document.getElementById('npDia').value) || 10;
+    var mesIni = document.getElementById('npMesIni').value || pagMesRef();
+    var np = parseInt(document.getElementById('npParcelas').value) || 1;
+    nova = {
+      fornecedor: fornecedor, descricao: descricao, valor: valor,
+      parcelas: np, mesInicial: mesIni, diaVenc: dia,
+      vencimento: mesIni + '-' + String(dia).padStart(2,'0'),
+      pagamentos: {}, status: 'pendente'
+    };
+  } else {
+    var venc = document.getElementById('npAvulsaVenc').value;
+    if (!venc) { toast('⚠️ Informe a data de vencimento','#b45309'); return; }
+    nova = {
+      fornecedor: fornecedor, descricao: descricao, valor: valor,
+      vencimento: venc, diaVenc: parseInt(venc.slice(8,10)),
+      parcelas: 1, pagamentos: {}, status: 'pendente'
+    };
+  }
+  db.financeiro.pagar.push(nova);
+  saveDB();
+  closeM('mNovaPagar');
+  // Ir para o mês inicial da conta criada
+  if (tipo === 'parcelada') pagSetMesRef(nova.mesInicial);
+  else pagSetMesRef(nova.vencimento.slice(0,7));
+  finRenderPagar();
+  toast('✅ Conta adicionada','#0d7a3e');
+}
+
 function finAddLinha(aba) {
   finInit();
   var nova = aba==='acertos' ? {data:new Date().toISOString().split('T')[0],valor:0,banco:''}
@@ -4906,87 +4985,197 @@ function finLimparDataPagar() {
   var f=document.getElementById('pagDataFim'); if(f)f.value='';
   finRenderPagar();
 }
+
+// ══ CONTAS A PAGAR — PARCELAS E NAVEGAÇÃO POR MÊS ══════════════
+// Retorna o mês de referência selecionado (AAAA-MM). Default: mês atual.
+function pagMesRef(){
+  var el = document.getElementById('pagMesRef');
+  if (el && el.value) return el.value;
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function pagSetMesRef(ym){
+  var el = document.getElementById('pagMesRef');
+  if (el) el.value = ym;
+}
+function pagMudarMes(delta){
+  var ym = pagMesRef().split('-');
+  var ano = parseInt(ym[0]), mes = parseInt(ym[1]) - 1; // 0-based
+  var d = new Date(ano, mes + delta, 1);
+  pagSetMesRef(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  finRenderPagar();
+}
+function pagMesAtual(){
+  var d = new Date();
+  pagSetMesRef(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  finRenderPagar();
+}
+// Soma meses a um "AAAA-MM" → novo "AAAA-MM"
+function pagAddMeses(ym, n){
+  var p = ym.split('-'); var d = new Date(parseInt(p[0]), parseInt(p[1])-1+n, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+// Diferença em meses entre dois "AAAA-MM" (b - a)
+function pagDiffMeses(a, b){
+  var pa=a.split('-'), pb=b.split('-');
+  return (parseInt(pb[0])-parseInt(pa[0]))*12 + (parseInt(pb[1])-parseInt(pa[1]));
+}
+// Qual nº de parcela cai no mês de referência? (1..parcelas) ou 0 se fora do intervalo
+function pagParcelaNoMes(r, ymRef){
+  if (!r.parcelas || r.parcelas <= 1) {
+    // Conta avulsa: aparece só no mês do vencimento
+    var vm = (r.vencimento||'').slice(0,7);
+    return (vm === ymRef) ? 1 : 0;
+  }
+  var inicio = r.mesInicial || (r.vencimento||'').slice(0,7);
+  if (!inicio) return 0;
+  var d = pagDiffMeses(inicio, ymRef);
+  if (d < 0 || d >= r.parcelas) return 0;
+  return d + 1; // parcela 1-based
+}
+// Data de vencimento da parcela no mês de referência (AAAA-MM-DD)
+function pagVencNoMes(r, ymRef){
+  var dia = r.diaVenc || parseInt((r.vencimento||'').slice(8,10)) || 10;
+  return ymRef + '-' + String(dia).padStart(2,'0');
+}
+// Mês/ano da última parcela (vencimento final)
+function pagVencFinal(r){
+  if (!r.parcelas || r.parcelas <= 1) return (r.vencimento||'').slice(0,7);
+  var inicio = r.mesInicial || (r.vencimento||'').slice(0,7);
+  return pagAddMeses(inicio, r.parcelas - 1);
+}
+// Status da parcela do mês (lê do histórico r.pagamentos[ymRef])
+function pagStatusParcela(r, ymRef){
+  if (r.pagamentos && r.pagamentos[ymRef] && r.pagamentos[ymRef].pago) return 'pago';
+  // Compatibilidade: contas avulsas antigas usavam r.status='pago' direto
+  if ((!r.parcelas || r.parcelas <= 1) && r.status === 'pago') return 'pago';
+  var venc = pagVencNoMes(r, ymRef);
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  if (new Date(venc+'T00:00') < hoje) return 'vencido';
+  return 'pendente';
+}
+// Marcar/desmarcar pagamento da parcela do mês (salva no histórico)
+function pagToggleParcela(idx, ymRef, pagar){
+  finInit();
+  var r = db.financeiro.pagar[idx];
+  if (!r) return;
+  if (!r.pagamentos) r.pagamentos = {};
+  if (pagar) {
+    r.pagamentos[ymRef] = { pago:true, pagoEm:new Date().toISOString().split('T')[0] };
+    if (!r.parcelas || r.parcelas <= 1) { r.status = 'pago'; r.pagoEm = r.pagamentos[ymRef].pagoEm; }
+  } else {
+    if (!confirm('Reverter o pagamento desta parcela?')) return;
+    delete r.pagamentos[ymRef];
+    if (!r.parcelas || r.parcelas <= 1) { r.status = 'pendente'; r.pagoEm = ''; }
+  }
+  saveDB();
+  finRenderPagar();
+  toast(pagar ? '✅ Parcela paga' : '↩ Pagamento revertido', pagar?'#0d7a3e':'#b45309');
+}
+function pagFmtMesAno(ym){
+  var meses=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  var p=ym.split('-'); return meses[parseInt(p[1])-1] + '/' + p[0];
+}
+
 function finRenderPagar() {
   var grid = document.getElementById('finGridPagar');
   if (!grid) return;
   finInit();
   var rows = db.financeiro.pagar;
+  var ymRef = pagMesRef();
   var q = (document.getElementById('qPagar')&&document.getElementById('qPagar').value||'').toLowerCase();
-  var di = (document.getElementById('pagDataIni')||{}).value||'';
-  var df = (document.getElementById('pagDataFim')||{}).value||'';
   var fst = (document.getElementById('pagStatus')||{}).value||'';
   var ordem = (document.getElementById('pagOrdenar')||{}).value||'';
 
-  var visiveis = rows.map(function(r,idx){ return {r:r,idx:idx}; }).filter(function(o){
-    var r=o.r; if(!r) return false;
-    var st = r.status||'pendente';
-    if (fst && st!==fst) return false;
-    if (q && ((r.fornecedor||'')+' '+(r.placa||'')).toLowerCase().indexOf(q)<0) return false;
-    var dref = st==='pago' ? (r.pagoEm||r.vencimento) : r.vencimento;
-    if (di && (!dref || dref < di)) return false;
-    if (df && (!dref || dref > df)) return false;
-    return true;
+  // Monta a lista do mês: cada conta que tem parcela no mês de referência
+  var visiveis = [];
+  rows.forEach(function(r, idx){
+    if (!r) return;
+    var np = pagParcelaNoMes(r, ymRef);
+    if (np === 0) return;  // essa conta não tem parcela neste mês
+    var st = pagStatusParcela(r, ymRef);
+    if (fst) {
+      if (fst==='pago' && st!=='pago') return;
+      if (fst==='pendente' && st==='pago') return;
+    }
+    if (q && ((r.fornecedor||'')+' '+(r.descricao||'')).toLowerCase().indexOf(q)<0) return;
+    visiveis.push({ r:r, idx:idx, np:np, st:st, venc:pagVencNoMes(r,ymRef) });
   });
 
+  // Ordenação
   if (ordem==='fornecedor') visiveis.sort(function(a,b){ return (a.r.fornecedor||'').localeCompare(b.r.fornecedor||'','pt'); });
-  else if (ordem==='venc') visiveis.sort(function(a,b){ return (a.r.vencimento||'9999').localeCompare(b.r.vencimento||'9999'); });
-  else if (ordem==='venc_desc') visiveis.sort(function(a,b){ return (b.r.vencimento||'').localeCompare(a.r.vencimento||''); });
   else if (ordem==='valor') visiveis.sort(function(a,b){ return (Number(b.r.valor)||0)-(Number(a.r.valor)||0); });
+  else visiveis.sort(function(a,b){ return (a.venc||'').localeCompare(b.venc||''); });
 
-  // Stats
+  // Stats do mês
   var stats = document.getElementById('pagarStats');
   if (stats) {
-    var tPend=0, tPago=0, nPend=0, nPago=0;
-    var hoje = new Date(); hoje.setHours(0,0,0,0);
-    var nVenc=0, tVenc=0;
-    rows.forEach(function(r){
-      if(!r) return;
-      var v=Number(r.valor)||0;
-      if ((r.status||'pendente')==='pago') { tPago+=v; nPago++; }
-      else {
-        tPend+=v; nPend++;
-        if (r.vencimento && new Date(r.vencimento+'T00:00')<hoje) { nVenc++; tVenc+=v; }
-      }
+    var tPend=0,tPago=0,nPend=0,nPago=0,nVenc=0,tVenc=0;
+    visiveis.forEach(function(o){
+      var v=Number(o.r.valor)||0;
+      if (o.st==='pago'){ tPago+=v; nPago++; }
+      else { tPend+=v; nPend++; if(o.st==='vencido'){ nVenc++; tVenc+=v; } }
     });
     stats.innerHTML =
-      '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value" style="font-size:15px">'+brl(tPend)+'</div><div class="stat-label">A Pagar ('+nPend+')</div></div>'+
+      '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value" style="font-size:15px">'+brl(tPend)+'</div><div class="stat-label">A Pagar em '+pagFmtMesAno(ymRef)+' ('+nPend+')</div></div>'+
       '<div class="stat" style="border-left-color:#7c2d12"><div class="stat-value" style="font-size:15px">'+brl(tVenc)+'</div><div class="stat-label">⚠️ Vencidas ('+nVenc+')</div></div>'+
-      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+brl(tPago)+'</div><div class="stat-label">Pago ('+nPago+')</div></div>'+
-      '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">'+brl(tPend+tPago)+'</div><div class="stat-label">Total Geral</div></div>';
+      '<div class="stat" style="border-left-color:#0d7a3e"><div class="stat-value" style="font-size:15px">'+brl(tPago)+'</div><div class="stat-label">✅ Pagas ('+nPago+')</div></div>';
   }
 
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px">'
-    + '<thead><tr>' + ['Vencimento','Fornecedor','Placa','Valor (R$)','Descrição','Status','Pago em',''].map(finTH).join('') + '</tr></thead><tbody>';
+    + '<thead><tr>' + ['Dia','Fornecedor','Valor (R$)','Descrição','Parcela','Venc. Final','Status','Pago em',''].map(finTH).join('') + '</tr></thead><tbody>';
   var totalVis=0;
-  var hoje2 = new Date(); hoje2.setHours(0,0,0,0);
+
   visiveis.forEach(function(o){
-    var r=o.r, i=o.idx;
-    var st = r.status||'pendente';
+    var r=o.r, i=o.idx, st=o.st, np=o.np;
     totalVis += Number(r.valor)||0;
-    var vencido = st==='pendente' && r.vencimento && new Date(r.vencimento+'T00:00')<hoje2;
-    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'pagar\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
+    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'pagar\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'"><\/input>'; }
+
     var stBadge = st==='pago' ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">✅ Pago</span>'
-      : vencido ? '<span style="background:#fde2e2;color:#7c2d12;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">❌ Vencida</span>'
+      : st==='vencido' ? '<span style="background:#fde2e2;color:#7c2d12;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">❌ Vencida</span>'
       : '<span style="background:#fef3cd;color:#b45309;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">⏳ Pendente</span>';
-    var bg = st==='pago' ? 'background:#f5fdf8' : vencido ? 'background:#fff5f5' : '';
+    var bg = st==='pago' ? 'background:#f5fdf8' : st==='vencido' ? 'background:#fff5f5' : '';
+
+    // Dia (editável só para parcela — muda diaVenc; para avulsa muda o dia do vencimento)
+    var dia = r.diaVenc || parseInt((r.vencimento||'').slice(8,10)) || '';
+    var diaCel = '<input type="number" min="1" max="31" value="'+dia+'" onchange="finEdit(\'pagar\','+i+',\'diaVenc\',parseInt(this.value)||1)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:48px;text-align:center;color:#0E1B4D" title="Dia do vencimento">';
+
+    // Parcela: "3/12" para parcelada, "única" para avulsa
+    var parcelaCel = (r.parcelas && r.parcelas>1)
+      ? '<span style="font-weight:700;color:#2B4BF2">'+np+'/'+r.parcelas+'</span>'
+      : '<span style="color:#5a607a;font-size:10px">única</span>';
+
+    // Vencimento final
+    var vf = pagVencFinal(r);
+    var vfCel = (r.parcelas && r.parcelas>1)
+      ? '<span style="font-size:10px;color:#5a607a">'+pagFmtMesAno(vf)+'</span>'
+      : '<span style="color:#ccc">—</span>';
+
+    // Pago em (do histórico do mês)
+    var pagoEm = (r.pagamentos && r.pagamentos[ymRef] && r.pagamentos[ymRef].pagoEm) || '';
+
     html += '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
-      + '<td style="padding:4px 6px"><input type="date" value="'+(r.vencimento||'')+'" onchange="finEdit(\'pagar\','+i+',\'vencimento\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0E1B4D"></td>'
+      + '<td style="padding:4px 6px;text-align:center">'+diaCel+'</td>'
       + '<td style="padding:4px 6px">'+inp('fornecedor','130px')+'</td>'
-      + '<td style="padding:4px 6px">'+inp('placa','80px','font-family:monospace;text-transform:uppercase')+'</td>'
       + '<td style="padding:4px 6px">'+inp('valor','100px','text-align:right;font-weight:700;color:#c0392b')+'</td>'
-      + '<td style="padding:4px 6px">'+inp('descricao','180px')+'</td>'
+      + '<td style="padding:4px 6px">'+inp('descricao','170px')+'</td>'
+      + '<td style="padding:4px 6px;text-align:center">'+parcelaCel+'</td>'
+      + '<td style="padding:4px 6px;text-align:center">'+vfCel+'</td>'
       + '<td style="padding:4px 6px">'+stBadge+'</td>'
-      + '<td style="padding:4px 6px">'+(st==='pago'
-          ? '<input type="date" value="'+(r.pagoEm||'')+'" onchange="finEdit(\'pagar\','+i+',\'pagoEm\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0d7a3e">'
-          : '<span style="color:#ccc;font-size:10px">—</span>')+'</td>'
+      + '<td style="padding:4px 6px">'+(st==='pago' ? '<span style="color:#0d7a3e;font-size:10px">'+(pagoEm||'✓')+'</span>' : '<span style="color:#ccc;font-size:10px">—</span>')+'</td>'
       + '<td style="padding:4px 6px;text-align:center;white-space:nowrap">'
         + (st==='pago'
-            ? '<button onclick="finPagarToggle('+i+',false)" title="Reverter" style="background:#fef3cd;color:#b45309;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">↩</button>'
-            : '<button onclick="finPagarToggle('+i+',true)" title="Marcar como pago" style="background:#e8f5ef;color:#0d7a3e;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">✅ Pagar</button>')
-        + ' <button onclick="finDel(\'pagar\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑</button>'
+            ? '<button onclick="pagToggleParcela('+i+',\''+ymRef+'\',false)" title="Reverter" style="background:#fef3cd;color:#b45309;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">↩</button>'
+            : '<button onclick="pagToggleParcela('+i+',\''+ymRef+'\',true)" title="Marcar como pago" style="background:#e8f5ef;color:#0d7a3e;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">✅ Pagar</button>')
+        + ' <button onclick="finDel(\'pagar\','+i+')" title="Excluir conta" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑<\/button>'
       + '</td></tr>';
   });
-  html += '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D"><td colspan="3" style="padding:9px 10px">TOTAL FILTRADO ('+visiveis.length+')</td><td style="padding:9px 10px;text-align:right;font-family:monospace;color:#c0392b">'+brl(totalVis)+'</td><td colspan="4"></td></tr></tfoot>';
+
+  if (!visiveis.length) {
+    html += '<tr><td colspan="9" style="padding:24px;text-align:center;color:#9099bf">Nenhuma conta a pagar em '+pagFmtMesAno(ymRef)+'.</td></tr>';
+  }
+
+  html += '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D"><td colspan="2" style="padding:9px 10px">TOTAL '+pagFmtMesAno(ymRef)+' ('+visiveis.length+')</td><td style="padding:9px 10px;text-align:right;font-family:monospace;color:#c0392b">'+brl(totalVis)+'</td><td colspan="6"></td></tr></tfoot>';
   html += '</table></div>';
   grid.innerHTML = html;
 }
@@ -6846,6 +7035,30 @@ function mltConfirmarImportacao(){
 </div></div>
 
 <!-- MODAL: ADICIONAR / EDITAR VEÍCULO -->
+<div class="modal-bg" id="mNovaPagar"><div class="modal" style="max-width:460px">
+  <div class="modal-head" style="background:#0E1B4D"><h3>Nova Conta a Pagar</h3><button class="modal-x" onclick="closeM('mNovaPagar')">✕</button></div>
+  <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Tipo de conta</label>
+      <select class="fs" id="npTipo" onchange="npToggleTipo()">
+        <option value="avulsa">Avulsa (pagamento único)</option>
+        <option value="parcelada">Parcelada / Recorrente</option>
+      </select>
+    </div>
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Fornecedor</label><input class="fi" id="npFornecedor" placeholder="Nome do fornecedor"></div>
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Descrição</label><input class="fi" id="npDescricao" placeholder="Ex: Financiamento, aluguel, etc."></div>
+    <div class="fg"><label class="fl">Valor (R$)</label><input class="fi" id="npValor" placeholder="0,00" inputmode="decimal"></div>
+    <div class="fg"><label class="fl">Dia do vencimento</label><input class="fi" id="npDia" type="number" min="1" max="31" placeholder="10"></div>
+    <div class="fg" id="npMesIniWrap"><label class="fl">Mês inicial</label><input class="fi" id="npMesIni" type="month"></div>
+    <div class="fg" id="npParcelasWrap"><label class="fl">Nº de parcelas</label><input class="fi" id="npParcelas" type="number" min="1" placeholder="12" oninput="npCalcFinal()"></div>
+    <div class="fg" id="npAvulsaVencWrap" style="grid-column:1/-1;display:none"><label class="fl">Data de vencimento</label><input class="fi" id="npAvulsaVenc" type="date"></div>
+    <div id="npFinalInfo" style="grid-column:1/-1;background:#EEF1FD;border-radius:8px;padding:10px;font-size:12px;color:#0E1B4D;display:none"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mNovaPagar')">Cancelar</button>
+    <button class="btn btn-blue" onclick="salvarNovaPagar()">Adicionar Conta</button>
+  </div>
+</div></div>
+
 <div class="modal-bg" id="mVeiculo"><div class="modal" style="max-width:520px">
   <div class="modal-head" style="background:#0E1B4D">
     <h3 id="mVeiculoTitulo">Novo Veículo</h3>
