@@ -476,7 +476,13 @@ tr:hover td{background:#f8f9fe;}
 
         <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <input class="filter-input" id="mltFBusca" placeholder="Buscar AIT, placa, cliente, infra&ccedil;&atilde;o..." oninput="mltAplicarFiltro()" style="flex:1;min-width:160px">
-          <select class="filter-sel" id="mltFPlaca" onchange="mltAplicarFiltro()"><option value="">Todos os ve&iacute;culos</option></select>
+          <div id="mltFPlacaWrap" style="position:relative;display:inline-block">
+            <button type="button" class="filter-sel" id="mltFPlacaBtn" onclick="mltTogglePlacasDrop(event)" style="min-width:150px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <span id="mltFPlacaLabel">Todos os veículos</span>
+              <span style="font-size:9px;color:#9099bf">▼</span>
+            </button>
+            <div id="mltFPlacaDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:100;background:#fff;border:1.5px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(14,27,77,.15);min-width:200px;max-height:320px;overflow-y:auto;padding:6px"></div>
+          </div>
           <select class="filter-sel" id="mltFFinal" onchange="mltAplicarFiltro()">
             <option value="">Final de placa: todos</option>
             <option value="0">Final 0</option>
@@ -1048,7 +1054,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v25-20260730-1437';
+var LOKA_BUILD = 'v26-20260730-1516';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -5347,7 +5353,7 @@ var MLT_GRAV = {
 
 var _mltEdit   = null;   // id em edição
 var _mltImport = [];     // buffer de conferência da importação
-var _mltFiltro = {q:'', status:'', placa:'', finalPlaca:'', cliente:'', de:'', ate:''};
+var _mltFiltro = {q:'', status:'', placa:'', placas:[], finalPlaca:'', cliente:'', de:'', ate:''};
 
 // ── Helpers ────────────────────────────────────────────────────
 // Options de cliente reutilizadas no modal e na conferência
@@ -5520,25 +5526,84 @@ function mltPreencherFiltroClientes(){
 }
 
 function mltPreencherFiltroPlacas(){
-  var sel = document.getElementById('mltFPlaca');
-  if (!sel) return;
+  var drop = document.getElementById('mltFPlacaDrop');
+  if (!drop) return;
   var placas = {};
   (db.veiculos || []).forEach(function(v){ if (v.placa) placas[mltNormPlaca(v.placa)] = 1; });
   mltMultas().forEach(function(m){ if (m.placa) placas[mltNormPlaca(m.placa)] = 1; });
-  var atual = sel.value;
-  var h = '<option value="">Todos os veículos</option>';
-  Object.keys(placas).sort().forEach(function(p){
-    h += '<option value="'+p+'">'+mltFmtPlaca(p)+'</option>';
+  var lista = Object.keys(placas).sort();
+
+  var sel = _mltFiltro.placas || [];
+  var h = '<div style="padding:4px 6px;border-bottom:1px solid #eef1fd;margin-bottom:4px;display:flex;gap:8px">'
+    + '<a href="#" onclick="mltPlacasTodas(true);return false" style="font-size:11px;color:#2B4BF2;font-weight:700;text-decoration:none">Marcar todas</a>'
+    + '<a href="#" onclick="mltPlacasTodas(false);return false" style="font-size:11px;color:#c0392b;font-weight:700;text-decoration:none">Limpar</a></div>';
+  lista.forEach(function(p){
+    var checked = sel.indexOf(p) >= 0 ? 'checked' : '';
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px" '
+      + 'onmouseover="this.style.background=\'#f4f6fb\'" onmouseout="this.style.background=\'\'">'
+      + '<input type="checkbox" value="'+p+'" '+checked+' onchange="mltPlacasMudou()" style="width:16px;height:16px;cursor:pointer">'
+      + '<span>'+mltFmtPlaca(p)+'</span></label>';
   });
-  sel.innerHTML = h;
-  sel.value = atual;
+  drop.innerHTML = h;
+  mltAtualizarLabelPlacas();
+}
+
+// Marcar/desmarcar todas
+function mltPlacasTodas(marcar){
+  var drop = document.getElementById('mltFPlacaDrop');
+  if (!drop) return;
+  drop.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = marcar; });
+  mltPlacasMudou();
+}
+
+// Coletar placas marcadas e aplicar filtro
+function mltPlacasMudou(){
+  var drop = document.getElementById('mltFPlacaDrop');
+  if (!drop) return;
+  var marcadas = [];
+  drop.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb){ marcadas.push(cb.value); });
+  _mltFiltro.placas = marcadas;
+  mltAtualizarLabelPlacas();
+  mltRender();
+}
+
+// Atualizar o texto do botão
+function mltAtualizarLabelPlacas(){
+  var lbl = document.getElementById('mltFPlacaLabel');
+  if (!lbl) return;
+  var n = (_mltFiltro.placas||[]).length;
+  if (n === 0) lbl.textContent = 'Todos os veículos';
+  else if (n === 1) lbl.textContent = mltFmtPlaca(_mltFiltro.placas[0]);
+  else lbl.textContent = n + ' placas selecionadas';
+}
+
+// Abrir/fechar o dropdown
+function mltTogglePlacasDrop(ev){
+  if (ev) ev.stopPropagation();
+  var drop = document.getElementById('mltFPlacaDrop');
+  if (!drop) return;
+  var abrir = drop.style.display === 'none';
+  drop.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    // fechar ao clicar fora
+    setTimeout(function(){
+      document.addEventListener('click', mltFecharPlacasDrop);
+    }, 10);
+  }
+}
+function mltFecharPlacasDrop(ev){
+  var wrap = document.getElementById('mltFPlacaWrap');
+  if (wrap && !wrap.contains(ev.target)) {
+    var drop = document.getElementById('mltFPlacaDrop');
+    if (drop) drop.style.display = 'none';
+    document.removeEventListener('click', mltFecharPlacasDrop);
+  }
 }
 
 // ── FILTROS ────────────────────────────────────────────────────
 function mltAplicarFiltro(){
   _mltFiltro.q      = (document.getElementById('mltFBusca')||{}).value || '';
   _mltFiltro.status = (document.getElementById('mltFStatus')||{}).value || '';
-  _mltFiltro.placa  = (document.getElementById('mltFPlaca')||{}).value || '';
   _mltFiltro.finalPlaca = (document.getElementById('mltFFinal')||{}).value || '';
   _mltFiltro.cliente= (document.getElementById('mltFCliente')||{}).value || '';
   _mltFiltro.de     = (document.getElementById('mltFDe')||{}).value || '';
@@ -5547,10 +5612,14 @@ function mltAplicarFiltro(){
 }
 
 function mltLimparFiltro(){
-  ['mltFBusca','mltFStatus','mltFPlaca','mltFCliente','mltFDe','mltFAte'].forEach(function(id){
+  ['mltFBusca','mltFStatus','mltFFinal','mltFCliente','mltFDe','mltFAte'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  _mltFiltro = {q:'', status:'', placa:'', cliente:'', de:'', ate:''};
+  _mltFiltro = {q:'', status:'', placa:'', placas:[], finalPlaca:'', cliente:'', de:'', ate:''};
+  // Desmarcar checkboxes de placa e atualizar rótulo
+  var drop = document.getElementById('mltFPlacaDrop');
+  if (drop) drop.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+  if (typeof mltAtualizarLabelPlacas === 'function') mltAtualizarLabelPlacas();
   mltRender();
 }
 
@@ -5559,7 +5628,7 @@ function mltFiltradas(){
   var q = f.q.toLowerCase().trim();
   return mltMultas().filter(function(m){
     if (f.status && m.status !== f.status) return false;
-    if (f.placa && mltNormPlaca(m.placa) !== f.placa) return false;
+    if (f.placas && f.placas.length && f.placas.indexOf(mltNormPlaca(m.placa)) < 0) return false;
     if (f.finalPlaca) {
       var _dig = String(m.placa||'').replace(/[^0-9]/g,'');
       if (_dig.slice(-1) !== f.finalPlaca) return false;
