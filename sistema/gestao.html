@@ -451,6 +451,7 @@ tr:hover td{background:#f8f9fe;}
         <button class="btn btn-blue" onclick="openManutRegistro(null)">+ Nova Manutenção</button>
         <button class="btn btn-outline" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
         <button class="btn btn-outline" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
+        <button class="btn" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioManutencao()" title="Gerar relatório por placa para imprimir ou salvar em PDF">📄 Relatório PDF</button>
       </div>
 
       <!-- Resumo -->
@@ -1047,7 +1048,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v24-20260730-1425';
+var LOKA_BUILD = 'v25-20260730-1437';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -3774,6 +3775,109 @@ function parseBRLFat(s) {
   return parseFloat(s) || 0;
 }
 
+
+
+// ── RELATÓRIO DE MANUTENÇÃO POR PLACA ──────────────────────────
+function relatorioManutencao(){
+  garantirArray('manutencoes');
+  var todas = db.manutencoes || [];
+  if (!todas.length) { toast('Nenhuma manutenção cadastrada','#b45309'); return; }
+
+  // Perguntar a placa (sugere a do filtro de busca, se houver)
+  var sugestao = (document.getElementById('qManut')&&document.getElementById('qManut').value||'').toUpperCase().trim();
+  var placa = prompt('Digite a PLACA para o relatório (deixe em branco para TODAS):', sugestao);
+  if (placa === null) return;  // cancelou
+  placa = placa.toUpperCase().replace(/[^A-Z0-9]/g,'').trim();
+
+  // Filtrar
+  var lista = todas.filter(function(m){
+    if (!placa) return true;
+    return String(m.placa||'').toUpperCase().replace(/[^A-Z0-9]/g,'').indexOf(placa) >= 0;
+  });
+  if (!lista.length) { toast('Nenhuma manutenção para a placa '+placa,'#b45309'); return; }
+
+  // Agrupar por placa/veículo
+  var porVeic = {};
+  lista.forEach(function(m){
+    var p = String(m.placa||'SEM PLACA').toUpperCase();
+    if (!porVeic[p]) porVeic[p] = { nome:(m.veiculoNome||''), itens:[] };
+    porVeic[p].itens.push(m);
+  });
+
+  function parseCusto(c){
+    if (!c) return 0;
+    return parseFloat(String(c).replace(/[^0-9.,]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+  }
+  function fmtData(d){
+    if (!d) return '—';
+    var m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3]+'/'+m[2]+'/'+m[1] : d;
+  }
+  function stLabel(s){
+    return s==='concluida' ? 'Concluída' : s==='orcamento' ? 'Orçamento' : 'Em andamento';
+  }
+
+  var totalGeral = 0;
+  var blocos = '';
+  Object.keys(porVeic).sort().forEach(function(p){
+    var v = porVeic[p];
+    // ordenar por data desc
+    v.itens.sort(function(a,b){ return String(b.data||'').localeCompare(String(a.data||'')); });
+    var subtotal = v.itens.reduce(function(s,m){ return s + parseCusto(m.custo); }, 0);
+    totalGeral += subtotal;
+
+    var linhas = v.itens.map(function(m){
+      return '<tr>'
+        + '<td>'+fmtData(m.data)+'</td>'
+        + '<td>'+(m.tipo||'—')+'</td>'
+        + '<td>'+(m.oficina||'—')+'</td>'
+        + '<td>'+(m.descricao||'—')+'</td>'
+        + '<td>'+stLabel(m.status)+'</td>'
+        + '<td style="text-align:right;font-family:monospace">R$ '+parseCusto(m.custo).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>'
+        + '</tr>';
+    }).join('');
+
+    blocos += '<div class="veic-bloco">'
+      + '<div class="veic-head">'+p+(v.nome ? ' — '+v.nome : '')+' <span>'+v.itens.length+' manutenção(ões) · R$ '+subtotal.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span></div>'
+      + '<table><thead><tr><th>Data</th><th>Tipo</th><th>Oficina</th><th>Descrição</th><th>Status</th><th style="text-align:right">Custo</th></tr></thead>'
+      + '<tbody>'+linhas+'</tbody></table></div>';
+  });
+
+  var titulo = placa ? ('Placa ' + placa) : 'Todos os veículos';
+  var hoje = new Date().toLocaleDateString('pt-BR');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Relatório de Manutenção — '+titulo+'</title><style>'
+    + '*{margin:0;padding:0;box-sizing:border-box}'
+    + 'body{font-family:system-ui,-apple-system,Arial,sans-serif;color:#1a2340;padding:24px;font-size:12px}'
+    + '.cab{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0E1B4D;padding-bottom:14px;margin-bottom:18px}'
+    + '.cab h1{font-size:20px;color:#0E1B4D}.cab .sub{font-size:12px;color:#5a607a;margin-top:3px}'
+    + '.cab .meta{text-align:right;font-size:11px;color:#5a607a}'
+    + '.veic-bloco{margin-bottom:20px;page-break-inside:avoid}'
+    + '.veic-head{background:#0E1B4D;color:#fff;padding:8px 12px;border-radius:6px 6px 0 0;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center}'
+    + '.veic-head span{font-weight:400;font-size:11px;color:#c5ccf5}'
+    + 'table{width:100%;border-collapse:collapse}'
+    + 'th{background:#EEF1FD;color:#0E1B4D;padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;border:1px solid #d5dcf5}'
+    + 'td{padding:6px 8px;border:1px solid #e8ebf5;font-size:11px}'
+    + 'tr:nth-child(even) td{background:#f7f8fc}'
+    + '.total{margin-top:16px;text-align:right;font-size:15px;font-weight:800;color:#0E1B4D;border-top:2px solid #0E1B4D;padding-top:10px}'
+    + '.rodape{margin-top:24px;text-align:center;font-size:10px;color:#9099bf;border-top:1px solid #e8ebf5;padding-top:12px}'
+    + '@media print{body{padding:0}.no-print{display:none}}'
+    + '.btns{text-align:center;margin-bottom:16px}'
+    + '.btns button{background:#2B4BF2;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-weight:700;cursor:pointer;margin:0 4px;font-size:13px}'
+    + '</style></head><body>'
+    + '<div class="btns no-print"><button onclick="window.print()">🖨 Imprimir / Salvar PDF</button><button onclick="window.close()" style="background:#5a607a">Fechar</button></div>'
+    + '<div class="cab"><div><h1>Relatório de Manutenção</h1><div class="sub">'+titulo+'</div></div>'
+    + '<div class="meta">LOKÁ Aluguel de Veículos<br>Emitido em '+hoje+'</div></div>'
+    + blocos
+    + '<div class="total">Total Geral: R$ '+totalGeral.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>'
+    + '<div class="rodape">LOKÁ Aluguel de Veículos · CNPJ 39.911.638/0001-10 · Feira de Santana — BA</div>'
+    + '</body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
 
 function renderManutencao() {
   if (!db) return;
