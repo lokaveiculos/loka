@@ -605,6 +605,16 @@ tr:hover td{background:#f8f9fe;}
             <option value="parcial">◑ Parciais</option>
             <option value="recebido">✅ Recebidos</option>
           </select>
+          <select class="filter-sel" id="recTipo" onchange="finRenderReceber()">
+            <option value="">Todos os tipos</option>
+            <option value="Fatura">📄 Fatura</option>
+            <option value="Multas">🚦 Multas</option>
+            <option value="Avarias">🔧 Avarias</option>
+            <option value="Seguro">🛡️ Seguro</option>
+            <option value="Peças">⚙️ Peças</option>
+            <option value="Pneus">🛞 Pneus</option>
+            <option value="Outros">📌 Outros</option>
+          </select>
           <select class="filter-sel" id="recOrdenar" onchange="finRenderReceber()">
             <option value="">Ordenar por...</option>
             <option value="cliente">Cliente (A-Z)</option>
@@ -1037,7 +1047,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v23-20260729-1150';
+var LOKA_BUILD = 'v24-20260730-1425';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4477,6 +4487,21 @@ function finLimparDataReceber() {
   var f=document.getElementById('recDataFim'); if(f)f.value='';
   finRenderReceber();
 }
+var REC_TIPOS = ['Fatura','Multas','Avarias','Seguro','Peças','Pneus','Outros'];
+var REC_TIPO_COR = {Fatura:'#2B4BF2',Multas:'#c0392b',Avarias:'#b45309',Seguro:'#0e7490','Peças':'#7c3aed',Pneus:'#0d7a3e',Outros:'#5a607a'};
+
+// Select de tipo para linha de Contas a Receber
+function tipoSelect(r, i){
+  var atual = r.tipo || 'Outros';
+  var cor = REC_TIPO_COR[atual] || '#5a607a';
+  var opts = REC_TIPOS.map(function(t){
+    return '<option value="'+t+'"'+(t===atual?' selected':'')+'>'+t+'</option>';
+  }).join('');
+  return '<select onchange="finEdit(\'receber\','+i+',\'tipo\',this.value); finRenderReceber();" '
+    + 'style="border:1px solid '+cor+';border-radius:5px;padding:4px;font-size:11px;width:90px;'
+    + 'color:'+cor+';font-weight:700;background:#fff">'+opts+'</select>';
+}
+
 function finRenderReceber() {
   var grid = document.getElementById('finGridReceber');
   if (!grid) return;
@@ -4487,6 +4512,7 @@ function finRenderReceber() {
   var df = (document.getElementById('recDataFim')||{}).value||'';
   var fst = (document.getElementById('recStatus')||{}).value||'';
   var ordem = (document.getElementById('recOrdenar')||{}).value||'';
+  var fTipo = (document.getElementById('recTipo')||{}).value||'';
 
   // calcular status efetivo considerando recebimento parcial
   function statusReal(r){
@@ -4502,6 +4528,7 @@ function finRenderReceber() {
     var st = statusReal(r);
     if (fst && st!==fst) return false;
     if (q && (r.cliente||'').toLowerCase().indexOf(q)<0) return false;
+    if (fTipo && (r.tipo||'Outros')!==fTipo) return false;
     var dref = st==='recebido' ? (r.recebidoEm||r.vencimento) : r.vencimento;
     if (di && (!dref || dref < di)) return false;
     if (df && (!dref || dref > df)) return false;
@@ -4533,7 +4560,7 @@ function finRenderReceber() {
   }
 
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">'
-    + '<thead><tr>' + ['Cliente','Valor (R$)','Recebido (R$)','Saldo','Vencimento','Histórico','Status','Recebido em',''].map(finTH).join('') + '</tr></thead><tbody>';
+    + '<thead><tr>' + ['Cliente','Tipo','Valor (R$)','Recebido (R$)','Saldo','Vencimento','Histórico','Status','Recebido em',''].map(finTH).join('') + '</tr></thead><tbody>';
   var totalVis=0, recebVis=0;
   visiveis.forEach(function(o){
     var r=o.r, i=o.idx;
@@ -4549,6 +4576,7 @@ function finRenderReceber() {
     var bg = st==='recebido' ? 'background:#f5fdf8' : st==='parcial' ? 'background:#f5f9ff' : '';
     html += '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
       + '<td style="padding:4px 6px">'+inp('cliente','120px')+'</td>'
+      + '<td style="padding:4px 6px">'+tipoSelect(r,i)+'</td>'
       + '<td style="padding:4px 6px">'+inp('valor','95px','text-align:right;font-weight:700')+'</td>'
       + '<td style="padding:4px 6px">'+inp('recebido','95px','text-align:right;color:#0d7a3e;font-weight:700')+'</td>'
       + '<td style="padding:4px 6px;text-align:right;font-family:monospace;font-weight:700;color:'+(saldo<=0?'#0d7a3e':'#c0392b')+'">'+brl(saldo)+'</td>'
