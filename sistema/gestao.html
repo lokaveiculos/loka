@@ -1047,7 +1047,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v32-20260731-0117';
+var LOKA_BUILD = 'v33-20260731-0128';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4562,9 +4562,15 @@ function divPagamentosDoContrato(contrato){
   var pagas = 0, ultimoMes = '';
   pagar.forEach(function(c){
     if (!c) return;
-    var fc = divNormContrato(c.fornecedor);
-    // o fornecedor é "Banco - Contrato"; verifica se contém o contrato
-    if (fc.indexOf(alvo) < 0) return;
+    // 1º) vínculo firme (contratoVinc definido ao criar a conta)
+    // 2º) compatibilidade: contrato dentro do nome do fornecedor
+    var casou = false;
+    if (c.contratoVinc) {
+      casou = divNormContrato(c.contratoVinc) === alvo;
+    } else {
+      casou = divNormContrato(c.fornecedor).indexOf(alvo) >= 0;
+    }
+    if (!casou) return;
     if (c.pagamentos) {
       Object.keys(c.pagamentos).forEach(function(ym){
         if (c.pagamentos[ym] && c.pagamentos[ym].pago) {
@@ -4720,11 +4726,29 @@ function editarPagar(idx){
     if (av) av.style.display = 'none';
   }
 
+  // Restaurar o vínculo com financiamento, se houver
+  var _vc = document.getElementById('npVincular');
+  var _vw = document.getElementById('npVinculoWrap');
+  if (r.contratoVinc) {
+    if (_vc) _vc.checked = true;
+    if (_vw) _vw.style.display = 'block';
+    npPreencherListaFinanciamentos();
+    var _fin = document.getElementById('npFinanciamento');
+    if (_fin) _fin.value = r.contratoVinc;
+  } else {
+    if (_vc) _vc.checked = false;
+    if (_vw) _vw.style.display = 'none';
+  }
+
   openM('mNovaPagar');
 }
 
 function abrirNovaPagar(){
   _editandoPagarIdx = null;
+  var _vc = document.getElementById('npVincular');
+  if (_vc) { _vc.checked = false; }
+  var _vw = document.getElementById('npVinculoWrap');
+  if (_vw) _vw.style.display = 'none';
   var head = document.querySelector('#mNovaPagar .modal-head h3');
   if (head) head.textContent = 'Nova Conta a Pagar';
   var btn = document.querySelector('#mNovaPagar .modal-foot .btn-blue');
@@ -4742,6 +4766,52 @@ function abrirNovaPagar(){
   npToggleTipo();
   npCalcFinal();
   openM('mNovaPagar');
+}
+
+
+// ══ VÍNCULO CONTA A PAGAR ↔ FINANCIAMENTO ══════════════════════
+function npToggleVinculo(){
+  var chk = document.getElementById('npVincular').checked;
+  document.getElementById('npVinculoWrap').style.display = chk ? 'block' : 'none';
+  if (chk) npPreencherListaFinanciamentos();
+}
+
+function npPreencherListaFinanciamentos(){
+  finInit();
+  var sel = document.getElementById('npFinanciamento');
+  if (!sel) return;
+  var dividas = db.financeiro.divida || [];
+  var atual = sel.value;
+  var h = '<option value="">— Selecione o financiamento —</option>';
+  dividas.forEach(function(d, idx){
+    if (!d) return;
+    var rotulo = (d.banco||'Financiamento') + (d.contrato ? ' · '+d.contrato : '') + ' (R$ '+ (Number(d.valorParcela)||0).toLocaleString('pt-BR') + '/mês)';
+    // usa o contrato como valor de vínculo (identificador estável)
+    h += '<option value="'+(d.contrato||('idx'+idx))+'">'+rotulo+'</option>';
+  });
+  sel.innerHTML = h;
+  sel.value = atual;
+}
+
+function npPreencherDoFinanciamento(){
+  finInit();
+  var contrato = document.getElementById('npFinanciamento').value;
+  if (!contrato) return;
+  var d = (db.financeiro.divida||[]).find(function(x){ return x && String(x.contrato)===String(contrato); });
+  if (!d) return;
+  // Preencher automaticamente os dados a partir do financiamento
+  document.getElementById('npTipo').value = 'parcelada';
+  document.getElementById('npFornecedor').value = (d.banco||'') + (d.contrato ? ' - '+d.contrato : '');
+  document.getElementById('npDescricao').value = 'Financiamento' + (d.garantia ? ' · '+d.garantia : '');
+  document.getElementById('npValor').value = d.valorParcela != null ? String(d.valorParcela).replace('.',',') : '';
+  document.getElementById('npParcelas').value = d.totParcelas || '';
+  var pp = d.primParcela || '';
+  if (pp) {
+    document.getElementById('npMesIni').value = pp.slice(0,7);
+    document.getElementById('npDia').value = parseInt(pp.slice(8,10)) || 10;
+  }
+  npToggleTipo();
+  npCalcFinal();
 }
 
 function npToggleTipo(){
@@ -4788,6 +4858,12 @@ function salvarNovaPagar(){
       vencimento: mesIni + '-' + String(dia).padStart(2,'0'),
       pagamentos: {}, status: 'pendente'
     };
+    // Vínculo com financiamento do Endividamento
+    var _vinc = document.getElementById('npVincular');
+    if (_vinc && _vinc.checked) {
+      var _fin = document.getElementById('npFinanciamento').value;
+      if (_fin) nova.contratoVinc = _fin;
+    }
   } else {
     var venc = document.getElementById('npAvulsaVenc').value;
     if (!venc) { toast('⚠️ Informe a data de vencimento','#b45309'); return; }
@@ -4803,6 +4879,11 @@ function salvarNovaPagar(){
     nova.pagamentos = antiga.pagamentos || {};
     nova.status = antiga.status;
     nova.pagoEm = antiga.pagoEm;
+    // manter o vínculo se não foi alterado no modal
+    if (!nova.contratoVinc && antiga.contratoVinc) {
+      var _vc2 = document.getElementById('npVincular');
+      if (_vc2 && _vc2.checked) nova.contratoVinc = antiga.contratoVinc;
+    }
     db.financeiro.pagar[_editandoPagarIdx] = nova;
     saveDB();
     closeM('mNovaPagar');
@@ -7237,6 +7318,18 @@ function mltConfirmarImportacao(){
         <option value="avulsa">Avulsa (pagamento único)</option>
         <option value="parcelada">Parcelada / Recorrente</option>
       </select>
+    </div>
+    <div class="fg" style="grid-column:1/-1;background:#f0f2f9;padding:10px;border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:700;color:#0E1B4D">
+        <input type="checkbox" id="npVincular" onchange="npToggleVinculo()" style="width:16px;height:16px;cursor:pointer">
+        🔗 Vincular a um financiamento do Endividamento
+      </label>
+      <div id="npVinculoWrap" style="display:none;margin-top:8px">
+        <select class="fs" id="npFinanciamento" onchange="npPreencherDoFinanciamento()">
+          <option value="">— Selecione o financiamento —</option>
+        </select>
+        <div style="font-size:10px;color:#5a607a;margin-top:4px">Ao vincular, os pagamentos desta conta atualizam o Pago/Amortizado do Endividamento.</div>
+      </div>
     </div>
     <div class="fg" style="grid-column:1/-1"><label class="fl">Fornecedor</label><input class="fi" id="npFornecedor" placeholder="Nome do fornecedor"></div>
     <div class="fg" style="grid-column:1/-1"><label class="fl">Descrição</label><input class="fi" id="npDescricao" placeholder="Ex: Financiamento, aluguel, etc."></div>
