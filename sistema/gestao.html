@@ -1058,7 +1058,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v37-20260731-2147';
+var LOKA_BUILD = 'v38-20260731-2332';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1240,6 +1240,14 @@ function lokaLogout() {
 
 // ── DB ─────────────────────────────────────────────────────────
 function loadDB() {
+  // Failsafe: se nada liberar a trava em 15s, libera para não travar o uso.
+  setTimeout(function(){
+    if (!_dadosCarregados) {
+      console.warn('[TRAVA] Failsafe: liberando gravações após 15s (Firebase demorou).');
+      _dadosCarregados = true;
+    }
+  }, 15000);
+
   // 1. Carregar do localStorage imediatamente (rápido)
   var local = null;
   try { local = JSON.parse(localStorage.getItem('loka_db') || 'null'); } catch(e) {}
@@ -1266,6 +1274,8 @@ function loadDB() {
     checkAlertas();
     showPanel('dashboard');
     if (origem) toast('📂 Dados carregados: ' + origem, '#2B4BF2');
+    // LIBERA a trava: dados carregados, agora pode gravar com segurança
+    _dadosCarregados = true;
     // Ativar sincronização em tempo real
     setupRealtimeSync();
   }
@@ -1409,10 +1419,14 @@ function loadDB() {
     if (!db.historico) db.historico = [];
     if (!db.contratos) db.contratos = [];
     preencherCliSel(); checkAlertas(); showPanel('dashboard');
+    // Libera a trava no fallback (sem Firebase ou offline) — usa dados locais/seed
+    _dadosCarregados = true;
   }
 }
 
-var _ultimaEscritaLocal = 0;   // timestamp da última alteração local
+var _ultimaEscritaLocal = 0;
+var _dadosCarregados = false;   // trava: só permite gravar após carregar do Firebase
+var _firebaseConsultado = false; // marca se já consultamos o Firebase ao menos uma vez   // timestamp da última alteração local
 var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // Garante que um campo do db seja array (Firebase devolve como objeto após exclusões)
 // Normaliza TODOS os arrays do db de uma vez (Firebase devolve arrays como objeto
@@ -1491,6 +1505,19 @@ function _contarFin(f){
 
 function saveDB() {
   if (!db) return;
+
+  // ══ TRAVA DE CARREGAMENTO ══════════════════════════════════════
+  // Bloqueia gravações até os dados terminarem de carregar do Firebase.
+  // Isso impede que um lançamento feito logo ao abrir (antes dos dados
+  // chegarem) grave um banco vazio por cima dos dados reais.
+  if (!_dadosCarregados) {
+    console.warn('[TRAVA] Gravação bloqueada: dados ainda carregando. Aguarde alguns segundos e tente de novo.');
+    try { _mostrarSyncBadge && _mostrarSyncBadge('⏳ Aguarde carregar...'); } catch(e){}
+    try { toast && toast('⏳ Aguarde os dados carregarem antes de lançar','#b45309'); } catch(e){}
+    return;
+  }
+  // ═══════════════════════════════════════════════════════════════
+
   if (typeof normalizarDB === 'function') normalizarDB();
 
   // ══ GUARDA DE INTEGRIDADE ══════════════════════════════════════
