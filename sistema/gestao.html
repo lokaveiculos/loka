@@ -1047,7 +1047,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v31-20260731-0004';
+var LOKA_BUILD = 'v32-20260731-0117';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -1408,6 +1408,26 @@ function normalizarDB(){
       db[nome] = db[nome].filter(function(x){ return x != null; });
     }
   });
+
+  // Protege também as listas DENTRO do financeiro (pagar, receber, divida, etc.)
+  if (db.financeiro && typeof db.financeiro === 'object') {
+    ['receber','pagar','divida','bens','acertos','baixas'].forEach(function(sub){
+      var v = db.financeiro[sub];
+      if (v === undefined || v === null) { db.financeiro[sub] = []; return; }
+      if (!Array.isArray(v)) {
+        if (typeof v === 'object') {
+          db.financeiro[sub] = Object.keys(v)
+            .sort(function(a,b){ return Number(a)-Number(b); })
+            .map(function(k){ return v[k]; })
+            .filter(function(x){ return x != null; });
+        } else {
+          db.financeiro[sub] = [];
+        }
+      } else if (v.indexOf(null) >= 0) {
+        db.financeiro[sub] = v.filter(function(x){ return x != null; });
+      }
+    });
+  }
 }
 
 function garantirArray(nome){
