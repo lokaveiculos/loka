@@ -1058,7 +1058,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v36-20260731-2103';
+var LOKA_BUILD = 'v37-20260731-2147';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1254,6 +1254,14 @@ function loadDB() {
     db.contratos = cleanArr(db.contratos);
     db.multas    = cleanArr(db.multas);
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+    // Inicializa as contagens saudáveis do guarda de integridade
+    try {
+      if (typeof _ultimasContagens !== 'undefined') {
+        var _f = _contarFin(db.financeiro);
+        if (_f > 0) _ultimasContagens.financeiro = _f;
+        if ((db.clients||[]).length > 0) _ultimasContagens.clients = db.clients.length;
+      }
+    } catch(e){}
     preencherCliSel();
     checkAlertas();
     showPanel('dashboard');
@@ -1470,9 +1478,53 @@ function _removerFotosPesadas(obj){
   });
 }
 
+// Guarda de integridade: memoriza a última contagem "saudável" de cada área crítica
+var _ultimasContagens = { financeiro:0, ativos:0, clients:0, veiculos:0 };
+function _contarFin(f){
+  if (!f) return 0;
+  return (Array.isArray(f.receber)?f.receber.length:0)
+       + (Array.isArray(f.pagar)?f.pagar.length:0)
+       + (Array.isArray(f.acertos)?f.acertos.length:0)
+       + (Array.isArray(f.divida)?f.divida.length:0)
+       + (Array.isArray(f.bens)?f.bens.length:0);
+}
+
 function saveDB() {
   if (!db) return;
   if (typeof normalizarDB === 'function') normalizarDB();
+
+  // ══ GUARDA DE INTEGRIDADE ══════════════════════════════════════
+  // Impede que uma gravação apague dados: se o financeiro (ou clientes)
+  // está prestes a ir VAZIO mas tínhamos dados agora há pouco, ABORTA
+  // e recarrega do Firebase — evitando destruir os dados de outro aparelho.
+  try {
+    var finAgora = _contarFin(db.financeiro);
+    var cliAgora = (db.clients||[]).length;
+    if (_ultimasContagens.financeiro >= 5 && finAgora === 0) {
+      console.warn('[GUARDA] Bloqueado: financeiro ia a 0 (tinha '+_ultimasContagens.financeiro+'). Recarregando do Firebase.');
+      _mostrarSyncBadge && _mostrarSyncBadge('⚠️ Proteção ativada');
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+        firebase.database().ref('loka_db').once('value', function(snap){
+          var fb = snap.val();
+          if (fb && _contarFin(fb.financeiro) > 0) {
+            db.financeiro = fb.financeiro;
+            if (typeof normalizarDB==='function') normalizarDB();
+            try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e){}
+            if (typeof finRender==='function') try { finRender(_finAbaAtual||'acertos'); } catch(e){}
+          }
+        });
+      }
+      return; // não grava a versão vazia
+    }
+    if (_ultimasContagens.clients >= 30 && cliAgora === 0) {
+      console.warn('[GUARDA] Bloqueado: clientes ia a 0. Gravação abortada.');
+      return;
+    }
+    // Atualiza as contagens saudáveis
+    if (finAgora > 0) _ultimasContagens.financeiro = finAgora;
+    if (cliAgora > 0) _ultimasContagens.clients = cliAgora;
+  } catch(e){ console.error('Guarda de integridade:', e); }
+  // ═══════════════════════════════════════════════════════════════
   // PROTEÇÃO: nunca gravar fotos/base64 no banco (mantém o tamanho sob controle)
   try {
     if (db.manutencoes) _removerFotosPesadas(db.manutencoes);
@@ -1561,6 +1613,30 @@ function setupRealtimeSync() {
     db = fbData;
     normalizarDB();  // converte todos os arrays de uma vez
     db.veiculos  = cleanVeics(db.veiculos);
+    // ANTI-RESSURREIÇÃO: remove ativos que encerramos aqui há pouco (até 60s)
+    // mas que voltaram porque outro aparelho tinha versão antiga.
+    try {
+      if (window._encerradosRecentes && db.ativos) {
+        var agora = Date.now();
+        db.ativos = db.ativos.filter(function(a){
+          if (!a || !a.id) return true;
+          var tEnc = window._encerradosRecentes[a.id];
+          if (tEnc && (agora - tEnc) < 60000) {
+            console.warn('[ANTI-RESSURREIÇÃO] Aluguel '+a.id+' voltou do Firebase; removido (encerrado há '+Math.round((agora-tEnc)/1000)+'s).');
+            return false; // não deixa ressuscitar
+          }
+          return true;
+        });
+      }
+    } catch(e){ console.error('anti-ressurreição:', e); }
+    // Atualiza contagens saudáveis do guarda (o Firebase é fonte de verdade aqui)
+    try {
+      if (typeof _ultimasContagens !== 'undefined') {
+        var _f2 = _contarFin(db.financeiro);
+        if (_f2 > 0) _ultimasContagens.financeiro = _f2;
+        if ((db.clients||[]).length > 0) _ultimasContagens.clients = db.clients.length;
+      }
+    } catch(e){}
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
 
     // Não re-renderiza se há modal aberto (usuário pode estar digitando)
@@ -2736,6 +2812,11 @@ function confirmarEnc() {
     var vIdx = db.veiculos.findIndex(function(v){return v && v.id===a.veiculoId;});
     if (vIdx>=0) { db.veiculos[vIdx].status='disponivel'; var km=document.getElementById('encKm').value; if(km) db.veiculos[vIdx].km=km; }
     db.ativos.splice(idx,1);
+    // Registra o encerramento para impedir "ressurreição" por sync de outro aparelho
+    try {
+      if (!window._encerradosRecentes) window._encerradosRecentes = {};
+      window._encerradosRecentes[_encId] = Date.now();
+    } catch(e){}
   } catch(err) {
     console.error('Erro ao encerrar locação:', err);
     toast('❌ Falha ao encerrar: '+err.message,'#c0392b');
