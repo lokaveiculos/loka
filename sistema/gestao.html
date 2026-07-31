@@ -1047,7 +1047,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v33-20260731-0128';
+var LOKA_BUILD = 'v34-20260731-0139';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4387,11 +4387,24 @@ var FIN_SEED_PAGAR = [];
 
 function finInit() {
   if (!db.financeiro) db.financeiro = {};
-  if (!db.financeiro.acertos || !db.financeiro.acertos.length) db.financeiro.acertos = FIN_SEED_ACERTOS.slice();
-  if (!db.financeiro.bens    || !db.financeiro.bens.length)    db.financeiro.bens    = FIN_SEED_BENS.slice();
-  if (!db.financeiro.divida  || !db.financeiro.divida.length)  db.financeiro.divida  = FIN_SEED_DIVIDA.slice();
-  if (!db.financeiro.receber || !db.financeiro.receber.length) db.financeiro.receber = FIN_SEED_RECEBER.slice();
-  if (!db.financeiro.pagar) db.financeiro.pagar = FIN_SEED_PAGAR.slice();
+  // IMPORTANTE: só carrega o SEED se o campo NUNCA existiu (undefined).
+  // NÃO usar seed quando a lista está apenas vazia — isso apagaria dados reais
+  // caso o Firebase devolvesse a lista vazia/quebrada momentaneamente.
+  if (db.financeiro.acertos === undefined) db.financeiro.acertos = FIN_SEED_ACERTOS.slice();
+  if (db.financeiro.bens    === undefined) db.financeiro.bens    = FIN_SEED_BENS.slice();
+  if (db.financeiro.divida  === undefined) db.financeiro.divida  = FIN_SEED_DIVIDA.slice();
+  if (db.financeiro.receber === undefined) db.financeiro.receber = FIN_SEED_RECEBER.slice();
+  if (db.financeiro.pagar   === undefined) db.financeiro.pagar   = FIN_SEED_PAGAR.slice();
+  // Garante que são arrays (nunca objeto quebrado do Firebase)
+  ['acertos','bens','divida','receber','pagar','baixas'].forEach(function(k){
+    var v = db.financeiro[k];
+    if (v !== undefined && !Array.isArray(v)) {
+      if (v && typeof v === 'object') {
+        db.financeiro[k] = Object.keys(v).sort(function(a,b){return Number(a)-Number(b);})
+          .map(function(kk){ return v[kk]; }).filter(function(x){ return x != null; });
+      } else db.financeiro[k] = [];
+    }
+  });
 }
 
 var _finAbaAtual = 'acertos';
