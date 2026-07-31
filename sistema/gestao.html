@@ -1047,7 +1047,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v30-20260730-2321';
+var LOKA_BUILD = 'v31-20260731-0004';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 document.addEventListener('DOMContentLoaded', function(){
   try { var _bs = document.getElementById('buildStamp'); if (_bs) _bs.textContent = 'build ' + LOKA_BUILD; } catch(e){}
@@ -4498,40 +4498,125 @@ function finRenderBens() {
   grid.innerHTML = html;
 }
 
+
+// ══ ENDIVIDAMENTO — DATAS E SINCRONIZAÇÃO ══════════════════════
+// Converte AAAA-MM-DD (ou já DD/MM/AAAA) → DD/MM/AAAA para exibição
+function divDataBR(d){
+  if (!d) return '';
+  var s = String(d).trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);       // ISO
+  if (m) return m[3]+'/'+m[2]+'/'+m[1];
+  var m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);     // já BR
+  if (m2) return s;
+  var m3 = s.match(/^(\d{4})-(\d{2})$/);              // AAAA-MM
+  if (m3) return '01/'+m3[2]+'/'+m3[1];
+  return s;
+}
+// Converte DD/MM/AAAA → AAAA-MM-DD para armazenar
+function divDataISO(d){
+  if (!d) return '';
+  var s = String(d).trim();
+  var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return m[3]+'-'+m[2]+'-'+m[1];
+  return s; // já ISO ou outro
+}
+
+// Input de data que exibe DD/MM/AAAA e salva em ISO
+function divDataInput(i, campo){
+  var r = (db.financeiro.divida||[])[i];
+  var valorBR = divDataBR(r ? r[campo] : '');
+  return '<input type="text" value="'+valorBR+'" placeholder="dd/mm/aaaa" maxlength="10" '
+    + 'onchange="finEdit(\'divida\','+i+',\''+campo+'\',divDataISO(this.value))" '
+    + 'oninput="this.value=this.value.replace(/[^0-9/]/g,\'\')" '
+    + 'style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:90px;color:#0E1B4D;text-align:center">';
+}
+
+// Normaliza o número do contrato para casar (só dígitos e letras)
+function divNormContrato(c){ return String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+// Conta parcelas pagas de um contrato no Contas a Pagar (casa pelo contrato no fornecedor)
+function divPagamentosDoContrato(contrato){
+  var alvo = divNormContrato(contrato);
+  if (!alvo) return { pagas:0, ultimoMes:'' };
+  var pagar = (db.financeiro && db.financeiro.pagar) || [];
+  var pagas = 0, ultimoMes = '';
+  pagar.forEach(function(c){
+    if (!c) return;
+    var fc = divNormContrato(c.fornecedor);
+    // o fornecedor é "Banco - Contrato"; verifica se contém o contrato
+    if (fc.indexOf(alvo) < 0) return;
+    if (c.pagamentos) {
+      Object.keys(c.pagamentos).forEach(function(ym){
+        if (c.pagamentos[ym] && c.pagamentos[ym].pago) {
+          pagas++;
+          if (ym > ultimoMes) ultimoMes = ym;
+        }
+      });
+    }
+  });
+  return { pagas:pagas, ultimoMes:ultimoMes };
+}
+
+// Calcula amortização acumulada (só principal) após N parcelas pagas — sistema Price
+// Usa: principal (P), valorParcela (PMT), cet mensal (i). Amortização da parcela k = PMT - juros_k
+function divAmortizadoPrincipal(principal, parcela, cetMensal, nPagas){
+  var saldo = Number(principal)||0;
+  var pmt = Number(parcela)||0;
+  var i = Number(cetMensal)||0;
+  if (nPagas <= 0 || pmt <= 0) return 0;
+  var amortAcum = 0;
+  for (var k = 0; k < nPagas; k++){
+    var juros = saldo * i;
+    var amort = pmt - juros;           // parte do principal nesta parcela
+    if (amort < 0) amort = 0;
+    if (amort > saldo) amort = saldo;  // última parcela
+    amortAcum += amort;
+    saldo -= amort;
+    if (saldo <= 0){ saldo = 0; break; }
+  }
+  return amortAcum;
+}
+
 function finRenderDivida() {
   var grid = document.getElementById('finGridDivida');
   if (!grid) return;
   var rows = db.financeiro.divida;
   var tPrinc=0, tPago=0, tParcela=0, tEncargos=0, tBase=0, tAmort=0, tSaldo=0, tReceita=0;
   function inp(i,campo,w,extra){ var r=rows[i]; return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'divida\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
-  var cols = ['Banco','Contrato','Valor Principal','Data Liberação','1ª Parcela','Parcela Final','Pago','Nº Parcelas','CET','Sist. Amort.','Valor Parcela','Vlr Encargos','Parcela Base','Já Amortizado','Saldo Devedor','Garantia','Receita',''];
+  var cols = ['Banco','Contrato','Valor Principal','Data Liberação','1ª Parcela','Parcela Final','Pago ⚙️','Nº Parcelas','CET','Sist. Amort.','Valor Parcela','Vlr Encargos','Parcela Base','Já Amortizado ⚙️','Saldo Devedor','Garantia','Receita',''];
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:10px;min-width:1700px">'
     + '<thead><tr>' + cols.map(finTH).join('') + '</tr></thead><tbody>';
   rows.forEach(function(r,i){
     var princ = Number(r.principal)||0;
-    var amort = Number(r.amortizado)||0;
     var cet = Number(r.cet)||0;
     var parcela = Number(r.valorParcela)||0;
+    // AUTOMÁTICO: puxa as parcelas pagas do Contas a Pagar (casa pelo contrato)
+    var _sinc = divPagamentosDoContrato(r.contrato);
+    var pagoAuto = _sinc.pagas;
+    // Se não há vínculo no Contas a Pagar, usa o valor manual (compatibilidade)
+    var pago = pagoAuto > 0 ? pagoAuto : (Number(r.pago)||0);
+    // Amortizado calculado pela tabela Price (só principal)
+    var amort = pagoAuto > 0 ? divAmortizadoPrincipal(princ, parcela, cet, pago) : (Number(r.amortizado)||0);
     var saldo = princ - amort;            // O = C - N
     var encargos = saldo * cet;           // L = O * I
     var base = parcela - encargos;        // M = K - L
-    tPrinc+=princ; tPago+=Number(r.pago)||0; tParcela+=parcela; tEncargos+=encargos;
+    tPrinc+=princ; tPago+=pago; tParcela+=parcela; tEncargos+=encargos;
     tBase+=base; tAmort+=amort; tSaldo+=saldo; tReceita+=Number(r.receita)||0;
     html += '<tr style="border-bottom:1px solid #f0f2f8">'
       + '<td style="padding:3px 4px">'+inp(i,'banco','85px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'contrato','85px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'principal','90px','text-align:right')+'</td>'
-      + '<td style="padding:3px 4px">'+inp(i,'liberacao','100px')+'</td>'
-      + '<td style="padding:3px 4px">'+inp(i,'primParcela','100px')+'</td>'
-      + '<td style="padding:3px 4px">'+inp(i,'ultParcela','100px')+'</td>'
-      + '<td style="padding:3px 4px">'+inp(i,'pago','45px','text-align:center')+'</td>'
+      + '<td style="padding:3px 4px">'+divDataInput(i,'liberacao')+'</td>'
+      + '<td style="padding:3px 4px">'+divDataInput(i,'primParcela')+'</td>'
+      + '<td style="padding:3px 4px">'+divDataInput(i,'ultParcela')+'</td>'
+      + '<td style="padding:3px 4px">'+'<span style="font-weight:700;color:#2B4BF2" title="Automático do Contas a Pagar">'+pago+'/'+(Number(r.totParcelas)||0)+'</span>'+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'totParcelas','45px','text-align:center')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'cet','55px','text-align:center')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'sistema','70px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'valorParcela','80px','text-align:right')+'</td>'
       + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+brl(encargos)+'</td>'
       + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+brl(base)+'</td>'
-      + '<td style="padding:3px 4px">'+inp(i,'amortizado','90px','text-align:right')+'</td>'
+      + '<td style="padding:3px 4px">'+'<span style="color:#0d7a3e;font-weight:600" title="Calculado (Price)">'+brl(amort)+'</span>'+'</td>'
       + '<td style="padding:3px 4px;text-align:right;font-weight:700;font-family:monospace;color:#c0392b">'+brl(saldo)+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'garantia','110px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'receita','75px','text-align:right')+'</td>'
@@ -4550,7 +4635,7 @@ function finRenderDivida() {
     + '<td></td>'
     + '<td style="padding:8px 4px;text-align:right;font-family:monospace;color:#0d7a3e">'+brl(tReceita)+'</td>'
     + '<td></td></tr></tfoot>';
-  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">Encargos = Saldo × CET · Parcela Base = Parcela − Encargos · Saldo Devedor = Principal − Amortizado · Data base 31/01/2026</div>';
+  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">⚙️ Pago e Amortizado são automáticos (sincronizados com o Contas a Pagar) · Encargos = Saldo × CET · Parcela Base = Parcela − Encargos · Saldo Devedor = Principal − Amortizado · Data base 31/01/2026</div>';
   grid.innerHTML = html;
 }
 
