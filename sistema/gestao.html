@@ -1058,7 +1058,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v38-20260731-2332';
+var LOKA_BUILD = 'v39-20260731-2347';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1471,6 +1471,9 @@ function normalizarDB(){
 }
 
 function garantirArray(nome){
+  // PROTEÇÃO: 'financeiro' é um OBJETO (contém pagar/receber/acertos/divida/bens).
+  // Converter para array destruiria a estrutura. Nunca processar aqui.
+  if (nome === 'financeiro') { console.warn('garantirArray ignorado para financeiro (é objeto)'); return db.financeiro; }
   if (!Array.isArray(db[nome])) {
     db[nome] = (db[nome] && typeof db[nome] === 'object')
       ? Object.keys(db[nome]).sort(function(a,b){return Number(a)-Number(b);}).map(function(k){return db[nome][k];}).filter(function(x){return x!=null;})
@@ -4983,8 +4986,18 @@ function salvarNovaPagar(){
   if (!fornecedor) { toast('⚠️ Informe o fornecedor','#b45309'); return; }
   if (!valor) { toast('⚠️ Informe o valor','#b45309'); return; }
 
-  garantirArray('financeiro');  // segurança (financeiro é objeto, mas pagar é array)
-  if (!Array.isArray(db.financeiro.pagar)) db.financeiro.pagar = [];
+  // CORREÇÃO CRÍTICA: financeiro é um OBJETO (não array). NUNCA usar garantirArray('financeiro')
+  // — isso destruía o objeto inteiro (acertos/receber/divida/bens). Garante só a lista pagar.
+  if (!db.financeiro || typeof db.financeiro !== 'object' || Array.isArray(db.financeiro)) {
+    // Se financeiro foi corrompido, recarrega do que existe; nunca sobrescreve às cegas
+    if (typeof finInit === 'function') finInit();
+  }
+  if (!Array.isArray(db.financeiro.pagar)) {
+    var _p = db.financeiro.pagar;
+    db.financeiro.pagar = (_p && typeof _p === 'object')
+      ? Object.keys(_p).sort(function(a,b){return Number(a)-Number(b);}).map(function(k){return _p[k];}).filter(function(x){return x!=null;})
+      : [];
+  }
 
   var nova;
   if (tipo === 'parcelada') {
