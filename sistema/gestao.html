@@ -226,6 +226,7 @@ tr:hover td{background:#f8f9fe;}
     
     <div data-label="Faturas" class="nav-item" id="ni-faturas" onclick="showPanel('faturas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Faturas</div>
     <div data-label="Manutenção" class="nav-item" id="ni-manutencao" onclick="showPanel('manutencao')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Manutenção</div>
+     <div data-label="Fornecedores" class="nav-item" id="ni-fornecedores" onclick="showPanel('fornecedores')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9"/><path d="M9 22V12h6v10"/></svg>Fornecedores</div>
     <div data-label="Multas" class="nav-item" id="ni-multas" onclick="showPanel('multas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas</div>
     <div data-label="Financeiro" class="nav-item" id="ni-financeiro" onclick="showPanel('financeiro')" style="display:none"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro</div>
     <div data-label="Formulários" class="nav-item" id="ni-formularios" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
@@ -459,6 +460,25 @@ tr:hover td{background:#f8f9fe;}
 
       <!-- Tabela -->
       <div id="manutGrid"></div>
+    </div>
+
+    <!-- ══ FORNECEDORES ══ -->
+    <div class="panel" id="panel-fornecedores" style="display:none;width:100%">
+      <div class="toolbar">
+        <div class="search-box" style="flex:1;min-width:180px;">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="filter-input" id="qFornecedor" type="text" placeholder="Buscar fornecedor..." oninput="renderFornecedores()">
+        </div>
+        <button class="btn btn-blue" onclick="openFornecedor(null)" style="white-space:nowrap">+ Novo Fornecedor</button>
+      </div>
+      <div class="table-card">
+        <div class="table-head"><h3>Fornecedores</h3><span id="fornCount"></span></div>
+        <div class="table-scroll">
+          <table><thead><tr>
+            <th>Nome</th><th>Telefone</th><th>CNPJ</th><th>Especialidade</th><th>Obs.</th><th></th>
+          </tr></thead><tbody id="fornTable"></tbody></table>
+        </div>
+      </div>
     </div>
 
     <!-- ══ FINANCEIRO (Admin/Master) ══ -->
@@ -1058,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v40-20260803-1408';
+var LOKA_BUILD = 'v42-20260803-1516';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1174,6 +1194,7 @@ function showPanel(name) {
     if (name === 'contratos')   renderContratos();
     if (name === 'historico')   renderHistorico();
     if (name === 'manutencao')  { _manutFiltroVeiculo=null; renderManutencao(); }
+  if (name === 'fornecedores') renderFornecedores();
     if (name === 'faturas')     { setFiltroFaturas(''); carregarFaturas(); }
     if (name === 'financeiro')  { finInit(); finMostrarAba('acertos'); }
     if (name === 'multas')      { mltInit(); mltMostrarAba('lista'); }
@@ -1450,7 +1471,7 @@ var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // quando há chaves não sequenciais, após exclusões). Chamado ao carregar/sincronizar.
 function normalizarDB(){
   if (!db) return;
-  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico'].forEach(function(nome){
+  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores'].forEach(function(nome){
     if (db[nome] === undefined || db[nome] === null) { db[nome] = []; return; }
     if (!Array.isArray(db[nome])) {
       if (typeof db[nome] === 'object') {
@@ -4202,7 +4223,7 @@ function openManutRegistro(id) {
     mrTipo: m ? m.tipo||'preventiva' : 'preventiva',
     mrStatus: m ? m.status||'em_andamento' : 'em_andamento',
     mrDescricao: m ? m.descricao||'' : '',
-    mrOficina: m ? m.oficina||'' : '',
+    mrFornecedorSel: m ? m.oficina||'' : '',
     mrKm: m ? m.km||'' : '',
     mrCusto: m ? m.custo||'' : '',
     mrPgto: m ? m.pgto||'' : '',
@@ -4211,6 +4232,19 @@ function openManutRegistro(id) {
   Object.keys(fields).forEach(function(k) {
     var el = document.getElementById(k); if(el) el.value = fields[k];
   });
+
+  // Preencher o dropdown de fornecedores ANTES de aplicar os valores
+  preencherFornecedorSel();
+  // Reaplica o valor da oficina/fornecedor (o loop acima rodou antes de popular o select)
+  var _fsel = document.getElementById('mrFornecedorSel');
+  if (_fsel) {
+    var _ofic = m ? (m.oficina||'') : '';
+    // se o valor salvo não está entre as opções, adiciona (fornecedor antigo digitado à mão)
+    if (_ofic && Array.prototype.slice.call(_fsel.options).every(function(o){return o.value!==_ofic;})) {
+      var op = document.createElement('option'); op.value=_ofic; op.textContent=_ofic+' (antigo)'; _fsel.appendChild(op);
+    }
+    _fsel.value = _ofic;
+  }
 
   // Comprovantes existentes
   _mrComps = [];  // comprovantes desativados
@@ -4259,6 +4293,98 @@ function sincronizarBuscaPlaca() {
 }
 
 
+
+// ══ CADASTRO DE FORNECEDORES ═══════════════════════════════════
+var _fornEditId = null;
+
+function renderFornecedores(){
+  if (!db) return;
+  garantirArray('fornecedores');
+  var q = (document.getElementById('qFornecedor')&&document.getElementById('qFornecedor').value||'').toLowerCase();
+  var list = (db.fornecedores||[]).filter(function(f){
+    if (!f) return false;
+    return !q || ((f.nome||'')+' '+(f.especialidade||'')+' '+(f.cnpj||'')).toLowerCase().indexOf(q)>=0;
+  });
+  var el = document.getElementById('fornCount'); if(el) el.textContent = list.length+' fornecedor(es)';
+  var tb = document.getElementById('fornTable'); if(!tb) return;
+  tb.innerHTML = list.length ? list.map(function(f){
+    var idx = db.fornecedores.indexOf(f);
+    return '<tr>'
+      + '<td><strong>'+(f.nome||'—')+'</strong></td>'
+      + '<td>'+(f.tel||'—')+'</td>'
+      + '<td>'+(f.cnpj||'—')+'</td>'
+      + '<td>'+(f.especialidade||'—')+'</td>'
+      + '<td style="font-size:11px;color:#5a607a">'+(f.obs||'')+'</td>'
+      + '<td style="white-space:nowrap">'
+        + '<button onclick="openFornecedor('+idx+')" title="Editar" style="background:#EEF1FD;color:#2B4BF2;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700">✏️</button> '
+        + '<button onclick="excluirFornecedor('+idx+')" title="Excluir" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑</button>'
+      + '</td></tr>';
+  }).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9099bf">Nenhum fornecedor cadastrado. Clique em "+ Novo Fornecedor".</td></tr>';
+}
+
+function openFornecedor(idx){
+  garantirArray('fornecedores');
+  _fornEditId = (idx==null) ? null : idx;
+  var f = (idx==null) ? {} : (db.fornecedores[idx]||{});
+  document.getElementById('fornModalTitle').textContent = (idx==null) ? 'Novo Fornecedor' : 'Editar Fornecedor';
+  document.getElementById('fnNome').value = f.nome || '';
+  document.getElementById('fnTel').value = f.tel || '';
+  document.getElementById('fnCnpj').value = f.cnpj || '';
+  document.getElementById('fnEspec').value = f.especialidade || '';
+  document.getElementById('fnObs').value = f.obs || '';
+  openM('mFornecedor');
+}
+
+function salvarFornecedor(){
+  garantirArray('fornecedores');
+  var nome = (document.getElementById('fnNome').value||'').trim();
+  if (!nome) { toast('⚠️ Informe o nome do fornecedor','#b45309'); return; }
+  var obj = {
+    id: (_fornEditId!=null && db.fornecedores[_fornEditId] && db.fornecedores[_fornEditId].id) || ('forn_'+Date.now()),
+    nome: nome,
+    tel: (document.getElementById('fnTel').value||'').trim(),
+    cnpj: (document.getElementById('fnCnpj').value||'').trim(),
+    especialidade: (document.getElementById('fnEspec').value||'').trim(),
+    obs: (document.getElementById('fnObs').value||'').trim()
+  };
+  if (_fornEditId!=null && db.fornecedores[_fornEditId]) {
+    db.fornecedores[_fornEditId] = obj;
+  } else {
+    db.fornecedores.push(obj);
+  }
+  saveDB();
+  closeM('mFornecedor');
+  renderFornecedores();
+  preencherFornecedorSel();  // atualiza o dropdown da manutenção
+  toast('✅ Fornecedor salvo','#0d7a3e');
+}
+
+function excluirFornecedor(idx){
+  garantirArray('fornecedores');
+  var f = db.fornecedores[idx];
+  if (!f) return;
+  if (!confirm('Excluir o fornecedor "'+(f.nome||'')+'"?')) return;
+  db.fornecedores.splice(idx,1);
+  saveDB();
+  renderFornecedores();
+  preencherFornecedorSel();
+  toast('Fornecedor excluído','#b45309');
+}
+
+// Preenche o dropdown de fornecedor no modal de manutenção
+function preencherFornecedorSel(){
+  var sel = document.getElementById('mrFornecedorSel');
+  if (!sel) return;
+  garantirArray('fornecedores');
+  var atual = sel.value;
+  var h = '<option value="">— Selecione o fornecedor —</option>';
+  (db.fornecedores||[]).forEach(function(f){
+    if (f && f.nome) h += '<option value="'+f.nome.replace(/"/g,'&quot;')+'">'+f.nome+(f.especialidade?' ('+f.especialidade+')':'')+'</option>';
+  });
+  sel.innerHTML = h;
+  sel.value = atual;
+}
+
 function salvarManutencao() {
   garantirArray('manutencoes'); 
   var veicId = document.getElementById('mrVeiculo').value;
@@ -4282,7 +4408,7 @@ function salvarManutencao() {
     tipo:        get('mrTipo'),
     status:      st,
     descricao:   desc,
-    oficina:     get('mrOficina'),
+    oficina:     get('mrFornecedorSel'),
     km:          get('mrKm'),
     custo:       get('mrCusto'),
     pgto:        get('mrPgto'),
@@ -7602,6 +7728,21 @@ function mltConfirmarImportacao(){
   </div>
 </div></div>
 
+<div class="modal-bg" id="mFornecedor"><div class="modal" style="max-width:480px">
+  <div class="modal-head" style="background:#0E1B4D"><h3 id="fornModalTitle">Novo Fornecedor</h3><button class="modal-x" onclick="closeM('mFornecedor')">✕</button></div>
+  <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Nome / Razão Social *</label><input class="fi" id="fnNome" placeholder="Nome do fornecedor"></div>
+    <div class="fg"><label class="fl">Telefone</label><input class="fi" id="fnTel" placeholder="(75) 00000-0000"></div>
+    <div class="fg"><label class="fl">CNPJ</label><input class="fi" id="fnCnpj" placeholder="00.000.000/0000-00"></div>
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Especialidade / Tipo de serviço</label><input class="fi" id="fnEspec" placeholder="Ex: Mecânica geral, Elétrica, Funilaria, Pneus..."></div>
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><textarea class="fi" id="fnObs" rows="2" placeholder="Anotações"></textarea></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mFornecedor')">Cancelar</button>
+    <button class="btn btn-blue" onclick="salvarFornecedor()">Salvar</button>
+  </div>
+</div></div>
+
 <div class="modal-bg" id="mVeiculo"><div class="modal" style="max-width:520px">
   <div class="modal-head" style="background:#0E1B4D">
     <h3 id="mVeiculoTitulo">Novo Veículo</h3>
@@ -7725,7 +7866,12 @@ function mltConfirmarImportacao(){
       <div class="fg" style="grid-column:1/-1"><label class="fl">Descrição / Serviços *</label>
         <input class="fi" id="mrDescricao" placeholder="Ex: Troca de óleo, filtro de ar, pastilha de freio...">
       </div>
-      <div class="fg"><label class="fl">Oficina / Fornecedor</label><input class="fi" id="mrOficina" placeholder="Nome da oficina"></div>
+      <div class="fg"><label class="fl">Oficina / Fornecedor</label>
+        <div style="display:flex;gap:6px">
+          <select class="fs" id="mrFornecedorSel" style="flex:1"><option value="">— Selecione o fornecedor —</option></select>
+          <button type="button" onclick="openFornecedor(null)" title="Cadastrar novo fornecedor" style="background:#2B4BF2;color:#fff;border:none;border-radius:6px;padding:0 12px;cursor:pointer;font-weight:700;white-space:nowrap">+ novo</button>
+        </div>
+      </div>
       <div class="fg"><label class="fl">KM na entrada</label><input class="fi" id="mrKm" placeholder="Ex: 45320" type="number"></div>
       <div class="fg"><label class="fl">Custo (R$)</label><input class="fi" id="mrCusto" placeholder="0,00" oninput="maskBRL(this)"></div>
       <div class="fg"><label class="fl">Forma de Pagamento</label>

@@ -553,6 +553,33 @@ textarea.input {
         </table>
         <div style="padding:10px 14px;border-top:1px solid #f0f2f8">
           <button class="add-outro" onclick="addOutroValor()">＋ Adicionar outro valor</button>
+        <div id="jurosMultaBox" style="margin-top:10px;padding:12px;background:#fff8f0;border:1px solid #f0d9b8;border-radius:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <input type="checkbox" id="jmAtivar" onchange="calcJurosMulta()" style="width:16px;height:16px;cursor:pointer">
+            <label for="jmAtivar" style="font-weight:700;color:#b45309;cursor:pointer;font-size:13px">⚠️ Cobrar juros e multa por atraso</label>
+          </div>
+          <div id="jmCampos" style="display:none">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px">
+              <div>
+                <label style="font-size:10px;color:#7a6a55;font-weight:600;display:block">Multa (%)</label>
+                <input class="fin-input" id="jmMulta" type="text" value="2" placeholder="2" oninput="maskPct(this);calcJurosMulta()" style="text-align:right">
+              </div>
+              <div>
+                <label style="font-size:10px;color:#7a6a55;font-weight:600;display:block">Juros (% ao mês)</label>
+                <input class="fin-input" id="jmJurosMes" type="text" value="6" placeholder="6" oninput="maskPct(this);calcJurosMulta()" style="text-align:right">
+              </div>
+              <div>
+                <label style="font-size:10px;color:#7a6a55;font-weight:600;display:block">Dias em atraso</label>
+                <input class="fin-input" id="jmDias" type="number" min="0" placeholder="0" oninput="calcJurosMulta()" style="text-align:right">
+              </div>
+            </div>
+            <div style="font-size:11px;color:#7a6a55;display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #f0d9b8">
+              <span>Multa: <b id="jmValMulta">R$ 0,00</b> · Juros: <b id="jmValJuros">R$ 0,00</b></span>
+              <span style="font-weight:700;color:#b45309">Acréscimo: <b id="jmValTotal">R$ 0,00</b></span>
+            </div>
+            <div style="font-size:10px;color:#9a8a75;margin-top:4px">Os dias de atraso são calculados automaticamente pelo vencimento, mas você pode ajustar. Juros pro rata: (% ao mês ÷ 30) × dias.</div>
+          </div>
+        </div>
         </div>
         <table class="fin-table">
           <tbody>
@@ -748,6 +775,15 @@ function preencherFaturaParaEdicao(fat, editId) {
   set('periodoRef', fat.periodo);
   set('dataEmissao', fat.emissao);
   set('dataVenc', fat.vencimento);
+  // Restaurar juros/multa por atraso
+  if (fat.jurosMulta) {
+    var jmA = document.getElementById('jmAtivar');
+    if (jmA) jmA.checked = !!fat.jurosMulta.ativo;
+    set('jmMulta', fat.jurosMulta.multa);
+    set('jmJurosMes', fat.jurosMulta.jurosMes);
+    set('jmDias', fat.jurosMulta.dias);
+    if (typeof calcJurosMulta === 'function') calcJurosMulta();
+  }
   set('fatStatus', fat.status);
   set('fatPgto', fat.pgto);
   set('fatObs', fat.obs);
@@ -1090,6 +1126,66 @@ function remOutro(id) {
 }
 
 // ── TOTAL ─────────────────────────────────────────────────────
+// ── JUROS E MULTA POR ATRASO ─────────────────────────────────
+function maskPct(el){
+  // permite números e vírgula/ponto para percentuais
+  el.value = el.value.replace(/[^0-9.,]/g,'');
+}
+
+// Calcula dias de atraso entre o vencimento e hoje
+function diasDeAtraso(){
+  var venc = document.getElementById('dataVenc');
+  if (!venc || !venc.value) return 0;
+  var dv = new Date(venc.value + 'T00:00:00');
+  if (isNaN(dv.getTime())) return 0;
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var diff = Math.floor((hoje - dv) / 86400000);
+  return diff > 0 ? diff : 0;
+}
+
+// Calcula o acréscimo (multa + juros). Recebe a base (subtotal sem acréscimo).
+// Retorna o valor a somar. Também atualiza os campos visuais.
+function calcJurosMulta(base){
+  var box = document.getElementById('jmCampos');
+  var ativar = document.getElementById('jmAtivar');
+  if (ativar) document.getElementById('jmCampos').style.display = ativar.checked ? 'block' : 'none';
+  if (!ativar || !ativar.checked) {
+    // zera os displays
+    ['jmValMulta','jmValJuros','jmValTotal'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent='R$ 0,00'; });
+    return 0;
+  }
+
+  // Se a base não veio (chamada direta pelo oninput), calcula do subtotal atual
+  if (base == null) {
+    base = 0;
+    var vlM = document.getElementById('vlMensal'); if (vlM) base += parseBRL(vlM.value);
+    var vlC = document.getElementById('vlCaucao'); if (vlC) base += parseBRL(vlC.value);
+    var vlS = document.getElementById('vlSeguro'); if (vlS) base += parseBRL(vlS.value);
+    document.querySelectorAll('#finBody .fin-row-outro').forEach(function(row){
+      var inputs = row.querySelectorAll('.fin-input');
+      if (inputs.length >= 3) base += parseBRL(inputs[2].value);
+    });
+  }
+
+  // Dias de atraso: usa o campo (se preenchido) ou calcula do vencimento
+  var campoDias = document.getElementById('jmDias');
+  var dias = campoDias && campoDias.value !== '' ? (parseInt(campoDias.value)||0) : diasDeAtraso();
+  if (campoDias && campoDias.value === '') { var d = diasDeAtraso(); if (d>0) campoDias.value = d; dias = d; }
+
+  var pctMulta = parseFloat((document.getElementById('jmMulta').value||'0').replace(',','.')) || 0;
+  var pctJurosMes = parseFloat((document.getElementById('jmJurosMes').value||'0').replace(',','.')) || 0;
+
+  var valMulta = base * (pctMulta/100);
+  // Juros pro rata die: (% ao mês / 30) * dias
+  var valJuros = base * ((pctJurosMes/100) / 30) * dias;
+
+  var mE=document.getElementById('jmValMulta'); if(mE) mE.textContent = fmtBRL(valMulta);
+  var jE=document.getElementById('jmValJuros'); if(jE) jE.textContent = fmtBRL(valJuros);
+  var tE=document.getElementById('jmValTotal'); if(tE) tE.textContent = fmtBRL(valMulta + valJuros);
+
+  return valMulta + valJuros;
+}
+
 function calcTotal() {
   // Soma da planilha de veículos → preenche automaticamente o campo de locação
   var veicTotal = calcTotalVeic();
@@ -1113,6 +1209,9 @@ function calcTotal() {
     var inputs = row.querySelectorAll('.fin-input');
     if (inputs.length >= 3) sub += parseBRL(inputs[2].value);
   });
+  // Acréscimo de juros e multa por atraso (se ativado)
+  var acrescimo = calcJurosMulta(sub);
+  sub += acrescimo;
   var desc  = parseBRL(document.getElementById('vlDesconto').value);
   var total = Math.max(0, sub - desc);
 
@@ -1211,6 +1310,12 @@ function salvarFatura() {
     periodo: document.getElementById('periodoRef').value,
     emissao: document.getElementById('dataEmissao').value,
     vencimento: document.getElementById('dataVenc').value,
+    jurosMulta: {
+      ativo: !!(document.getElementById('jmAtivar') && document.getElementById('jmAtivar').checked),
+      multa: (document.getElementById('jmMulta')||{}).value || '',
+      jurosMes: (document.getElementById('jmJurosMes')||{}).value || '',
+      dias: (document.getElementById('jmDias')||{}).value || ''
+    },
     status: document.getElementById('fatStatus').value,
     pgto: document.getElementById('fatPgto').value,
     veiculos: veics.map(function(v){return v.marca+' '+v.modelo+' '+v.placa;}),
