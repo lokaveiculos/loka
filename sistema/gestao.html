@@ -1058,7 +1058,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v39-20260731-2347';
+var LOKA_BUILD = 'v40-20260803-1408';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1252,7 +1252,23 @@ function loadDB() {
   var local = null;
   try { local = JSON.parse(localStorage.getItem('loka_db') || 'null'); } catch(e) {}
 
-  function inicializarCom(dados, origem) {
+  function aplicarEncerrados(dados){
+  try {
+    var lista = (dados && dados.encerrados) || {};
+    if (window._encerradosRecentes) {
+      Object.keys(window._encerradosRecentes).forEach(function(id){ lista[id] = lista[id] || window._encerradosRecentes[id]; });
+    }
+    if (db.ativos && Object.keys(lista).length) {
+      db.ativos = db.ativos.filter(function(a){
+        if (!a || !a.id) return true;
+        if (lista[a.id]) { console.warn('[ENCERRADOS] '+a.id+' removido dos ativos (consta como encerrado).'); return false; }
+        return true;
+      });
+    }
+  } catch(e){ console.error('aplicarEncerrados:', e); }
+}
+
+function inicializarCom(dados, origem) {
     db = dados;
     // Limpar nulls que o Firebase pode deixar em gaps de arrays deletados
     db.ativos    = cleanArr(db.ativos);
@@ -1261,6 +1277,7 @@ function loadDB() {
     db.historico = cleanArr(db.historico);
     db.contratos = cleanArr(db.contratos);
     db.multas    = cleanArr(db.multas);
+    aplicarEncerrados(dados);  // não deixa contratos encerrados reaparecerem ao abrir
     try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
     // Inicializa as contagens saudáveis do guarda de integridade
     try {
@@ -1643,17 +1660,20 @@ function setupRealtimeSync() {
     db = fbData;
     normalizarDB();  // converte todos os arrays de uma vez
     db.veiculos  = cleanVeics(db.veiculos);
-    // ANTI-RESSURREIÇÃO: remove ativos que encerramos aqui há pouco (até 60s)
-    // mas que voltaram porque outro aparelho tinha versão antiga.
+    // ANTI-RESSURREIÇÃO DEFINITIVA: remove dos ativos qualquer aluguel que esteja
+    // na lista de encerrados do Firebase (persistente, vale para todos os aparelhos).
     try {
-      if (window._encerradosRecentes && db.ativos) {
-        var agora = Date.now();
+      var listaEnc = (fbData && fbData.encerrados) || {};
+      // Junta com os encerrados recentes em memória (redundância de segurança)
+      if (window._encerradosRecentes) {
+        Object.keys(window._encerradosRecentes).forEach(function(id){ listaEnc[id] = listaEnc[id] || window._encerradosRecentes[id]; });
+      }
+      if (db.ativos && Object.keys(listaEnc).length) {
         db.ativos = db.ativos.filter(function(a){
           if (!a || !a.id) return true;
-          var tEnc = window._encerradosRecentes[a.id];
-          if (tEnc && (agora - tEnc) < 60000) {
-            console.warn('[ANTI-RESSURREIÇÃO] Aluguel '+a.id+' voltou do Firebase; removido (encerrado há '+Math.round((agora-tEnc)/1000)+'s).');
-            return false; // não deixa ressuscitar
+          if (listaEnc[a.id]) {
+            console.warn('[ANTI-RESSURREIÇÃO] Aluguel '+a.id+' está na lista de encerrados; removido dos ativos.');
+            return false;
           }
           return true;
         });
@@ -2576,6 +2596,23 @@ function openAluguel() {
   openM('mAluguel');
 }
 
+
+// Valida que a data final é posterior à inicial (formato ISO AAAA-MM-DD).
+// Retorna true se OK, false se inválida (e mostra aviso).
+function validarPeriodo(dataIni, dataFim, contexto){
+  if (!dataIni || !dataFim) return true; // se falta uma, não bloqueia aqui
+  // Comparação segura por data real (não string), evitando erros de formato
+  var di = new Date(dataIni + 'T00:00:00');
+  var df = new Date(dataFim + 'T00:00:00');
+  if (isNaN(di.getTime()) || isNaN(df.getTime())) return true; // formato inesperado: não trava
+  if (df <= di) {
+    var msg = (contexto||'A data final') + ' deve ser posterior à data inicial';
+    try { toast('⚠️ ' + msg, '#c0392b'); } catch(e){ alert(msg); }
+    return false;
+  }
+  return true;
+}
+
 function salvarAluguel() {
   var cIdx = parseInt((document.getElementById('aCliente').value||''));
   var vIdx = parseInt((document.getElementById('aVeiculo').value||''));
@@ -2583,7 +2620,7 @@ function salvarAluguel() {
   var ret = document.getElementById('aRetirada').value;
   var dev = document.getElementById('aDevolucao').value;
   if (!ret||!dev) { toast('⚠️ Informe as datas','#b45309'); return; }
-  if (dev <= ret) { toast('⚠️ Devolução deve ser após a retirada','#b45309'); return; }
+  if (!validarPeriodo(ret, dev, 'A data de devolução')) return;
   var cl = db.clients[cIdx], v = db.veiculos[vIdx];
   if (!cl || !v) { toast('⚠️ Cliente ou veículo inválido. Reabra a tela e tente de novo.','#c0392b'); return; }
   var a = {
@@ -2652,6 +2689,8 @@ function confirmarPror() {
   var idx = db.ativos.findIndex(function(x){return x.id===_prorId;});
   if (idx<0) return;
   var a = db.ativos[idx];
+  // A nova data de devolução deve ser posterior à retirada
+  if (!validarPeriodo(a.retirada, nd, 'A nova data de devolução')) return;
   var datAnterior = a.devolucao;
   var valor       = document.getElementById('prorValor').value || '';
   var pgtoStatus  = document.getElementById('prorPgtoStatus').value || 'a_pagar';
@@ -2842,10 +2881,15 @@ function confirmarEnc() {
     var vIdx = db.veiculos.findIndex(function(v){return v && v.id===a.veiculoId;});
     if (vIdx>=0) { db.veiculos[vIdx].status='disponivel'; var km=document.getElementById('encKm').value; if(km) db.veiculos[vIdx].km=km; }
     db.ativos.splice(idx,1);
-    // Registra o encerramento para impedir "ressurreição" por sync de outro aparelho
+    // Registra o encerramento em memória E no Firebase (lista persistente)
+    // para impedir "ressurreição" por sync de outro aparelho — de forma DEFINITIVA.
     try {
       if (!window._encerradosRecentes) window._encerradosRecentes = {};
       window._encerradosRecentes[_encId] = Date.now();
+      // Persiste no Firebase: qualquer aparelho que sincronizar vai respeitar
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length && _encId) {
+        firebase.database().ref('loka_db/encerrados/' + _encId).set(Date.now());
+      }
     } catch(e){}
   } catch(err) {
     console.error('Erro ao encerrar locação:', err);
