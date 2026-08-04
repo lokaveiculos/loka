@@ -1078,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v43-20260803-1737';
+var LOKA_BUILD = 'v44-20260804-1220';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -2903,22 +2903,41 @@ function confirmarEnc() {
     var vIdx = db.veiculos.findIndex(function(v){return v && v.id===a.veiculoId;});
     if (vIdx>=0) { db.veiculos[vIdx].status='disponivel'; var km=document.getElementById('encKm').value; if(km) db.veiculos[vIdx].km=km; }
     db.ativos.splice(idx,1);
-    // Registra o encerramento em memória E no Firebase (lista persistente)
-    // para impedir "ressurreição" por sync de outro aparelho — de forma DEFINITIVA.
-    try {
-      if (!window._encerradosRecentes) window._encerradosRecentes = {};
-      window._encerradosRecentes[_encId] = Date.now();
-      // Persiste no Firebase: qualquer aparelho que sincronizar vai respeitar
-      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length && _encId) {
-        firebase.database().ref('loka_db/encerrados/' + _encId).set(Date.now());
-      }
-    } catch(e){}
+    // Registra o encerramento em memória
+    if (!window._encerradosRecentes) window._encerradosRecentes = {};
+    window._encerradosRecentes[_encId] = Date.now();
   } catch(err) {
     console.error('Erro ao encerrar locação:', err);
     toast('❌ Falha ao encerrar: '+err.message,'#c0392b');
     return;
   }
-  saveDB();
+
+  // ══ GRAVAÇÃO DIRETA NO FIREBASE (não depende do saveDB, que pode estar travado) ══
+  // Grava os 3 pontos críticos do encerramento diretamente, de forma garantida:
+  // 1) marca o id na lista de encerrados  2) regrava os ativos sem ele  3) regrava histórico
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      var _ref = firebase.database().ref('loka_db');
+      var _updates = {};
+      _updates['encerrados/' + _encId] = Date.now();
+      _updates['ativos'] = db.ativos;
+      _updates['historico'] = db.historico;
+      _updates['veiculos'] = db.veiculos;
+      _updates['_ultimaEscrita'] = Date.now();
+      _ref.update(_updates).then(function(){
+        console.log('[ENCERRAMENTO] Gravado no Firebase com sucesso: ' + _encId);
+      }).catch(function(e){
+        console.error('[ENCERRAMENTO] Erro ao gravar no Firebase:', e);
+        toast('⚠️ Encerrou localmente, mas houve erro ao sincronizar. Verifique a conexão.','#b45309');
+      });
+    }
+    // Atualiza o localStorage também
+    try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e){}
+  } catch(e){ console.error('Encerramento (gravação direta):', e); }
+
+  // Tenta o saveDB normal também (redundância — se não estiver travado, reforça)
+  try { saveDB(); } catch(e){}
+
   if (typeof renderAtivos==='function') renderAtivos();
   if (typeof renderDashboard==='function') renderDashboard();
   if (typeof checkAlertas==='function') checkAlertas();
