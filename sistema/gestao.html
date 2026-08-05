@@ -1078,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v44-20260804-1220';
+var LOKA_BUILD = 'v46-20260805-1205';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4046,6 +4046,24 @@ function relatorioManutencao(){
     var m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
     return m ? m[3]+'/'+m[2]+'/'+m[1] : d;
   }
+  // Dias parado na oficina: entre entrada e saída (ou até hoje, se ainda não saiu)
+  function diasParado(entrada, saida){
+    if (!entrada) return null;
+    var di = new Date(String(entrada).slice(0,10) + 'T00:00:00');
+    if (isNaN(di.getTime())) return null;
+    var df;
+    var aindaNaOficina = false;
+    if (saida) {
+      df = new Date(String(saida).slice(0,10) + 'T00:00:00');
+      if (isNaN(df.getTime())) { df = new Date(); aindaNaOficina = true; }
+    } else {
+      df = new Date(); df.setHours(0,0,0,0);
+      aindaNaOficina = true;
+    }
+    var dias = Math.floor((df - di) / 86400000);
+    if (dias < 0) dias = 0;
+    return { dias: dias, aindaNaOficina: aindaNaOficina };
+  }
   function stLabel(s){
     return s==='concluida' ? 'Concluída' : s==='orcamento' ? 'Orçamento' : 'Em andamento';
   }
@@ -4060,8 +4078,15 @@ function relatorioManutencao(){
     totalGeral += subtotal;
 
     var linhas = v.itens.map(function(m){
+      var dp = diasParado(m.data, m.saida);
+      var dpTxt = '—';
+      if (dp) {
+        dpTxt = dp.dias + (dp.dias===1?' dia':' dias') + (dp.aindaNaOficina ? ' <span style="color:#c0392b;font-weight:700">(na oficina)</span>' : '');
+      }
       return '<tr>'
         + '<td>'+fmtData(m.data)+'</td>'
+        + '<td>'+(m.saida ? fmtData(m.saida) : '<span style="color:#c0392b">—</span>')+'</td>'
+        + '<td style="text-align:center">'+dpTxt+'</td>'
         + '<td>'+(m.tipo||'—')+'</td>'
         + '<td>'+(m.oficina||'—')+'</td>'
         + '<td>'+(m.descricao||'—')+'</td>'
@@ -4072,7 +4097,7 @@ function relatorioManutencao(){
 
     blocos += '<div class="veic-bloco">'
       + '<div class="veic-head">'+p+(v.nome ? ' — '+v.nome : '')+' <span>'+v.itens.length+' manutenção(ões) · R$ '+subtotal.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span></div>'
-      + '<table><thead><tr><th>Data</th><th>Tipo</th><th>Oficina</th><th>Descrição</th><th>Status</th><th style="text-align:right">Custo</th></tr></thead>'
+      + '<table><thead><tr><th>Entrada</th><th>Saída</th><th style="text-align:center">Dias parado</th><th>Tipo</th><th>Oficina</th><th>Descrição</th><th>Status</th><th style="text-align:right">Custo</th></tr></thead>'
       + '<tbody>'+linhas+'</tbody></table></div>';
   });
 
@@ -4240,6 +4265,7 @@ function openManutRegistro(id) {
     mrVeiculo: m ? m.veiculoId||'' : (_manutFiltroVeiculo||''),
     mrData: m ? m.data||'' : new Date().toISOString().split('T')[0],
     mrRetorno: m ? m.retorno||'' : '',
+    mrSaida: m ? m.saida||'' : '',
     mrTipo: m ? m.tipo||'preventiva' : 'preventiva',
     mrStatus: m ? m.status||'em_andamento' : 'em_andamento',
     mrDescricao: m ? m.descricao||'' : '',
@@ -4425,6 +4451,7 @@ function salvarManutencao() {
     placa:       v.placa||'',
     data:        data,
     retorno:     get('mrRetorno'),
+    saida:       get('mrSaida'),
     tipo:        get('mrTipo'),
     status:      st,
     descricao:   desc,
@@ -7865,6 +7892,7 @@ function mltConfirmarImportacao(){
       </div>
       <div class="fg"><label class="fl">Data de Entrada *</label><input class="fi" id="mrData" type="date"></div>
       <div class="fg"><label class="fl">Previsão de Retorno</label><input class="fi" id="mrRetorno" type="date"></div>
+      <div class="fg"><label class="fl">Data de Saída da Oficina</label><input class="fi" id="mrSaida" type="date" title="Data real em que o veículo saiu da oficina"></div>
       <div class="fg"><label class="fl">Tipo</label>
         <select class="fs" id="mrTipo">
           <option value="preventiva">Preventiva</option>

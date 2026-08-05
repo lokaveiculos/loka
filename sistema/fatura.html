@@ -433,7 +433,7 @@ textarea.input {
         </div>
         <div class="field">
           <label class="label">Período de Referência</label>
-          <input class="input" id="periodoRef" type="month">
+          <input class="input" id="periodoRef" type="month" onchange="atualizarDiasParados()">
         </div>
         <div class="field">
           <label class="label">Data de Emissão</label>
@@ -712,6 +712,7 @@ function carregarDados() {
       _clients  = data.clients  || [];
       _veiculos = data.veiculos || [];
       _ativos   = data.ativos   || [];
+      _manutencoes = data.manutencoes || [];
     }
     renderVeiculosArea(_veiculos);
     verificarModoEdicao();
@@ -719,7 +720,7 @@ function carregarDados() {
     console.warn('Firebase read error:', e);
     try {
       const local = JSON.parse(localStorage.getItem('loka_db') || 'null');
-      if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; _ativos=local.ativos||[]; }
+      if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; _ativos=local.ativos||[]; _manutencoes=local.manutencoes||[]; }
     } catch(e2) {}
     renderVeiculosArea(_veiculos);
     verificarModoEdicao();
@@ -958,6 +959,7 @@ function stBadge(st) {
 }
 
 var _veicExibidos = [];
+var _manutencoes = [];
 function renderVeiculosArea(lista) {
   var area = document.getElementById('veiculosArea');
   // Limpar seleção ao trocar a lista exibida (índices mudam)
@@ -983,6 +985,7 @@ function renderVeiculosArea(lista) {
       + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vseg-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vdesc-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="color:var(--red)"></td>'
+      + '<td class="num-cell" id="vparado-'+i+'" style="font-size:11px;text-align:center">—</td>'
       + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px;font-weight:700">—</td>'
     + '</tr>';
   }).join('');
@@ -1000,6 +1003,7 @@ function renderVeiculosArea(lista) {
     + '<th>Valor Unit. (R$)</th>'
     + '<th>Seguro (R$)</th>'
     + '<th>Desconto (R$)</th>'
+    + '<th title="Dias parado na oficina no mês de referência">Parado (oficina)</th>'
     + '<th>Subtotal</th>'
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
@@ -1072,6 +1076,86 @@ function toggleVeiculo(i) {
   atualizarContadorVeic();
   calcTotalVeic();
   calcTotal();
+  atualizarDiasParados();
+}
+
+
+// ══ DIAS PARADO NA OFICINA (integração com manutenções) ══════════
+// Calcula quantos dias uma placa ficou parada na oficina dentro de um mês (AAAA-MM).
+function diasParadoNoMes(placa, mesRef){
+  if (!placa || !mesRef) return 0;
+  var alvo = String(placa).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  var mes = String(mesRef).slice(0,7); // AAAA-MM
+  if (!/^\d{4}-\d{2}$/.test(mes)) return 0;
+
+  // Limites do mês
+  var ini = new Date(mes + '-01T00:00:00');
+  var fim = new Date(ini.getFullYear(), ini.getMonth()+1, 0); // último dia do mês
+  fim.setHours(23,59,59,999);
+
+  var totalDias = 0;
+  (_manutencoes||[]).forEach(function(m){
+    if (!m) return;
+    var pl = String(m.placa||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (pl !== alvo) return;
+    if (!m.data) return;
+    var entrada = new Date(String(m.data).slice(0,10) + 'T00:00:00');
+    if (isNaN(entrada.getTime())) return;
+    // saída: usa a data de saída, ou hoje se ainda não saiu
+    var saida = m.saida ? new Date(String(m.saida).slice(0,10) + 'T00:00:00') : new Date();
+    if (isNaN(saida.getTime())) saida = new Date();
+
+    // Interseção do período [entrada, saída] com o mês [ini, fim]
+    var de = entrada > ini ? entrada : ini;
+    var ate = saida < fim ? saida : fim;
+    if (ate >= de) {
+      var dias = Math.floor((ate - de) / 86400000);
+      if (dias >= 0) totalDias += dias;
+    }
+  });
+  return totalDias;
+}
+
+// Atualiza a célula de "dias parado" de cada veículo exibido
+function atualizarDiasParados(){
+  var mesRef = obterMesReferencia();
+  _veicExibidos.forEach(function(v, i){
+    var cel = document.getElementById('vparado-'+i);
+    if (!cel || !v) return;
+    var dias = diasParadoNoMes(v.placa, mesRef);
+    if (dias > 0) {
+      cel.innerHTML = '<span style="color:#c0392b;font-weight:700">'+dias+'d</span>'
+        + '<br><button type="button" onclick="aplicarDescontoParado('+i+','+dias+')" '
+        + 'style="margin-top:2px;font-size:9px;background:#2B4BF2;color:#fff;border:none;border-radius:4px;padding:2px 5px;cursor:pointer" '
+        + 'title="Deduzir '+dias+' dia(s) parado(s)">↓ deduzir</button>';
+    } else {
+      cel.innerHTML = '<span style="color:#9099bf">0d</span>';
+    }
+  });
+}
+
+// Aplica o desconto: (aluguel mensal ÷ 30) × dias parados
+function aplicarDescontoParado(i, dias){
+  var finEl = document.getElementById('vfin-'+i);
+  var descEl = document.getElementById('vdesc-'+i);
+  if (!finEl || !descEl) return;
+  var mensal = parseBRL(finEl.value);
+  if (!mensal) { alert('Preencha o valor do aluguel deste veículo primeiro.'); return; }
+  var valorDesconto = (mensal / 30) * dias;
+  // Soma ao desconto existente (se já houver)
+  var atual = parseBRL(descEl.value) || 0;
+  var novo = atual + valorDesconto;
+  descEl.value = novo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  calcTotalVeic(); calcTotal();
+}
+
+// Obtém o mês de referência da fatura (do campo periodoRef ou emissão)
+function obterMesReferencia(){
+  var per = document.getElementById('periodoRef');
+  if (per && per.value && /^\d{4}-\d{2}/.test(per.value)) return per.value.slice(0,7);
+  var em = document.getElementById('dataEmissao');
+  if (em && em.value) return String(em.value).slice(0,7);
+  return new Date().toISOString().slice(0,7);
 }
 
 function calcTotalVeic() {
