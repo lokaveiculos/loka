@@ -1078,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v47-20260805-1757';
+var LOKA_BUILD = 'v49-20260805-1810';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -2912,37 +2912,46 @@ function confirmarEnc() {
     return;
   }
 
-  // ══ GRAVAÇÃO DIRETA NO FIREBASE (não depende do saveDB, que pode estar travado) ══
-  // Grava os 3 pontos críticos do encerramento diretamente, de forma garantida:
-  // 1) marca o id na lista de encerrados  2) regrava os ativos sem ele  3) regrava histórico
-  try {
-    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
-      var _ref = firebase.database().ref('loka_db');
-      var _updates = {};
-      _updates['encerrados/' + _encId] = Date.now();
-      _updates['ativos'] = db.ativos;
-      _updates['historico'] = db.historico;
-      _updates['veiculos'] = db.veiculos;
-      _updates['_ultimaEscrita'] = Date.now();
-      _ref.update(_updates).then(function(){
-        console.log('[ENCERRAMENTO] Gravado no Firebase com sucesso: ' + _encId);
-      }).catch(function(e){
-        console.error('[ENCERRAMENTO] Erro ao gravar no Firebase:', e);
-        toast('⚠️ Encerrou localmente, mas houve erro ao sincronizar. Verifique a conexão.','#b45309');
-      });
-    }
-    // Atualiza o localStorage também
-    try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e){}
-  } catch(e){ console.error('Encerramento (gravação direta):', e); }
+  // ══ GRAVAÇÃO DIRETA NO FIREBASE — versão robusta com verificação ══
+  var _idEncerrado = _encId;  // guarda o id antes de qualquer coisa
+  console.log('[ENCERRAMENTO] Iniciando gravação do id: ' + _idEncerrado);
+  if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) {
+    console.error('[ENCERRAMENTO] Firebase não disponível!');
+    toast('❌ Sem conexão com o banco. Não foi possível encerrar.','#c0392b');
+    return;
+  }
+  var _ref = firebase.database().ref('loka_db');
+  var _updates = {};
+  _updates['encerrados/' + _idEncerrado] = Date.now();
+  _updates['ativos'] = db.ativos;
+  _updates['historico'] = db.historico;
+  _updates['veiculos'] = db.veiculos;
+  _updates['_ultimaEscrita'] = Date.now();
 
-  // Tenta o saveDB normal também (redundância — se não estiver travado, reforça)
-  try { saveDB(); } catch(e){}
+  _ref.update(_updates).then(function(){
+    console.log('[ENCERRAMENTO] ✅ update() concluído. Verificando...');
+    // Verifica se realmente gravou na lista de encerrados
+    return _ref.child('encerrados/' + _idEncerrado).once('value');
+  }).then(function(snap){
+    if (snap && snap.val()) {
+      console.log('[ENCERRAMENTO] ✅ VERIFICADO: id ' + _idEncerrado + ' está na lista de encerrados.');
+      toast('✅ Locação encerrada!','#0d7a3e');
+    } else {
+      console.error('[ENCERRAMENTO] ❌ FALHOU: id não apareceu na lista após gravar.');
+      toast('⚠️ Encerramento pode não ter sido salvo. Recarregue e verifique.','#b45309');
+    }
+  }).catch(function(e){
+    console.error('[ENCERRAMENTO] ❌ Erro ao gravar:', e);
+    toast('❌ Erro ao encerrar: ' + e.message,'#c0392b');
+  });
+
+  // Atualiza o localStorage
+  try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e){}
 
   if (typeof renderAtivos==='function') renderAtivos();
   if (typeof renderDashboard==='function') renderDashboard();
   if (typeof checkAlertas==='function') checkAlertas();
   closeM('mEncerramento');
-  toast('✅ Locação encerrada!','#0d7a3e');
 }
 
 
@@ -4016,18 +4025,34 @@ function relatorioManutencao(){
   var todas = db.manutencoes || [];
   if (!todas.length) { toast('Nenhuma manutenção cadastrada','#b45309'); return; }
 
-  // Perguntar a placa (sugere a do filtro de busca, se houver)
-  var sugestao = (document.getElementById('qManut')&&document.getElementById('qManut').value||'').toUpperCase().trim();
-  var placa = prompt('Digite a PLACA para o relatório (deixe em branco para TODAS):', sugestao);
-  if (placa === null) return;  // cancelou
-  placa = placa.toUpperCase().replace(/[^A-Z0-9]/g,'').trim();
+  // MESMO FILTRO DA TELA: busca, status, datas e veículo selecionado.
+  // O relatório reflete exatamente o que está sendo exibido na tela de Manutenção.
+  var q  = (document.getElementById('qManut')&&document.getElementById('qManut').value||'').toLowerCase();
+  var fs = (document.getElementById('fManutStatus')&&document.getElementById('fManutStatus').value)||'';
+  var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
+  var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
 
-  // Filtrar
   var lista = todas.filter(function(m){
-    if (!placa) return true;
-    return String(m.placa||'').toUpperCase().replace(/[^A-Z0-9]/g,'').indexOf(placa) >= 0;
+    if (!m) return false;
+    if (fs && m.status !== fs) return false;
+    if (_manutFiltroVeiculo && m.veiculoId !== _manutFiltroVeiculo && m.placa !== _manutFiltroVeiculo) return false;
+    if (dataIni && (!m.data || m.data < dataIni)) return false;
+    if (dataFim && (!m.data || m.data > dataFim)) return false;
+    if (!q) return true;
+    return ((m.veiculoNome||'')+' '+(m.placa||'')+' '+(m.oficina||'')+' '+(m.descricao||'')).toLowerCase().indexOf(q) >= 0;
   });
-  if (!lista.length) { toast('Nenhuma manutenção para a placa '+placa,'#b45309'); return; }
+  if (!lista.length) { toast('Nenhuma manutenção com os filtros atuais','#b45309'); return; }
+
+  // Descrição dos filtros aplicados (aparece no cabeçalho do relatório)
+  var filtrosAplicados = [];
+  if (q) filtrosAplicados.push('Busca: "'+q+'"');
+  if (fs) filtrosAplicados.push('Status: '+fs);
+  if (_manutFiltroVeiculo) {
+    var vf = (db.veiculos||[]).find(function(v){ return v && (v.id===_manutFiltroVeiculo || v.placa===_manutFiltroVeiculo); });
+    filtrosAplicados.push('Veículo: '+(vf ? (vf.marca+' '+vf.modelo+' · '+vf.placa) : _manutFiltroVeiculo));
+  }
+  if (dataIni) filtrosAplicados.push('De: '+dataIni.split('-').reverse().join('/'));
+  if (dataFim) filtrosAplicados.push('Até: '+dataFim.split('-').reverse().join('/'));
 
   // Agrupar por placa/veículo
   var porVeic = {};
@@ -4101,7 +4126,7 @@ function relatorioManutencao(){
       + '<tbody>'+linhas+'</tbody></table></div>';
   });
 
-  var titulo = placa ? ('Placa ' + placa) : 'Todos os veículos';
+  var titulo = filtrosAplicados.length ? filtrosAplicados.join(' · ') : 'Todos os veículos (sem filtros)';
   var hoje = new Date().toLocaleDateString('pt-BR');
 
   var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
@@ -4125,7 +4150,7 @@ function relatorioManutencao(){
     + '.btns button{background:#2B4BF2;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-weight:700;cursor:pointer;margin:0 4px;font-size:13px}'
     + '</style></head><body>'
     + '<div class="btns no-print"><button onclick="window.print()">🖨 Imprimir / Salvar PDF</button><button onclick="window.close()" style="background:#5a607a">Fechar</button></div>'
-    + '<div class="cab"><div><h1>Relatório de Manutenção</h1><div class="sub">'+titulo+'</div></div>'
+    + '<div class="cab"><div><h1>Relatório de Manutenção</h1><div class="sub">'+titulo+'</div><div style="font-size:11px;color:#5a607a;margin-top:4px">'+lista.length+' manutenção(ões)</div></div>'
     + '<div class="meta">LOKÁ Aluguel de Veículos<br>Emitido em '+hoje+'</div></div>'
     + blocos
     + '<div class="total">Total Geral: R$ '+totalGeral.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>'
