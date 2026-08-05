@@ -433,7 +433,7 @@ textarea.input {
         </div>
         <div class="field">
           <label class="label">Período de Referência</label>
-          <input class="input" id="periodoRef" type="month" onchange="atualizarDiasParados()">
+          <input class="input" id="periodoRef" type="month">
         </div>
         <div class="field">
           <label class="label">Data de Emissão</label>
@@ -985,7 +985,10 @@ function renderVeiculosArea(lista) {
       + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vseg-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vdesc-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="color:var(--red)"></td>'
-      + '<td class="num-cell" id="vparado-'+i+'" style="font-size:11px;text-align:center">—</td>'
+      + '<td class="num-cell" style="text-align:center;white-space:nowrap">'
+        + '<input class="veic-fin" id="vparado-'+i+'" type="number" min="0" placeholder="0" oninput="calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="max-width:44px;text-align:center;display:inline-block">'
+        + '<button type="button" onclick="event.stopPropagation();aplicarDescontoParado('+i+')" title="Deduzir os dias parados do valor" style="margin-left:3px;font-size:9px;background:#2B4BF2;color:#fff;border:none;border-radius:4px;padding:3px 5px;cursor:pointer">↓</button>'
+        + '</td>' '
       + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px;font-weight:700">—</td>'
     + '</tr>';
   }).join('');
@@ -1003,7 +1006,7 @@ function renderVeiculosArea(lista) {
     + '<th>Valor Unit. (R$)</th>'
     + '<th>Seguro (R$)</th>'
     + '<th>Desconto (R$)</th>'
-    + '<th title="Dias parado na oficina no mês de referência">Parado (oficina)</th>'
+    + '<th title="Dias parado na oficina (digite e clique ↓ para deduzir)">Dias parado</th>'
     + '<th>Subtotal</th>'
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
@@ -1076,7 +1079,6 @@ function toggleVeiculo(i) {
   atualizarContadorVeic();
   calcTotalVeic();
   calcTotal();
-  atualizarDiasParados();
 }
 
 
@@ -1134,19 +1136,24 @@ function atualizarDiasParados(){
   });
 }
 
-// Aplica o desconto: (aluguel mensal ÷ 30) × dias parados
-function aplicarDescontoParado(i, dias){
+// Aplica o desconto: (aluguel mensal ÷ 30) × dias parados (digitados manualmente)
+function aplicarDescontoParado(i){
   var finEl = document.getElementById('vfin-'+i);
   var descEl = document.getElementById('vdesc-'+i);
-  if (!finEl || !descEl) return;
+  var parEl = document.getElementById('vparado-'+i);
+  if (!finEl || !descEl || !parEl) return;
+  var dias = parseInt(parEl.value) || 0;
+  if (dias <= 0) { alert('Digite quantos dias o veículo ficou parado na oficina.'); return; }
   var mensal = parseBRL(finEl.value);
   if (!mensal) { alert('Preencha o valor do aluguel deste veículo primeiro.'); return; }
   var valorDesconto = (mensal / 30) * dias;
-  // Soma ao desconto existente (se já houver)
   var atual = parseBRL(descEl.value) || 0;
   var novo = atual + valorDesconto;
   descEl.value = novo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   calcTotalVeic(); calcTotal();
+  // feedback visual
+  descEl.style.transition='background .3s'; descEl.style.background='#fff3cd';
+  setTimeout(function(){ descEl.style.background=''; }, 600);
 }
 
 // Obtém o mês de referência da fatura (do campo periodoRef ou emissão)
