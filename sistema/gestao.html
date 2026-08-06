@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v54-20260806-2019 -->
+<!-- LOKA deploy: v58-20260806-2227 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -805,6 +805,7 @@ tr:hover td{background:#f8f9fe;}
 <div class="user-bar">
   <span id="userBarName">LOKÁ</span>
   <span id="buildStamp" style="font-size:9px;color:rgba(255,255,255,.2)">01.02 · build 10/06/2026 17:23</span>
+  <button class="logout-btn" onclick="window.open('ajuda.html','_blank')" title="Central de Ajuda — como usar cada tela">❓ Ajuda</button>
   <button class="logout-btn" onclick="abrirGerenciarUsuarios()" id="btnGerUsers" style="display:none">👥 Usuários</button>
   <button class="logout-btn" onclick="lokaLogout()">⏻ Sair</button>
 </div>
@@ -1079,7 +1080,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v54-20260806-2019';
+var LOKA_BUILD = 'v58-20260806-2227';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1331,7 +1332,7 @@ function inicializarCom(dados, origem) {
     // LIBERA a trava: dados carregados, agora pode gravar com segurança
     _dadosCarregados = true;
     // Ativar sincronização em tempo real
-    setupRealtimeSync(); registrarVersaoAtual(); escutarVersao();
+    setupRealtimeSync(); registrarVersaoAtual(); escutarVersao(); iniciarVerificacaoPublicacao(); setTimeout(backupAutomatico, 8000);
   }
 
   // 2. Tentar carregar do Firebase (protege contra localStorage vazio)
@@ -1415,7 +1416,7 @@ function inicializarCom(dados, origem) {
         }
         preencherCliSel(); checkAlertas(); showPanel('dashboard');
         // Ativar sincronização em tempo real
-        setupRealtimeSync(); registrarVersaoAtual(); escutarVersao();
+        setupRealtimeSync(); registrarVersaoAtual(); escutarVersao(); iniciarVerificacaoPublicacao(); setTimeout(backupAutomatico, 8000);
         return;
       }
 
@@ -1681,6 +1682,146 @@ function _gravarDbNoFirebase() {
 // Chamada uma vez após loadDB — escuta mudanças feitas por OUTROS usuários
 
 // ══════════════════════════════════════════════════════════════════
+// BACKUP AUTOMÁTICO DIÁRIO — snapshot em loka_backups/AAAA-MM-DD
+// Roda 1x por dia (primeira sessão que abrir). Mantém os últimos 7 dias.
+// ══════════════════════════════════════════════════════════════════
+var BACKUP_DIAS_MANTER = 7;
+
+function backupAutomatico(){
+  try {
+    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+    if (!db) return;
+    // Só faz backup de dados reais (nunca de um estado vazio)
+    var nCli = (db.clients||[]).length, nAtv = (db.ativos||[]).length;
+    var nFin = 0;
+    try { nFin = _contarFin(db.financeiro); } catch(e){}
+    if (nCli < 3 && nAtv < 1 && nFin < 3) { console.log('[BACKUP-AUTO] Dados insuficientes, não vou gravar backup.'); return; }
+
+    var hoje = new Date().toISOString().slice(0,10); // AAAA-MM-DD
+    var refMeta = firebase.database().ref('loka_backups_meta/ultimoDia');
+    refMeta.once('value', function(snap){
+      if (snap.val() === hoje) return; // já houve backup hoje
+      console.log('[BACKUP-AUTO] Gravando backup diário de ' + hoje + '...');
+
+      // Snapshot enxuto: remove fotos pesadas (mesma regra do saveDB)
+      var copia;
+      try {
+        copia = JSON.parse(JSON.stringify(db));
+        if (typeof _removerFotosPesadas === 'function') _removerFotosPesadas(copia);
+      } catch(e){ copia = db; }
+
+      var updates = {};
+      updates['loka_backups/' + hoje] = { dados: copia, criadoEm: Date.now(), build: (typeof LOKA_BUILD!=='undefined'?LOKA_BUILD:'?') };
+      updates['loka_backups_meta/ultimoDia'] = hoje;
+
+      firebase.database().ref().update(updates).then(function(){
+        console.log('[BACKUP-AUTO] ✅ Backup de ' + hoje + ' gravado.');
+        _limparBackupsAntigos();
+      }).catch(function(e){ console.warn('[BACKUP-AUTO] Falha ao gravar:', e && e.message); });
+    });
+  } catch(e){ console.warn('backupAutomatico:', e); }
+}
+
+// Remove backups com mais de BACKUP_DIAS_MANTER dias
+function _limparBackupsAntigos(){
+  try {
+    firebase.database().ref('loka_backups').once('value', function(snap){
+      var todos = snap.val() || {};
+      var dias = Object.keys(todos).sort(); // AAAA-MM-DD ordena certo como string
+      var excesso = dias.length - BACKUP_DIAS_MANTER;
+      if (excesso <= 0) return;
+      var updates = {};
+      dias.slice(0, excesso).forEach(function(d){ updates['loka_backups/' + d] = null; });
+      firebase.database().ref().update(updates).then(function(){
+        console.log('[BACKUP-AUTO] Limpeza: removidos ' + excesso + ' backup(s) antigo(s).');
+      });
+    });
+  } catch(e){}
+}
+
+// ── Comandos de console para consultar/restaurar (uso do administrador) ──
+function listarBackupsAutomaticos(){
+  firebase.database().ref('loka_backups').once('value', function(snap){
+    var todos = snap.val() || {};
+    var dias = Object.keys(todos).sort();
+    console.log('%c═══ BACKUPS AUTOMÁTICOS DISPONÍVEIS ═══','font-weight:bold;color:#2B4BF2');
+    if (!dias.length) { console.log('  (nenhum ainda)'); return; }
+    dias.forEach(function(d){
+      var b = todos[d];
+      var nCli = ((b.dados||{}).clients||[]).length;
+      var nAtv = ((b.dados||{}).ativos||[]).length;
+      console.log('  ' + d + ' · build ' + (b.build||'?') + ' · clientes:' + nCli + ' ativos:' + nAtv);
+    });
+    console.log('Para restaurar: restaurarBackupAutomatico("AAAA-MM-DD")');
+  });
+}
+
+function restaurarBackupAutomatico(dia){
+  if (!dia) { console.log('Informe o dia: restaurarBackupAutomatico("2026-08-06")'); return; }
+  firebase.database().ref('loka_backups/' + dia).once('value', function(snap){
+    var b = snap.val();
+    if (!b || !b.dados) { console.log('❌ Backup de ' + dia + ' não encontrado. Use listarBackupsAutomaticos().'); return; }
+    var nCli = (b.dados.clients||[]).length, nAtv = (b.dados.ativos||[]).length;
+    if (!confirm('RESTAURAR o backup de ' + dia + '?\n\nClientes: ' + nCli + ' · Ativos: ' + nAtv + '\n\nISTO SUBSTITUI OS DADOS ATUAIS. Um backup do estado atual será baixado antes.')) { console.log('Cancelado.'); return; }
+    // baixa o estado atual antes (segurança)
+    try {
+      var blob = new Blob([JSON.stringify(db)], {type:'application/json'});
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'backup_antes_restauracao_' + Date.now() + '.json';
+      a.click();
+    } catch(e){}
+    b.dados._ultimaEscrita = Date.now();
+    firebase.database().ref('loka_db').set(b.dados).then(function(){
+      alert('✅ Backup de ' + dia + ' restaurado! A página vai recarregar.');
+      location.reload(true);
+    }).catch(function(e){ console.log('❌ Erro:', e.message); });
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// VERIFICAÇÃO DIRETA NO SERVIDOR — detecta nova publicação sozinho
+// Cada página consulta o carimbo (ETag/Last-Modified) do próprio arquivo
+// a cada 5 min e ao voltar o foco. Mudou → dispara o aviso de atualização.
+// Não depende de ninguém abrir a versão nova primeiro.
+// ══════════════════════════════════════════════════════════════════
+var _carimboServidor = null;
+var _VCHECK_INTERVALO = 5 * 60 * 1000; // 5 minutos
+
+function verificarArquivoPublicado(){
+  try {
+    if (location.protocol === 'file:') return;              // rodando local: não aplica
+    if (typeof _versaoAvisada !== 'undefined' && _versaoAvisada) return; // aviso já na tela
+    var url = location.pathname + '?vchk=' + Date.now();
+    fetch(url, { method:'HEAD', cache:'no-store' }).then(function(r){
+      if (!r.ok) return;
+      var carimbo = r.headers.get('etag') || r.headers.get('last-modified') || '';
+      if (!carimbo) return;
+      if (_carimboServidor === null) { _carimboServidor = carimbo; return; }  // primeira leitura: referência
+      if (carimbo !== _carimboServidor) {
+        _carimboServidor = carimbo;
+        console.log('[VERSÃO] Nova publicação detectada no servidor (carimbo mudou).');
+        if (typeof _versaoAvisada !== 'undefined') _versaoAvisada = true;
+        if (typeof mostrarAvisoAtualizacao === 'function') mostrarAvisoAtualizacao('(nova publicação)');
+      }
+    }).catch(function(){ /* offline ou bloqueado: ignora, tenta na próxima */ });
+  } catch(e){}
+}
+
+function iniciarVerificacaoPublicacao(){
+  try {
+    if (location.protocol === 'file:') return;
+    verificarArquivoPublicado();                              // referência inicial
+    setInterval(verificarArquivoPublicado, _VCHECK_INTERVALO); // a cada 5 min
+    document.addEventListener('visibilitychange', function(){  // ao voltar o foco
+      if (!document.hidden) verificarArquivoPublicado();
+    });
+  } catch(e){}
+}
+
+
+// ══════════════════════════════════════════════════════════════════
 // AUTO-ATUALIZAÇÃO — todos os usuários na mesma versão automaticamente
 // ══════════════════════════════════════════════════════════════════
 var _versaoAvisada = false;
@@ -1907,6 +2048,9 @@ function _mostrarSyncBadge(msg) {
 
 function fmt(s) {
   if (!s) return '—';
+  s = String(s);
+  if (s.indexOf('T') > 0) s = s.slice(0, 10);      // ISO com hora → só a data
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s; // já está em DD/MM/AAAA
   var d = new Date(s + 'T00:00');
   return isNaN(d) ? s : d.toLocaleDateString('pt-BR');
 }
@@ -2546,6 +2690,13 @@ function renderAtivos() {
     if (!a) return false;
     if (_filtroAtivos && a.tipo !== _filtroAtivos) return false;
     return !q || (a.clienteNome+' '+a.veiculoNome+' '+(a.placa||'')).toLowerCase().indexOf(q)>=0;
+  });
+
+  // Ordena por data de devolução: vencidos e mais urgentes primeiro; sem data vai ao fim
+  list.sort(function(a,b){
+    var da = a.devolucao ? String(a.devolucao).slice(0,10) : '9999-12-31';
+    var db_ = b.devolucao ? String(b.devolucao).slice(0,10) : '9999-12-31';
+    return da < db_ ? -1 : da > db_ ? 1 : 0;
   });
 
   var grid = document.getElementById('ativosGrid');

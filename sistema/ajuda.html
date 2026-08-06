@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<!-- LOKA deploy: v58-20260806-2227 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajuda — Sistema LOKÁ</title>
+<style>
+  :root{--azul:#2B4BF2;--escuro:#0E1B4D;--cinza:#5a607a;--claro:#EEF1FD;--verde:#0d7a3e;--verm:#c0392b;--amar:#b45309}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#1a2340;background:#f5f6fb;line-height:1.6}
+  .topo{position:sticky;top:0;z-index:50;background:var(--escuro);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 12px rgba(0,0,0,.18)}
+  .topo h1{font-size:17px;font-weight:800;white-space:nowrap}
+  .topo .logo{font-size:20px}
+  .busca{flex:1;max-width:480px;position:relative}
+  .busca input{width:100%;border:none;border-radius:10px;padding:10px 14px 10px 38px;font-size:14px;background:rgba(255,255,255,.14);color:#fff;outline:none}
+  .busca input::placeholder{color:rgba(255,255,255,.55)}
+  .busca .lupa{position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.6}
+  .voltar{background:var(--azul);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap}
+  .layout{display:flex;max-width:1200px;margin:0 auto;gap:0;min-height:calc(100vh - 60px)}
+  nav{width:240px;flex-shrink:0;background:#fff;border-right:1px solid #e7eaf4;padding:20px 0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto}
+  nav .grupo{font-size:10px;font-weight:800;color:#9099bf;text-transform:uppercase;letter-spacing:1px;padding:14px 22px 6px}
+  nav a{display:block;padding:8px 22px;color:#3a4160;text-decoration:none;font-size:13.5px;border-left:3px solid transparent}
+  nav a:hover{background:var(--claro);color:var(--azul)}
+  nav a.ativo{background:var(--claro);color:var(--azul);border-left-color:var(--azul);font-weight:700}
+  main{flex:1;padding:34px 40px 80px;max-width:860px}
+  .tela{background:#fff;border-radius:16px;padding:28px 32px;margin-bottom:26px;box-shadow:0 2px 10px rgba(14,27,77,.05);scroll-margin-top:80px}
+  .tela h2{color:var(--escuro);font-size:21px;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .tela .onde{font-size:12px;color:#9099bf;margin-bottom:14px}
+  .tela h3{color:var(--azul);font-size:15px;margin:18px 0 6px}
+  .tela p{margin:7px 0;font-size:14px}
+  .tela ul,.tela ol{margin:7px 0 7px 22px;font-size:14px}
+  .tela li{margin:4px 0}
+  .box{background:var(--claro);border-left:4px solid var(--azul);border-radius:0 9px 9px 0;padding:11px 15px;margin:12px 0;font-size:13px}
+  .atencao{background:#fdf3e7;border-left-color:var(--amar)}
+  .dica{background:#e8f5ef;border-left-color:var(--verde)}
+  .perigo{background:#fdecea;border-left-color:var(--verm)}
+  code{background:#f0f2fa;border-radius:4px;padding:1px 6px;font-size:12.5px;font-family:ui-monospace,Consolas,monospace}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
+  th{background:var(--escuro);color:#fff;padding:8px 11px;text-align:left;font-size:11px;text-transform:uppercase}
+  td{padding:8px 11px;border-bottom:1px solid #eef0f6;vertical-align:top}
+  .semresultado{display:none;background:#fff;border-radius:16px;padding:40px;text-align:center;color:#9099bf}
+  .oculto{display:none!important}
+  mark{background:#ffe89b;border-radius:3px;padding:0 2px}
+  @media(max-width:800px){nav{display:none}main{padding:18px 14px 60px}}
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <span class="logo">📘</span>
+  <h1>Central de Ajuda — LOKÁ</h1>
+  <div class="busca">
+    <span class="lupa">🔍</span>
+    <input type="text" id="qAjuda" placeholder="Buscar na ajuda... (ex: encerrar, fatura, multa)" oninput="filtrarAjuda()">
+  </div>
+  <a class="voltar" href="gestao.html">← Voltar ao sistema</a>
+</div>
+
+<div class="layout">
+<nav id="navAjuda">
+  <div class="grupo">Começando</div>
+  <a href="#inicio">Primeiros passos</a>
+  <div class="grupo">Principal</div>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#clientes">Clientes</a>
+  <a href="#alugueis">Aluguéis Ativos</a>
+  <a href="#veiculos">Veículos</a>
+  <a href="#frota">Frota Ativa</a>
+  <div class="grupo">Documentos</div>
+  <a href="#faturas">Faturas</a>
+  <a href="#manutencao">Manutenção</a>
+  <a href="#fornecedores">Fornecedores</a>
+  <a href="#multas">Multas</a>
+  <a href="#financeiro">Financeiro</a>
+  <a href="#formularios">Formulários</a>
+  <a href="#contratos">Contratos Gerados</a>
+  <a href="#historico">Aluguéis Encerrados</a>
+  <div class="grupo">Público</div>
+  <a href="#reservas">Reservas</a>
+  <a href="#precadastro">Pré-Cadastro</a>
+  <div class="grupo">Administração</div>
+  <a href="#usuarios">Usuários</a>
+  <a href="#backup">Backup e dados</a>
+  <a href="#atualizacao">Atualizações</a>
+  <a href="#problemas">Problemas comuns</a>
+</nav>
+
+<main id="conteudoAjuda">
+
+<div class="tela" id="inicio">
+<h2>🚀 Primeiros passos</h2>
+<div class="onde">Para quem está começando a usar o sistema</div>
+<h3>Entrando no sistema</h3>
+<ol>
+<li>Acesse <code>lokaveiculos.com.br/sistema/gestao.html</code></li>
+<li>Digite seu usuário e senha e entre</li>
+<li>A tela inicial é o Dashboard, com o resumo do dia</li>
+</ol>
+<h3>Conhecendo a tela</h3>
+<ul>
+<li><b>Menu lateral:</b> todas as telas, em 3 grupos (Principal, Documentos, Público)</li>
+<li><b>+ NOVO</b> (topo): atalho para criar um aluguel</li>
+<li><b>Faixa vermelha no topo:</b> alertas de locações vencidas ou vencendo</li>
+<li><b>Rodapé:</b> seu nome e perfil, a versão do sistema, botões Usuários/Sair e Backup/Restaurar</li>
+</ul>
+<div class="dica box"><b>Dica:</b> o fluxo básico do dia a dia é — cadastrar o <b>cliente</b> → criar o <b>aluguel</b> → gerar o <b>contrato</b> → fazer o <b>checklist</b> na entrega → e ao final, <b>encerrar</b> a locação.</div>
+</div>
+
+<div class="tela" id="dashboard">
+<h2>📊 Dashboard</h2>
+<div class="onde">Menu → Dashboard (tela inicial)</div>
+<p>Resumo do negócio em tempo real: total de veículos, clientes, aluguéis ativos e alertas.</p>
+<h3>O que observar diariamente</h3>
+<ul>
+<li>A faixa de <b>locações vencidas</b> — cada uma exige ação (cobrar, prorrogar ou encerrar)</li>
+<li>Os <b>vencimentos em até 3 dias</b> — combine devolução ou renovação com o cliente</li>
+</ul>
+<p>O Dashboard só exibe. Para agir, clique no módulo correspondente do menu.</p>
+</div>
+
+<div class="tela" id="clientes">
+<h2>👤 Clientes</h2>
+<div class="onde">Menu → Clientes</div>
+<h3>Cadastrar</h3>
+<ol>
+<li>Clique em <b>+ Novo Cliente</b></li>
+<li>Preencha nome/razão social, CPF ou CNPJ, CNH, telefone e endereço</li>
+<li>Salve</li>
+</ol>
+<h3>Ações em cada cliente</h3>
+<table>
+<tr><th>Botão</th><th>Função</th></tr>
+<tr><td>✏️</td><td>Editar os dados</td></tr>
+<tr><td>Status/Bloquear</td><td>Impede novos aluguéis (o filtro "Bloqueados" lista todos)</td></tr>
+<tr><td>🗑</td><td>Excluir — só para cadastros sem histórico; prefira bloquear</td></tr>
+</table>
+<div class="atencao box">Evite renomear clientes com movimentação: faturas, multas e histórico usam o nome para vincular.</div>
+</div>
+
+<div class="tela" id="alugueis">
+<h2>🔑 Aluguéis Ativos</h2>
+<div class="onde">Menu → Aluguéis Ativos · atalho + NOVO no topo</div>
+<p>A tela mais importante: todas as locações em andamento, com cliente, veículo/placa, tipo, datas, dias restantes, valor e pagamento.</p>
+<h3>Criar um aluguel</h3>
+<ol>
+<li><b>+ NOVO</b> → escolha o cliente (precisa estar cadastrado)</li>
+<li>Escolha o veículo (só aparecem os disponíveis)</li>
+<li>Defina tipo (Diária/Mensal), retirada, devolução e valor → Salvar</li>
+</ol>
+<div class="box">O sistema bloqueia datas invertidas (devolução antes da retirada) na criação e na prorrogação.</div>
+<h3>Botões de cada linha</h3>
+<table>
+<tr><th>Botão</th><th>Função</th></tr>
+<tr><td>📅</td><td><b>Prorrogar:</b> estende a devolução e gera o termo de prorrogação</td></tr>
+<tr><td>💳</td><td><b>Pagamento:</b> marca Pago/Pendente</td></tr>
+<tr><td>🔴</td><td><b>Encerrar:</b> finaliza a locação (veja abaixo)</td></tr>
+<tr><td>🗑</td><td><b>Excluir:</b> apaga sem histórico — só para lançamentos errados</td></tr>
+</table>
+<h3>Encerrar uma locação</h3>
+<ol>
+<li>Clique em 🔴 na linha do aluguel</li>
+<li>Informe data de devolução, KM, condição e observações</li>
+<li>Confirme em <b>Encerrar Locação</b></li>
+</ol>
+<p>Automaticamente: o registro vai para <b>Aluguéis Encerrados</b>, o veículo volta a <b>disponível</b> e o sistema confirma a gravação no banco (mostra aviso se falhar).</p>
+<h3>Filtros e link público</h3>
+<ul>
+<li>Filtros <b>TODOS / DIÁRIA / MENSAL</b> + busca por cliente ou veículo</li>
+<li><b>Link para compartilhar:</b> página somente-leitura para o cliente acompanhar</li>
+</ul>
+</div>
+
+<div class="tela" id="veiculos">
+<h2>🚗 Veículos</h2>
+<div class="onde">Menu → Veículos</div>
+<h3>Cadastrar</h3>
+<ol>
+<li><b>+ Novo Veículo</b> → marca, modelo, placa, cor, ano, KM</li>
+<li>Informe os valores: diária, diária KM livre, mensal, mensal KM livre e franquia</li>
+<li>Salve</li>
+</ol>
+<h3>Status</h3>
+<table>
+<tr><th>Status</th><th>Significado</th></tr>
+<tr><td>disponível</td><td>Pronto para alugar (aparece na criação de aluguéis)</td></tr>
+<tr><td>alugado</td><td>Automático quando há aluguel ativo</td></tr>
+<tr><td>manutenção</td><td>Na oficina</td></tr>
+<tr><td>inativo</td><td>Fora de operação (botão inativar/reativar)</td></tr>
+</table>
+</div>
+
+<div class="tela" id="frota">
+<h2>🚛 Frota Ativa</h2>
+<div class="onde">Menu → Frota Ativa · restrito a admin/master</div>
+<p>Visão consolidada de toda a frota com documentação:</p>
+<ul>
+<li><b>RENAVAM, Chassi, Ano/Mod, Alienado:</b> documentação de cada placa</li>
+<li><b>Locatário/Info:</b> quem está com o veículo agora (vem do aluguel ativo)</li>
+<li><b>Entrega</b> e <b>KM Entrega:</b> quando e com que quilometragem o veículo foi entregue ao cliente atual</li>
+</ul>
+<div class="box">Veículo "sem locatário" = sem aluguel ativo registrado para a placa. Crie o aluguel para vincular à empresa/cliente.</div>
+</div>
+
+<div class="tela" id="faturas">
+<h2>🧾 Faturas</h2>
+<div class="onde">Menu → Faturas</div>
+<h3>Criar uma fatura</h3>
+<ol>
+<li>Nova fatura → selecione o <b>cliente</b> e o <b>Período de Referência</b> (mês)</li>
+<li>Marque os <b>veículos</b>; para cada um: qtd de dias/meses, valor unitário, seguro, desconto</li>
+<li>Subtotais e total calculam sozinhos → salve e imprima</li>
+</ol>
+<h3>Deduzir dias parados na oficina</h3>
+<ol>
+<li>Na coluna <b>"Dias parado"</b>, digite os dias que o veículo ficou parado no mês</li>
+<li>Clique no botão <b>↓</b></li>
+<li>O desconto <code>(mensal ÷ 30) × dias</code> entra no campo Desconto</li>
+</ol>
+<div class="dica box">Os dias exatos estão no relatório de Manutenção (coluna "Dias parado").</div>
+<h3>Juros e multa por atraso</h3>
+<p>Ative a seção de juros/multa, informe multa (%), juros ao mês (%) e dias de atraso. Padrão usado: <b>2% multa + 6% a.m.</b> (juros pro rata por dia). O total recalcula na hora.</p>
+</div>
+
+<div class="tela" id="manutencao">
+<h2>🔧 Manutenção</h2>
+<div class="onde">Menu → Manutenção</div>
+<h3>Registrar</h3>
+<ol>
+<li><b>+ Nova</b> → selecione o veículo</li>
+<li>Informe <b>Data de Entrada</b>, <b>Previsão de Retorno</b> e, quando o carro voltar, a <b>Data de Saída da Oficina</b></li>
+<li>Escolha o <b>fornecedor/oficina</b> (ou cadastre pelo botão +)</li>
+<li>Tipo, descrição, KM na entrada, custo, pagamento e status (orçamento / em andamento / concluída)</li>
+</ol>
+<div class="atencao box"><b>Preencha sempre a Data de Saída</b> quando o veículo voltar — ela alimenta o cálculo de dias parados usado no relatório e na fatura.</div>
+<h3>Relatório</h3>
+<p>O relatório <b>obedece aos filtros da tela</b> (busca, status, período, veículo). Mostra Entrada, Saída e <b>Dias parado</b> — com "(na oficina)" em vermelho para quem ainda não saiu — agrupado por veículo com subtotais. O cabeçalho registra os filtros aplicados.</p>
+</div>
+
+<div class="tela" id="fornecedores">
+<h2>🏪 Fornecedores</h2>
+<div class="onde">Menu → Fornecedores</div>
+<p>Cadastro de oficinas e prestadores de serviço.</p>
+<ol>
+<li><b>+ Novo Fornecedor</b> → nome, telefone, CNPJ, especialidade, observações</li>
+<li>Editar (✏️) e excluir (🗑) em cada linha; busca no topo</li>
+</ol>
+<p>Os fornecedores aparecem no menu suspenso do registro de manutenção.</p>
+</div>
+
+<div class="tela" id="multas">
+<h2>🚨 Multas</h2>
+<div class="onde">Menu → Multas</div>
+<h3>Importar por PDF</h3>
+<ol>
+<li>Envie o PDF do órgão de trânsito — o sistema lê as infrações automaticamente</li>
+<li>Para cada multa, o sistema <b>cruza a data da infração com os aluguéis</b> (ativos e histórico) e sugere o condutor responsável</li>
+<li>Confirme ou ajuste o locatário indicado</li>
+</ol>
+<h3>Acompanhamento</h3>
+<ul>
+<li><b>Alertas de prazo:</b> multas com prazo de indicação/recurso vencendo ganham destaque</li>
+<li><b>Filtros:</b> por cliente, por finais de placa (multi-seleção) e período</li>
+<li><b>Relatório A4:</b> agrupado por cliente, pronto para cobrança</li>
+</ul>
+</div>
+
+<div class="tela" id="financeiro">
+<h2>💰 Financeiro</h2>
+<div class="onde">Menu → Financeiro · restrito a admin/master</div>
+<p>Cinco abas:</p>
+<table>
+<tr><th>Aba</th><th>O que controla</th></tr>
+<tr><td><b>Acertos</b></td><td>Fechamentos/acertos financeiros por período</td></tr>
+<tr><td><b>Bens</b></td><td>Inventário patrimonial com valores</td></tr>
+<tr><td><b>Endividamento</b></td><td>Financiamentos por contrato, pagamentos vinculados e principal amortizado (tabela Price)</td></tr>
+<tr><td><b>Contas a Receber</b></td><td>Por tipo (Fatura, Multas, Avarias, Seguro, Peças, Pneus, Outros), com baixa parcial e relatório</td></tr>
+<tr><td><b>Contas a Pagar</b></td><td>Contas simples ou parceladas (projeção automática dos meses); vínculo com financiamento do Endividamento; baixa mês a mês</td></tr>
+</table>
+<h3>Conta parcelada (a pagar)</h3>
+<ol>
+<li>Nova conta → informe parcelas, mês inicial e dia de vencimento</li>
+<li>O sistema projeta os meses automaticamente</li>
+<li>Se for financiamento, use <b>vincular a contrato</b> — os pagamentos alimentam a amortização no Endividamento</li>
+</ol>
+<div class="perigo box"><b>Antes de lançamentos em lote ou correções: ⬇ BACKUP.</b> O Financeiro é o módulo mais sensível.</div>
+</div>
+
+<div class="tela" id="formularios">
+<h2>📄 Formulários</h2>
+<div class="onde">Menu → Formulários</div>
+<p>Geração de documentos prontos para imprimir:</p>
+<table>
+<tr><th>Documento</th><th>Quando usar</th></tr>
+<tr><td>Contrato — Diária</td><td>Locações por diária</td></tr>
+<tr><td>Contrato — Mensal</td><td>Locações mensais/empresas</td></tr>
+<tr><td>Recibo de Reserva</td><td>Comprovante de reserva com caução e termos</td></tr>
+<tr><td>Checklist de Vistoria</td><td>Entrega/devolução, com fotos e assinatura digital</td></tr>
+</table>
+</div>
+
+<div class="tela" id="contratos">
+<h2>📑 Contratos Gerados</h2>
+<div class="onde">Menu → Contratos Gerados</div>
+<p>Arquivo de todos os contratos emitidos, com cliente, veículo e período. Permite conferir e reimprimir qualquer contrato já gerado.</p>
+</div>
+
+<div class="tela" id="historico">
+<h2>📚 Aluguéis Encerrados</h2>
+<div class="onde">Menu → Aluguéis Encerrados</div>
+<p>Histórico <b>permanente</b> de todas as locações finalizadas.</p>
+<ul>
+<li>Filtros por busca, veículo e período, com resumo de valores</li>
+<li>É também uma proteção: contrato que está aqui <b>não pode</b> voltar a ativo — o sistema bloqueia automaticamente</li>
+</ul>
+</div>
+
+<div class="tela" id="reservas">
+<h2>📅 Reservas</h2>
+<div class="onde">Menu → Reservas (área pública)</div>
+<p>Solicitações de reserva feitas pelos clientes na página pública (reserva.html).</p>
+<ol>
+<li>O cliente preenche a reserva online</li>
+<li>A solicitação aparece nesta aba</li>
+<li>A equipe confere, edita se preciso e converte em aluguel — ou gera o Recibo de Reserva</li>
+</ol>
+</div>
+
+<div class="tela" id="precadastro">
+<h2>📝 Pré-Cadastro</h2>
+<div class="onde">Menu → Pré-Cadastro (área pública)</div>
+<p>Formulário público (cadastro.html) em que o cliente envia os dados antes de ir à loja: dados pessoais, endereço com busca automática por CEP e foto da CNH.</p>
+<p>As solicitações chegam aqui para a equipe validar e transformar em cliente cadastrado.</p>
+</div>
+
+<div class="tela" id="usuarios">
+<h2>👥 Usuários</h2>
+<div class="onde">Rodapé → botão 👥 Usuários · restrito a admin/master</div>
+<table>
+<tr><th>Perfil</th><th>Acessos</th></tr>
+<tr><td><b>master</b></td><td>Tudo + gestão de usuários</td></tr>
+<tr><td><b>admin</b></td><td>Tudo, incluindo Financeiro e Frota Ativa</td></tr>
+<tr><td><b>equipe/operador</b></td><td>Operação do dia a dia — sem Financeiro e Frota Ativa</td></tr>
+</table>
+<p>Crie, edite e exclua usuários e defina o perfil de cada um.</p>
+</div>
+
+<div class="tela" id="backup">
+<h2>💾 Backup e dados</h2>
+<div class="onde">Rodapé → botões ⬇ BACKUP e ⬆ RESTAURAR</div>
+<h3>Onde os dados ficam</h3>
+<p>Tudo é salvo na nuvem (Firebase) em tempo real. O site apenas exibe as telas — <b>se o site cair, os dados continuam seguros</b>. Cada aparelho guarda também uma cópia local para internet instável.</p>
+<h3>Backup automático diário (novo!)</h3>
+<p>O sistema grava sozinho um backup completo <b>uma vez por dia</b> (na primeira vez que alguém abre o sistema no dia), mantendo os <b>últimos 7 dias</b> na nuvem. Nenhuma ação é necessária.</p>
+<div class="dica box">Para o administrador: no Console (F12), <code>listarBackupsAutomaticos()</code> mostra os dias disponíveis e <code>restaurarBackupAutomatico("AAAA-MM-DD")</code> restaura um deles (baixando antes uma cópia do estado atual, por segurança).</div>
+<h3>Backup manual</h3>
+<ol>
+<li><b>⬇ BACKUP:</b> baixa um arquivo .json com todos os dados — recomendado antes de operações em lote e para guardar cópias externas</li>
+<li><b>⬆ RESTAURAR:</b> devolve um backup ao sistema (substitui os dados atuais — use com cuidado)</li>
+</ol>
+<h3>Proteções automáticas</h3>
+<ul>
+<li><b>Trava de carregamento:</b> impede gravar antes de os dados carregarem</li>
+<li><b>Guarda de integridade:</b> aborta gravações que zerariam listas importantes</li>
+<li><b>Dupla barreira:</b> contratos encerrados não voltam (bloqueio pela lista de encerrados + histórico)</li>
+</ul>
+</div>
+
+<div class="tela" id="atualizacao">
+<h2>🔄 Atualizações</h2>
+<div class="onde">Automático a partir da v52</div>
+<p>Quando uma nova versão é publicada, <b>todas as páginas abertas se atualizam sozinhas</b>. O sistema detecta a novidade por dois caminhos:</p>
+<ul>
+<li><b>Verificação direta no servidor:</b> cada página consulta a cada 5 minutos (e ao voltar o foco na aba) se há publicação nova</li>
+<li><b>Aviso em tempo real:</b> quando qualquer aparelho abre a versão nova, os demais são notificados na hora</li>
+</ul>
+<p>Nos dois casos aparece o aviso <i>"Nova versão disponível"</i> com contagem de 20 segundos: atualiza sozinho ao final, ou na hora pelo botão <b>Atualizar agora</b> (dá para adiar 1 minuto se estiver no meio de algo).</p>
+<div class="box">O número da versão aparece no rodapé (ex: v54-20260806-2019). Em caso de dúvida ou suporte, informe esse número.</div>
+</div>
+
+<div class="tela" id="problemas">
+<h2>🆘 Problemas comuns</h2>
+<div class="onde">Consulte antes de acionar o suporte</div>
+<table>
+<tr><th>Sintoma</th><th>Solução</th></tr>
+<tr><td>Rodapé com versão antiga</td><td>Ctrl+Shift+Delete → limpar cache (última hora) → fechar e reabrir o navegador</td></tr>
+<tr><td>"Site not found"</td><td>Hospedagem fora do ar — os dados estão seguros. Use o sistema local (gestao.html do ZIP) até voltar</td></tr>
+<tr><td>Dados diferentes entre aparelhos</td><td>Confirme que todos estão na mesma versão e recarregue — a sincronização resolve em segundos</td></tr>
+<tr><td>Aviso "aguarde os dados carregarem"</td><td>Espere alguns segundos — é a trava de segurança</td></tr>
+<tr><td>Financeiro aparenta vazio</td><td>NÃO lance nada. Recarregue. Persistindo: ⬆ RESTAURAR com o último backup e acione o suporte</td></tr>
+<tr><td>Internet caiu</td><td>O sistema guarda localmente e sincroniza quando voltar</td></tr>
+</table>
+<div class="perigo box"><b>Regra de ouro:</b> qualquer comportamento estranho com dados → primeiro ⬇ BACKUP, depois investigue.</div>
+</div>
+
+<div class="semresultado" id="semResultado">
+  <div style="font-size:40px;margin-bottom:8px">🔍</div>
+  Nenhum resultado para a busca.<br>Tente outra palavra (ex: "encerrar", "fatura", "multa").
+</div>
+
+</main>
+</div>
+
+<script>
+// Busca instantânea: filtra as seções e destaca o termo
+function filtrarAjuda(){
+  var q = (document.getElementById('qAjuda').value||'').trim().toLowerCase();
+  var telas = document.querySelectorAll('.tela');
+  var achou = 0;
+  telas.forEach(function(t){
+    // limpa destaques anteriores
+    t.querySelectorAll('mark').forEach(function(m){ m.replaceWith(m.textContent); });
+    if (!q){ t.classList.remove('oculto'); achou++; return; }
+    var txt = t.textContent.toLowerCase();
+    if (txt.indexOf(q) >= 0){
+      t.classList.remove('oculto'); achou++;
+      destacar(t, q);
+    } else {
+      t.classList.add('oculto');
+    }
+  });
+  document.getElementById('semResultado').style.display = achou ? 'none' : 'block';
+}
+
+function destacar(raiz, termo){
+  var walker = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+  var nos = [];
+  while (walker.nextNode()){
+    var n = walker.currentNode;
+    if (n.parentNode.tagName !== 'SCRIPT' && n.textContent.toLowerCase().indexOf(termo) >= 0) nos.push(n);
+  }
+  nos.slice(0,40).forEach(function(n){
+    var txt = n.textContent, low = txt.toLowerCase(), i = low.indexOf(termo);
+    if (i < 0) return;
+    var frag = document.createDocumentFragment();
+    var resto = txt, pos;
+    while ((pos = resto.toLowerCase().indexOf(termo)) >= 0){
+      frag.appendChild(document.createTextNode(resto.slice(0, pos)));
+      var mk = document.createElement('mark');
+      mk.textContent = resto.slice(pos, pos + termo.length);
+      frag.appendChild(mk);
+      resto = resto.slice(pos + termo.length);
+    }
+    frag.appendChild(document.createTextNode(resto));
+    n.parentNode.replaceChild(frag, n);
+  });
+}
+
+// Marca o item ativo no menu conforme rolagem
+var links = document.querySelectorAll('nav a');
+window.addEventListener('scroll', function(){
+  var atual = '';
+  document.querySelectorAll('.tela').forEach(function(t){
+    if (t.getBoundingClientRect().top < 130) atual = t.id;
+  });
+  links.forEach(function(a){ a.classList.toggle('ativo', a.getAttribute('href') === '#'+atual); });
+});
+</script>
+</body>
+</html>
