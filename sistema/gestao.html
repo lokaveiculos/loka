@@ -1078,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v49-20260805-1810';
+var LOKA_BUILD = 'v50-20260806-1058';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1603,10 +1603,48 @@ function saveDB() {
   _ultimaEscritaLocal = Date.now();
   db._ultimaEscrita = _ultimaEscritaLocal;   // carimbo viaja junto no Firebase
 
-  // Salva no localStorage imediatamente
-  try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+  // ══ PROTEÇÃO ANTI-RESSURREIÇÃO NO SAVEDB ═══════════════════════════
+  // ANTES de gravar o db inteiro, consulta a lista de encerrados no Firebase
+  // e remove da memória qualquer ativo que já foi encerrado. Isso impede que
+  // um aparelho com dados desatualizados ressuscite um contrato encerrado.
+  // A gravação real acontece no callback, já com os ativos limpos.
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && navigator.onLine) {
+      firebase.database().ref('loka_db/encerrados').once('value', function(snapEnc){
+        var listaEnc = snapEnc.val() || {};
+        // junta com memória local
+        if (window._encerradosRecentes) {
+          Object.keys(window._encerradosRecentes).forEach(function(id){ listaEnc[id] = listaEnc[id] || window._encerradosRecentes[id]; });
+        }
+        // Remove dos ativos os que constam como encerrados
+        if (db.ativos && Object.keys(listaEnc).length) {
+          var antes = db.ativos.length;
+          db.ativos = db.ativos.filter(function(a){ return !(a && a.id && listaEnc[a.id]); });
+          if (db.ativos.length !== antes) {
+            console.warn('[SAVEDB] Removidos '+(antes-db.ativos.length)+' ativo(s) encerrado(s) antes de gravar.');
+          }
+        }
+        // PRESERVA a lista de encerrados no db (nunca sobrescreve com vazio)
+        db.encerrados = Object.assign({}, listaEnc, db.encerrados || {});
+        try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+        _gravarDbNoFirebase();
+      }, function(err){
+        // Se falhar a leitura da lista, grava mesmo assim (não trava o sistema)
+        console.warn('[SAVEDB] Não leu lista de encerrados, gravando direto:', err && err.message);
+        try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+        _gravarDbNoFirebase();
+      });
+      return; // a gravação real acontece no callback acima
+    }
+  } catch(e){ console.error('[SAVEDB] proteção encerrados:', e); }
 
-  // Salva no Firebase
+  // Salva no localStorage imediatamente (caso offline / sem firebase)
+  try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
+  _gravarDbNoFirebase();
+}
+
+// Função interna que faz a gravação do db no Firebase (chamada após limpar encerrados)
+function _gravarDbNoFirebase() {
   try {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && navigator.onLine) {
       _isSaving = true;
