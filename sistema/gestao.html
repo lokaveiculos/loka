@@ -1078,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v52-20260806-1127';
+var LOKA_BUILD = 'v53-20260806-1245';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -3779,6 +3779,8 @@ function renderFrota() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ano/Mod</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Alienado</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Locatário / Info</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Entrega</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">KM Entrega</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
     + '</tr></thead><tbody>'
     + list.map(function(v) {
@@ -3826,6 +3828,8 @@ function renderFrota() {
         '<td style="padding:9px 12px;text-align:center;font-size:11px">'+docAnoMod+'</td>'+
         '<td style="padding:9px 12px;text-align:center">'+docAlienado+'</td>'+
         '<td style="padding:9px 12px;font-size:11px">'+infoCell+'</td>'+
+        '<td style="padding:9px 12px;font-size:11px;text-align:center">'+(ativo && (ativo.dataEntrega||ativo.retirada) ? fmt(ativo.dataEntrega||ativo.retirada) : '—')+'</td>'+
+        '<td style="padding:9px 12px;font-size:11px;text-align:center">'+(ativo && ativo.kmEntrega ? ativo.kmEntrega : '—')+'</td>'+
         '<td style="padding:9px 12px"><div style="display:flex;gap:4px;justify-content:center">'+
           '<button class="icon-btn" onclick="openVeiculo(\''+v.id+'\')" title="Editar">✏️</button>'+
           '<button class="icon-btn" onclick="abrirPrecos(\''+v.id+'\')" title="Preços" style="color:#7c3aed;border-color:#7c3aed">💰</button>'+
@@ -3841,7 +3845,7 @@ function renderFrota() {
           (st==='alugado' ? '<button class="icon-btn" onclick="liberarVeiculo(\''+v.id+'\')" title="Forçar Disponível" style="color:#0d7a3e;border-color:#0d7a3e;font-size:10px;padding:3px 7px">🔓 Liberar</button>' : '')+
         '</div></td>'+
       '</tr>';
-      } catch(_e) { console.error('renderFrota row:', _e); return '<tr><td colspan="8" style="color:#c0392b;font-size:11px;padding:8px">⚠️ Linha com erro: ' + (_e.message||'') + '</td></tr>'; }
+      } catch(_e) { console.error('renderFrota row:', _e); return '<tr><td colspan="10" style="color:#c0392b;font-size:11px;padding:8px">⚠️ Linha com erro: ' + (_e.message||'') + '</td></tr>'; }
     }).join('')
     + '</tbody></table></div>';
 }
@@ -5026,7 +5030,7 @@ function finRenderBens() {
       + '</tr>';
   });
   if (!visiveis.length) {
-    html += '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhum bem encontrado para "'+q+'"</td></tr>';
+    html += '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhum bem encontrado para "'+q+'"</td></tr>';
   }
   html += '</tbody><tfoot><tr style="background:#EEF1FD"><td colspan="5" style="padding:9px 10px;font-weight:800;text-align:right;color:#0E1B4D">'+(q?'TOTAL FILTRADO':'TOTAL FINANCIADO')+'</td><td style="padding:9px 10px;text-align:right;font-weight:800;font-family:monospace;color:#0E1B4D">'+brl(q?totalFiltrado:totalGeral)+'</td><td colspan="2"></td></tr></tfoot>';
   html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">'+(q ? visiveis.length+' de '+rows.length+' veículos' : rows.length+' veículos')+'</div>';
