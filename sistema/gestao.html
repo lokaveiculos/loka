@@ -1078,7 +1078,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v50-20260806-1058';
+var LOKA_BUILD = 'v52-20260806-1127';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1276,16 +1276,30 @@ function loadDB() {
 
   function aplicarEncerrados(dados){
   try {
-    var lista = (dados && dados.encerrados) || {};
+    // FONTE 1: lista explícita de encerrados (loka_db/encerrados)
+    var lista = (dados && dados.encerrados) || (db && db.encerrados) || {};
     if (window._encerradosRecentes) {
       Object.keys(window._encerradosRecentes).forEach(function(id){ lista[id] = lista[id] || window._encerradosRecentes[id]; });
     }
-    if (db.ativos && Object.keys(lista).length) {
+    // FONTE 2: histórico — qualquer id que já foi para o histórico está encerrado.
+    // O histórico é permanente (nunca apagado), então é uma barreira à prova de falhas.
+    var histIds = {};
+    var hist = (dados && dados.historico) || (db && db.historico) || [];
+    (Array.isArray(hist) ? hist : Object.values(hist||{})).forEach(function(h){
+      if (h && h.id) histIds[h.id] = true;
+    });
+
+    if (db.ativos && (Object.keys(lista).length || Object.keys(histIds).length)) {
+      var removidos = 0;
       db.ativos = db.ativos.filter(function(a){
         if (!a || !a.id) return true;
-        if (lista[a.id]) { console.warn('[ENCERRADOS] '+a.id+' removido dos ativos (consta como encerrado).'); return false; }
+        if (lista[a.id] || histIds[a.id]) {
+          removidos++;
+          return false;
+        }
         return true;
       });
+      if (removidos > 0) console.warn('[ENCERRADOS] '+removidos+' ativo(s) removido(s) por constarem como encerrados (lista/histórico).');
     }
   } catch(e){ console.error('aplicarEncerrados:', e); }
 }
@@ -1316,7 +1330,7 @@ function inicializarCom(dados, origem) {
     // LIBERA a trava: dados carregados, agora pode gravar com segurança
     _dadosCarregados = true;
     // Ativar sincronização em tempo real
-    setupRealtimeSync();
+    setupRealtimeSync(); registrarVersaoAtual(); escutarVersao();
   }
 
   // 2. Tentar carregar do Firebase (protege contra localStorage vazio)
@@ -1400,7 +1414,7 @@ function inicializarCom(dados, origem) {
         }
         preencherCliSel(); checkAlertas(); showPanel('dashboard');
         // Ativar sincronização em tempo real
-        setupRealtimeSync();
+        setupRealtimeSync(); registrarVersaoAtual(); escutarVersao();
         return;
       }
 
@@ -1616,16 +1630,10 @@ function saveDB() {
         if (window._encerradosRecentes) {
           Object.keys(window._encerradosRecentes).forEach(function(id){ listaEnc[id] = listaEnc[id] || window._encerradosRecentes[id]; });
         }
-        // Remove dos ativos os que constam como encerrados
-        if (db.ativos && Object.keys(listaEnc).length) {
-          var antes = db.ativos.length;
-          db.ativos = db.ativos.filter(function(a){ return !(a && a.id && listaEnc[a.id]); });
-          if (db.ativos.length !== antes) {
-            console.warn('[SAVEDB] Removidos '+(antes-db.ativos.length)+' ativo(s) encerrado(s) antes de gravar.');
-          }
-        }
         // PRESERVA a lista de encerrados no db (nunca sobrescreve com vazio)
         db.encerrados = Object.assign({}, listaEnc, db.encerrados || {});
+        // Remove dos ativos (dupla barreira: lista + histórico)
+        aplicarEncerrados({ encerrados: db.encerrados, historico: db.historico });
         try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
         _gravarDbNoFirebase();
       }, function(err){
@@ -1670,6 +1678,108 @@ function _gravarDbNoFirebase() {
 
 // ── SINCRONIZAÇÃO EM TEMPO REAL ────────────────────────────────
 // Chamada uma vez após loadDB — escuta mudanças feitas por OUTROS usuários
+
+// ══════════════════════════════════════════════════════════════════
+// AUTO-ATUALIZAÇÃO — todos os usuários na mesma versão automaticamente
+// ══════════════════════════════════════════════════════════════════
+var _versaoAvisada = false;
+
+// Registra a versão desta sessão como a "mais recente" no Firebase.
+// Chamado ao carregar: quem abre por último com uma versão nova define o padrão.
+function registrarVersaoAtual(){
+  try {
+    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+    if (typeof LOKA_BUILD === 'undefined') return;
+    var ref = firebase.database().ref('loka_db/versaoAtual');
+    ref.once('value', function(snap){
+      var atual = snap.val();
+      // Se não há versão registrada, ou a minha é MAIS NOVA, registra a minha.
+      // Compara pela string do build (v51-... > v50-...).
+      if (!atual || _versaoMaisNova(LOKA_BUILD, atual)) {
+        ref.set(LOKA_BUILD);
+        console.log('[VERSÃO] Registrei esta versão como a mais recente: ' + LOKA_BUILD);
+      }
+    });
+  } catch(e){ console.error('registrarVersaoAtual:', e); }
+}
+
+// Retorna true se 'a' é mais nova que 'b' (compara vNN-data-hora)
+function _versaoMaisNova(a, b){
+  if (!b) return true;
+  if (!a) return false;
+  // extrai o número da versão (vNN) e a data-hora
+  function chave(v){
+    var m = String(v).match(/v(\d+)-(\d+)-(\d+)/);
+    if (m) return parseInt(m[1])*1e12 + parseInt(m[2])*1e6 + parseInt(m[3]);
+    return 0;
+  }
+  return chave(a) > chave(b);
+}
+
+// Escuta a versão mais recente. Se alguém publicar mais novo, avisa e atualiza.
+function escutarVersao(){
+  try {
+    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+    firebase.database().ref('loka_db/versaoAtual').on('value', function(snap){
+      var maisRecente = snap.val();
+      if (!maisRecente || typeof LOKA_BUILD === 'undefined') return;
+      // Se a versão mais recente é mais nova que a minha, estou desatualizado
+      if (_versaoMaisNova(maisRecente, LOKA_BUILD) && !_versaoAvisada) {
+        _versaoAvisada = true;
+        console.warn('[VERSÃO] Nova versão disponível: ' + maisRecente + ' (estou em ' + LOKA_BUILD + ')');
+        mostrarAvisoAtualizacao(maisRecente);
+      }
+    });
+  } catch(e){ console.error('escutarVersao:', e); }
+}
+
+// Mostra o aviso de atualização com contagem regressiva (atualiza sozinho ao fim)
+function mostrarAvisoAtualizacao(novaVersao){
+  // Evita duplicar
+  if (document.getElementById('avisoAtualizacao')) return;
+
+  var SEGUNDOS = 20;  // tempo antes de atualizar sozinho
+  var overlay = document.createElement('div');
+  overlay.id = 'avisoAtualizacao';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(14,27,77,.55);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)';
+
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:16px;max-width:420px;width:90%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center;font-family:system-ui,-apple-system,sans-serif">'
+    + '<div style="font-size:42px;margin-bottom:8px">🔄</div>'
+    + '<h2 style="margin:0 0 8px;color:#0E1B4D;font-size:20px">Nova versão disponível!</h2>'
+    + '<p style="margin:0 0 4px;color:#5a607a;font-size:14px">Uma atualização do sistema foi publicada.</p>'
+    + '<p style="margin:0 0 18px;color:#9099bf;font-size:12px">Atualizando automaticamente em <b id="avisoContador" style="color:#2B4BF2">'+SEGUNDOS+'</b>s</p>'
+    + '<button id="btnAtualizarAgora" style="background:#2B4BF2;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;width:100%">Atualizar agora</button>'
+    + '<div style="margin-top:10px"><button id="btnAdiarAtualizacao" style="background:none;border:none;color:#9099bf;font-size:12px;cursor:pointer;text-decoration:underline">Adiar por 1 minuto</button></div>'
+    + '</div>';
+
+  document.body.appendChild(overlay);
+
+  function atualizar(){
+    // força buscar a versão nova do servidor (ignora cache)
+    var url = window.location.href.split('?')[0].split('#')[0];
+    window.location.replace(url + '?v=' + Date.now());
+  }
+
+  document.getElementById('btnAtualizarAgora').onclick = atualizar;
+
+  var restante = SEGUNDOS;
+  var timer = setInterval(function(){
+    restante--;
+    var c = document.getElementById('avisoContador');
+    if (c) c.textContent = restante;
+    if (restante <= 0) { clearInterval(timer); atualizar(); }
+  }, 1000);
+
+  document.getElementById('btnAdiarAtualizacao').onclick = function(){
+    clearInterval(timer);
+    var ov = document.getElementById('avisoAtualizacao');
+    if (ov) ov.remove();
+    // Volta a avisar depois de 1 minuto
+    setTimeout(function(){ _versaoAvisada = false; escutarVersao(); }, 60000);
+  };
+}
+
 function setupRealtimeSync() {
   if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
 
@@ -1720,25 +1830,8 @@ function setupRealtimeSync() {
     db = fbData;
     normalizarDB();  // converte todos os arrays de uma vez
     db.veiculos  = cleanVeics(db.veiculos);
-    // ANTI-RESSURREIÇÃO DEFINITIVA: remove dos ativos qualquer aluguel que esteja
-    // na lista de encerrados do Firebase (persistente, vale para todos os aparelhos).
-    try {
-      var listaEnc = (fbData && fbData.encerrados) || {};
-      // Junta com os encerrados recentes em memória (redundância de segurança)
-      if (window._encerradosRecentes) {
-        Object.keys(window._encerradosRecentes).forEach(function(id){ listaEnc[id] = listaEnc[id] || window._encerradosRecentes[id]; });
-      }
-      if (db.ativos && Object.keys(listaEnc).length) {
-        db.ativos = db.ativos.filter(function(a){
-          if (!a || !a.id) return true;
-          if (listaEnc[a.id]) {
-            console.warn('[ANTI-RESSURREIÇÃO] Aluguel '+a.id+' está na lista de encerrados; removido dos ativos.');
-            return false;
-          }
-          return true;
-        });
-      }
-    } catch(e){ console.error('anti-ressurreição:', e); }
+    // ANTI-RESSURREIÇÃO: usa a função robusta (cruza lista de encerrados E histórico)
+    aplicarEncerrados(fbData);
     // Atualiza contagens saudáveis do guarda (o Firebase é fonte de verdade aqui)
     try {
       if (typeof _ultimasContagens !== 'undefined') {
