@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v65-20260807-1425 -->
+<!-- LOKA deploy: v66-20260807-1425 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -206,22 +206,21 @@ tr.vsel .veic-fin { pointer-events: auto; }
   @page { size: A4 portrait; margin: 10mm 8mm; }
   body { background: #fff !important; padding: 0 !important; font-size: 11px !important; min-height: 0 !important; height: auto !important; }
   html { height: auto !important; }
-  /* ── Controle de quebra de página ── */
+  /* ── Controle de quebra de página (impressão multi-página) ── */
   html, body { height: auto !important; min-height: 0 !important; }
-  .fatura { min-height: 0 !important; height: auto !important; page-break-after: avoid !important; }
-  .fatura-body { min-height: 0 !important; }
-  .sec { page-break-inside: auto !important; }   /* seção grande pode dividir entre páginas */
-  .veic-table-wrap { page-break-inside: auto !important; }
-  .veic-table tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+  /* overflow:hidden nos containers impede o navegador de paginar → deixa espaço em branco.
+     Aqui liberamos o overflow para o conteúdo fluir entre as páginas. */
+  .fatura, .fatura-body, #veiculosArea, .veic-table-wrap {
+    overflow: visible !important; height: auto !important; min-height: 0 !important;
+  }
+  .fatura { page-break-after: auto !important; }
+  /* Tabela de veículos flui naturalmente entre as páginas */
+  .veic-table { page-break-inside: auto !important; }
   .veic-table thead { display: table-header-group !important; }
-  /* nada depois do rodapé força nova página */
-  .fatura-footer { page-break-after: avoid !important; page-break-inside: avoid !important; }
-  body > *:last-child, .fatura > *:last-child { page-break-after: avoid !important; margin-bottom: 0 !important; }
-
-  /* Evitar página em branco no final */
-  .fatura, .fatura-body, .fatura-footer, .sec { page-break-after: auto !important; }
-  .fatura:last-child, .sec:last-child { page-break-after: avoid !important; }
-  *:last-child { page-break-after: avoid !important; }
+  .veic-table tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+  /* Seções podem fluir; blocos pequenos permanecem inteiros */
+  .sec { page-break-inside: auto !important; }
+  .fin-table, .fin-row-total, #jurosMultaBox, .fatura-footer { page-break-inside: avoid !important; }
 
   /* Ocultar elementos de UI */
   .action-bar, .cli-search-wrap, .veic-search-bar, .add-outro,
@@ -302,9 +301,7 @@ tr.vsel .veic-fin { pointer-events: auto; }
   .fin-table td { padding: 6px 8px !important; }
   .fin-row-total td { padding: 8px !important; font-size: 13px !important; }
 
-  /* Quebras de página */
-  .veic-table-wrap { page-break-inside: avoid; }
-  .sec { page-break-inside: avoid; }
+  /* (regras de quebra de página consolidadas no topo deste bloco @media print) */
 
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
@@ -426,6 +423,7 @@ textarea.input {
   <button class="btn btn-outline" onclick="limparFatura()">🗑 Limpar</button>
   <button class="btn btn-outline" onclick="window.print()">🖨 Imprimir</button>
   <button class="btn btn-primary" onclick="salvarFatura()">💾 Salvar Fatura</button>
+  <button class="btn btn-green" onclick="salvarContaReceber()">📥 Salvar no Contas a Receber</button>
 </div>
 
 <div class="fatura">
@@ -1469,6 +1467,79 @@ function salvarFatura() {
       status('✅ Fatura salva (offline)!', '#0d7a3e');
     }
   } catch(e) { status('❌ Erro: '+e.message, '#c0392b'); }
+}
+
+// ── SALVAR NO CONTAS A RECEBER ────────────────────────────────
+function salvarContaReceber() {
+  if (typeof calcTotal === 'function') calcTotal();
+
+  var num = document.getElementById('faturaNum').value;
+  var cli = _clienteSelecionado;
+  var veics = Array.from(_veicSelecionados).map(function(i){return _veicExibidos[i];}).filter(Boolean);
+
+  // Total: usa a composição; se vier zerado, cai para o total dos veículos
+  var totalNum = parseBRL(document.getElementById('totalDisplay').textContent);
+  if (totalNum <= 0 && typeof calcTotalVeic === 'function') totalNum = calcTotalVeic();
+
+  if (!cli)          { status('⚠️ Selecione um cliente antes de salvar', '#b45309'); return; }
+  if (!num)          { status('⚠️ Informe o número da fatura', '#b45309'); return; }
+  if (!veics.length) { status('⚠️ Selecione ao menos um veículo', '#b45309'); return; }
+  if (totalNum <= 0) { status('⚠️ O total deve ser maior que zero', '#b45309'); return; }
+
+  var periodo = document.getElementById('periodoRef').value || '';
+  var nomeMes = periodo ? new Date(periodo+'-01').toLocaleString('pt-BR',{month:'long',year:'numeric'}) : periodo;
+
+  // Chave determinística: mesmo cliente + nº fatura + período = mesmo registro (evita duplicar)
+  var sanit = function(s){ return String(s||'').replace(/[.#$\[\]\/]/g,'-'); };
+  var contaId = sanit(cli.id || 'sem_cliente') + '_' + sanit(num) + '_' + sanit(periodo || 'sp');
+
+  var conta = {
+    id: contaId,
+    tipo: 'receber',
+    origem: 'fatura',
+    faturaNumero: num,
+    faturaId: _editandoFaturaId || null,
+    descricao: 'Fatura #' + num + (nomeMes ? ' — ' + nomeMes : ''),
+    cliente: cli.nome,
+    clienteId: cli.id || null,
+    documento: cli.cpf || '',          // CPF ou CNPJ
+    telefone: cli.telefone || '',
+    referencia: periodo,
+    emissao: document.getElementById('dataEmissao').value,
+    vencimento: document.getElementById('dataVenc').value,
+    formaPagamento: document.getElementById('fatPgto').value,
+    status: document.getElementById('fatStatus').value,   // pendente | pago | vencido | parcial
+    valor: totalNum,                    // numérico, para somatórios no gestão
+    valorFmt: fmtBRL(totalNum),
+    qtdVeiculos: veics.length,
+    placas: veics.map(function(v){ return v.placa; }),
+    obs: (document.getElementById('fatObs')||{}).value || '',
+    criadoEm: new Date().toISOString()
+  };
+
+  var path = 'contasReceber/' + contaId;
+
+  if (!db) {
+    // Fallback offline
+    var list = JSON.parse(localStorage.getItem('loka_contas_receber')||'[]');
+    list = list.filter(function(c){ return c.id !== contaId; });
+    list.unshift(conta);
+    localStorage.setItem('loka_contas_receber', JSON.stringify(list));
+    status('✅ Conta a receber salva (offline)!', '#0d7a3e');
+    return;
+  }
+
+  db.ref(path).once('value').then(function(snap){
+    if (snap.exists()) {
+      if (!confirm('Já existe uma conta a receber para a Fatura #'+num+' de '+cli.nome+'.\nDeseja atualizar o valor para '+fmtBRL(totalNum)+'?')) {
+        status('Operação cancelada.', '#6b7280');
+        return;
+      }
+    }
+    db.ref(path).set(conta).then(function(){
+      status('✅ Lançado no Contas a Receber: '+fmtBRL(totalNum)+' · venc. '+fmtDate(conta.vencimento), '#0d7a3e');
+    }).catch(function(e){ status('❌ Erro Firebase: '+e.message, '#c0392b'); });
+  }).catch(function(e){ status('❌ Erro ao verificar: '+e.message, '#c0392b'); });
 }
 
 function status(msg, color) {
