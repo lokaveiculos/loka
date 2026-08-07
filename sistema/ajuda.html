@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v60-20260806-2248 -->
+<!-- LOKA deploy: v61-20260807-1301 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ajuda — Sistema LOKÁ</title>
@@ -188,6 +188,17 @@
 <tr><td>manutenção</td><td>Na oficina</td></tr>
 <tr><td>inativo</td><td>Fora de operação (botão inativar/reativar)</td></tr>
 </table>
+</div>
+
+<h3>Botão 🔓 Liberar</h3>
+<p>Disponível nas telas Veículos e Frota Ativa, para quando o veículo volta. O sistema identifica a situação sozinho:</p>
+<table>
+<tr><th>Situação</th><th>O que acontece</th></tr>
+<tr><td>Veículo com <b>aluguel ativo</b></td><td>Abre a tela de <b>encerramento</b> já preenchida: informe a <b>data de devolução</b> e o <b>KM</b>. O contrato vai para o histórico, o veículo fica disponível e o KM é atualizado no cadastro.</td></tr>
+<tr><td>Veículo em <b>contrato com várias placas</b></td><td>Retira <b>apenas aquela placa</b> do contrato e libera o veículo. O contrato segue ativo com as demais placas.</td></tr>
+<tr><td>Veículo <b>sem aluguel</b> (status errado)</td><td>Apenas corrige o status para Disponível.</td></tr>
+</table>
+<div class="dica box">O KM atual do veículo já vem sugerido no campo — confira e ajuste se necessário, pois ele atualiza o cadastro do veículo.</div>
 </div>
 
 <div class="tela" id="frota">

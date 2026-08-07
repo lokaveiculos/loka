@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v60-20260806-2248 -->
+<!-- LOKA deploy: v61-20260807-1301 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1100,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v60-20260806-2248';
+var LOKA_BUILD = 'v61-20260807-1301';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -3209,8 +3209,16 @@ function confirmarEnc() {
       obs: document.getElementById('encObs').value,
       encerradoEm: new Date().toISOString()
     }));
-    var vIdx = db.veiculos.findIndex(function(v){return v && v.id===a.veiculoId;});
+    var _npl = function(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
+    var vIdx = db.veiculos.findIndex(function(v){return v && a.veiculoId && v.id===a.veiculoId;});
+    if (vIdx < 0 && a.placa) {   // fallback: casa pela placa (contratos sem veiculoId)
+      vIdx = db.veiculos.findIndex(function(v){ return v && _npl(v.placa)===_npl(a.placa); });
+    }
+    if (vIdx < 0 && _liberarVeicPendente) {   // fallback: veículo que originou o "Liberar"
+      vIdx = db.veiculos.findIndex(function(v){ return v && v.id===_liberarVeicPendente; });
+    }
     if (vIdx>=0) { db.veiculos[vIdx].status='disponivel'; var km=document.getElementById('encKm').value; if(km) db.veiculos[vIdx].km=km; }
+    _liberarVeicPendente = null;
     db.ativos.splice(idx,1);
     // Registra o encerramento em memória
     if (!window._encerradosRecentes) window._encerradosRecentes = {};
@@ -3697,27 +3705,62 @@ function excluirVeiculo() {
 
 // ── LIBERAR VEÍCULO (forçar status para disponível) ─────────
 function liberarVeiculo(vId) {
-  var v = (db.veiculos||[]).find(function(x){ return x.id===vId; });
+  garantirArray('ativos'); garantirArray('veiculos');
+  var v = (db.veiculos||[]).find(function(x){ return x && x.id===vId; });
   if (!v) return;
-  // Verificar se há ativo vinculado
+
+  var _np = function(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
+  var placaV = _np(v.placa);
+
+  // Procura o aluguel ativo do veículo (por id OU por placa, inclusive contratos multi-veículo)
   var ativo = (db.ativos||[]).find(function(a){
-    return a && (a.placa===v.placa || a.veiculoId===vId);
+    if (!a) return false;
+    if (a.veiculoId && a.veiculoId===vId) return true;
+    if (a.placa && _np(a.placa)===placaV) return true;
+    if (a.placas && a.placas.some(function(p){ return _np(p)===placaV; })) return true;
+    return false;
   });
-  var aviso = ativo
-    ? '⚠️ ATENÇÃO: Este veículo está vinculado ao aluguel de '+ativo.clienteNome+'.\n\nForçar liberação irá apenas alterar o status — o registro de aluguel continua ativo.\n\n'
-    : '';
-  if (!confirm(aviso+'Liberar o veículo '+v.marca+' '+v.modelo+' ('+v.placa+')?\nStatus será alterado para Disponível.')) return;
-  var idx = db.veiculos.findIndex(function(x){ return x.id===vId; });
-  if (idx >= 0) {
-    db.veiculos[idx].status = 'disponivel';
-    saveDB();
-    renderVeiculos();
-    renderFrota();
-    renderDashboard();
-    toast('✅ '+v.placa+' liberado — status: Disponível','#0d7a3e');
+
+  // ── SEM aluguel vinculado: apenas corrige o status ──
+  if (!ativo) {
+    if (!confirm('Liberar o veículo '+v.marca+' '+v.modelo+' ('+v.placa+')?\n\nNão há aluguel ativo vinculado — o status passará para Disponível.')) return;
+    var idx0 = db.veiculos.findIndex(function(x){ return x && x.id===vId; });
+    if (idx0 >= 0) {
+      db.veiculos[idx0].status = 'disponivel';
+      saveDB(); renderVeiculos(); renderFrota(); renderDashboard();
+      toast('✅ '+v.placa+' liberado — status: Disponível','#0d7a3e');
+    }
+    return;
   }
+
+  // ── Contrato multi-veículo: retira SÓ esta placa, mantém o contrato ──
+  var nPlacas = (ativo.placas||[]).length;
+  if (nPlacas > 1) {
+    if (!confirm('O veículo '+v.placa+' faz parte de um contrato com '+nPlacas+' placas ('+ativo.clienteNome+').\n\nRetirar apenas esta placa do contrato e liberar o veículo?\n(O contrato continua ativo com as demais placas.)')) return;
+    var aIdx = db.ativos.findIndex(function(x){ return x && x.id===ativo.id; });
+    if (aIdx >= 0) {
+      db.ativos[aIdx].placas = (db.ativos[aIdx].placas||[]).filter(function(p){ return _np(p)!==placaV; });
+      if (_np(db.ativos[aIdx].placa)===placaV) db.ativos[aIdx].placa = db.ativos[aIdx].placas[0] || '';
+    }
+    var vIdx2 = db.veiculos.findIndex(function(x){ return x && x.id===vId; });
+    if (vIdx2 >= 0) db.veiculos[vIdx2].status = 'disponivel';
+    saveDB(); renderVeiculos(); renderFrota(); renderAtivos(); renderDashboard();
+    toast('✅ '+v.placa+' retirada do contrato e liberada','#0d7a3e');
+    return;
+  }
+
+  // ── Aluguel individual: abre o encerramento completo (data, KM, condição, valor) ──
+  _liberarVeicPendente = vId;
+  openEncerramento(ativo.id);
+  setTimeout(function(){
+    var ek = document.getElementById('encKm');
+    if (ek && !ek.value && v.km) ek.value = v.km;   // sugere o KM atual do veículo
+    var ei = document.getElementById('encInfo');
+    if (ei) ei.innerHTML += '<br><span style="color:#2B4BF2;font-weight:700">Liberando o veículo '+v.placa+' — informe a data e o KM da devolução.</span>';
+  }, 120);
 }
 
+var _liberarVeicPendente = null;
 
 function inativarVeiculo(vId) {
   var idx = db.veiculos.findIndex(function(v){return v.id===vId;});
