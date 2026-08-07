@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v62-20260807-1325 -->
+<!-- LOKA deploy: v63-20260807-1333 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -1472,6 +1472,31 @@ function limparFatura() {
   document.getElementById('totalDisplay').textContent = 'R$ 0,00';
   document.getElementById('resumoBox').style.display = 'none';
 }
+
+// ── Detecta nova publicação e recarrega sozinho (evita ficar preso em cache) ──
+(function(){
+  if (location.protocol === 'file:') return;
+  var carimbo = null, avisado = false;
+  function checar(){
+    if (avisado) return;
+    fetch(location.pathname + '?vchk=' + Date.now(), {method:'HEAD', cache:'no-store'})
+      .then(function(r){
+        if (!r.ok) return;
+        var c = r.headers.get('etag') || r.headers.get('last-modified') || '';
+        if (!c) return;
+        if (carimbo === null) { carimbo = c; return; }
+        if (c !== carimbo) {
+          avisado = true;
+          console.log('[FATURA] Nova versão publicada — recarregando.');
+          location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+        }
+      }).catch(function(){});
+  }
+  checar();
+  setInterval(checar, 5*60*1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) checar(); });
+})();
+
 </script>
 
 </body>

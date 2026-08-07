@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v62-20260807-1325 -->
+<!-- LOKA deploy: v63-20260807-1333 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -442,7 +442,7 @@ tr:hover td{background:#f8f9fe;}
           <button id="fFatAvencer"  class="btn btn-outline" onclick="setFiltroFaturas('pendente')" style="font-size:11px;padding:7px 12px">⏳ A Vencer</button>
           <button id="fFatPagas"    class="btn btn-outline" onclick="setFiltroFaturas('pago')"      style="font-size:11px;padding:7px 12px">✅ Pagas</button>
         </div>
-        <button class="btn btn-blue" onclick="window.open('fatura.html','_blank')" style="white-space:nowrap">+ Nova Fatura</button>
+        <button class="btn btn-blue" onclick="window.open('fatura.html?v='+Date.now(),'_blank')" style="white-space:nowrap">+ Nova Fatura</button>
       </div>
 
       <div class="stats" id="faturasStats" style="margin-bottom:12px"></div>
@@ -1100,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v62-20260807-1325';
+var LOKA_BUILD = 'v63-20260807-1333';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4334,14 +4334,14 @@ function darBaixaFatura(fatId, cliId) {
 function editarFatura(fatId, cliId) {
   if (!fatId) return;
   // Abrir a tela de fatura em modo edição, passando cliente e id da fatura
-  var url = 'fatura.html?edit=' + encodeURIComponent(fatId) + '&cli=' + encodeURIComponent(cliId||'');
+  var url = 'fatura.html?v=' + Date.now() + '&edit=' + encodeURIComponent(fatId) + '&cli=' + encodeURIComponent(cliId||'');
   window.open(url, '_blank');
 }
 
 // ── CONSULTAR FATURA (abrir salva p/ visualizar/imprimir) ──────
 function consultarFatura(fatId, cliId) {
   if (!fatId) return;
-  var url = 'fatura.html?view=' + encodeURIComponent(fatId) + '&cli=' + encodeURIComponent(cliId||'');
+  var url = 'fatura.html?v=' + Date.now() + '&view=' + encodeURIComponent(fatId) + '&cli=' + encodeURIComponent(cliId||'');
   window.open(url, '_blank');
 }
 
