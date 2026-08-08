@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v65-20260807-1425 -->
+<!-- LOKA deploy: v67-20260807-1425 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -452,7 +452,7 @@ tr:hover td{background:#f8f9fe;}
 
     <!-- ══ MANUTENÇÃO ══ -->
     <div class="panel" id="panel-manutencao" style="display:none;width:100%">
-      <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+      <div class="toolbar" id="manutToolbar" style="flex-wrap:wrap;gap:8px">
         <div class="search-box" style="flex:1;min-width:200px">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input class="filter-input" id="qManut" type="text" placeholder="Buscar veículo, placa, oficina..." oninput="renderManutencao()">
@@ -470,7 +470,7 @@ tr:hover td{background:#f8f9fe;}
           <input class="filter-input" id="fManutDataFim" type="date" onchange="renderManutencao()" style="width:140px;padding:5px">
           <button onclick="limparFiltroDataManut()" title="Limpar datas" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
         </div>
-        <button class="btn btn-blue" onclick="openManutRegistro(null)">+ Nova Manutenção</button>
+        <button class="btn btn-blue" id="btnNovaManut" onclick="openManutRegistro(null)">+ Nova Manutenção</button>
         <button class="btn btn-outline" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
         <button class="btn btn-outline" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
         <button class="btn" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioManutencao()" title="Gerar relatório por placa para imprimir ou salvar em PDF">📄 Relatório PDF</button>
@@ -1100,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v65-20260807-1425';
+var LOKA_BUILD = 'v67-20260807-1425';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1171,18 +1171,110 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
-function showPanel(name) {
-  // Bloqueio de acesso: financeiro e frota só admin/master
-  if (name === 'financeiro' || name === 'frota') {
-    var _p = '';
-    try {
-      var _u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
-      _p = (_u.perfil || '').toLowerCase();
-    } catch(e) {}
-    if (_p !== 'admin' && _p !== 'master') {
-      toast('🔒 Acesso restrito a Administradores','#c0392b');
-      return;
+// ── PERFIS DE ACESSO / PERMISSÕES ──────────────────────────────
+function _perfilAtual() {
+  try { return (JSON.parse(sessionStorage.getItem('loka_user')||'{}').perfil||'').toLowerCase(); }
+  catch(e) { return ''; }
+}
+
+// Todos os painéis controláveis por permissão
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+// Rótulos amigáveis (usados no editor de perfis)
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _ACAO_LABEL   = {editarPrecos:'Editar preços dos veículos',gerenciarUsuarios:'Gerenciar usuários',gerenciarPerfis:'Gerenciar perfis de acesso',verRelatorio:'Ver Relatório mensal',manutencaoSoIncluir:'Manutenção: somente incluir (não vê a lista)'};
+
+// Perfis EMBUTIDOS (fallback — sempre existem, não podem ser excluídos)
+var _PERFIS_BUILTIN = {
+  master:   { nome:'Master',   builtin:true, paineis:_TODOS_PAINEIS.slice(),
+              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true,  manutencaoSoIncluir:false } },
+  admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
+              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true,  manutencaoSoIncluir:false } },
+  operador: { nome:'Operador', builtin:true,
+              paineis:['dashboard','clientes','ativos','veiculos','faturas','manutencao','fornecedores','multas','formularios','contratos','historico','reserva','cadastro'],
+              acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true,  manutencaoSoIncluir:false } },
+  oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
+              acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:false, manutencaoSoIncluir:true } }
+};
+
+// Perfis PERSONALIZADOS (carregados do Firebase: loka_perfis) — podem sobrescrever embutidos
+var _perfisCustom = {};
+
+function _getPerfilDef(chave) {
+  chave = (chave||'').toLowerCase();
+  var base = _PERFIS_BUILTIN[chave];
+  var cust = _perfisCustom[chave];
+  if (base && cust) {
+    return { nome: cust.nome||base.nome, builtin:true, chave:chave,
+             paineis: cust.paineis || base.paineis,
+             acoes: Object.assign({}, base.acoes, cust.acoes||{}) };
+  }
+  if (cust)  return { nome: cust.nome||chave, builtin:false, chave:chave, paineis: cust.paineis||[], acoes: cust.acoes||{} };
+  if (base)  return Object.assign({chave:chave}, base);
+  // Perfil desconhecido → acesso mínimo (apenas dashboard)
+  return { nome: chave||'—', builtin:false, chave:chave, paineis:['dashboard'], acoes:{} };
+}
+// Lista de perfis disponíveis (embutidos + personalizados), sem duplicar
+function _listaPerfis() {
+  var chaves = Object.keys(_PERFIS_BUILTIN);
+  Object.keys(_perfisCustom).forEach(function(k){ if (chaves.indexOf(k)<0) chaves.push(k); });
+  return chaves.map(_getPerfilDef);
+}
+function _permsAtual(){ return _getPerfilDef(_perfilAtual()); }
+function _podePainel(name){ return _permsAtual().paineis.indexOf(name) >= 0; }
+function _podeAcao(a){ return !!((_permsAtual().acoes||{})[a]); }
+function _soIncluirManutencao(){ return _podeAcao('manutencaoSoIncluir'); }
+function _isOficina(){ return _perfilAtual()==='oficina'; } // compat.
+
+// Aplica as permissões na interface (menu, botões) conforme o perfil logado
+function _aplicarPermissoesUI() {
+  var def = _permsAtual();
+  _TODOS_PAINEIS.forEach(function(p){
+    var ni = document.getElementById('ni-'+p);
+    if (ni) ni.style.display = (def.paineis.indexOf(p)>=0) ? 'flex' : 'none';
+  });
+  var niRel = document.getElementById('ni-relatorio');
+  if (niRel) niRel.style.display = (def.acoes && def.acoes.verRelatorio) ? 'flex' : 'none';
+  var bGU = document.getElementById('btnGerUsers');
+  if (bGU) bGU.style.display = (def.acoes && def.acoes.gerenciarUsuarios) ? 'inline-block' : 'none';
+  // Perfil "somente incluir manutenção": limpa a toolbar e a busca global
+  if (def.acoes && def.acoes.manutencaoSoIncluir) {
+    var gs = document.getElementById('gsWrap'); if (gs) gs.style.display = 'none';
+    var tb = document.getElementById('manutToolbar');
+    if (tb) Array.prototype.forEach.call(tb.children, function(c){ c.style.display='none'; });
+    var bnm = document.getElementById('btnNovaManut'); if (bnm) bnm.style.display='inline-flex';
+  }
+  // Se o painel visível não é permitido a este perfil, redireciona para um liberado
+  var _vis = document.querySelector('.panel[style*="block"]');
+  if (_vis) {
+    var _atual = _vis.id.replace('panel-','');
+    if (def.paineis.indexOf(_atual) < 0) {
+      var _dest = (def.paineis.indexOf('dashboard')>=0) ? 'dashboard' : (def.paineis[0]||null);
+      if (_dest && _dest !== _atual) showPanel(_dest);
     }
+  }
+}
+
+// Carrega perfis personalizados do Firebase e reaplica as permissões
+function _carregarPerfis(cb) {
+  if (!firebase || !firebase.apps || !firebase.apps.length) { if(cb) cb(); return; }
+  firebase.database().ref('loka_perfis').once('value').then(function(snap){
+    var v = snap.val() || {};
+    // aceita array ou objeto
+    _perfisCustom = {};
+    if (Array.isArray(v)) v.forEach(function(p){ if(p&&p.chave) _perfisCustom[p.chave.toLowerCase()] = p; });
+    else Object.keys(v).forEach(function(k){ var p=v[k]; if(p) _perfisCustom[(p.chave||k).toLowerCase()] = p; });
+    _aplicarPermissoesUI();
+    if (cb) cb();
+  }).catch(function(){ if(cb) cb(); });
+}
+
+function showPanel(name) {
+  // Controle de acesso por perfil (orientado a dados)
+  if (!_podePainel(name)) {
+    var perm = _permsAtual().paineis || [];
+    var destino = (perm.indexOf('dashboard')>=0) ? 'dashboard' : (perm[0]||null);
+    if (destino && destino !== name) return showPanel(destino);
+    return; // perfil sem painel liberado
   }
   // Mostra/oculta painéis
   for (var i = 0; i < PANELS.length; i++) {
@@ -1238,17 +1330,10 @@ window.addEventListener('DOMContentLoaded', function() {
     if (el) el.textContent = (u.nome || 'LOKÁ') + ' · ' + (u.perfil || '').toUpperCase();
     var p = document.getElementById('userPill');
     if (p) p.textContent = u.nome || 'Usuário';
-    // Frota Ativa: visível apenas para admin e master
-    var _perfil = (u.perfil || '').toLowerCase();
-    // Frota Ativa: visível apenas para admin e master
-    var _niFrota = document.getElementById('ni-frota');
-    if (_niFrota && (_perfil === 'admin' || _perfil === 'master')) _niFrota.style.display = 'flex';
-    // Botão Gerenciar Usuários: só para admin e master
-    var _btnGU = document.getElementById('btnGerUsers');
-    if (_btnGU && (_perfil === 'admin' || _perfil === 'master')) _btnGU.style.display = 'inline-block';
-    // Financeiro: visível apenas para admin e master
-    var _niFin = document.getElementById('ni-financeiro');
-    if (_niFin && (_perfil === 'admin' || _perfil === 'master')) _niFin.style.display = 'flex';
+    // Aplica permissões do perfil na interface (menu, botões, toolbar)
+    _aplicarPermissoesUI();
+    // Carrega perfis personalizados e reaplica (caso o usuário use um perfil custom)
+    _carregarPerfis();
   } catch(e) {}
   // Fecha modal ao clicar no fundo
   document.addEventListener('click', function(e) {
@@ -3553,12 +3638,8 @@ function excluirReserva(n) {
 var _precosVId = null;
 
 function abrirPrecos(vId) {
-  // Verificar se é admin ou master (operador não pode editar preços)
-  try {
-    var u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
-    var pf = (u.perfil || '').toLowerCase();
-    if (pf !== 'admin' && pf !== 'master') { toast('⚠️ Apenas Admin e Master podem editar preços', '#b45309'); return; }
-  } catch(e) {}
+  // Permissão: editar preços dos veículos
+  if (!_podeAcao('editarPrecos')) { toast('⚠️ Seu perfil não permite editar preços', '#b45309'); return; }
   _precosVId = vId;
   var v = db.veiculos.find(function(x){return x.id===vId;}) || {};
   document.getElementById('mPrecosNome').textContent = v.marca + ' ' + v.modelo + ' · ' + v.placa;
@@ -3782,13 +3863,27 @@ function inativarVeiculo(vId) {
 var _usuariosFirebase = [];
 
 function abrirGerenciarUsuarios() {
-  var perfil = '';
-  try { perfil = (JSON.parse(sessionStorage.getItem('loka_user')||'{}')).perfil || ''; } catch(e) {}
-  if (perfil !== 'admin' && perfil !== 'master') {
-    toast('⚠️ Acesso restrito a Admin e Master', '#c0392b'); return;
+  if (!_podeAcao('gerenciarUsuarios')) {
+    toast('⚠️ Seu perfil não permite gerenciar usuários', '#c0392b'); return;
   }
+  _carregarPerfis(function(){ _preencherSelectPerfis(); });
+  _preencherSelectPerfis();
   carregarUsuarios();
+  // Mostra/oculta o botão "Perfis de Acesso" conforme permissão
+  var bp = document.getElementById('btnGerPerfis');
+  if (bp) bp.style.display = _podeAcao('gerenciarPerfis') ? 'inline-block' : 'none';
   openM('mUsuarios');
+}
+
+// Preenche o <select> de perfil do formulário de usuário com todos os perfis disponíveis
+function _preencherSelectPerfis() {
+  var sel = document.getElementById('uPerfil');
+  if (!sel) return;
+  var atual = sel.value;
+  sel.innerHTML = _listaPerfis().map(function(p){
+    return '<option value="'+p.chave+'">'+p.nome+(p.builtin?'':' (personalizado)')+'</option>';
+  }).join('');
+  if (atual) sel.value = atual;
 }
 
 function carregarUsuarios() {
@@ -3807,12 +3902,24 @@ function renderUsuarios() {
   var todos = _usuariosFirebase.slice();
   if (!todos.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">Nenhum usuário adicional criado. Os usuários padrão (rogel, admin, equipe) são gerenciados no arquivo index.html.</p>'; return; }
 
-  var perfilBadge = {master:'bb', admin:'bg', operador:'bm'};
+  // Consulta/filtro
+  var _bq = (document.getElementById('uBusca')||{}).value || '';
+  _bq = _bq.trim().toLowerCase();
+  var _totalGeral = todos.length;
+  if (_bq) todos = todos.filter(function(u){
+    return ((u.usuario||'')+' '+(u.nome||'')+' '+(u.perfil||'')).toLowerCase().indexOf(_bq) >= 0;
+  });
+  if (!todos.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">Nenhum usuário encontrado para “'+_bq+'”.</p>'; return; }
+
+  // Mantém o índice REAL no array (para editar/excluir) mesmo com filtro
+  var perfilBadge = {master:'bb', admin:'bg', operador:'bm', oficina:'bm'};
   el.innerHTML = '<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:4px">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
     + '<thead><tr style="background:#0E1B4D"><th style="padding:8px 12px;text-align:left;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Usuário</th><th style="padding:8px 12px;color:#fff;font-size:9px">Nome</th><th style="padding:8px 12px;color:#fff;font-size:9px">Perfil</th><th style="padding:8px 12px;color:#fff;font-size:9px">Ações</th></tr></thead>'
     + '<tbody>'
-    + todos.map(function(u, n) {
+    + todos.map(function(u) {
+      // Índice REAL no array _usuariosFirebase (garante editar/excluir corretos com filtro)
+      var n = _usuariosFirebase.indexOf(u);
       return '<tr style="border-bottom:1px solid #f0f2f8">'
         + '<td style="padding:8px 12px;font-weight:700">'+u.usuario+'</td>'
         + '<td style="padding:8px 12px">'+u.nome+'</td>'
@@ -3823,7 +3930,10 @@ function renderUsuarios() {
           + '<button class="icon-btn" onclick="resetarSenha('+n+')" title="Alterar Senha">🔑</button>'
         + '</div></td></tr>';
     }).join('')
-    + '</tbody></table></div>';
+    + '</tbody></table>'
+    + '<div style="padding:6px 12px;background:#f8f9ff;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">'
+      + (_bq ? todos.length+' de '+_totalGeral+' usuário(s)' : _totalGeral+' usuário(s) cadastrado(s) no Firebase')
+    + '</div></div>';
 }
 
 function salvarUsuario() {
@@ -3884,6 +3994,12 @@ function editarUsuario(n) {
 function excluirUsuario(n) {
   var u = _usuariosFirebase[n];
   if (!u) return;
+  // Proteção: não permite excluir o próprio usuário que está logado
+  var _me = '';
+  try { _me = (JSON.parse(sessionStorage.getItem('loka_user')||'{}').usuario||'').toLowerCase(); } catch(e){}
+  if (_me && (u.usuario||'').toLowerCase() === _me) {
+    toast('⚠️ Você não pode excluir o usuário com o qual está logado', '#c0392b'); return;
+  }
   if (!confirm('Excluir usuário "' + u.usuario + '" (' + u.nome + ')?\n\nEsta ação não pode ser desfeita.')) return;
   _usuariosFirebase.splice(n, 1);
   firebase.database().ref('loka_users').set(_usuariosFirebase).then(function() {
@@ -3908,10 +4024,140 @@ function limparFormUsuario() {
   ['uLogin','uNome','uSenha','uSenha2'].forEach(function(id) {
     var e = document.getElementById(id); if(e) e.value='';
   });
-  document.getElementById('uPerfil').value = 'operador';
+  var _sp = document.getElementById('uPerfil'); if(_sp) _sp.value = 'operador';
   document.getElementById('uEditId').value = '';
   var t = document.getElementById('userFormTitulo'); if(t) t.textContent='Novo Usuário';
 }
+
+// ══ GERENCIADOR DE PERFIS DE ACESSO ═══════════════════════════════════════════
+function abrirPerfis() {
+  if (!_podeAcao('gerenciarPerfis')) { toast('⚠️ Seu perfil não permite gerenciar perfis', '#c0392b'); return; }
+  _carregarPerfis(function(){ renderPerfis(); montarCheckboxesPerfil(); });
+  renderPerfis(); montarCheckboxesPerfil(); limparFormPerfil();
+  openM('mPerfis');
+}
+
+// Monta os checkboxes de painéis e ações no formulário de perfil
+function montarCheckboxesPerfil() {
+  var cp = document.getElementById('perfPaineis');
+  if (cp) cp.innerHTML = _TODOS_PAINEIS.map(function(p){
+    return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
+      + '<input type="checkbox" class="perf-painel" value="'+p+'"> '+_PAINEL_LABEL[p]+'</label>';
+  }).join('');
+  var ca = document.getElementById('perfAcoes');
+  if (ca) ca.innerHTML = Object.keys(_ACAO_LABEL).map(function(a){
+    return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
+      + '<input type="checkbox" class="perf-acao" value="'+a+'"> '+_ACAO_LABEL[a]+'</label>';
+  }).join('');
+}
+
+function renderPerfis() {
+  var el = document.getElementById('perfisLista');
+  if (!el) return;
+  var lista = _listaPerfis();
+  var badge = {true:'bb', false:'bm'};
+  el.innerHTML = '<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:4px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<thead><tr style="background:#0E1B4D">'
+    + '<th style="padding:8px 12px;text-align:left;color:#fff;font-size:9px;text-transform:uppercase">Perfil</th>'
+    + '<th style="padding:8px 12px;color:#fff;font-size:9px">Chave</th>'
+    + '<th style="padding:8px 12px;color:#fff;font-size:9px;text-align:center">Painéis</th>'
+    + '<th style="padding:8px 12px;color:#fff;font-size:9px;text-align:center">Ações</th></tr></thead><tbody>'
+    + lista.map(function(p){
+      return '<tr style="border-bottom:1px solid #f0f2f8">'
+        + '<td style="padding:8px 12px;font-weight:700">'+p.nome+(p.builtin?' <span class="badge bg" style="font-size:8px">padrão</span>':'')+'</td>'
+        + '<td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;background:#f0f2f9;padding:1px 6px;border-radius:3px">'+p.chave+'</span></td>'
+        + '<td style="padding:8px 12px;text-align:center">'+(p.paineis?p.paineis.length:0)+'</td>'
+        + '<td style="padding:8px 12px"><div style="display:flex;gap:5px;justify-content:center">'
+          + '<button class="icon-btn" onclick="editarPerfil(\''+p.chave+'\')" title="Editar permissões">✏️</button>'
+          + (p.builtin ? '' : '<button class="icon-btn" onclick="excluirPerfil(\''+p.chave+'\')" title="Excluir" style="border-color:#c0392b;color:#c0392b">🗑</button>')
+        + '</div></td></tr>';
+    }).join('')
+    + '</tbody></table></div>'
+    + '<p style="font-size:10px;color:var(--muted);margin:6px 2px 0">Os perfis marcados como <strong>padrão</strong> podem ter as permissões editadas, mas não podem ser excluídos.</p>';
+}
+
+function editarPerfil(chave) {
+  var p = _getPerfilDef(chave);
+  document.getElementById('perfNome').value  = p.nome || '';
+  var ck = document.getElementById('perfChave');
+  ck.value = p.chave || '';
+  ck.readOnly = true;  // não muda a chave de um perfil existente
+  document.getElementById('perfEditKey').value = p.chave || '';
+  document.getElementById('perfFormTitulo').textContent = 'Editar Perfil: ' + p.nome;
+  // marca os checkboxes
+  var pain = p.paineis || [];
+  document.querySelectorAll('.perf-painel').forEach(function(c){ c.checked = pain.indexOf(c.value)>=0; });
+  var ac = p.acoes || {};
+  document.querySelectorAll('.perf-acao').forEach(function(c){ c.checked = !!ac[c.value]; });
+}
+
+function salvarPerfil() {
+  var nome  = (document.getElementById('perfNome').value||'').trim();
+  var chave = (document.getElementById('perfChave').value||'').trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  var editKey = document.getElementById('perfEditKey').value;
+  if (!nome)  { toast('⚠️ Informe o nome do perfil', '#b45309'); return; }
+  if (!chave) { toast('⚠️ Informe a chave (só letras/números, sem espaço)', '#b45309'); return; }
+
+  // Se é novo, chave não pode colidir com existente
+  if (!editKey) {
+    if (_PERFIS_BUILTIN[chave] || _perfisCustom[chave]) { toast('⚠️ Já existe um perfil com esta chave', '#c0392b'); return; }
+  }
+
+  var paineis = Array.prototype.map.call(document.querySelectorAll('.perf-painel:checked'), function(c){ return c.value; });
+  var acoes = {};
+  Array.prototype.forEach.call(document.querySelectorAll('.perf-acao'), function(c){ acoes[c.value] = c.checked; });
+
+  if (!paineis.length && !acoes.manutencaoSoIncluir) {
+    if (!confirm('Este perfil não terá acesso a nenhum painel. Deseja salvar mesmo assim?')) return;
+  }
+
+  var registro = { chave: chave, nome: nome, paineis: paineis, acoes: acoes, atualizadoEm: new Date().toISOString() };
+  _perfisCustom[chave] = registro;
+
+  // Persiste como objeto (chave -> registro) em loka_perfis
+  firebase.database().ref('loka_perfis/' + chave).set(registro).then(function(){
+    renderPerfis();
+    _preencherSelectPerfis();
+    limparFormPerfil();
+    toast(editKey ? '✅ Perfil atualizado!' : '✅ Perfil criado!', '#0d7a3e');
+    // Se o perfil editado é o do usuário logado, reaplica a interface
+    if (chave === _perfilAtual()) _aplicarPermissoesUI();
+  }).catch(function(e){ toast('❌ Erro: '+e.message, '#c0392b'); });
+}
+
+function excluirPerfil(chave) {
+  chave = (chave||'').toLowerCase();
+  if (_PERFIS_BUILTIN[chave]) { toast('⚠️ Perfis padrão não podem ser excluídos', '#b45309'); return; }
+  // Verifica se há usuários usando este perfil
+  var emUso = (_usuariosFirebase||[]).filter(function(u){ return (u.perfil||'').toLowerCase()===chave; });
+  var aviso = emUso.length ? '\n\n⚠️ '+emUso.length+' usuário(s) usam este perfil e ficarão sem acesso até receberem outro perfil.' : '';
+  if (!confirm('Excluir o perfil "'+chave+'"?'+aviso)) return;
+  delete _perfisCustom[chave];
+  firebase.database().ref('loka_perfis/' + chave).remove().then(function(){
+    renderPerfis();
+    _preencherSelectPerfis();
+    toast('🗑 Perfil excluído.', '#c0392b');
+  }).catch(function(e){ toast('❌ Erro: '+e.message, '#c0392b'); });
+}
+
+function limparFormPerfil() {
+  var n=document.getElementById('perfNome'); if(n) n.value='';
+  var k=document.getElementById('perfChave'); if(k){ k.value=''; k.readOnly=false; }
+  var e=document.getElementById('perfEditKey'); if(e) e.value='';
+  var t=document.getElementById('perfFormTitulo'); if(t) t.textContent='Novo Perfil';
+  document.querySelectorAll('.perf-painel,.perf-acao').forEach(function(c){ c.checked=false; });
+}
+
+// Sugere a chave a partir do nome (só ao criar)
+function _sugerirChavePerfil() {
+  var ek = document.getElementById('perfEditKey');
+  if (ek && ek.value) return; // editando: não mexe na chave
+  var nome = (document.getElementById('perfNome').value||'');
+  var ck = document.getElementById('perfChave');
+  if (ck && !ck.readOnly) ck.value = nome.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+}
+
 
 // ── FROTA ATIVA ──────────────────────────────────────────────────────────────
 var FROTA_DOCS = {"RHI1I58":["1272329914","WV1DB42H7MA032455","21/21","Sim"],"SIL2E59":["1355510845","9BD358ATFRYM95883","23/24","Sim"],"RVV7E29":["1331797486","935CEFC2CPB541228","22/23","Sim"],"RCY8H74":["1249455860","9BD2651MHM9174853","20/21","Sim"],"RDK5G66":["1274609485","9BD2651MHM9194903","21/21","Sim"],"SYO1G57":["1380452977","9BD2651PDR9263377","24/24","Sim"],"SCO5B72":["1298701950","9BWAG45U0PT002364","21/22","Sim"],"EQQ2J61":["1323355739","9BWAG45U4PT071154","22/23","Sim"],"GIR7I93":["1323137510","9BWAG45U2PT071802","22/23","Sim"],"FOY3F87":["1316290287","9BWAG45U0PT053203","22/23","Sim"],"DFT8I72":["1301727269","9BWAG45U2PT026150","21/22","Não"],"RUE0E26":["1297911870","9BWAG45U5PT008564","22/23","Sim"],"STD4J70":["1380931441","93YRBB002SJ891872","24/25","Não"],"RUZ9J78":["1320985480","9BD341ACZPY831887","22/23","Sim"],"RVO7C13":["1328141672","9BD341ACZPY849913","22/23","Sim"],"SHJ0I58":["1343158467","9BD341ACZPY872313","23/23","Sim"],"SHS2E71":["1338582310","9BD341ACZPY880678","23/23","Sim"],"SHV7B26":["1346782714","9BD341ACZPY886919","23/23","Sim"],"SHW9F83":["1347731820","9BD341ACZPY886308","23/23","Sim"],"SHW9G84":["1347731838","9BD341ACZPY886451","23/23","Sim"],"SHG3D40":["1341126924","9BD341ACZPY866157","23/23","Sim"],"SIO9A51":["1357437177","9BGEB48A0RG159190","23/24","Não"],"RUQ2J15":["1304683688","9BGEN69H0PG152841","22/23","Sim"],"RVC9A19":["1322444614","9BGEN69H0PG152841","22/23","Sim"],"RUV5G98":["1318310145","9BGEB69A0PG167990","22/23","Não"],"RVN9D70":["1327703375","8ADUWNFX2PG531016","22/23","Sim"],"SIA6F77":["1351238059","8ADUEFC23PG578764","23/23","Sim"],"STF4F32":["1384085677","9BWAG5R1XRT044582","24/24","Sim"],"FYQ2B92":["1348605879","9BWAG5R18PT210482","23/23","Sim"],"TGZ6D54":["1449968128","8AFBR01M7TJ488225","25/26","Sim"],"TGZ1E73":["1449969710","8AFBR01M8TJ481722","25/26","Sim"],"RVI0D04":["1324934163","9886111LRPK510094","22/23","Sim"],"FDZ9G34":["1323355593","9BWKL45U8PP020703","22/23","Sim"],"GCI9I23":["1324826638","9BWKL45UXPP021352","22/23","Sim"],"FLR6J14":["1356115087","9BWKL45U7PP074333","22/23","Sim"],"RVD8J06":["1322981946","9BWKL45U0PP018718","22/23","Sim"],"RVD9I55":["1323061166","9BWKL45UXPP019472","22/23","Sim"],"RVD9I71":["1323061360","9BWKL45U4PP019497","22/23","Sim"],"RVT1A74":["1330071015","9BWKL45U1PP028383","22/23","Sim"],"RVT2A32":["1330168990","9BWKL45U0PP028441","22/23","Sim"],"RVT2A34":["1330169015","9BWKL45U5PP028452","22/23","Sim"],"SHF6F29":["1340650026","9BWKL45U1PP036046","23/23","Sim"],"SHG1J02":["1341042690","9BWKL45U0PP036068","23/23","Sim"],"SHH1C11":["1341688019","9BWKL45U4PP038874","23/23","Sim"],"SHU8B53":["1346288647","9BWKL45U0PP051976","23/23","Sim"],"SIC2G45":["1352114973","9BWKL45U5PP057370","23/23","Sim"],"EJD9E52":["1353221382","9BWKL45U9PP059431","23/23","Sim"],"EUB9I42":["1344690120","9BWKL45U9PP042130","23/23","Sim"],"EXN2A36":["1326359298","9BWKL45U1PP019652","22/23","Sim"],"FCC6E35":["1325151359","9BWKL45UXPP020718","22/23","Sim"],"FTI3F81":["1323137405","9BWKL45UXPP017849","22/23","Sim"],"FVJ7F62":["1324826220","9BWKL46U8PP021236","22/23","Sim"],"GBW2B46":["1324826344","9BWKL45U4PP021296","23/23","Sim"],"GCQ2G23":["1323259195","9BWKL45U3PP020401","22/23","Sim"],"GEZ8H54":["1352176057","9BWKL45U1PP066115","23/23","Sim"],"GJO0D71":["1329023185","9BWKL45U9PP015638","23/23","Sim"],"GJU9H02":["1323139947","9BWKL45U8PP020474","23/23","Sim"],"RMP0A86":["1256924129","9BWKB45U3NP001878","21/22","Sim"],"RND5I98":["1264297553","9BWKB45U1NP012832","21/22","Sim"],"RPR1G73":["1342803210","9BWKL45U8PP039879","22/23","Sim"],"RTE3J75":["1281875047","9BWKB45U4NP030662","21/22","Sim"],"RTE3J85":["1281875136","9BWKB45U6NP030646","21/22","Sim"],"RTE3J91":["1281875195","9BWKB45U8NP030616","21/22","Sim"],"RUE5E24":["1298292031","9BWKB45U1PP002546","22/23","Sim"],"RUE5F30":["1298293429","9BWKB45U5PP003232","22/23","Sim"],"SEV0J14":["1361459260","9BGJJ7520RB173322","23/24","Sim"],"RNU7E72":["1276026037","9BD281A22NYW69009","21/22","Sim"],"RVO5A91":["1327933990","9BD281A2DPYY17868","22/23","Sim"],"RUE5F40":["1298293550","9BWKB45U9PP003203","22/23","Sim"],"RUI8I24":["1300988867","9BWKB45U8PP003631","22/23","Sim"],"RUJ4A55":["1301285088","9BWKB45U4PP003626","22/23","Sim"],"RUL7A99":["1302113060","9BWKB45U5PP005708","22/23","Sim"],"RUP3D82":["1303935381","9BWKB45U8PP005704","22/23","Sim"],"RUP8F63":["1304412501","9BWKB45UXPP004098","22/23","Sim"],"RUT7D45":["1317016944","9BWKB45U2PP010512","22/23","Sim"],"RUX8G52":["1319279179","9BWKB45U8PP013637","22/23","Sim"],"RVT2A51":["1330169350","9BWKB45U4PP028829","22/23","Sim"],"RVD9I60":["1323061220","9BWKB45U1PP018727","22/23","Sim"],"SDF3C81":["1379492456","9BWKL45UXRP022780","24/24","Não"],"SHF6F23":["1340649966","9BWKL45UXPP036112","23/23","Sim"],"SHF6F28":["1340650018","9BWKL45U1PP036029","23/23","Sim"],"SHH6B15":["1342024254","9BWKL45U4PP038891","23/23","Sim"],"SHU8B66":["1346288876","9BWKL45U7PP051909","23/23","Sim"],"SIC2G39":["1352114841","9BWKL45U2PP057343","23/23","Sim"],"SIC2G42":["1352114906","9BWKL45U3PP056749","23/23","Sim"],"SIC2G46":["1352114981","9BWKL45U5PP057403","23/23","Sim"],"SIC2G48":["1352115015","9BWKL45U6PP057393","23/23","Sim"],"SIC2G51":["1352115074","9BWKL45U7PP057399","23/23","Sim"],"SIC2G52":["1352115082","9BWKL45U9PP057405","23/23","Sim"],"QNH1995":["1133716129","9BWKB45U2JP071320","17/18","Sim"],"FCQ8B73":["1354598927","9BWKL45U1PP069340","23/23","Sim"],"EBL7E41":["1354597483","9BWKL45U3PP068190","23/23","Sim"],"EKU9D72":["1354599176","9BWKL45U3PP069419","23/23","Sim"],"FCH1I73":["1354597670","9BWKL45U5PP068546","23/23","Sim"],"FCN9G63":["1365511917","9BWKL45U8PP082215","23/23","Sim"],"EUE8G81":["1365512000","9BWKL45U5PP081572","23/23","Sim"],"EVT1C72":["1354599990","9BWKL45U9PP069702","23/23","Sim"],"SWO4I55":["1401437572","9BWKL45USP007737","24/25","Sim"],"SWH3A72":["1389400422","9BWKL45U9RP031955","24/24","Sim"],"RML9D09":["1254734381","9BWKB45U2NP002617","21/22","Sim"],"GDE1E83":["1323256897","9BWKL45U4PP020424","23/23","Sim"],"EYA5J14":["1354597840","9BWKL45U6PP068412","23/23","Não"],"SKT3B92":["1432806650","9BD376ATDSYC30084","25/25","Sim"]};
@@ -4521,6 +4767,18 @@ function relatorioManutencao(){
 function renderManutencao() {
   if (!db) return;
   if (!db.manutencoes) db.manutencoes = [];
+  // Perfil "somente incluir": não exibe a lista/custos das manutenções da empresa.
+  if (_soIncluirManutencao()) {
+    var _st = document.getElementById('manutStats'); if (_st) _st.innerHTML = '';
+    var _g = document.getElementById('manutGrid');
+    if (_g) _g.innerHTML =
+      '<div class="empty" style="padding:40px 20px;text-align:center">'
+      + '<div style="font-size:34px;margin-bottom:6px">🔧</div>'
+      + '<p style="font-weight:800;color:var(--dark);margin:0 0 4px">Registrar manutenção</p>'
+      + '<small style="color:var(--muted)">Use o botão <strong>+ Nova Manutenção</strong> acima para registrar um serviço realizado.</small>'
+      + '</div>';
+    return;
+  }
   var q  = (document.getElementById('qManut').value||'').toLowerCase();
   var fs = document.getElementById('fManutStatus').value;
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
@@ -8226,6 +8484,11 @@ function mltConfirmarImportacao(){
     <button class="modal-close" onclick="closeM('mUsuarios')">✕</button>
   </div>
   <div class="modal-body">
+    <!-- Consultar usuários -->
+    <div class="search-box" style="margin-bottom:10px">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="filter-input" id="uBusca" type="text" placeholder="Consultar por login, nome ou perfil..." oninput="renderUsuarios()">
+    </div>
     <!-- Lista de usuários -->
     <div id="usuariosLista" style="margin-bottom:16px"></div>
     <!-- Formulário novo/editar -->
@@ -8239,6 +8502,7 @@ function mltConfirmarImportacao(){
         <div class="fg"><label class="fl">Perfil *</label>
           <select class="fs" id="uPerfil">
             <option value="operador">Operador</option>
+            <option value="oficina">Oficina (só incluir manutenções)</option>
             <option value="admin">Admin</option>
             <option value="master">Master</option>
           </select>
@@ -8252,6 +8516,43 @@ function mltConfirmarImportacao(){
   </div>
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeM('mUsuarios')">Fechar</button>
+    <button class="btn" id="btnGerPerfis" onclick="abrirPerfis()" style="display:none;margin-left:auto;background:#0E1B4D;color:#fff">🔐 Perfis de Acesso</button>
+  </div>
+</div></div>
+
+<!-- MODAL: PERFIS DE ACESSO -->
+<div class="modal-bg" id="mPerfis"><div class="modal" style="max-width:620px">
+  <div class="modal-head" style="background:#0E1B4D">
+    <h3>🔐 Perfis de Acesso</h3>
+    <button class="modal-close" onclick="closeM('mPerfis')">✕</button>
+  </div>
+  <div class="modal-body">
+    <!-- Lista de perfis -->
+    <div id="perfisLista" style="margin-bottom:16px"></div>
+    <!-- Formulário novo/editar -->
+    <div style="background:#f8f9ff;border-radius:10px;padding:14px;border:1.5px solid var(--border)">
+      <div class="sec-label" id="perfFormTitulo" style="margin-top:0">Novo Perfil</div>
+      <div class="g2" style="margin-top:10px">
+        <div class="fg"><label class="fl">Nome do perfil *</label><input class="fi" id="perfNome" placeholder="Ex: Financeiro" oninput="_sugerirChavePerfil()"></div>
+        <div class="fg"><label class="fl">Chave (identificador) *</label><input class="fi" id="perfChave" placeholder="ex: financeiro" autocomplete="off"><input type="hidden" id="perfEditKey"></div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="fl" style="display:block;margin-bottom:6px">Painéis que este perfil pode acessar</label>
+        <div id="perfPaineis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px"></div>
+      </div>
+      <div style="margin-top:12px">
+        <label class="fl" style="display:block;margin-bottom:6px">Permissões especiais</label>
+        <div id="perfAcoes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-outline" onclick="limparFormPerfil()">＋ Novo</button>
+        <button class="btn btn-blue" onclick="salvarPerfil()" style="flex:1">💾 Salvar Perfil</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mPerfis')">Fechar</button>
+    <button class="btn btn-outline" onclick="closeM('mPerfis');abrirGerenciarUsuarios()" style="margin-left:auto">👥 Voltar a Usuários</button>
   </div>
 </div></div>
 
