@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v69-20260807-1425 -->
+<!-- LOKA deploy: v70-20260807-1425 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1100,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v69-20260807-1425';
+var LOKA_BUILD = 'v70-20260807-1425';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1254,23 +1254,30 @@ function _modoManutencao() {
 function _soIncluirManutencao(){ var m=_modoManutencao(); return m.restrito && !m.mostraLista; } // compat
 
 // Associação do usuário logado (oficina / cliente) — para o escopo de visualização
-var _assocCache = null; // {oficina:'', clienteId:''}
+var _assocCache = null; // {oficinas:[], clienteId:''}
+// Normaliza a lista de oficinas de um usuário (aceita array novo ou string antiga)
+function _oficinasDe(u) {
+  if (!u) return [];
+  if (Array.isArray(u.oficinasAssoc)) return u.oficinasAssoc.filter(Boolean);
+  if (u.oficinaAssoc) return [u.oficinaAssoc];  // compatibilidade
+  return [];
+}
 function _carregarAssoc(cb) {
   // 1) tenta pela própria sessão (se o login já trouxe os campos)
   var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user')||'{}'); } catch(e){}
-  if (sess.oficinaAssoc != null || sess.clienteAssoc != null) {
-    _assocCache = { oficina: sess.oficinaAssoc||'', clienteId: sess.clienteAssoc||'' };
+  if (sess.oficinasAssoc != null || sess.oficinaAssoc != null || sess.clienteAssoc != null) {
+    _assocCache = { oficinas: _oficinasDe(sess), clienteId: sess.clienteAssoc||'' };
     if (cb) cb(); return;
   }
   // 2) senão, busca o registro do próprio usuário em loka_users
   var meu = (sess.usuario||'').toLowerCase();
-  if (!meu || !firebase || !firebase.apps || !firebase.apps.length) { _assocCache = {oficina:'',clienteId:''}; if(cb) cb(); return; }
+  if (!meu || !firebase || !firebase.apps || !firebase.apps.length) { _assocCache = {oficinas:[],clienteId:''}; if(cb) cb(); return; }
   firebase.database().ref('loka_users').once('value').then(function(snap){
     var arr = snap.val(); arr = arr ? (Array.isArray(arr)?arr:Object.values(arr)) : [];
     var u = arr.filter(Boolean).find(function(x){ return (x.usuario||'').toLowerCase()===meu; }) || {};
-    _assocCache = { oficina: u.oficinaAssoc||'', clienteId: u.clienteAssoc||'' };
+    _assocCache = { oficinas: _oficinasDe(u), clienteId: u.clienteAssoc||'' };
     if (cb) cb();
-  }).catch(function(){ _assocCache = {oficina:'',clienteId:''}; if(cb) cb(); });
+  }).catch(function(){ _assocCache = {oficinas:[],clienteId:''}; if(cb) cb(); });
 }
 // Placas atualmente locadas a um cliente (usa os aluguéis ativos)
 function _placasDoCliente(clienteId) {
@@ -4104,7 +4111,8 @@ function salvarUsuario() {
     nome:     nome,
     senha:    senha || (editId !== '' ? _usuariosFirebase[parseInt(editId)].senha : ''),
     perfil:   perfil,
-    oficinaAssoc: (document.getElementById('uOficinaAssoc')||{}).value ? document.getElementById('uOficinaAssoc').value.trim() : '',
+    oficinasAssoc: Array.prototype.map.call(document.querySelectorAll('#uOficinasAssoc .assoc-oficina:checked'), function(c){ return c.value; }),
+    oficinaAssoc: '',  // legado (limpo — usamos oficinasAssoc)
     clienteAssoc: (document.getElementById('uClienteAssoc')||{}).value || ''
   };
 
@@ -4132,7 +4140,20 @@ function editarUsuario(n) {
   document.getElementById('uSenha').value  = '';
   document.getElementById('uSenha2').value = '';
   document.getElementById('uPerfil').value = u.perfil;
-  var _of = document.getElementById('uOficinaAssoc'); if(_of) _of.value = u.oficinaAssoc || '';
+  // Marca as oficinas associadas (garante que oficinas fora do catálogo também apareçam)
+  var _ofs = _oficinasDe(u);
+  var _cont = document.getElementById('uOficinasAssoc');
+  if (_cont) {
+    _ofs.forEach(function(nome){
+      if (!_cont.querySelector('.assoc-oficina[value="'+String(nome).replace(/"/g,'&quot;')+'"]')) {
+        var lbl = document.createElement('label');
+        lbl.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)';
+        lbl.innerHTML = '<input type="checkbox" class="assoc-oficina" value="'+String(nome).replace(/"/g,'&quot;')+'"> <span>'+nome+'</span>';
+        _cont.appendChild(lbl);
+      }
+    });
+    _cont.querySelectorAll('.assoc-oficina').forEach(function(c){ c.checked = _ofs.indexOf(c.value) >= 0; });
+  }
   var _cl = document.getElementById('uClienteAssoc'); if(_cl) _cl.value = u.clienteAssoc || '';
   _toggleAssocFields();
   document.getElementById('uEditId').value = String(n);
@@ -4149,14 +4170,21 @@ function _toggleAssocFields() {
   if (wCl) wCl.style.display = ac.manutencaoEscopoCliente ? 'block' : 'none';
 }
 
-// Preenche a lista de oficinas conhecidas e o select de clientes
+// Preenche a lista de oficinas (checkboxes) e o select de clientes
 function _preencherAssocFields() {
-  // Oficinas: nomes distintos já usados em manutenções + fornecedores
-  var ofs = {};
-  (db && db.manutencoes||[]).forEach(function(m){ if(m&&m.oficina) ofs[m.oficina.trim()]=1; });
-  (db && db.fornecedores||[]).forEach(function(f){ if(f&&f.nome) ofs[f.nome.trim()]=1; });
-  var dl = document.getElementById('oficinasDatalist');
-  if (dl) dl.innerHTML = Object.keys(ofs).sort().map(function(o){ return '<option value="'+o.replace(/"/g,'&quot;')+'">'; }).join('');
+  // Oficinas conhecidas: fornecedores cadastrados + nomes já usados em manutenções
+  var forn = {}; (db && db.fornecedores||[]).forEach(function(f){ if(f&&f.nome) forn[f.nome.trim()]=1; });
+  var usadas = {}; (db && db.manutencoes||[]).forEach(function(m){ if(m&&m.oficina) usadas[String(m.oficina).trim()]=1; });
+  var todas = {}; Object.keys(forn).forEach(function(n){ todas[n]=1; }); Object.keys(usadas).forEach(function(n){ todas[n]=1; });
+  var nomes = Object.keys(todas).filter(Boolean).sort(function(a,b){ return a.localeCompare(b); });
+  var cont = document.getElementById('uOficinasAssoc');
+  if (cont) cont.innerHTML = nomes.length ? nomes.map(function(n){
+    var reg = forn[n];
+    return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
+      + '<input type="checkbox" class="assoc-oficina" value="'+n.replace(/"/g,'&quot;')+'"> <span>'+n
+      + (reg ? '' : ' <span style="font-size:8px;background:#fef3cd;color:#b45309;padding:1px 4px;border-radius:3px" title="Nome usado em manutenções, mas ainda não está no cadastro de Fornecedores">não cadastrada</span>')
+      + '</span></label>';
+  }).join('') : '<span style="font-size:11px;color:var(--muted)">Nenhuma oficina encontrada. Cadastre em <strong>Fornecedores</strong>.</span>';
   // Clientes
   var sel = document.getElementById('uClienteAssoc');
   if (sel) {
@@ -4202,7 +4230,7 @@ function limparFormUsuario() {
     var e = document.getElementById(id); if(e) e.value='';
   });
   var _sp = document.getElementById('uPerfil'); if(_sp) _sp.value = 'operador';
-  var _of = document.getElementById('uOficinaAssoc'); if(_of) _of.value = '';
+  var _oc = document.getElementById('uOficinasAssoc'); if(_oc) _oc.querySelectorAll('.assoc-oficina').forEach(function(c){ c.checked=false; });
   var _cl = document.getElementById('uClienteAssoc'); if(_cl) _cl.value = '';
   _toggleAssocFields();
   document.getElementById('uEditId').value = '';
@@ -4971,7 +4999,7 @@ function renderManutencaoRestrito(modo) {
   }
 
   // Monta o escopo (interseção quando há oficina E cliente)
-  var oficinaAssoc = (_assocCache.oficina||'').trim().toLowerCase();
+  var setOficinas = new Set((_assocCache.oficinas||[]).map(function(o){ return String(o).trim().toLowerCase(); }));
   var placasCliente = modo.escopoCliente ? _placasDoCliente(_assocCache.clienteId) : null;
   var q  = ((document.getElementById('qManut')||{}).value||'').toLowerCase();
   var fs = (document.getElementById('fManutStatus')||{}).value || '';
@@ -4980,7 +5008,7 @@ function renderManutencaoRestrito(modo) {
 
   var list = (db.manutencoes||[]).filter(function(m){
     if (!m) return false;
-    if (modo.escopoOficina) { if ((m.oficina||'').trim().toLowerCase() !== oficinaAssoc) return false; }
+    if (modo.escopoOficina) { if (!setOficinas.has((m.oficina||'').trim().toLowerCase())) return false; }
     if (modo.escopoCliente) { if (!m.placa || !placasCliente.has(String(m.placa).toUpperCase())) return false; }
     if (fs && m.status !== fs) return false;
     if (dataIni && (!m.data || m.data < dataIni)) return false;
@@ -4994,7 +5022,7 @@ function renderManutencaoRestrito(modo) {
 
   // Cabeçalho de contexto
   var ctx = '';
-  if (modo.escopoOficina) ctx += 'Oficina: <strong>'+(_assocCache.oficina||'— não associada —')+'</strong>';
+  if (modo.escopoOficina) ctx += 'Oficina(s): <strong>'+((_assocCache.oficinas||[]).join(', ')||'— nenhuma associada —')+'</strong>';
   if (modo.escopoCliente) {
     var cli = (db.clients||[]).find(function(c){ return c && c.id===_assocCache.clienteId; });
     ctx += (ctx?' · ':'') + 'Cliente: <strong>'+(cli?cli.nome:'— não associado —')+'</strong>';
@@ -8782,10 +8810,9 @@ function mltConfirmarImportacao(){
           </select>
         </div>
         <div class="fg" id="wrapOficinaAssoc" style="display:none">
-          <label class="fl">Oficina associada</label>
-          <input class="fi" id="uOficinaAssoc" list="oficinasDatalist" placeholder="Nome da oficina" autocomplete="off">
-          <datalist id="oficinasDatalist"></datalist>
-          <small style="font-size:10px;color:var(--muted)">O usuário verá o histórico das placas lançadas para esta oficina.</small>
+          <label class="fl">Oficinas associadas</label>
+          <div id="uOficinasAssoc" style="max-height:150px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px"></div>
+          <small style="font-size:10px;color:var(--muted)">Marque uma ou mais oficinas — o usuário verá o histórico das placas lançadas para elas. Gerencie as oficinas no painel <strong>Fornecedores</strong>.</small>
         </div>
         <div class="fg" id="wrapClienteAssoc" style="display:none">
           <label class="fl">Cliente associado</label>
