@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v68-20260807-1425 -->
+<!-- LOKA deploy: v69-20260807-1425 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -471,9 +471,9 @@ tr:hover td{background:#f8f9fe;}
           <button onclick="limparFiltroDataManut()" title="Limpar datas" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
         </div>
         <button class="btn btn-blue" id="btnNovaManut" onclick="openManutRegistro(null)">+ Nova Manutenção</button>
-        <button class="btn btn-outline" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
-        <button class="btn btn-outline" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
-        <button class="btn" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioManutencao()" title="Gerar relatório por placa para imprimir ou salvar em PDF">📄 Relatório PDF</button>
+        <button class="btn btn-outline" id="btnImportManut" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
+        <button class="btn btn-outline" id="btnFormOficina" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
+        <button class="btn" id="btnRelManut" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioManutencao()" title="Gerar relatório por placa para imprimir ou salvar em PDF">📄 Relatório PDF</button>
       </div>
 
       <!-- Resumo -->
@@ -1100,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v68-20260807-1425';
+var LOKA_BUILD = 'v69-20260807-1425';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1181,19 +1181,31 @@ function _perfilAtual() {
 var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
 var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
-var _ACAO_LABEL   = {editarPrecos:'Editar preços dos veículos',gerenciarUsuarios:'Gerenciar usuários',gerenciarPerfis:'Gerenciar perfis de acesso',verRelatorio:'Ver Relatório mensal',manutencaoSoIncluir:'Manutenção: somente incluir (não vê a lista)'};
+var _ACAO_LABEL   = {
+  editarPrecos:'Editar preços dos veículos',
+  gerenciarUsuarios:'Gerenciar usuários',
+  gerenciarPerfis:'Gerenciar perfis de acesso',
+  verRelatorio:'Ver Relatório mensal',
+  manutencaoIncluir:'Manutenção: incluir novas',
+  manutencaoEscopoOficina:'Manutenção: ver só as placas da oficina associada',
+  manutencaoEscopoCliente:'Manutenção: ver só as placas locadas ao cliente associado'
+};
 
 // Perfis EMBUTIDOS (fallback — sempre existem, não podem ser excluídos)
 var _PERFIS_BUILTIN = {
   master:   { nome:'Master',   builtin:true, paineis:_TODOS_PAINEIS.slice(),
-              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true,  manutencaoSoIncluir:false } },
+              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true } },
   admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
-              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true,  manutencaoSoIncluir:false } },
+              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true } },
   operador: { nome:'Operador', builtin:true,
               paineis:['dashboard','clientes','ativos','veiculos','faturas','manutencao','fornecedores','multas','formularios','contratos','historico','reserva','cadastro'],
-              acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true,  manutencaoSoIncluir:false } },
+              acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true } },
+  // Oficina: inclui novas manutenções E consulta o histórico das placas da sua oficina
   oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
-              acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:false, manutencaoSoIncluir:true } }
+              acoes:{ manutencaoIncluir:true, manutencaoEscopoOficina:true } },
+  // Clientes: consulta o histórico de manutenção apenas das placas locadas a ele
+  clientes: { nome:'Clientes', builtin:true, paineis:['manutencao'],
+              acoes:{ manutencaoEscopoCliente:true } }
 };
 
 // Perfis PERSONALIZADOS (carregados do Firebase: loka_perfis) — podem sobrescrever embutidos
@@ -1222,8 +1234,57 @@ function _listaPerfis() {
 function _permsAtual(){ return _getPerfilDef(_perfilAtual()); }
 function _podePainel(name){ return _permsAtual().paineis.indexOf(name) >= 0; }
 function _podeAcao(a){ return !!((_permsAtual().acoes||{})[a]); }
-function _soIncluirManutencao(){ return _podeAcao('manutencaoSoIncluir'); }
 function _isOficina(){ return _perfilAtual()==='oficina'; } // compat.
+
+// Modo do painel de Manutenção conforme o perfil (incluir / escopos)
+function _modoManutencao() {
+  var ac = _permsAtual().acoes || {};
+  var incluir = !!ac.manutencaoIncluir || !!ac.manutencaoSoIncluir; // compat com flag antigo
+  var escopoOficina = !!ac.manutencaoEscopoOficina;
+  var escopoCliente = !!ac.manutencaoEscopoCliente;
+  var soIncluir = !!ac.manutencaoSoIncluir; // legado: incluir sem ver lista
+  return {
+    incluir: incluir,
+    escopoOficina: escopoOficina,
+    escopoCliente: escopoCliente,
+    mostraLista: (escopoOficina || escopoCliente),   // vê histórico (filtrado)
+    restrito: !!(incluir || escopoOficina || escopoCliente || soIncluir)
+  };
+}
+function _soIncluirManutencao(){ var m=_modoManutencao(); return m.restrito && !m.mostraLista; } // compat
+
+// Associação do usuário logado (oficina / cliente) — para o escopo de visualização
+var _assocCache = null; // {oficina:'', clienteId:''}
+function _carregarAssoc(cb) {
+  // 1) tenta pela própria sessão (se o login já trouxe os campos)
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user')||'{}'); } catch(e){}
+  if (sess.oficinaAssoc != null || sess.clienteAssoc != null) {
+    _assocCache = { oficina: sess.oficinaAssoc||'', clienteId: sess.clienteAssoc||'' };
+    if (cb) cb(); return;
+  }
+  // 2) senão, busca o registro do próprio usuário em loka_users
+  var meu = (sess.usuario||'').toLowerCase();
+  if (!meu || !firebase || !firebase.apps || !firebase.apps.length) { _assocCache = {oficina:'',clienteId:''}; if(cb) cb(); return; }
+  firebase.database().ref('loka_users').once('value').then(function(snap){
+    var arr = snap.val(); arr = arr ? (Array.isArray(arr)?arr:Object.values(arr)) : [];
+    var u = arr.filter(Boolean).find(function(x){ return (x.usuario||'').toLowerCase()===meu; }) || {};
+    _assocCache = { oficina: u.oficinaAssoc||'', clienteId: u.clienteAssoc||'' };
+    if (cb) cb();
+  }).catch(function(){ _assocCache = {oficina:'',clienteId:''}; if(cb) cb(); });
+}
+// Placas atualmente locadas a um cliente (usa os aluguéis ativos)
+function _placasDoCliente(clienteId) {
+  var set = new Set();
+  var cli = (db.clients||[]).find(function(c){ return c && c.id===clienteId; });
+  var nome = cli ? cli.nome : null;
+  (db.ativos||[]).forEach(function(a){
+    if (!a) return;
+    if ((clienteId && a.clienteId===clienteId) || (nome && a.clienteNome===nome)) {
+      _placasDoAtivo(a).forEach(function(p){ set.add(p); });
+    }
+  });
+  return set;
+}
 
 // Aplica as permissões na interface (menu, botões) conforme o perfil logado
 function _aplicarPermissoesUI() {
@@ -1236,12 +1297,12 @@ function _aplicarPermissoesUI() {
   if (niRel) niRel.style.display = (def.acoes && def.acoes.verRelatorio) ? 'flex' : 'none';
   var bGU = document.getElementById('btnGerUsers');
   if (bGU) bGU.style.display = (def.acoes && def.acoes.gerenciarUsuarios) ? 'inline-block' : 'none';
-  // Perfil "somente incluir manutenção": limpa a toolbar e a busca global
-  if (def.acoes && def.acoes.manutencaoSoIncluir) {
+  // Perfil de manutenção restrito (oficina / clientes): ajusta a toolbar e a busca global
+  var modo = _modoManutencao();
+  if (modo.restrito) {
     var gs = document.getElementById('gsWrap'); if (gs) gs.style.display = 'none';
-    var tb = document.getElementById('manutToolbar');
-    if (tb) Array.prototype.forEach.call(tb.children, function(c){ c.style.display='none'; });
-    var bnm = document.getElementById('btnNovaManut'); if (bnm) bnm.style.display='inline-flex';
+    ['btnImportManut','btnFormOficina','btnRelManut'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display='none'; });
+    var bnm = document.getElementById('btnNovaManut'); if (bnm) bnm.style.display = modo.incluir ? 'inline-flex' : 'none';
   }
   // Se o painel visível não é permitido a este perfil, redireciona para um liberado
   var _vis = document.querySelector('.panel[style*="block"]');
@@ -1334,6 +1395,11 @@ window.addEventListener('DOMContentLoaded', function() {
     _aplicarPermissoesUI();
     // Carrega perfis personalizados e reaplica (caso o usuário use um perfil custom)
     _carregarPerfis();
+    // Carrega a associação (oficina/cliente) do usuário para o escopo de manutenção
+    _carregarAssoc(function(){
+      var pm = document.getElementById('panel-manutencao');
+      if (pm && pm.style.display !== 'none' && typeof renderManutencao==='function') renderManutencao();
+    });
   } catch(e) {}
   // Fecha modal ao clicar no fundo
   document.addEventListener('click', function(e) {
@@ -3940,8 +4006,10 @@ function abrirGerenciarUsuarios() {
   if (!_podeAcao('gerenciarUsuarios')) {
     toast('⚠️ Seu perfil não permite gerenciar usuários', '#c0392b'); return;
   }
-  _carregarPerfis(function(){ _preencherSelectPerfis(); });
+  _carregarPerfis(function(){ _preencherSelectPerfis(); _toggleAssocFields(); });
   _preencherSelectPerfis();
+  _preencherAssocFields();
+  _toggleAssocFields();
   carregarUsuarios();
   // Mostra/oculta o botão "Perfis de Acesso" conforme permissão
   var bp = document.getElementById('btnGerPerfis');
@@ -3986,7 +4054,7 @@ function renderUsuarios() {
   if (!todos.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">Nenhum usuário encontrado para “'+_bq+'”.</p>'; return; }
 
   // Mantém o índice REAL no array (para editar/excluir) mesmo com filtro
-  var perfilBadge = {master:'bb', admin:'bg', operador:'bm', oficina:'bm'};
+  var perfilBadge = {master:'bb', admin:'bg', operador:'bm', oficina:'bm', clientes:'bm'};
   el.innerHTML = '<div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:4px">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
     + '<thead><tr style="background:#0E1B4D"><th style="padding:8px 12px;text-align:left;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Usuário</th><th style="padding:8px 12px;color:#fff;font-size:9px">Nome</th><th style="padding:8px 12px;color:#fff;font-size:9px">Perfil</th><th style="padding:8px 12px;color:#fff;font-size:9px">Ações</th></tr></thead>'
@@ -4035,7 +4103,9 @@ function salvarUsuario() {
     usuario:  login,
     nome:     nome,
     senha:    senha || (editId !== '' ? _usuariosFirebase[parseInt(editId)].senha : ''),
-    perfil:   perfil
+    perfil:   perfil,
+    oficinaAssoc: (document.getElementById('uOficinaAssoc')||{}).value ? document.getElementById('uOficinaAssoc').value.trim() : '',
+    clienteAssoc: (document.getElementById('uClienteAssoc')||{}).value || ''
   };
 
   if (editId !== '') {
@@ -4062,7 +4132,40 @@ function editarUsuario(n) {
   document.getElementById('uSenha').value  = '';
   document.getElementById('uSenha2').value = '';
   document.getElementById('uPerfil').value = u.perfil;
+  var _of = document.getElementById('uOficinaAssoc'); if(_of) _of.value = u.oficinaAssoc || '';
+  var _cl = document.getElementById('uClienteAssoc'); if(_cl) _cl.value = u.clienteAssoc || '';
+  _toggleAssocFields();
   document.getElementById('uEditId').value = String(n);
+}
+
+// Mostra os campos de associação (oficina/cliente) conforme o perfil selecionado exigir
+function _toggleAssocFields() {
+  var chave = (document.getElementById('uPerfil')||{}).value || '';
+  var def = _getPerfilDef(chave);
+  var ac = def.acoes || {};
+  var wOf = document.getElementById('wrapOficinaAssoc');
+  var wCl = document.getElementById('wrapClienteAssoc');
+  if (wOf) wOf.style.display = ac.manutencaoEscopoOficina ? 'block' : 'none';
+  if (wCl) wCl.style.display = ac.manutencaoEscopoCliente ? 'block' : 'none';
+}
+
+// Preenche a lista de oficinas conhecidas e o select de clientes
+function _preencherAssocFields() {
+  // Oficinas: nomes distintos já usados em manutenções + fornecedores
+  var ofs = {};
+  (db && db.manutencoes||[]).forEach(function(m){ if(m&&m.oficina) ofs[m.oficina.trim()]=1; });
+  (db && db.fornecedores||[]).forEach(function(f){ if(f&&f.nome) ofs[f.nome.trim()]=1; });
+  var dl = document.getElementById('oficinasDatalist');
+  if (dl) dl.innerHTML = Object.keys(ofs).sort().map(function(o){ return '<option value="'+o.replace(/"/g,'&quot;')+'">'; }).join('');
+  // Clientes
+  var sel = document.getElementById('uClienteAssoc');
+  if (sel) {
+    var atual = sel.value;
+    sel.innerHTML = '<option value="">— Selecione o cliente —</option>'
+      + (db && db.clients||[]).slice().sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'');})
+          .map(function(c){ return '<option value="'+c.id+'">'+(c.nome||'(sem nome)')+'</option>'; }).join('');
+    if (atual) sel.value = atual;
+  }
 }
 
 function excluirUsuario(n) {
@@ -4099,6 +4202,9 @@ function limparFormUsuario() {
     var e = document.getElementById(id); if(e) e.value='';
   });
   var _sp = document.getElementById('uPerfil'); if(_sp) _sp.value = 'operador';
+  var _of = document.getElementById('uOficinaAssoc'); if(_of) _of.value = '';
+  var _cl = document.getElementById('uClienteAssoc'); if(_cl) _cl.value = '';
+  _toggleAssocFields();
   document.getElementById('uEditId').value = '';
   var t = document.getElementById('userFormTitulo'); if(t) t.textContent='Novo Usuário';
 }
@@ -4182,7 +4288,7 @@ function salvarPerfil() {
   var acoes = {};
   Array.prototype.forEach.call(document.querySelectorAll('.perf-acao'), function(c){ acoes[c.value] = c.checked; });
 
-  if (!paineis.length && !acoes.manutencaoSoIncluir) {
+  if (!paineis.length && !acoes.manutencaoIncluir && !acoes.manutencaoEscopoOficina && !acoes.manutencaoEscopoCliente) {
     if (!confirm('Este perfil não terá acesso a nenhum painel. Deseja salvar mesmo assim?')) return;
   }
 
@@ -4838,14 +4944,24 @@ function relatorioManutencao(){
   win.document.close();
 }
 
-function renderManutencao() {
-  if (!db) return;
-  if (!db.manutencoes) db.manutencoes = [];
-  // Perfil "somente incluir": não exibe a lista/custos das manutenções da empresa.
-  if (_soIncluirManutencao()) {
-    var _st = document.getElementById('manutStats'); if (_st) _st.innerHTML = '';
-    var _g = document.getElementById('manutGrid');
-    if (_g) _g.innerHTML =
+// Consulta de manutenção com ESCOPO (perfis oficina / clientes)
+function renderManutencaoRestrito(modo) {
+  var stats = document.getElementById('manutStats');
+  var grid  = document.getElementById('manutGrid');
+  if (!grid) return;
+
+  // Associação ainda não carregada → carrega e re-renderiza
+  if (_assocCache === null) {
+    if (stats) stats.innerHTML = '';
+    grid.innerHTML = '<div class="loading"><div class="spinner"></div>Carregando histórico...</div>';
+    _carregarAssoc(function(){ renderManutencao(); });
+    return;
+  }
+
+  // Perfil que só inclui (sem escopo de visualização): mantém tela de "registrar"
+  if (!modo.mostraLista) {
+    if (stats) stats.innerHTML = '';
+    grid.innerHTML =
       '<div class="empty" style="padding:40px 20px;text-align:center">'
       + '<div style="font-size:34px;margin-bottom:6px">🔧</div>'
       + '<p style="font-weight:800;color:var(--dark);margin:0 0 4px">Registrar manutenção</p>'
@@ -4853,6 +4969,93 @@ function renderManutencao() {
       + '</div>';
     return;
   }
+
+  // Monta o escopo (interseção quando há oficina E cliente)
+  var oficinaAssoc = (_assocCache.oficina||'').trim().toLowerCase();
+  var placasCliente = modo.escopoCliente ? _placasDoCliente(_assocCache.clienteId) : null;
+  var q  = ((document.getElementById('qManut')||{}).value||'').toLowerCase();
+  var fs = (document.getElementById('fManutStatus')||{}).value || '';
+  var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
+  var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
+
+  var list = (db.manutencoes||[]).filter(function(m){
+    if (!m) return false;
+    if (modo.escopoOficina) { if ((m.oficina||'').trim().toLowerCase() !== oficinaAssoc) return false; }
+    if (modo.escopoCliente) { if (!m.placa || !placasCliente.has(String(m.placa).toUpperCase())) return false; }
+    if (fs && m.status !== fs) return false;
+    if (dataIni && (!m.data || m.data < dataIni)) return false;
+    if (dataFim && (!m.data || m.data > dataFim)) return false;
+    if (!q) return true;
+    return ((m.veiculoNome||'')+' '+(m.placa||'')+' '+(m.oficina||'')+' '+(m.descricao||'')).toLowerCase().indexOf(q) >= 0;
+  });
+
+  // Custo: oculto para o perfil de cliente (informação interna da locadora)
+  var mostrarCusto = !(modo.escopoCliente && !modo.escopoOficina);
+
+  // Cabeçalho de contexto
+  var ctx = '';
+  if (modo.escopoOficina) ctx += 'Oficina: <strong>'+(_assocCache.oficina||'— não associada —')+'</strong>';
+  if (modo.escopoCliente) {
+    var cli = (db.clients||[]).find(function(c){ return c && c.id===_assocCache.clienteId; });
+    ctx += (ctx?' · ':'') + 'Cliente: <strong>'+(cli?cli.nome:'— não associado —')+'</strong>';
+  }
+
+  if (stats) stats.innerHTML =
+    '<div style="background:#EEF1FD;border-radius:8px;padding:9px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
+    + '<span>🔎 '+ctx+'</span><span style="color:var(--muted)">'+list.length+' manutenção(ões)</span></div>';
+
+  if (!list.length) {
+    grid.innerHTML = '<div class="empty"><p>Nenhuma manutenção encontrada</p><small>'
+      + (modo.escopoOficina ? 'Só aparecem aqui os serviços lançados para a sua oficina.' : 'Só aparecem as manutenções das placas locadas a você.')
+      + '</small></div>';
+    return;
+  }
+
+  var stLbl = {em_andamento:'🔧 Em andamento', concluida:'✅ Concluída', orcamento:'📋 Orçamento'};
+  var stCor = {em_andamento:'#7c3aed', concluida:'#0d7a3e', orcamento:'#b45309'};
+  var stBg  = {em_andamento:'#ede9fe', concluida:'#e8f5ef', orcamento:'#fef3cd'};
+  var tipoLbl = {preventiva:'Preventiva',corretiva:'Corretiva',revisao:'Revisão',pneu:'Pneu',funilaria:'Funilaria',eletrica:'Elétrica',outro:'Outro'};
+
+  grid.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:640px">'
+    + '<thead><tr style="background:var(--dark)">'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase">Veículo</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase">Serviço</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase">Oficina</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:center">Entrada</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:center">Retorno</th>'
+    + (mostrarCusto ? '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:right">Custo</th>' : '')
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase">Status</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:center">Ver</th>'
+    + '</tr></thead><tbody>'
+    + list.slice().reverse().map(function(m){
+      var st = m.status || 'em_andamento';
+      var comp = m.comprovantes && m.comprovantes.length ? ' <span style="font-size:9px;background:#EEF1FD;color:#2B4BF2;padding:1px 5px;border-radius:3px">📎 '+m.comprovantes.length+'</span>' : '';
+      return '<tr style="border-bottom:1px solid #f0f2f8">'
+        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span></td>'
+        + '<td style="padding:9px 12px"><span style="background:#f0f2f9;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+(tipoLbl[m.tipo]||m.tipo||'')+'</span><br><span style="font-size:11px;color:var(--muted)">'+((m.descricao||'').substring(0,40))+((m.descricao&&m.descricao.length>40)?'...':'')+'</span>'+comp+'</td>'
+        + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+(m.retorno ? fmt(m.retorno) : '—')+'</td>'
+        + (mostrarCusto ? '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px">'+(m.custo?'R$ '+m.custo:'—')+'</td>' : '')
+        + '<td style="padding:9px 12px"><span style="background:'+(stBg[st]||'#f0f2f9')+';color:'+(stCor[st]||'#555')+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+(stLbl[st]||st)+'</span></td>'
+        + '<td style="padding:9px 12px;text-align:center"><button class="icon-btn manut-view-btn" data-mid="'+m.id+'" title="Consultar / Comprovantes" style="color:#0d7a3e;border-color:#0d7a3e">🔍</button></td>'
+      + '</tr>';
+    }).join('')
+    + '</tbody></table></div>';
+
+  grid.addEventListener('click', function(e){
+    var btnV = e.target.closest('.manut-view-btn');
+    if (btnV) consultarManutencao(btnV.dataset.mid);
+  });
+}
+
+function renderManutencao() {
+  if (!db) return;
+  if (!db.manutencoes) db.manutencoes = [];
+  // Perfil de manutenção RESTRITO (oficina / clientes): consulta com escopo
+  var _modo = _modoManutencao();
+  if (_modo.restrito) { renderManutencaoRestrito(_modo); return; }
   var q  = (document.getElementById('qManut').value||'').toLowerCase();
   var fs = document.getElementById('fManutStatus').value;
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
@@ -8574,12 +8777,20 @@ function mltConfirmarImportacao(){
         <div class="fg"><label class="fl">Senha *</label><input class="fi" id="uSenha" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
         <div class="fg"><label class="fl">Confirmar Senha *</label><input class="fi" id="uSenha2" type="password" placeholder="Repita a senha" autocomplete="new-password"></div>
         <div class="fg"><label class="fl">Perfil *</label>
-          <select class="fs" id="uPerfil">
+          <select class="fs" id="uPerfil" onchange="_toggleAssocFields()">
             <option value="operador">Operador</option>
-            <option value="oficina">Oficina (só incluir manutenções)</option>
-            <option value="admin">Admin</option>
-            <option value="master">Master</option>
           </select>
+        </div>
+        <div class="fg" id="wrapOficinaAssoc" style="display:none">
+          <label class="fl">Oficina associada</label>
+          <input class="fi" id="uOficinaAssoc" list="oficinasDatalist" placeholder="Nome da oficina" autocomplete="off">
+          <datalist id="oficinasDatalist"></datalist>
+          <small style="font-size:10px;color:var(--muted)">O usuário verá o histórico das placas lançadas para esta oficina.</small>
+        </div>
+        <div class="fg" id="wrapClienteAssoc" style="display:none">
+          <label class="fl">Cliente associado</label>
+          <select class="fs" id="uClienteAssoc"><option value="">— Selecione o cliente —</option></select>
+          <small style="font-size:10px;color:var(--muted)">O usuário verá só as manutenções das placas locadas a este cliente.</small>
         </div>
         <div class="fg" style="display:flex;align-items:flex-end">
           <input type="hidden" id="uEditId">
