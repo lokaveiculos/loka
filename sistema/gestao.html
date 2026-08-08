@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v72-20260807-1425 -->
+<!-- LOKA deploy: v73-20260807-1425 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -537,8 +537,9 @@ tr:hover td{background:#f8f9fe;}
           <input class="filter-input" id="mltFDe"  type="date" onchange="mltAplicarFiltro()" title="Infra&ccedil;&atilde;o de" style="max-width:140px">
           <input class="filter-input" id="mltFAte" type="date" onchange="mltAplicarFiltro()" title="Infra&ccedil;&atilde;o at&eacute;" style="max-width:140px">
           <button class="btn btn-outline" onclick="mltLimparFiltro()" style="font-size:11px">Limpar</button>
-          <button class="btn btn-outline" onclick="mltRelatorio()" style="font-size:11px">&#128203; Relat&oacute;rio</button>
-          <button class="btn btn-green" onclick="mltAbrir(null)">+ Nova Multa</button>
+          <button class="btn btn-outline" onclick="mltRelatorio()" style="font-size:11px">&#128203; Relat&oacute;rio PDF</button>
+          <button class="btn btn-outline" id="mltBtnExcel" onclick="mltRelatorioCSV()" style="font-size:11px">&#128202; Excel</button>
+          <button class="btn btn-green" id="mltBtnNova" onclick="mltAbrir(null)">+ Nova Multa</button>
         </div>
 
         <div id="mltGrid"></div>
@@ -1100,7 +1101,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v72-20260807-1425';
+var LOKA_BUILD = 'v73-20260807-1425';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1188,7 +1189,8 @@ var _ACAO_LABEL   = {
   verRelatorio:'Ver Relatório mensal',
   manutencaoIncluir:'Manutenção: incluir novas',
   manutencaoEscopoOficina:'Manutenção: ver só as placas da oficina associada',
-  manutencaoEscopoCliente:'Manutenção: ver só as placas locadas ao cliente associado'
+  manutencaoEscopoCliente:'Manutenção: ver só as placas locadas ao cliente associado',
+  multasEscopoCliente:'Multas: ver só as multas dos clientes associados'
 };
 
 // Perfis EMBUTIDOS (fallback — sempre existem, não podem ser excluídos)
@@ -1203,9 +1205,9 @@ var _PERFIS_BUILTIN = {
   // Oficina: inclui novas manutenções E consulta o histórico das placas da sua oficina
   oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
               acoes:{ manutencaoIncluir:true, manutencaoEscopoOficina:true, verRelatorio:true } },
-  // Clientes: consulta o histórico de manutenção apenas das placas locadas a ele
-  clientes: { nome:'Clientes', builtin:true, paineis:['manutencao'],
-              acoes:{ manutencaoEscopoCliente:true, verRelatorio:true } }
+  // Clientes: consulta manutenção E multas apenas das placas/clientes associados
+  clientes: { nome:'Clientes', builtin:true, paineis:['manutencao','multas'],
+              acoes:{ manutencaoEscopoCliente:true, multasEscopoCliente:true, verRelatorio:true } }
 };
 
 // Perfis PERSONALIZADOS (carregados do Firebase: loka_perfis) — podem sobrescrever embutidos
@@ -1252,6 +1254,8 @@ function _modoManutencao() {
   };
 }
 function _soIncluirManutencao(){ var m=_modoManutencao(); return m.restrito && !m.mostraLista; } // compat
+// Perfil restrito de MULTAS (consulta apenas os clientes associados)
+function _multasRestrito(){ return _podeAcao('multasEscopoCliente'); }
 
 // Associação do usuário logado (oficina / cliente) — para o escopo de visualização
 var _assocCache = null; // {oficinas:[], clientes:[]}
@@ -7505,7 +7509,19 @@ function mltInit(){
   if (!Array.isArray(db.multas)) db.multas = [];
   mltPreencherFiltroPlacas();
   mltPreencherFiltroClientes();
+  _aplicarRestricaoMultas();
   mltRender();
+}
+
+// Perfil restrito de multas: some com importar/nova/edição e mostra só consulta + relatório
+function _aplicarRestricaoMultas(){
+  var r = _multasRestrito();
+  var hide = function(id){ var e=document.getElementById(id); if(e) e.style.display = r ? 'none' : ''; };
+  hide('mltTabImportar');   // aba Importar PDF
+  hide('mltBtnNova');       // + Nova Multa
+  hide('mltFCliente');      // filtro de cliente (o escopo já é fixo)
+  var bx = document.getElementById('mltBtnExcel'); if (bx) bx.style.display = '';
+  if (r) mltMostrarAba('lista');
 }
 
 function mltMostrarAba(aba){
@@ -7608,7 +7624,13 @@ function mltLimparFiltro(){
 function mltFiltradas(){
   var f = _mltFiltro;
   var q = f.q.toLowerCase().trim();
+  // Escopo por cliente (perfis restritos, ex.: Clientes): só as multas dos clientes associados
+  var escSet = null;
+  if (typeof _multasRestrito === 'function' && _multasRestrito() && _assocCache) {
+    escSet = {}; (_assocCache.clientes||[]).forEach(function(id){ escSet[id] = 1; });
+  }
   return mltMultas().filter(function(m){
+    if (escSet && !(m.clienteId && escSet[m.clienteId])) return false;
     if (f.status && m.status !== f.status) return false;
     if (f.placas && f.placas.length && f.placas.indexOf(mltNormPlaca(m.placa)) < 0) return false;
     if (f.finais && f.finais.length) {
@@ -7770,8 +7792,10 @@ function mltRender(){
       + '<td>'+prazos+'</td>'
       + '<td><span class="badge" style="background:'+st.bg+';color:'+st.cor+'">'+st.rot+'</span></td>'
       + '<td class="td-actions">'
-        + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="mltAbrir(\''+m.id+'\')">Editar</button>'
-        + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:var(--red)" onclick="mltExcluir(\''+m.id+'\')">✕</button>'
+        + (_multasRestrito()
+            ? '<span style="color:var(--muted);font-size:10px">—</span>'
+            : '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="mltAbrir(\''+m.id+'\')">Editar</button>'
+              + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:var(--red)" onclick="mltExcluir(\''+m.id+'\')">✕</button>')
       + '</td></tr>';
   });
 
@@ -8039,9 +8063,32 @@ function mltRelatorio(){
   w.document.close();
 }
 
-
-// ═══════════════════════════════════════════════════════════════
-// IMPORTAÇÃO DE PDF (pdf.js)
+// Exporta para Excel (CSV) as multas do filtro/escopo atual
+function mltRelatorioCSV(){
+  var lista = mltFiltradas();
+  if (!lista.length) { toast('Nenhuma multa no filtro atual','#b45309'); return; }
+  var esc = function(s){ s=(s==null?'':String(s)); return '"'+s.replace(/"/g,'""')+'"'; };
+  var linhas = [ ['Placa','Veículo','AIT','Data Infração','Infração','Órgão','Locatário','Status','Vencimento','Valor (R$)','Pago (R$)','Data Pgto'].map(esc).join(';') ];
+  lista.forEach(function(m){
+    linhas.push([
+      mltFmtPlaca(m.placa), m.veiculoNome||'', m.ait||'', mltBR(m.dataInfracao), m.descricao||'',
+      m.orgao||'', m.clienteNome||'(sem locatário)', (MLT_STATUS[m.status]||{}).rot||m.status||'',
+      m.vencimento?mltBR(m.vencimento):'', mltNum(m.valor).toFixed(2).replace('.',','),
+      m.dataPagamento?(mltNum(m.valorPago)||mltNum(m.valor)).toFixed(2).replace('.',','):'',
+      m.dataPagamento?mltBR(m.dataPagamento):''
+    ].map(esc).join(';'));
+  });
+  var csv = '\ufeff' + linhas.join('\r\n');
+  try {
+    var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'multas_'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    toast('📊 Excel exportado ('+lista.length+' multas)','#0d7a3e');
+  } catch(e) { toast('❌ Erro ao exportar: '+e.message,'#c0392b'); }
+}
 // ═══════════════════════════════════════════════════════════════
 var MLT_PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 var MLT_PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
