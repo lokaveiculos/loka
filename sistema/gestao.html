@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v67-20260807-1425 -->
+<!-- LOKA deploy: v68-20260807-1425 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1100,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v67-20260807-1425';
+var LOKA_BUILD = 'v68-20260807-1425';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -2307,23 +2307,85 @@ function globalSearch(q) {
 
 // ── DASHBOARD ─────────────────────────────────────────────────
 // ── AUDITORIA DE STATUS (Bloco 3B) ──────────────────────────
+// ── Casamento veículo ↔ aluguel ativo (cobre todos os formatos) ──────────────
+// Um aluguel pode referenciar o veículo por: placa (única OU várias juntas
+// "AAA1A11, BBB2B22"), placas[], veiculos[{placa}], veiculo.placa, ou veiculoId.
+function _placasDoAtivo(a) {
+  var out = [];
+  if (!a) return out;
+  function add(p) {
+    if (p == null) return;
+    String(p).split(/[,;\/]/).forEach(function(x){ x = x.trim().toUpperCase(); if (x) out.push(x); });
+  }
+  add(a.placa); add(a.veiculoPlaca); add(a.placaVeiculo);
+  if (Array.isArray(a.placas)) a.placas.forEach(add);
+  if (Array.isArray(a.veiculos)) a.veiculos.forEach(function(vv){ if (vv) add(vv.placa != null ? vv.placa : vv); });
+  if (a.veiculo && a.veiculo.placa) add(a.veiculo.placa);
+  return out;
+}
+function _idsDoAtivo(a) {
+  var out = [];
+  if (!a) return out;
+  if (a.veiculoId) out.push(a.veiculoId);
+  if (Array.isArray(a.veiculoIds)) a.veiculoIds.forEach(function(x){ if (x) out.push(x); });
+  if (Array.isArray(a.veiculos)) a.veiculos.forEach(function(vv){ if (vv && vv.id) out.push(vv.id); if (vv && vv.veiculoId) out.push(vv.veiculoId); });
+  return out;
+}
+// Conjuntos de placas e ids com aluguel ativo
+function _refsAtivas() {
+  var placas = new Set(), ids = new Set();
+  (db.ativos||[]).forEach(function(a){
+    _placasDoAtivo(a).forEach(function(p){ placas.add(p); });
+    _idsDoAtivo(a).forEach(function(id){ ids.add(id); });
+  });
+  return { placas: placas, ids: ids };
+}
+function _veiculoTemAluguelAtivo(v, refs) {
+  if (!v) return false;
+  if (v.placa && refs.placas.has(String(v.placa).toUpperCase())) return true;
+  if (v.id && refs.ids.has(v.id)) return true;
+  return false;
+}
+
+// Reconciliação automática (direção segura): veículo com aluguel ativo que
+// aparece como "disponivel" é corrigido para "alugado". Não mexe em
+// manutencao/inativo, e nunca libera veículo (isso fica na auditoria manual).
+function reconciliarStatusVeiculos(silent) {
+  if (!db) return 0;
+  db.ativos   = cleanArr(db.ativos);
+  db.veiculos = cleanVeics(db.veiculos);
+  var refs = _refsAtivas();
+  var n = 0, exemplos = [];
+  db.veiculos.forEach(function(v){
+    if (!v || !v.placa) return;
+    if (v.status === 'disponivel' && _veiculoTemAluguelAtivo(v, refs)) {
+      v.status = 'alugado'; n++;
+      if (exemplos.length < 3) exemplos.push(v.placa);
+    }
+  });
+  if (n > 0) {
+    saveDB();
+    if (typeof renderVeiculos === 'function')  try { renderVeiculos(); }  catch(e){}
+    if (typeof renderDashboard === 'function')  try { renderDashboard(); } catch(e){}
+    if (!silent) toast('🔧 '+n+' veículo(s) alugado(s) que apareciam como Disponível foram corrigidos ('+exemplos.join(', ')+(n>3?'…':'')+')', '#0d7a3e');
+  } else if (!silent) {
+    toast('✅ Nenhuma divergência: todos os alugados já estão com status correto', '#0d7a3e');
+  }
+  return n;
+}
+
 function auditarStatusVeiculos() {
   if (!db) return;
   db.ativos   = cleanArr(db.ativos);
   db.veiculos = cleanVeics(db.veiculos);
 
-  // Coletar todas as placas em contratos ativos
-  var placasAtivas = new Set();
-  db.ativos.forEach(function(a) {
-    if (!a) return;
-    if (a.placa) placasAtivas.add(a.placa.toUpperCase());
-    if (a.placas) a.placas.forEach(function(p){ if(p) placasAtivas.add(p.toUpperCase()); });
-  });
+  // Coletar todas as placas E ids com aluguel ativo (todos os formatos)
+  var refs = _refsAtivas();
 
   var problemas = [];
   db.veiculos.forEach(function(v) {
     if (!v || !v.placa) return;
-    var temContrato = placasAtivas.has(v.placa.toUpperCase());
+    var temContrato = _veiculoTemAluguelAtivo(v, refs);
     // Caso 1: status alugado mas sem contrato ativo
     if (v.status === 'alugado' && !temContrato) {
       problemas.push({tipo:'alugado_sem_contrato', placa:v.placa, nome:v.marca+' '+v.modelo, v:v});
@@ -2396,8 +2458,20 @@ function auditarStatusVeiculos() {
 }
 
 
+var _reconcileFeito = false;
 function renderDashboard() {
   if (!db) return;
+  // Reconciliação automática (uma vez por carregamento): corrige veículos alugados
+  // que estejam aparecendo como "Disponível".
+  if (!_reconcileFeito) {
+    _reconcileFeito = true;
+    setTimeout(function(){
+      try {
+        var n = reconciliarStatusVeiculos(true);
+        if (n > 0) toast('🔧 '+n+' veículo(s) alugado(s) que apareciam como Disponível foram corrigidos automaticamente','#0d7a3e');
+      } catch(e){}
+    }, 500);
+  }
   db.ativos    = cleanArr(db.ativos);
   db.veiculos  = cleanVeics(db.veiculos);
   db.clients   = cleanArr(db.clients);
