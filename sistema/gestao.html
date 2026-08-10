@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v73-20260807-1425 -->
+<!-- LOKA deploy: v75-20260810-1200 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -69,7 +69,7 @@ body{font-family:"Montserrat",sans-serif;background:#f0f2fa;color:var(--dark);fo
 .table-head span{font-size:10px;color:var(--muted);}
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
-th{background:#f8f9fe;padding:9px 12px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+th{background:#f8f9fe;padding:9px 12px;text-align:left;font-size:9px;font-weight:800 !important;text-transform:uppercase;letter-spacing:.7px;color:#111827 !important;border-bottom:1px solid var(--border);white-space:nowrap;}
 td{padding:10px 12px;border-bottom:1px solid #f5f6fa;vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
 tr:hover td{background:#f8f9fe;}
@@ -423,6 +423,8 @@ tr:hover td{background:#f8f9fe;}
           <option value="8">Final 8</option>
           <option value="9">Final 9</option>
         </select>
+        <button class="btn btn-outline" onclick="frotaRelatorioPDF()" style="white-space:nowrap" title="Relatório da frota em PDF">📄 Relatório PDF</button>
+        <button class="btn btn-outline" onclick="frotaRelatorioCSV()" style="white-space:nowrap" title="Exportar frota para Excel">📊 Excel</button>
         <button class="btn btn-blue" onclick="openVeiculo(null)" style="white-space:nowrap">+ Adicionar Veículo</button>
       </div>
       <div id="frotaGrid"></div>
@@ -1101,7 +1103,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v73-20260807-1425';
+var LOKA_BUILD = 'v75-20260810-1200';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4401,6 +4403,82 @@ function docsDaPlaca(placa) {
   return { renavam: d[0], chassi: d[1], anoMod: d[2], alienado: d[3] };
 }
 
+// ── RELATÓRIO DA FROTA (Veículo/Placa/RENAVAM/Chassi/Ano-Mod/Alienado) ───────
+var _frotaListaAtual = [];
+function _frotaCampos(v) {
+  var _doc = (typeof docsDaPlaca==='function' ? docsDaPlaca(v.placa) : null) || {};
+  var ali = (v.alienado!=null && v.alienado!=='') ? v.alienado : (_doc.alienado||'');
+  return {
+    veiculo:  ((v.marca||'')+' '+(v.modelo||'')).trim() || '—',
+    placa:    v.placa||'',
+    renavam:  v.renavam || _doc.renavam || '',
+    chassi:   v.chassi  || _doc.chassi  || '',
+    anoMod:   v.anoMod  || _doc.anoMod  || v.ano || '',
+    alienado: ali || '—'
+  };
+}
+function _frotaParaRelatorio() {
+  var lista = (_frotaListaAtual && _frotaListaAtual.length) ? _frotaListaAtual : (db.veiculos||[]);
+  return lista.filter(Boolean).slice().sort(function(a,b){
+    return ((a.marca||'')+(a.modelo||'')).localeCompare((b.marca||'')+(b.modelo||''));
+  });
+}
+function frotaRelatorioPDF() {
+  var lista = _frotaParaRelatorio();
+  if (!lista.length) { toast('Nenhum veículo para o relatório','#b45309'); return; }
+  var linhas = lista.map(function(v){
+    var c = _frotaCampos(v);
+    return '<tr>'
+      + '<td>'+c.veiculo+'</td>'
+      + '<td style="font-family:monospace;font-weight:700">'+c.placa+'</td>'
+      + '<td style="font-family:monospace">'+(c.renavam||'—')+'</td>'
+      + '<td style="font-family:monospace;font-size:10px">'+(c.chassi||'—')+'</td>'
+      + '<td style="text-align:center">'+(c.anoMod||'—')+'</td>'
+      + '<td style="text-align:center">'+c.alienado+'</td>'
+      + '</tr>';
+  }).join('');
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório da Frota</title>'
+    + '<style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:24px}'
+    + 'h1{font-size:18px;margin:0 0 2px}.sub{color:#555;font-size:12px;margin-bottom:14px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:11px}'
+    + 'th{background:#0E1B4D;color:#fff !important;padding:7px 9px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}'
+    + 'td{padding:6px 9px;border-bottom:1px solid #e5e7eb}'
+    + 'tr:nth-child(even) td{background:#f7f8fc}'
+    + '@media print{@page{size:A4 landscape;margin:12mm}}'
+    + '</style></head><body>'
+    + '<h1>Relatório da Frota — LOKÁ Aluguel de Veículos</h1>'
+    + '<div class="sub">'+lista.length+' veículo(s) · gerado em '+new Date().toLocaleString('pt-BR')+'</div>'
+    + '<table><thead><tr>'
+    + '<th>Veículo</th><th>Placa</th><th>RENAVAM</th><th>Chassi</th><th>Ano/Mod</th><th>Alienado</th>'
+    + '</tr></thead><tbody>'+linhas+'</tbody></table>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>'
+    + '</body></html>';
+  var w = window.open('', '_blank');
+  if (!w) { toast('Permita pop-ups para gerar o PDF','#b45309'); return; }
+  w.document.write(html); w.document.close();
+}
+function frotaRelatorioCSV() {
+  var lista = _frotaParaRelatorio();
+  if (!lista.length) { toast('Nenhum veículo para o relatório','#b45309'); return; }
+  var esc = function(s){ s=(s==null?'':String(s)); return '"'+s.replace(/"/g,'""')+'"'; };
+  var linhas = [ ['Veículo','Placa','RENAVAM','Chassi','Ano/Mod','Alienado'].map(esc).join(';') ];
+  lista.forEach(function(v){
+    var c = _frotaCampos(v);
+    linhas.push([c.veiculo,c.placa,c.renavam,c.chassi,c.anoMod,c.alienado].map(esc).join(';'));
+  });
+  var csv = '\ufeff' + linhas.join('\r\n');
+  try {
+    var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'frota_'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    toast('📊 Frota exportada ('+lista.length+' veículos)','#0d7a3e');
+  } catch(e) { toast('❌ Erro ao exportar: '+e.message,'#c0392b'); }
+}
+
 function renderFrota() {
   if (!db) return;
   db.ativos    = cleanArr(db.ativos);
@@ -4445,6 +4523,7 @@ function renderFrota() {
     }
     return true;
   });
+  _frotaListaAtual = list;
 
   // Stats
   var nDisp  = db.veiculos.filter(function(v){return v.status==='disponivel';}).length;
@@ -4590,14 +4669,17 @@ function renderVeiculos() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Placa</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Cor / Ano</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Status</th>'
-    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Diária</th>'
-    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Mensal</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Diária<br><span style="font-size:8px;font-weight:600">100km / livre</span></th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Mensal<br><span style="font-size:8px;font-weight:600">3000km / livre</span></th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
     + '</tr></thead><tbody>'
     + list.map(function(v) {
       var st = v.status||'disponivel';
-      var diaria = v.diaria ? 'R$ '+Number(v.diaria).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
-      var mensal = v.mensal ? 'R$ '+Number(v.mensal).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
+      var _pbrl = function(n){ return n ? 'R$ '+Number(n).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—'; };
+      var diariaCell = '<div style="line-height:1.35"><div><span style="font-size:9px;color:var(--muted)">100km </span><strong style="font-size:11px">'+_pbrl(v.diaria)+'</strong></div>'
+        + '<div><span style="font-size:9px;color:var(--muted)">livre </span><strong style="font-size:11px">'+_pbrl(v.diaria_km_livre)+'</strong></div></div>';
+      var mensalCell = '<div style="line-height:1.35"><div><span style="font-size:9px;color:var(--muted)">3000km </span><strong style="font-size:11px;color:var(--green)">'+_pbrl(v.mensal)+'</strong></div>'
+        + '<div><span style="font-size:9px;color:var(--muted)">livre </span><strong style="font-size:11px;color:var(--green)">'+_pbrl(v.mensal_km_livre)+'</strong></div></div>';
       var manutBtn = st==='manutencao'
         ? '<button class="icon-btn" onclick="openRetornoManut(\''+v.id+'\')" title="Dar Baixa" style="color:var(--purple);border-color:var(--purple)">✅</button>'
         : '';
@@ -4617,8 +4699,8 @@ function renderVeiculos() {
             return a?'<br><span style="font-size:9px;color:var(--blue);font-weight:600">👤 '+a.clienteNome+'</span>':'';
           })()+
         '</td>'+
-        '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px">'+diaria+'</td>'+
-        '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px;color:var(--green)">'+mensal+'</td>'+
+        '<td style="padding:9px 12px;text-align:right">'+diariaCell+'</td>'+
+        '<td style="padding:9px 12px;text-align:right">'+mensalCell+'</td>'+
         '<td style="padding:9px 12px"><div style="display:flex;gap:4px;justify-content:center">'+
           '<button class="icon-btn" onclick="openVeiculo(\''+v.id+'\')" title="Editar">✏️</button>'+
           '<button class="icon-btn" onclick="abrirPrecos(\''+v.id+'\')" title="Preços" style="color:#7c3aed;border-color:#7c3aed">💰</button>'+
@@ -5125,7 +5207,7 @@ function renderManutencaoRestrito(modo) {
       var st = m.status || 'em_andamento';
       var comp = m.comprovantes && m.comprovantes.length ? ' <span style="font-size:9px;background:#EEF1FD;color:#2B4BF2;padding:1px 5px;border-radius:3px">📎 '+m.comprovantes.length+'</span>' : '';
       return '<tr style="border-bottom:1px solid #f0f2f8">'
-        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span></td>'
+        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span>'+(_empresaDaManut(m)?'<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+_empresaDaManut(m)+'</span>':'')+'</td>'
         + '<td style="padding:9px 12px"><span style="background:#f0f2f9;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+(tipoLbl[m.tipo]||m.tipo||'')+'</span><br><span style="font-size:11px;color:var(--muted)">'+((m.descricao||'').substring(0,40))+((m.descricao&&m.descricao.length>40)?'...':'')+'</span>'+comp+'</td>'
         + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
@@ -5205,7 +5287,7 @@ function renderManutencao() {
       var st   = m.status || 'em_andamento';
       var comp = m.comprovantes && m.comprovantes.length ? ' <span style="font-size:9px;background:#EEF1FD;color:#2B4BF2;padding:1px 5px;border-radius:3px">📎 '+m.comprovantes.length+'</span>' : '';
       return '<tr style=\"border-bottom:1px solid #f0f2f8\">'
-        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span></td>'
+        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span>'+(_empresaDaManut(m)?'<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+_empresaDaManut(m)+'</span>':'')+'</td>'
         + '<td style="padding:9px 12px"><span style="background:#f0f2f9;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+(tipoLbl[m.tipo]||m.tipo||'')+'</span><br><span style="font-size:11px;color:var(--muted)">'+(m.descricao||'').substring(0,40)+(m.descricao&&m.descricao.length>40?'...':'')+'</span>'+comp+'</td>'
         + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
@@ -5304,6 +5386,7 @@ function openManutRegistro(id) {
   // Comprovantes existentes
   _mrComps = [];  // comprovantes desativados
   renderMrComps();
+  _atualizarLocatariaManut();
   openM('mManutRegistro');
 }
 
@@ -5333,11 +5416,55 @@ function anexarComprovante(input) {
 }
 
 // ── BUSCA POR PLACA NO MODAL DE MANUTENÇÃO ──────────────────
+// ── LOCATÁRIA DO VEÍCULO (empresa que está com o carro alugado) ──────────────
+// Descobre, pelos aluguéis ativos, qual empresa está com aquele veículo.
+// Robusto a contratos multi-veículo (usa _placasDoAtivo/_idsDoAtivo).
+function _locatariaAtual(placa, veiculoId) {
+  var P = String(placa||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  var res = null;
+  (db.ativos||[]).forEach(function(a){
+    if (res || !a) return;
+    var placas = _placasDoAtivo(a).map(function(x){ return String(x).toUpperCase().replace(/[^A-Z0-9]/g,''); });
+    var ids = _idsDoAtivo(a);
+    if ((P && placas.indexOf(P) >= 0) || (veiculoId && ids.indexOf(veiculoId) >= 0)) {
+      res = { clienteId: a.clienteId||'', clienteNome: a.clienteNome||'' };
+    }
+  });
+  return res;
+}
+
+// Atualiza o box "Empresa locatária" no modal de manutenção
+function _atualizarLocatariaManut() {
+  var box = document.getElementById('mrLocatariaBox');
+  var nomeEl = document.getElementById('mrLocatariaNome');
+  if (!box || !nomeEl) return;
+  var vid = (document.getElementById('mrVeiculo')||{}).value || '';
+  var v = (db.veiculos||[]).find(function(x){ return x && x.id===vid; });
+  if (!vid || !v) { box.style.display='none'; return; }
+  var loc = _locatariaAtual(v.placa, v.id);
+  box.style.display = 'block';
+  if (loc && loc.clienteNome) {
+    nomeEl.textContent = loc.clienteNome;
+    box.style.background = '#e8f0ff';
+  } else {
+    nomeEl.textContent = 'Veículo não está locado no momento';
+    box.style.background = '#fff4e5';
+  }
+}
+
+// Empresa locatária de uma manutenção: usa a gravada; se não houver, a atual
+function _empresaDaManut(m) {
+  if (m && m.clienteNome) return m.clienteNome;
+  var loc = _locatariaAtual(m ? m.placa : '', m ? m.veiculoId : '');
+  return (loc && loc.clienteNome) ? loc.clienteNome : '';
+}
+
 function selecionarVeiculoPorPlaca(placa) {
   placa = (placa||'').toUpperCase().trim();
   var v = (db.veiculos||[]).find(function(x){ return x && x.placa && x.placa.toUpperCase()===placa; });
   var sel = document.getElementById('mrVeiculo');
   if (v && sel) sel.value = v.id;
+  _atualizarLocatariaManut();
 }
 function sincronizarBuscaPlaca() {
   var sel = document.getElementById('mrVeiculo');
@@ -5345,6 +5472,7 @@ function sincronizarBuscaPlaca() {
   if (!sel || !bp) return;
   var v = (db.veiculos||[]).find(function(x){ return x && x.id===sel.value; });
   bp.value = v ? v.placa : '';
+  _atualizarLocatariaManut();
 }
 
 
@@ -5452,12 +5580,16 @@ function salvarManutencao() {
   var v = (db.veiculos||[]).find(function(x){ return x.id===veicId; }) || {};
   var get = function(id){ return document.getElementById(id)&&document.getElementById(id).value||''; };
   var st  = get('mrStatus');
+  // Empresa locatária no momento (vínculo automático pelo aluguel ativo)
+  var _loc = _locatariaAtual(v.placa, v.id);
 
   var registro = {
     id:          _manutEditId || 'manut_'+Date.now(),
     veiculoId:   veicId,
     veiculoNome: v.marca+' '+v.modelo,
     placa:       v.placa||'',
+    clienteId:   _loc ? (_loc.clienteId||'') : '',
+    clienteNome: _loc ? (_loc.clienteNome||'') : '',
     data:        data,
     retorno:     get('mrRetorno'),
     saida:       get('mrSaida'),
@@ -5472,6 +5604,11 @@ function salvarManutencao() {
     criadoEm:    _manutEditId ? undefined : new Date().toISOString(),
     atualizadoEm:new Date().toISOString()
   };
+  // Ao editar, preserva a locatária já registrada se agora não houver aluguel ativo
+  if (_manutEditId && !registro.clienteNome) {
+    var _antiga = (db.manutencoes||[]).find(function(x){ return x.id===_manutEditId; });
+    if (_antiga && _antiga.clienteNome) { registro.clienteId=_antiga.clienteId||''; registro.clienteNome=_antiga.clienteNome; }
+  }
   if (!registro.criadoEm && _manutEditId) {
     var old = (db.manutencoes||[]).find(function(x){ return x.id===_manutEditId; });
     if (old) registro.criadoEm = old.criadoEm;
@@ -8774,9 +8911,9 @@ function mltConfirmarImportacao(){
   <div class="modal-head" style="background:#7c3aed"><h3>💰 Editar Preços — <span id="mPrecosNome"></span></h3><button class="modal-close" onclick="closeM('mPrecos')">✕</button></div>
   <div class="modal-body">
     <div class="g2">
-      <div class="fg"><label class="fl">Diária Normal (R$)</label><input class="fi" id="pDiaria" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Diária 100 km (R$)</label><input class="fi" id="pDiaria" type="number" step="0.01" placeholder="0.00"></div>
       <div class="fg"><label class="fl">Diária KM Livre (R$)</label><input class="fi" id="pDiariaKm" type="number" step="0.01" placeholder="0.00"></div>
-      <div class="fg"><label class="fl">Mensal Normal (R$)</label><input class="fi" id="pMensal" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="fg"><label class="fl">Mensal 3.000 km (R$)</label><input class="fi" id="pMensal" type="number" step="0.01" placeholder="0.00"></div>
       <div class="fg"><label class="fl">Mensal KM Livre (R$)</label><input class="fi" id="pMensalKm" type="number" step="0.01" placeholder="0.00"></div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Franquia (km/dia) — para modalidade diária normal</label><input class="fi" id="pFranquia" type="number" placeholder="Ex: 100"></div>
     </div>
@@ -8992,6 +9129,9 @@ function mltConfirmarImportacao(){
         <select class="fs" id="mrVeiculo" onchange="sincronizarBuscaPlaca()">
           <option value="">— Selecione —</option>
         </select>
+        <div id="mrLocatariaBox" style="margin-top:8px;font-size:12px;padding:8px 12px;border-radius:8px;background:#f0f2f9;color:var(--muted);display:none">
+          🏢 Empresa locatária: <strong id="mrLocatariaNome" style="color:var(--dark)">—</strong>
+        </div>
       </div>
       <div class="fg"><label class="fl">Data de Entrada *</label><input class="fi" id="mrData" type="date"></div>
       <div class="fg"><label class="fl">Previsão de Retorno</label><input class="fi" id="mrRetorno" type="date"></div>
