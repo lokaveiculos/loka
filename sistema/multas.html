@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multas · LOKÁ</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+<style>
+  :root{
+    --blue:#2B4BF2; --dark:#0E1B4D; --light:#EEF1FD; --field:#F7F8FF;
+    --border:#C5CCF5; --muted:#5a607a; --green:#0d7a3e; --red:#c0392b;
+    --amber:#b45309; --purple:#7c3aed;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--light); color:var(--dark); line-height:1.5;
+    padding:20px; max-width:1200px; margin:0 auto;
+  }
+  a{color:var(--blue)}
+  .topbar{
+    display:flex; align-items:center; gap:12px; margin-bottom:20px;
+    padding-bottom:16px; border-bottom:1px solid var(--border);
+  }
+  .logo{
+    width:40px; height:40px; border-radius:10px;
+    background:linear-gradient(135deg,var(--dark),var(--blue));
+    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800;
+  }
+  .topbar h1{font-size:18px; font-weight:800}
+  .topbar .sub{font-size:11px; color:var(--muted)}
+  .back{margin-left:auto; font-size:12px; text-decoration:none; color:var(--muted); border:1px solid var(--border); padding:7px 12px; border-radius:8px}
+  .back:hover{background:#fff}
+
+  .hero{
+    background:linear-gradient(135deg,#0E1B4D,#2B4BF2);
+    border-radius:14px; padding:22px 24px; color:#fff; margin-bottom:18px;
+  }
+  .hero h2{font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px}
+  .hero p{font-size:12px; opacity:.88; margin-top:6px; max-width:640px}
+  .hero-actions{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap}
+
+  .btn{
+    border:none; border-radius:8px; padding:9px 16px; font-size:12px; font-weight:600;
+    cursor:pointer; font-family:inherit; transition:.15s;
+  }
+  .btn:disabled{opacity:.55; cursor:not-allowed}
+  .btn-blue{background:var(--blue); color:#fff}
+  .btn-green{background:var(--green); color:#fff}
+  .btn-ghost{background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3)}
+  .btn-outline{background:#fff; color:var(--dark); border:1px solid var(--border)}
+  .btn:hover:not(:disabled){filter:brightness(1.05)}
+
+  .status-line{font-size:12px; margin-top:14px; min-height:18px}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px}
+  .card{background:#fff; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(14,27,77,.06)}
+  .card .label{font-size:11px; color:var(--muted); font-weight:600}
+  .card .value{font-size:22px; font-weight:800; margin-top:4px}
+
+  .section{background:#fff; border-radius:12px; padding:18px 20px; box-shadow:0 1px 4px rgba(14,27,77,.06); margin-bottom:16px}
+  .section h3{font-size:13px; font-weight:800; margin-bottom:10px}
+
+  table{width:100%; border-collapse:collapse; font-size:12px}
+  th{background:var(--dark); color:#fff; padding:8px 10px; text-align:left; font-size:11px; position:sticky; top:0}
+  td{padding:7px 10px; border-bottom:1px solid var(--light)}
+  tr:hover td{background:var(--field)}
+  .scroll{overflow-x:auto; border:1px solid var(--border); border-radius:10px}
+  .badge{display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700}
+  .empty{text-align:center; color:var(--muted); padding:36px 16px; font-size:13px}
+
+  .note{background:#fff4e5; border-left:4px solid var(--amber); border-radius:8px; padding:12px 14px; font-size:12px; color:#7a4a00; margin-bottom:16px}
+  .note strong{color:var(--amber)}
+  .gate{max-width:360px; margin:80px auto; background:#fff; border-radius:14px; padding:28px; box-shadow:0 4px 20px rgba(14,27,77,.1); text-align:center}
+  .gate input{width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; margin:8px 0; font-family:inherit}
+  .gate input:first-of-type{margin-top:14px}
+  .gate .err{color:var(--red); font-size:12px; min-height:16px}
+  .muted{color:var(--muted)}
+  .fmt-mono{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<!-- ══ Porta de entrada simples (mesma lógica de sessão do sistema) ══ -->
+<div id="gate" class="gate">
+  <div class="logo" style="margin:0 auto 8px">L</div>
+  <div style="font-weight:800">Multas e-Frotas</div>
+  <div class="muted" style="font-size:12px;margin-top:4px">Acesso restrito · LOKÁ</div>
+  <input type="text" id="gateUser" placeholder="Usuário" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('gatePass').focus()">
+  <input type="password" id="gatePass" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')gateEntrar()">
+  <div class="err" id="gateErr"></div>
+  <button class="btn btn-blue" style="width:100%" onclick="gateEntrar()">Entrar</button>
+</div>
+
+<!-- ══ App ══ -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="logo">L</div>
+    <div>
+      <h1>Multas e-Frotas</h1>
+      <div class="sub">Consulta automática SENATRAN · LOKÁ Aluguel de Veículos</div>
+    </div>
+    <a class="back" href="gestao.html">← Voltar ao sistema</a>
+  </div>
+
+  <div class="hero">
+    <h2>📡 Consulta automática de multas</h2>
+    <p>
+      Busca as infrações da frota direto na base da SENATRAN, via e-Frotas, usando o certificado
+      digital da LOKÁ. As multas entram já com o locatário identificado pela data da locação — sem
+      digitar nada. A varredura roda sozinha todo dia; use os botões abaixo para testar ou rodar na hora.
+    </p>
+    <div class="hero-actions">
+      <button class="btn btn-ghost" id="btnTestar" onclick="efrTestar()">Testar conexão</button>
+      <button class="btn btn-green" id="btnConsultar" onclick="efrConsultar()">🔄 Consultar agora</button>
+    </div>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div id="configWarn" class="note" style="display:none">
+    <strong>⚙ Falta configurar os endpoints do e-Frotas.</strong>
+    O backend está no ar e o certificado pode ser testado, mas a consulta de infrações
+    só funciona depois de preencher as URLs e os campos do Swagger de homologação
+    (arquivos <code>efrotas-client.js</code> e <code>adaptador.js</code>).
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="section">
+    <h3>Últimas multas recebidas do e-Frotas</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th>
+          <th>Locatário</th><th>Valor</th><th>Situação</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="empty">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Última sincronização</h3>
+    <div id="syncInfo" class="muted" style="font-size:12px">Sem execução registrada ainda.</div>
+  </div>
+</div>
+
+<!-- Config do Firebase (mesma do sistema) -->
+<script>
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyD-abT7hNat5vkGfJXYPm3bOCefAp_5i5A",
+  authDomain:        "loka-b8dd2.firebaseapp.com",
+  databaseURL:       "https://loka-b8dd2-default-rtdb.firebaseio.com",
+  projectId:         "loka-b8dd2",
+  storageBucket:     "loka-b8dd2.firebasestorage.app",
+  messagingSenderId: "633462890390",
+  appId:             "1:633462890390:web:40e9baa2b80e5b709307b7"
+};
+firebase.initializeApp(FIREBASE_CONFIG);
+var dbRef = firebase.database();
+var FN_REGION = 'southamerica-east1';
+
+// ── Porta de entrada: reaproveita a sessão do sistema principal ──
+// O gestao.html grava 'loka_sess' no localStorage ao logar. Se existir,
+// entra direto. Senão, valida contra loka_users (mesma base do sistema).
+function gateOk(){
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  iniciar();
+}
+
+// Mesma chave de sessão do sistema (index.html)
+var SESSION_KEY = 'loka_session';
+
+// Valida o token de sessão do sistema (base64 com expiração)
+function sessaoValida(){
+  try {
+    var tok = sessionStorage.getItem(SESSION_KEY);
+    if (!tok) return null;
+    var d = JSON.parse(atob(tok));
+    if (!d || !d.exp || Date.now() > d.exp) return null;
+    return d;   // { u, n, p (perfil), exp }
+  } catch(e){ return null; }
+}
+
+function gateEntrar(){
+  var user = (document.getElementById('gateUser')||{}).value || '';
+  var pass = document.getElementById('gatePass').value;
+  var err  = document.getElementById('gateErr');
+  err.textContent = '';
+  var u = user.trim().toLowerCase();
+  if (!u || !pass){ err.textContent = 'Informe usuário e senha.'; return; }
+  // valida contra loka_users, igual ao index.html
+  dbRef.ref('loka_users').once('value').then(function(snap){
+    var fb = snap.val();
+    var list = Array.isArray(fb) ? fb : (fb ? Object.values(fb) : []);
+    var found = list.find(function(usr){
+      return usr && usr.usuario && usr.usuario.toLowerCase() === u && usr.senha === pass;
+    });
+    if (found){
+      // grava a MESMA sessão do sistema, para navegar entre páginas sem relogar
+      var token = btoa(JSON.stringify({
+        u: found.usuario, n: found.nome, p: found.perfil, exp: Date.now() + 8*3600000
+      }));
+      sessionStorage.setItem(SESSION_KEY, token);
+      sessionStorage.setItem('loka_user', JSON.stringify({
+        nome: found.nome, perfil: found.perfil, usuario: found.usuario
+      }));
+      gateOk();
+    } else {
+      err.textContent = 'Usuário ou senha incorretos.';
+    }
+  }).catch(function(e){
+    err.textContent = 'Erro ao validar: ' + e.message;
+  });
+}
+
+// entrada automática se a sessão do sistema estiver ativa
+(function(){
+  if (sessaoValida()){ gateOk(); }
+})();
+
+// ── Helpers de formato ──
+function brl(v){ return 'R$ ' + (Number(v)||0).toFixed(2).replace('.',','); }
+function fmtPlaca(p){
+  var s = String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (s.length!==7) return s||'—';
+  if (/[A-Z]/.test(s.charAt(4))) return s;
+  return s.slice(0,3)+'-'+s.slice(3);
+}
+function brData(d){
+  if(!d) return '—';
+  var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3]+'/'+m[2]+'/'+m[1] : d;
+}
+
+var STATUS_ROT = {
+  pendente:{r:'Pendente',c:'#b45309',b:'#fff4e5'}, indicada:{r:'Indicado',c:'#2B4BF2',b:'#eaeeff'},
+  recurso:{r:'Recurso',c:'#7c3aed',b:'#f2ebff'}, paga:{r:'Paga',c:'#0d7a3e',b:'#e6f5ec'},
+  repassada:{r:'Repassada',c:'#0e7490',b:'#e0f5f8'}, cobrada:{r:'Cobrada',c:'#0d7a3e',b:'#e6f5ec'},
+  cancelada:{r:'Cancelada',c:'#5a607a',b:'#eef1fd'}
+};
+
+// ── Status/feedback ──
+function status(txt, cor){
+  var el = document.getElementById('statusLine');
+  el.innerHTML = '<span style="color:'+(cor||'#fff')+'">'+txt+'</span>';
+}
+function setBtns(disabled){
+  document.getElementById('btnTestar').disabled = disabled;
+  document.getElementById('btnConsultar').disabled = disabled;
+}
+
+function fns(){ return firebase.app().functions(FN_REGION); }
+
+function traduzErro(e){
+  var m = (e && e.message) || 'Erro desconhecido';
+  if (m.indexOf('unauthenticated')>=0) return 'Sessão expirada — recarregue a página.';
+  if (m.indexOf('not-found')>=0 || m.indexOf('NOT_FOUND')>=0) return 'Função não encontrada — o backend foi publicado?';
+  if (m.indexOf('internal')>=0) return 'Erro no servidor — confira os logs do Firebase.';
+  if (m.indexOf('não configurado')>=0 || m.indexOf('CONFIRMAR')>=0){
+    document.getElementById('configWarn').style.display='block';
+    return 'Endpoints do e-Frotas ainda não configurados (veja o aviso abaixo).';
+  }
+  return m;
+}
+
+function efrTestar(){
+  setBtns(true); status('⏳ Testando certificado e conexão…','#ffe');
+  fns().httpsCallable('testarConexaoEfrotas')({}).then(function(r){
+    var d = r.data||{};
+    if (d.ok) status('✓ '+(d.msg||'Conexão OK')+' (HTTP '+(d.http||'?')+')','#9f9');
+    else status('⚠ '+traduzErro({message:d.erro||''}),'#fbb');
+  }).catch(function(e){ status('⚠ '+traduzErro(e),'#fbb'); })
+    .finally(function(){ setBtns(false); });
+}
+
+function efrConsultar(){
+  setBtns(true); status('⏳ Consultando e-Frotas… pode levar alguns minutos.','#ffe');
+  fns().httpsCallable('dispararConsultaMultas')({}).then(function(r){
+    var d = r.data||{};
+    var msg = '✓ '+d.placas+' veículo(s) · '+d.novas+' nova(s)';
+    if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
+    if (d.erros && d.erros.length) msg += ' · ⚠ '+d.erros.length+' com erro';
+    status(msg,'#9f9');
+    carregarDados();
+  }).catch(function(e){ status('⚠ '+traduzErro(e),'#fbb'); })
+    .finally(function(){ setBtns(false); });
+}
+
+// ── Carrega multas e status do banco ──
+function carregarDados(){
+  dbRef.ref('loka_db').get().then(function(snap){
+    var db = snap.val() || {};
+    var multas = (db.multas || []).filter(Boolean);
+    renderCards(multas);
+    renderTabela(multas);
+    renderSync(db.efrotas_status);
+  }).catch(function(e){
+    document.getElementById('tbody').innerHTML =
+      '<tr><td colspan="7" class="empty">Erro ao carregar: '+e.message+'</td></tr>';
+  });
+}
+
+function renderCards(multas){
+  var doEfrotas = multas.filter(function(m){ return m.origem==='efrotas'; });
+  var aberto=0, pago=0, semLoc=0;
+  multas.forEach(function(m){
+    var v = Number(m.valor)||0;
+    if (m.status!=='paga' && m.status!=='cancelada') aberto+=v;
+    if (m.dataPagamento) pago += (Number(m.valorPago)||v);
+    if (!m.clienteId && m.status!=='cancelada') semLoc++;
+  });
+  document.getElementById('cards').innerHTML =
+     card('Multas no total', multas.length)
+   + card('Via e-Frotas', doEfrotas.length)
+   + card('Em aberto', brl(aberto), 'var(--red)')
+   + card('Sem locatário', semLoc, semLoc?'var(--amber)':'var(--dark)');
+}
+function card(label,value,cor){
+  return '<div class="card"><div class="label">'+label+'</div>'
+    + '<div class="value" style="color:'+(cor||'var(--dark)')+'">'+value+'</div></div>';
+}
+
+function renderTabela(multas){
+  var lista = multas.slice().sort(function(a,b){
+    return String(b.dataInfracao||'').localeCompare(String(a.dataInfracao||''));
+  }).slice(0,50);
+
+  if (!lista.length){
+    document.getElementById('tbody').innerHTML =
+      '<tr><td colspan="7" class="empty">Nenhuma multa ainda. Rode uma consulta ou importe pelo sistema.</td></tr>';
+    return;
+  }
+  document.getElementById('tbody').innerHTML = lista.map(function(m){
+    var st = STATUS_ROT[m.status] || STATUS_ROT.pendente;
+    var loc = m.clienteNome
+      ? '<span style="color:var(--green);font-weight:600">'+m.clienteNome+'</span>'
+      : '<span style="color:var(--amber)">⚠ não identificado</span>';
+    var tag = m.origem==='efrotas'
+      ? ' <span class="badge" style="background:#eaeeff;color:#2B4BF2">e-Frotas</span>' : '';
+    return '<tr>'
+      + '<td><strong>'+fmtPlaca(m.placa)+'</strong></td>'
+      + '<td class="fmt-mono">'+(m.ait||'—')+tag+'</td>'
+      + '<td>'+brData(m.dataInfracao)+'</td>'
+      + '<td>'+(m.descricao||'—')+'</td>'
+      + '<td>'+loc+'</td>'
+      + '<td class="fmt-mono">'+brl(m.valor)+'</td>'
+      + '<td><span class="badge" style="background:'+st.b+';color:'+st.c+'">'+st.r+'</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function renderSync(st){
+  var el = document.getElementById('syncInfo');
+  if (!st || !st.ultimaExecucao){ el.textContent = 'Sem execução registrada ainda.'; return; }
+  var quando = new Date(st.ultimaExecucao).toLocaleString('pt-BR');
+  var txt = '🕐 ' + quando + ' · ' + (st.placasConsultadas||0) + ' placa(s) · '
+    + (st.novas||0) + ' nova(s), ' + (st.atualizadas||0) + ' atualizada(s)';
+  if (st.erros && st.erros.length) txt += ' · ⚠ ' + st.erros.length + ' com erro';
+  el.textContent = txt;
+}
+
+function iniciar(){
+  carregarDados();
+  // atualização ao vivo quando o backend gravar
+  dbRef.ref('loka_db/efrotas_status').on('value', function(snap){
+    renderSync(snap.val());
+  });
+}
+</script>
+</body>
+</html>

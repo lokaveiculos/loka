@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v74-20260810-1200 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -202,25 +201,13 @@ tr.vsel .veic-fin { pointer-events: auto; }
 .veic-search-input:focus { border-color:var(--blue); background-color:#fff; }
 .veic-count { font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap; }
 @media print {
-  .no-print { display: none !important; }
   @page { size: A4 portrait; margin: 10mm 8mm; }
   body { background: #fff !important; padding: 0 !important; font-size: 11px !important; min-height: 0 !important; height: auto !important; }
   html { height: auto !important; }
-  /* ── Controle de quebra de página (impressão multi-página) ── */
-  html, body { height: auto !important; min-height: 0 !important; }
-  /* overflow:hidden nos containers impede o navegador de paginar → deixa espaço em branco.
-     Aqui liberamos o overflow para o conteúdo fluir entre as páginas. */
-  .fatura, .fatura-body, #veiculosArea, .veic-table-wrap {
-    overflow: visible !important; height: auto !important; min-height: 0 !important;
-  }
-  .fatura { page-break-after: auto !important; }
-  /* Tabela de veículos flui naturalmente entre as páginas */
-  .veic-table { page-break-inside: auto !important; }
-  .veic-table thead { display: table-header-group !important; }
-  .veic-table tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-  /* Seções podem fluir; blocos pequenos permanecem inteiros */
-  .sec { page-break-inside: auto !important; }
-  .fin-table, .fin-row-total, #jurosMultaBox, .fatura-footer { page-break-inside: avoid !important; }
+  /* Evitar página em branco no final */
+  .fatura, .fatura-body, .fatura-footer, .sec { page-break-after: auto !important; }
+  .fatura:last-child, .sec:last-child { page-break-after: avoid !important; }
+  *:last-child { page-break-after: avoid !important; }
 
   /* Ocultar elementos de UI */
   .action-bar, .cli-search-wrap, .veic-search-bar, .add-outro,
@@ -244,56 +231,40 @@ tr.vsel .veic-fin { pointer-events: auto; }
   .veic-table tbody tr:not(.vsel) { display: none !important; }
   .veic-table tbody tr { page-break-inside: avoid !important; }
   .veic-table thead { display: table-header-group !important; }
-  .veic-table tfoot { display: table-row-group !important; }   /* total aparece UMA vez, no fim */
+  .veic-table tfoot { display: table-footer-group !important; }
 
   .veic-table-wrap { overflow: visible !important; border: 1px solid #bbb !important; border-radius: 0 !important; }
-  .veic-table { font-size: 7.5px !important; width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
+  .veic-table { font-size: 9px !important; width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
   .veic-table .chk-cell { display: none !important; width: 0 !important; padding: 0 !important; }
-  .veic-table thead th { padding: 3px 2px !important; font-size: 6.5px !important; letter-spacing: 0 !important; background: #0E1B4D !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; text-align: left !important; border: 0.5px solid #1a2a5e !important; }
-  .veic-table tbody td { padding: 2.5px 2px !important; border: 0.5px solid #e0e0e0 !important; vertical-align: middle !important; }
+  .veic-table thead th { padding: 4px 5px !important; font-size: 8px !important; background: #0E1B4D !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; text-align: left !important; border: 0.5px solid #1a2a5e !important; }
+  .veic-table tbody td { padding: 4px 5px !important; border: 0.5px solid #e0e0e0 !important; vertical-align: middle !important; }
   .veic-table tbody tr:nth-child(even) td { background: #f7f8fc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   /* Nome do veículo: uma linha compacta, permite quebra natural sem cortar */
-  .veic-table tbody td:nth-child(2) { white-space: nowrap !important; line-height: 1.15 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-  .veic-table tbody td:nth-child(2) strong { font-weight: 600 !important; font-size: 7.5px !important; }
+  .veic-table tbody td:nth-child(2) { white-space: normal !important; line-height: 1.2 !important; }
+  .veic-table tbody td:nth-child(2) strong { font-weight: 600 !important; font-size: 9px !important; }
   .veic-table tbody td:nth-child(2) span { display: none !important; }  /* ocultar cor/ano para compactar */
 
   /* Demais células sem quebra */
   .veic-table tbody td:not(:nth-child(2)) { white-space: nowrap !important; }
 
-  /* Larguras das 10 colunas — soma 100% (chk oculto) */
-  .veic-table th:nth-child(2),  .veic-table td:nth-child(2)  { width: 16% !important; font-size: 7px !important; }                              /* Veículo */
-  .veic-table th:nth-child(3),  .veic-table td:nth-child(3)  { width: 10% !important; }                              /* Placa */
-  .veic-table th:nth-child(4),  .veic-table td:nth-child(4)  { width:  8% !important; }                              /* Status */
-  .veic-table th:nth-child(5),  .veic-table td:nth-child(5)  { width:  6% !important; text-align: center !important; } /* Qtd */
-  .veic-table th:nth-child(6),  .veic-table td:nth-child(6)  { width: 13% !important; text-align: right  !important; } /* Valor Unit */
-  .veic-table th:nth-child(7),  .veic-table td:nth-child(7)  { width: 12% !important; text-align: right  !important; } /* Seguro */
-  .veic-table th:nth-child(8),  .veic-table td:nth-child(8)  { width: 12% !important; text-align: right  !important; } /* Desconto */
-  .veic-table th:nth-child(9),  .veic-table td:nth-child(9)  { width:  6% !important; text-align: center !important; } /* Dias parado */
-  .veic-table th:nth-child(10), .veic-table td:nth-child(10) { width: 17% !important; text-align: right !important; font-size: 7px !important; white-space: nowrap !important; letter-spacing: -0.2px !important; } /* Subtotal */
+  /* Larguras das 9 colunas (chk oculto) */
+  .veic-table th:nth-child(2), .veic-table td:nth-child(2) { width: 22% !important; }  /* Veículo */
+  .veic-table th:nth-child(3), .veic-table td:nth-child(3) { width: 13% !important; }  /* Placa */
+  .veic-table th:nth-child(4), .veic-table td:nth-child(4) { width: 11% !important; }  /* Status */
+  .veic-table th:nth-child(5), .veic-table td:nth-child(5) { width: 7% !important; text-align: center !important; }  /* Qtd */
+  .veic-table th:nth-child(6), .veic-table td:nth-child(6) { width: 13% !important; text-align: right !important; }  /* Valor Unit */
+  .veic-table th:nth-child(7), .veic-table td:nth-child(7) { width: 11% !important; text-align: right !important; }  /* Seguro */
+  .veic-table th:nth-child(8), .veic-table td:nth-child(8) { width: 11% !important; text-align: right !important; }  /* Desconto */
+  .veic-table th:nth-child(9), .veic-table td:nth-child(9) { width: 12% !important; text-align: right !important; }  /* Subtotal */
 
-
-  /* Nome do veículo: só a marca/modelo, uma linha, sem cor/ano */
-  .veic-table tbody td:nth-child(2) br { display: none !important; }
-  .veic-table tbody td:nth-child(2) span { display: none !important; }
-  .veic-table tbody td:nth-child(2) strong { font-size: 7px !important; white-space: nowrap !important; }
-  /* Linhas mais baixas */
-  .veic-table tbody tr { height: auto !important; }
-  .veic-table tbody td, .veic-table tbody td input { line-height: 1.1 !important; }
-  /* Campos de valor: nunca cortar o conteúdo */
-  .veic-table td input.veic-fin { width: 100% !important; min-width: 0 !important; font-size: 7px !important; letter-spacing: -0.2px !important; text-overflow: clip !important; }
-
-/* Botão de dedução não vai para o papel */
-  .veic-table td:nth-child(9) button { display: none !important; }
-  .veic-table td:nth-child(9) input  { width: 100% !important; text-align: center !important; }
-
-/* Inputs viram texto puro na impressão */
-  .veic-table .veic-fin { border: none !important; background: transparent !important; padding: 0 !important; font-size: 7.5px !important; text-align: inherit !important; width: 100% !important; -webkit-appearance: none; }
-  .veic-table .placa-badge { background: transparent !important; border: none !important; padding: 0 !important; font-family: monospace !important; font-size: 7.5px !important; font-weight: 700 !important; }
+  /* Inputs viram texto puro na impressão */
+  .veic-table .veic-fin { border: none !important; background: transparent !important; padding: 0 !important; font-size: 9px !important; text-align: inherit !important; width: 100% !important; -webkit-appearance: none; }
+  .veic-table .placa-badge { background: transparent !important; border: none !important; padding: 0 !important; font-family: monospace !important; font-size: 9px !important; font-weight: 700 !important; }
   .veic-table thead th, .veic-table tbody td { word-break: normal !important; overflow: hidden !important; }
-  .veic-fin { font-size: 7.5px !important; padding: 1px 0 !important; }
-  .placa-badge { font-size: 7px !important; padding: 0 2px !important; }
-  .st-badge { font-size: 6.5px !important; padding: 0 2px !important; }
+  .veic-fin { font-size: 10px !important; padding: 2px 0 !important; }
+  .placa-badge { font-size: 8px !important; padding: 1px 4px !important; }
+  .st-badge { font-size: 8px !important; padding: 1px 4px !important; }
 
   /* Fin table */
   .fin-table { font-size: 11px !important; }
@@ -301,7 +272,9 @@ tr.vsel .veic-fin { pointer-events: auto; }
   .fin-table td { padding: 6px 8px !important; }
   .fin-row-total td { padding: 8px !important; font-size: 13px !important; }
 
-  /* (regras de quebra de página consolidadas no topo deste bloco @media print) */
+  /* Quebras de página */
+  .veic-table-wrap { page-break-inside: avoid; }
+  .sec { page-break-inside: avoid; }
 
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
@@ -401,9 +374,16 @@ textarea.input {
 
 /* ── PRINT ── */
 @media print {
-  /* (bloco secundário — apenas cores; margens e tabela vêm do bloco principal) */
+  @page { margin: 12mm; size: A4; }
+  body { background: #fff; padding: 0; }
+  .action-bar { display: none !important; }
+  .fatura { box-shadow: none; border-radius: 0; max-width: 100%; }
+  .input, .select, .fin-input { border-color: #ccc !important; background: #fff !important; }
+  .cli-search-wrap { display: none; }
   .cli-selected { margin-top: 0 !important; }
   .veic-card { break-inside: avoid; }
+  .add-outro { display: none; }
+  .del-btn { display: none; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
@@ -423,7 +403,6 @@ textarea.input {
   <button class="btn btn-outline" onclick="limparFatura()">🗑 Limpar</button>
   <button class="btn btn-outline" onclick="window.print()">🖨 Imprimir</button>
   <button class="btn btn-primary" onclick="salvarFatura()">💾 Salvar Fatura</button>
-  <button class="btn btn-green" onclick="salvarContaReceber()">📥 Salvar no Contas a Receber</button>
 </div>
 
 <div class="fatura">
@@ -573,33 +552,6 @@ textarea.input {
         </table>
         <div style="padding:10px 14px;border-top:1px solid #f0f2f8">
           <button class="add-outro" onclick="addOutroValor()">＋ Adicionar outro valor</button>
-        <div id="jurosMultaBox" style="margin-top:10px;padding:12px;background:#fff8f0;border:1px solid #f0d9b8;border-radius:10px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <input type="checkbox" id="jmAtivar" onchange="calcJurosMulta()" style="width:16px;height:16px;cursor:pointer">
-            <label for="jmAtivar" style="font-weight:700;color:#b45309;cursor:pointer;font-size:13px">⚠️ Cobrar juros e multa por atraso</label>
-          </div>
-          <div id="jmCampos" style="display:none">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px">
-              <div>
-                <label style="font-size:10px;color:#7a6a55;font-weight:600;display:block">Multa (%)</label>
-                <input class="fin-input" id="jmMulta" type="text" value="2" placeholder="2" oninput="maskPct(this);calcJurosMulta()" style="text-align:right">
-              </div>
-              <div>
-                <label style="font-size:10px;color:#7a6a55;font-weight:600;display:block">Juros (% ao mês)</label>
-                <input class="fin-input" id="jmJurosMes" type="text" value="6" placeholder="6" oninput="maskPct(this);calcJurosMulta()" style="text-align:right">
-              </div>
-              <div>
-                <label style="font-size:10px;color:#7a6a55;font-weight:600;display:block">Dias em atraso</label>
-                <input class="fin-input" id="jmDias" type="number" min="0" placeholder="0" oninput="calcJurosMulta()" style="text-align:right">
-              </div>
-            </div>
-            <div style="font-size:11px;color:#7a6a55;display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #f0d9b8">
-              <span>Multa: <b id="jmValMulta">R$ 0,00</b> · Juros: <b id="jmValJuros">R$ 0,00</b></span>
-              <span style="font-weight:700;color:#b45309">Acréscimo: <b id="jmValTotal">R$ 0,00</b></span>
-            </div>
-            <div style="font-size:10px;color:#9a8a75;margin-top:4px">Os dias de atraso são calculados automaticamente pelo vencimento, mas você pode ajustar. Juros pro rata: (% ao mês ÷ 30) × dias.</div>
-          </div>
-        </div>
         </div>
         <table class="fin-table">
           <tbody>
@@ -732,7 +684,6 @@ function carregarDados() {
       _clients  = data.clients  || [];
       _veiculos = data.veiculos || [];
       _ativos   = data.ativos   || [];
-      _manutencoes = data.manutencoes || [];
     }
     renderVeiculosArea(_veiculos);
     verificarModoEdicao();
@@ -740,7 +691,7 @@ function carregarDados() {
     console.warn('Firebase read error:', e);
     try {
       const local = JSON.parse(localStorage.getItem('loka_db') || 'null');
-      if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; _ativos=local.ativos||[]; _manutencoes=local.manutencoes||[]; }
+      if (local) { _clients=local.clients||[]; _veiculos=local.veiculos||[]; _ativos=local.ativos||[]; }
     } catch(e2) {}
     renderVeiculosArea(_veiculos);
     verificarModoEdicao();
@@ -749,42 +700,21 @@ function carregarDados() {
 
 // ── MODO EDIÇÃO: carregar fatura existente ──────────────────
 var _editandoFaturaId = null;
-var _modoConsulta = false;
 function verificarModoEdicao() {
   var params = new URLSearchParams(window.location.search);
   var editId = params.get('edit');
-  var viewId = params.get('view');
   var cliId = params.get('cli');
-  var alvo = editId || viewId;
-  if (!alvo) return;
-  _modoConsulta = !!viewId;
+  if (!editId) return;
 
   // Buscar a fatura no Firebase
-  var path = 'faturas/' + (cliId||'') + '/' + alvo;
+  var path = 'faturas/' + (cliId||'') + '/' + editId;
   db.ref(path).once('value').then(function(snap) {
     var fat = snap.val();
-    if (!fat) { status('⚠️ Fatura não encontrada', '#b45309'); return; }
-    preencherFaturaParaEdicao(fat, alvo);
-    if (_modoConsulta) {
-      // Modo consulta: aguardar preencher e abrir a impressão
-      setTimeout(function(){ aplicarModoConsulta(fat); }, 1200);
-    }
+    if (!fat) { status('⚠️ Fatura não encontrada para edição', '#b45309'); return; }
+    preencherFaturaParaEdicao(fat, editId);
   }).catch(function(e) {
     status('❌ Erro ao carregar fatura: '+e.message, '#c0392b');
   });
-}
-
-function aplicarModoConsulta(fat) {
-  status('👁 Fatura ' + (fat.numero||'') + ' — modo consulta', '#0e7490');
-  // Banner de consulta
-  var banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#0e7490;color:#fff;text-align:center;padding:8px;font-size:13px;font-weight:700;z-index:9998;box-shadow:0 2px 8px rgba(0,0,0,.2)';
-  banner.className = 'no-print';
-  banner.innerHTML = '👁 Consultando fatura ' + (fat.numero||'') + ' &nbsp;·&nbsp; '
-    + '<button onclick="window.print()" style="background:#fff;color:#0e7490;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;margin:0 4px">🖨 Imprimir / PDF</button>'
-    + '<button onclick="location.href=location.pathname+\'?edit=\'+new URLSearchParams(location.search).get(\'view\')+\'&cli=\'+new URLSearchParams(location.search).get(\'cli\')" style="background:transparent;color:#fff;border:1.5px solid #fff;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;margin:0 4px">✏️ Editar</button>';
-  document.body.appendChild(banner);
-  document.body.style.paddingTop = '44px';
 }
 
 function preencherFaturaParaEdicao(fat, editId) {
@@ -796,15 +726,6 @@ function preencherFaturaParaEdicao(fat, editId) {
   set('periodoRef', fat.periodo);
   set('dataEmissao', fat.emissao);
   set('dataVenc', fat.vencimento);
-  // Restaurar juros/multa por atraso
-  if (fat.jurosMulta) {
-    var jmA = document.getElementById('jmAtivar');
-    if (jmA) jmA.checked = !!fat.jurosMulta.ativo;
-    set('jmMulta', fat.jurosMulta.multa);
-    set('jmJurosMes', fat.jurosMulta.jurosMes);
-    set('jmDias', fat.jurosMulta.dias);
-    if (typeof calcJurosMulta === 'function') calcJurosMulta();
-  }
   set('fatStatus', fat.status);
   set('fatPgto', fat.pgto);
   set('fatObs', fat.obs);
@@ -979,7 +900,6 @@ function stBadge(st) {
 }
 
 var _veicExibidos = [];
-var _manutencoes = [];
 function renderVeiculosArea(lista) {
   var area = document.getElementById('veiculosArea');
   // Limpar seleção ao trocar a lista exibida (índices mudam)
@@ -1005,10 +925,6 @@ function renderVeiculosArea(lista) {
       + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vseg-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vdesc-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="color:var(--red)"></td>'
-      + '<td class="num-cell" style="text-align:center;white-space:nowrap">'
-        + '<input class="veic-fin" id="vparado-'+i+'" type="number" min="0" placeholder="0" oninput="calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="max-width:44px;text-align:center;display:inline-block">'
-        + '<button type="button" onclick="event.stopPropagation();aplicarDescontoParado('+i+')" title="Deduzir os dias parados do valor" style="margin-left:3px;font-size:9px;background:#2B4BF2;color:#fff;border:none;border-radius:4px;padding:3px 5px;cursor:pointer">↓</button>'
-        + '</td>'
       + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px;font-weight:700">—</td>'
     + '</tr>';
   }).join('');
@@ -1026,7 +942,6 @@ function renderVeiculosArea(lista) {
     + '<th>Valor Unit. (R$)</th>'
     + '<th>Seguro (R$)</th>'
     + '<th>Desconto (R$)</th>'
-    + '<th title="Dias parado na oficina (digite e clique ↓ para deduzir)">Dias parado</th>'
     + '<th>Subtotal</th>'
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
@@ -1101,90 +1016,6 @@ function toggleVeiculo(i) {
   calcTotal();
 }
 
-
-// ══ DIAS PARADO NA OFICINA (integração com manutenções) ══════════
-// Calcula quantos dias uma placa ficou parada na oficina dentro de um mês (AAAA-MM).
-function diasParadoNoMes(placa, mesRef){
-  if (!placa || !mesRef) return 0;
-  var alvo = String(placa).toUpperCase().replace(/[^A-Z0-9]/g,'');
-  var mes = String(mesRef).slice(0,7); // AAAA-MM
-  if (!/^\d{4}-\d{2}$/.test(mes)) return 0;
-
-  // Limites do mês
-  var ini = new Date(mes + '-01T00:00:00');
-  var fim = new Date(ini.getFullYear(), ini.getMonth()+1, 0); // último dia do mês
-  fim.setHours(23,59,59,999);
-
-  var totalDias = 0;
-  (_manutencoes||[]).forEach(function(m){
-    if (!m) return;
-    var pl = String(m.placa||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-    if (pl !== alvo) return;
-    if (!m.data) return;
-    var entrada = new Date(String(m.data).slice(0,10) + 'T00:00:00');
-    if (isNaN(entrada.getTime())) return;
-    // saída: usa a data de saída, ou hoje se ainda não saiu
-    var saida = m.saida ? new Date(String(m.saida).slice(0,10) + 'T00:00:00') : new Date();
-    if (isNaN(saida.getTime())) saida = new Date();
-
-    // Interseção do período [entrada, saída] com o mês [ini, fim]
-    var de = entrada > ini ? entrada : ini;
-    var ate = saida < fim ? saida : fim;
-    if (ate >= de) {
-      var dias = Math.floor((ate - de) / 86400000);
-      if (dias >= 0) totalDias += dias;
-    }
-  });
-  return totalDias;
-}
-
-// Atualiza a célula de "dias parado" de cada veículo exibido
-function atualizarDiasParados(){
-  var mesRef = obterMesReferencia();
-  _veicExibidos.forEach(function(v, i){
-    var cel = document.getElementById('vparado-'+i);
-    if (!cel || !v) return;
-    var dias = diasParadoNoMes(v.placa, mesRef);
-    if (dias > 0) {
-      cel.innerHTML = '<span style="color:#c0392b;font-weight:700">'+dias+'d</span>'
-        + '<br><button type="button" onclick="aplicarDescontoParado('+i+','+dias+')" '
-        + 'style="margin-top:2px;font-size:9px;background:#2B4BF2;color:#fff;border:none;border-radius:4px;padding:2px 5px;cursor:pointer" '
-        + 'title="Deduzir '+dias+' dia(s) parado(s)">↓ deduzir</button>';
-    } else {
-      cel.innerHTML = '<span style="color:#9099bf">0d</span>';
-    }
-  });
-}
-
-// Aplica o desconto: (aluguel mensal ÷ 30) × dias parados (digitados manualmente)
-function aplicarDescontoParado(i){
-  var finEl = document.getElementById('vfin-'+i);
-  var descEl = document.getElementById('vdesc-'+i);
-  var parEl = document.getElementById('vparado-'+i);
-  if (!finEl || !descEl || !parEl) return;
-  var dias = parseInt(parEl.value) || 0;
-  if (dias <= 0) { alert('Digite quantos dias o veículo ficou parado na oficina.'); return; }
-  var mensal = parseBRL(finEl.value);
-  if (!mensal) { alert('Preencha o valor do aluguel deste veículo primeiro.'); return; }
-  var valorDesconto = (mensal / 30) * dias;
-  var atual = parseBRL(descEl.value) || 0;
-  var novo = atual + valorDesconto;
-  descEl.value = novo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-  calcTotalVeic(); calcTotal();
-  // feedback visual
-  descEl.style.transition='background .3s'; descEl.style.background='#fff3cd';
-  setTimeout(function(){ descEl.style.background=''; }, 600);
-}
-
-// Obtém o mês de referência da fatura (do campo periodoRef ou emissão)
-function obterMesReferencia(){
-  var per = document.getElementById('periodoRef');
-  if (per && per.value && /^\d{4}-\d{2}/.test(per.value)) return per.value.slice(0,7);
-  var em = document.getElementById('dataEmissao');
-  if (em && em.value) return String(em.value).slice(0,7);
-  return new Date().toISOString().slice(0,7);
-}
-
 function calcTotalVeic() {
   var total = 0;
   _veicSelecionados.forEach(function(i) {
@@ -1237,66 +1068,6 @@ function remOutro(id) {
 }
 
 // ── TOTAL ─────────────────────────────────────────────────────
-// ── JUROS E MULTA POR ATRASO ─────────────────────────────────
-function maskPct(el){
-  // permite números e vírgula/ponto para percentuais
-  el.value = el.value.replace(/[^0-9.,]/g,'');
-}
-
-// Calcula dias de atraso entre o vencimento e hoje
-function diasDeAtraso(){
-  var venc = document.getElementById('dataVenc');
-  if (!venc || !venc.value) return 0;
-  var dv = new Date(venc.value + 'T00:00:00');
-  if (isNaN(dv.getTime())) return 0;
-  var hoje = new Date(); hoje.setHours(0,0,0,0);
-  var diff = Math.floor((hoje - dv) / 86400000);
-  return diff > 0 ? diff : 0;
-}
-
-// Calcula o acréscimo (multa + juros). Recebe a base (subtotal sem acréscimo).
-// Retorna o valor a somar. Também atualiza os campos visuais.
-function calcJurosMulta(base){
-  var box = document.getElementById('jmCampos');
-  var ativar = document.getElementById('jmAtivar');
-  if (ativar) document.getElementById('jmCampos').style.display = ativar.checked ? 'block' : 'none';
-  if (!ativar || !ativar.checked) {
-    // zera os displays
-    ['jmValMulta','jmValJuros','jmValTotal'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent='R$ 0,00'; });
-    return 0;
-  }
-
-  // Se a base não veio (chamada direta pelo oninput), calcula do subtotal atual
-  if (base == null) {
-    base = 0;
-    var vlM = document.getElementById('vlMensal'); if (vlM) base += parseBRL(vlM.value);
-    var vlC = document.getElementById('vlCaucao'); if (vlC) base += parseBRL(vlC.value);
-    var vlS = document.getElementById('vlSeguro'); if (vlS) base += parseBRL(vlS.value);
-    document.querySelectorAll('#finBody .fin-row-outro').forEach(function(row){
-      var inputs = row.querySelectorAll('.fin-input');
-      if (inputs.length >= 3) base += parseBRL(inputs[2].value);
-    });
-  }
-
-  // Dias de atraso: usa o campo (se preenchido) ou calcula do vencimento
-  var campoDias = document.getElementById('jmDias');
-  var dias = campoDias && campoDias.value !== '' ? (parseInt(campoDias.value)||0) : diasDeAtraso();
-  if (campoDias && campoDias.value === '') { var d = diasDeAtraso(); if (d>0) campoDias.value = d; dias = d; }
-
-  var pctMulta = parseFloat((document.getElementById('jmMulta').value||'0').replace(',','.')) || 0;
-  var pctJurosMes = parseFloat((document.getElementById('jmJurosMes').value||'0').replace(',','.')) || 0;
-
-  var valMulta = base * (pctMulta/100);
-  // Juros pro rata die: (% ao mês / 30) * dias
-  var valJuros = base * ((pctJurosMes/100) / 30) * dias;
-
-  var mE=document.getElementById('jmValMulta'); if(mE) mE.textContent = fmtBRL(valMulta);
-  var jE=document.getElementById('jmValJuros'); if(jE) jE.textContent = fmtBRL(valJuros);
-  var tE=document.getElementById('jmValTotal'); if(tE) tE.textContent = fmtBRL(valMulta + valJuros);
-
-  return valMulta + valJuros;
-}
-
 function calcTotal() {
   // Soma da planilha de veículos → preenche automaticamente o campo de locação
   var veicTotal = calcTotalVeic();
@@ -1320,9 +1091,6 @@ function calcTotal() {
     var inputs = row.querySelectorAll('.fin-input');
     if (inputs.length >= 3) sub += parseBRL(inputs[2].value);
   });
-  // Acréscimo de juros e multa por atraso (se ativado)
-  var acrescimo = calcJurosMulta(sub);
-  sub += acrescimo;
   var desc  = parseBRL(document.getElementById('vlDesconto').value);
   var total = Math.max(0, sub - desc);
 
@@ -1421,12 +1189,6 @@ function salvarFatura() {
     periodo: document.getElementById('periodoRef').value,
     emissao: document.getElementById('dataEmissao').value,
     vencimento: document.getElementById('dataVenc').value,
-    jurosMulta: {
-      ativo: !!(document.getElementById('jmAtivar') && document.getElementById('jmAtivar').checked),
-      multa: (document.getElementById('jmMulta')||{}).value || '',
-      jurosMes: (document.getElementById('jmJurosMes')||{}).value || '',
-      dias: (document.getElementById('jmDias')||{}).value || ''
-    },
     status: document.getElementById('fatStatus').value,
     pgto: document.getElementById('fatPgto').value,
     veiculos: veics.map(function(v){return v.marca+' '+v.modelo+' '+v.placa;}),
@@ -1457,144 +1219,16 @@ function salvarFatura() {
     var path = 'faturas/' + (fatura.clienteId || 'sem_cliente') + '/' + fatura.id;
     if (db) {
       db.ref(path).set(fatura).then(function() {
+        status((_editandoFaturaId ? '✅ Fatura atualizada para ' : '✅ Fatura salva para ') + fatura.cliente + '!', '#0d7a3e');
         carregarFaturasCliente(fatura.clienteId);
-        // Lança/atualiza automaticamente no Contas a Receber (mesma chave = sem duplicar)
-        _sincronizarReceber(true).then(function(){
-          status((_editandoFaturaId ? '✅ Fatura atualizada' : '✅ Fatura salva') + ' e lançada no Contas a Receber!', '#0d7a3e');
-        }).catch(function(){
-          status((_editandoFaturaId ? '✅ Fatura atualizada' : '✅ Fatura salva') + ' — ⚠️ falha ao lançar no Contas a Receber', '#b45309');
-        });
       }).catch(function(e) { status('❌ Erro Firebase: '+e.message, '#c0392b'); });
     } else {
       var list = JSON.parse(localStorage.getItem('loka_faturas')||'[]');
       list.unshift(fatura);
       localStorage.setItem('loka_faturas', JSON.stringify(list));
-      _sincronizarReceber(true);
-      status('✅ Fatura salva e lançada no Contas a Receber (offline)!', '#0d7a3e');
+      status('✅ Fatura salva (offline)!', '#0d7a3e');
     }
   } catch(e) { status('❌ Erro: '+e.message, '#c0392b'); }
-}
-
-// ── SALVAR NO CONTAS A RECEBER ────────────────────────────────
-// Monta a LINHA no formato que a aba "Contas a Receber" do gestão espera.
-// Campos lidos pelo gestão em db.financeiro.receber:
-//   cliente, tipo, valor, recebido, vencimento, historico, status, recebidoEm
-// (faturaKey/origem são marcadores extras — o gestão ignora, servem p/ não duplicar)
-function _construirLinhaReceber() {
-  var num = document.getElementById('faturaNum').value;
-  var cli = _clienteSelecionado;
-  var veics = Array.from(_veicSelecionados).map(function(i){return _veicExibidos[i];}).filter(Boolean);
-  var totalNum = parseBRL(document.getElementById('totalDisplay').textContent);
-  if (totalNum <= 0 && typeof calcTotalVeic === 'function') totalNum = calcTotalVeic();
-  if (!cli || !num || !veics.length || totalNum <= 0) return null;
-
-  var periodo = document.getElementById('periodoRef').value || '';
-  var nomeMes = periodo ? new Date(periodo+'-01').toLocaleString('pt-BR',{month:'long',year:'numeric'}) : periodo;
-  var venc = document.getElementById('dataVenc').value || '';
-  var fatStatus = document.getElementById('fatStatus').value;
-
-  // Mapeia status da fatura -> status do Contas a Receber do gestão (pendente|parcial|recebido)
-  var status='pendente', recebido=0, recebidoEm='';
-  if (fatStatus==='pago')       { status='recebido'; recebido=totalNum; recebidoEm=new Date().toISOString().split('T')[0]; }
-  else if (fatStatus==='parcial'){ status='parcial'; }
-  // 'vencido' e 'pendente' -> 'pendente' (o gestão calcula o vencido pela data)
-
-  var sanit = function(s){ return String(s||'').replace(/[.#$\[\]\/]/g,'-'); };
-  var faturaKey = sanit(cli.id||'sc')+'_'+sanit(num)+'_'+sanit(periodo||'sp');
-
-  var hist = 'Fatura #'+num+(nomeMes?' — '+nomeMes:'')+' · '+veics.length+' veículo(s)';
-  var obs = (document.getElementById('fatObs')||{}).value || '';
-  if (obs) hist += ' · '+obs;
-
-  return {
-    faturaKey: faturaKey,
-    linha: {
-      cliente:   cli.nome,
-      tipo:      'Fatura',
-      valor:     totalNum,
-      recebido:  recebido,
-      vencimento: venc,
-      historico: hist,
-      status:    status,
-      recebidoEm: recebidoEm,
-      faturaKey: faturaKey,   // marcador anti-duplicação
-      origem:    'fatura'
-    }
-  };
-}
-
-// Grava/atualiza a linha em loka_db/financeiro/receber (nó que o gestão lê).
-// silent=true -> não mostra mensagem própria (quem chamou trata). Retorna Promise.
-function _sincronizarReceber(silent) {
-  return new Promise(function(resolve, reject){
-    var built = _construirLinhaReceber();
-    if (!built) { resolve({ok:false, reason:'invalido'}); return; }
-    var linha = built.linha, faturaKey = built.faturaKey;
-
-    // Normaliza array vindo do Firebase (pode vir como objeto {0:..,1:..})
-    function normArr(val){
-      if (Array.isArray(val)) return val.slice().filter(function(x){return x!=null;});
-      if (val && typeof val==='object') return Object.keys(val).sort(function(a,b){return Number(a)-Number(b);})
-        .map(function(k){return val[k];}).filter(function(x){return x!=null;});
-      return [];
-    }
-    // Insere ou atualiza pela faturaKey (preserva recebimentos já lançados no gestão)
-    function upsert(arr){
-      var idx=-1;
-      for (var j=0;j<arr.length;j++){ if(arr[j] && arr[j].faturaKey===faturaKey){ idx=j; break; } }
-      if (idx<0) { arr.push(linha); return {arr:arr, novo:true}; }
-      var atual = arr[idx];
-      var jaRecebeu = Number(atual.recebido)>0;
-      arr[idx] = Object.assign({}, atual, {
-        cliente: linha.cliente, tipo:'Fatura', valor: linha.valor,
-        vencimento: linha.vencimento, historico: linha.historico,
-        faturaKey: faturaKey, origem:'fatura'
-      });
-      // Só mexe em status/recebido se o gestão ainda NÃO registrou recebimento
-      if (!jaRecebeu) { arr[idx].status=linha.status; arr[idx].recebido=linha.recebido; arr[idx].recebidoEm=linha.recebidoEm; }
-      return {arr:arr, novo:false};
-    }
-
-    // Fallback offline (localStorage do próprio loka_db)
-    if (!db) {
-      try {
-        var raw = JSON.parse(localStorage.getItem('loka_db')||'{}');
-        raw.financeiro = raw.financeiro || {};
-        var r = upsert(normArr(raw.financeiro.receber));
-        raw.financeiro.receber = r.arr;
-        raw._ultimaEscrita = Date.now();
-        localStorage.setItem('loka_db', JSON.stringify(raw));
-        if (!silent) status('✅ Lançado no Contas a Receber (offline)', '#0d7a3e');
-        resolve({ok:true, offline:true, novo:r.novo});
-      } catch(e){ if(!silent) status('❌ Erro offline: '+e.message,'#c0392b'); reject(e); }
-      return;
-    }
-
-    // Online: lê a lista atual, faz upsert e grava SÓ o sub-nó + carimbo (não toca no resto)
-    db.ref('loka_db/financeiro/receber').once('value').then(function(snap){
-      var r = upsert(normArr(snap.val()));
-      db.ref('loka_db').update({
-        'financeiro/receber': r.arr,
-        '_ultimaEscrita': Date.now()   // faz o gestão aceitar a atualização na hora
-      }).then(function(){
-        if (!silent) status((r.novo?'✅ Lançado no Contas a Receber: ':'✅ Contas a Receber atualizado: ')+fmtBRL(linha.valor), '#0d7a3e');
-        resolve({ok:true, novo:r.novo});
-      }).catch(function(e){ if(!silent) status('❌ Erro Firebase: '+e.message,'#c0392b'); reject(e); });
-    }).catch(function(e){ if(!silent) status('❌ Erro ao ler Contas a Receber: '+e.message,'#c0392b'); reject(e); });
-  });
-}
-
-// Botão verde (lançamento manual/re-sincronização)
-function salvarContaReceber() {
-  if (typeof calcTotal === 'function') calcTotal();
-  var built = _construirLinhaReceber();
-  if (!built) {
-    if (!_clienteSelecionado) { status('⚠️ Selecione um cliente antes de salvar', '#b45309'); return; }
-    if (!document.getElementById('faturaNum').value) { status('⚠️ Informe o número da fatura', '#b45309'); return; }
-    if (!_veicSelecionados.size) { status('⚠️ Selecione ao menos um veículo', '#b45309'); return; }
-    status('⚠️ O total deve ser maior que zero', '#b45309'); return;
-  }
-  _sincronizarReceber(false);
 }
 
 function status(msg, color) {
@@ -1619,31 +1253,6 @@ function limparFatura() {
   document.getElementById('totalDisplay').textContent = 'R$ 0,00';
   document.getElementById('resumoBox').style.display = 'none';
 }
-
-// ── Detecta nova publicação e recarrega sozinho (evita ficar preso em cache) ──
-(function(){
-  if (location.protocol === 'file:') return;
-  var carimbo = null, avisado = false;
-  function checar(){
-    if (avisado) return;
-    fetch(location.pathname + '?vchk=' + Date.now(), {method:'HEAD', cache:'no-store'})
-      .then(function(r){
-        if (!r.ok) return;
-        var c = r.headers.get('etag') || r.headers.get('last-modified') || '';
-        if (!c) return;
-        if (carimbo === null) { carimbo = c; return; }
-        if (c !== carimbo) {
-          avisado = true;
-          console.log('[FATURA] Nova versão publicada — recarregando.');
-          location.replace(location.pathname + '?v=' + Date.now() + location.hash);
-        }
-      }).catch(function(){});
-  }
-  checar();
-  setInterval(checar, 5*60*1000);
-  document.addEventListener('visibilitychange', function(){ if(!document.hidden) checar(); });
-})();
-
 </script>
 
 </body>
