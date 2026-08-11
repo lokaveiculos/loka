@@ -278,16 +278,42 @@ function efrTestar(){
 }
 
 function efrConsultar(){
-  setBtns(true); status('⏳ Consultando e-Frotas… pode levar alguns minutos.','#ffe');
-  fns().httpsCallable('dispararConsultaMultas')({}).then(function(r){
+  if (!confirm('A consulta vai percorrer todos os veículos da frota.\n\nCada veículo consultado é cobrado pelo Serpro. Deseja continuar?')) return;
+  setBtns(true); status('⏳ Iniciando consulta…','#ffe');
+  fns().httpsCallable('dispararConsultaMultas')({ background: true }).then(function(r){
     var d = r.data||{};
-    var msg = '✓ '+d.placas+' veículo(s) · '+d.novas+' nova(s)';
-    if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
-    if (d.erros && d.erros.length) msg += ' · ⚠ '+d.erros.length+' com erro';
-    status(msg,'#9f9');
-    carregarDados();
+    if (d.iniciado){
+      status('⏳ Consulta em andamento… pode levar alguns minutos. O resultado aparece aqui sozinho.','#ffe');
+      acompanharProgresso();
+    } else {
+      var msg = '✓ '+d.placas+' veículo(s) · '+d.novas+' nova(s)';
+      if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
+      status(msg,'#9f9');
+      carregarDados();
+    }
   }).catch(function(e){ status('⚠ '+traduzErro(e),'#fbb'); })
     .finally(function(){ setBtns(false); });
+}
+
+// Acompanha a varredura pelo banco, já que ela roda em segundo plano
+var _obsProgresso = null;
+function acompanharProgresso(){
+  if (_obsProgresso) return;
+  var ref = dbRef.ref('loka_db/efrotas_status');
+  _obsProgresso = function(snap){
+    var st = snap.val();
+    if (!st) return;
+    if (st.emAndamento === false && st.ultimaExecucao){
+      var msg = '✓ '+(st.placasConsultadas||0)+' veículo(s) · '+(st.novas||0)+' nova(s)';
+      if (st.atualizadas) msg += ' · '+st.atualizadas+' atualizada(s)';
+      if (st.erros && st.erros.length) msg += ' · ⚠ '+st.erros.length+' com erro';
+      status(msg,'#9f9');
+      carregarDados();
+      ref.off('value', _obsProgresso);
+      _obsProgresso = null;
+    }
+  };
+  ref.on('value', _obsProgresso);
 }
 
 // ── Carrega multas e status do banco ──
