@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v75-20260810-1200 -->
+<!-- LOKA deploy: v76-20260810-1400 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -283,7 +283,7 @@ tr:hover td{background:#f8f9fe;}
     @keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.3}}
     </style>
     <div class="topbar-actions">
-      <div class="search-wrap">
+      <div class="search-wrap" id="gsWrap">
         <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="global-search-input" id="gsInput" type="text" placeholder="Buscar clientes, veículos..." oninput="globalSearch(this.value)" onfocus="globalSearch(this.value)" autocomplete="off">
         <div class="global-search-results" id="gsResults"></div>
@@ -686,9 +686,6 @@ tr:hover td{background:#f8f9fe;}
             <option value="pago">✅ Pagos</option>
           </select>
           <select class="filter-sel" id="pagDia" onchange="finRenderPagar()" title="Filtrar pelo dia do vencimento">
-            <option value="">Todos os dias</option><option value="1">Dia 1</option><option value="2">Dia 2</option><option value="3">Dia 3</option><option value="4">Dia 4</option><option value="5">Dia 5</option><option value="6">Dia 6</option><option value="7">Dia 7</option><option value="8">Dia 8</option><option value="9">Dia 9</option><option value="10">Dia 10</option><option value="11">Dia 11</option><option value="12">Dia 12</option><option value="13">Dia 13</option><option value="14">Dia 14</option><option value="15">Dia 15</option><option value="16">Dia 16</option><option value="17">Dia 17</option><option value="18">Dia 18</option><option value="19">Dia 19</option><option value="20">Dia 20</option><option value="21">Dia 21</option><option value="22">Dia 22</option><option value="23">Dia 23</option><option value="24">Dia 24</option><option value="25">Dia 25</option><option value="26">Dia 26</option><option value="27">Dia 27</option><option value="28">Dia 28</option><option value="29">Dia 29</option><option value="30">Dia 30</option><option value="31">Dia 31</option>
-          </select>
-          <select class="filter-sel" id="pagDia" onchange="finRenderPagar()">
             <option value="">Todos os dias</option><option value="1">Dia 1</option><option value="2">Dia 2</option><option value="3">Dia 3</option><option value="4">Dia 4</option><option value="5">Dia 5</option><option value="6">Dia 6</option><option value="7">Dia 7</option><option value="8">Dia 8</option><option value="9">Dia 9</option><option value="10">Dia 10</option><option value="11">Dia 11</option><option value="12">Dia 12</option><option value="13">Dia 13</option><option value="14">Dia 14</option><option value="15">Dia 15</option><option value="16">Dia 16</option><option value="17">Dia 17</option><option value="18">Dia 18</option><option value="19">Dia 19</option><option value="20">Dia 20</option><option value="21">Dia 21</option><option value="22">Dia 22</option><option value="23">Dia 23</option><option value="24">Dia 24</option><option value="25">Dia 25</option><option value="26">Dia 26</option><option value="27">Dia 27</option><option value="28">Dia 28</option><option value="29">Dia 29</option><option value="30">Dia 30</option><option value="31">Dia 31</option>
           </select>
           <select class="filter-sel" id="pagOrdenar" onchange="finRenderPagar()">
@@ -1103,7 +1100,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v75-20260810-1200';
+var LOKA_BUILD = 'v76-20260810-1400';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4150,7 +4147,7 @@ function salvarUsuario() {
 function editarUsuario(n) {
   var u = _usuariosFirebase[n];
   if (!u) return;
-  document.getElementById('uFormTitulo') && (document.getElementById('userFormTitulo').textContent = 'Editar Usuário');
+  document.getElementById('userFormTitulo') && (document.getElementById('userFormTitulo').textContent = 'Editar Usuário');
   document.getElementById('uLogin').value  = u.usuario;
   document.getElementById('uNome').value   = u.nome;
   document.getElementById('uSenha').value  = '';
@@ -5207,7 +5204,7 @@ function renderManutencaoRestrito(modo) {
       var st = m.status || 'em_andamento';
       var comp = m.comprovantes && m.comprovantes.length ? ' <span style="font-size:9px;background:#EEF1FD;color:#2B4BF2;padding:1px 5px;border-radius:3px">📎 '+m.comprovantes.length+'</span>' : '';
       return '<tr style="border-bottom:1px solid #f0f2f8">'
-        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span>'+(_empresaDaManut(m)?'<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+_empresaDaManut(m)+'</span>':'')+'</td>'
+        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span>'+(function(){var _e=_empresaDaManut(m);return _e?'<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+_e+'</span>':'';})()+'</td>'
         + '<td style="padding:9px 12px"><span style="background:#f0f2f9;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+(tipoLbl[m.tipo]||m.tipo||'')+'</span><br><span style="font-size:11px;color:var(--muted)">'+((m.descricao||'').substring(0,40))+((m.descricao&&m.descricao.length>40)?'...':'')+'</span>'+comp+'</td>'
         + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
@@ -5219,9 +5216,19 @@ function renderManutencaoRestrito(modo) {
     }).join('')
     + '</tbody></table></div>';
 
-  grid.addEventListener('click', function(e){
+  _wireManutGrid(grid);
+}
+
+// Liga o listener de clique do grid de manutenção UMA única vez (evita
+// listeners acumulados a cada re-render, que disparavam ações repetidas)
+function _wireManutGrid(grid) {
+  if (!grid || grid._manutWired) return;
+  grid._manutWired = true;
+  grid.addEventListener('click', function(e) {
     var btnV = e.target.closest('.manut-view-btn');
-    if (btnV) consultarManutencao(btnV.dataset.mid);
+    if (btnV) { consultarManutencao(btnV.dataset.mid); return; }
+    var btnE = e.target.closest('.manut-edit-btn');
+    if (btnE) openManutRegistro(btnE.dataset.mid);
   });
 }
 
@@ -5287,7 +5294,7 @@ function renderManutencao() {
       var st   = m.status || 'em_andamento';
       var comp = m.comprovantes && m.comprovantes.length ? ' <span style="font-size:9px;background:#EEF1FD;color:#2B4BF2;padding:1px 5px;border-radius:3px">📎 '+m.comprovantes.length+'</span>' : '';
       return '<tr style=\"border-bottom:1px solid #f0f2f8\">'
-        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span>'+(_empresaDaManut(m)?'<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+_empresaDaManut(m)+'</span>':'')+'</td>'
+        + '<td style="padding:9px 12px"><strong>'+(m.veiculoNome||'—')+'</strong><br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(m.placa||'')+'</span>'+(function(){var _e=_empresaDaManut(m);return _e?'<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+_e+'</span>':'';})()+'</td>'
         + '<td style="padding:9px 12px"><span style="background:#f0f2f9;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+(tipoLbl[m.tipo]||m.tipo||'')+'</span><br><span style="font-size:11px;color:var(--muted)">'+(m.descricao||'').substring(0,40)+(m.descricao&&m.descricao.length>40?'...':'')+'</span>'+comp+'</td>'
         + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
@@ -5301,13 +5308,8 @@ function renderManutencao() {
       + '</tr>';
     }).join('')
     + '</tbody></table></div>';
-  // Event delegation para edição e consulta
-  grid.addEventListener('click', function(e) {
-    var btnV = e.target.closest('.manut-view-btn');
-    if (btnV) { consultarManutencao(btnV.dataset.mid); return; }
-    var btnE = e.target.closest('.manut-edit-btn');
-    if (btnE) openManutRegistro(btnE.dataset.mid);
-  });
+  // Event delegation para edição e consulta (ligado uma única vez)
+  _wireManutGrid(grid);
 
   if (_manutFiltroVeiculo) {
     var vNome = (db.veiculos||[]).find(function(v){ return v&&(v.id===_manutFiltroVeiculo||v.placa===_manutFiltroVeiculo); });
