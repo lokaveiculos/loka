@@ -114,7 +114,13 @@
     </p>
     <div class="hero-actions">
       <button class="btn btn-ghost" id="btnTestar" onclick="efrTestar()">Testar conexão</button>
-      <button class="btn btn-green" id="btnConsultar" onclick="efrConsultar()">🔄 Consultar agora</button>
+      <button class="btn btn-green" id="btnConsultar" onclick="efrConsultar()">🔄 Consultar frota toda</button>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="placaUnica" placeholder="Placa (ex: SHG1J02)" maxlength="8"
+        style="padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;font-size:12px;width:150px;text-transform:uppercase">
+      <button class="btn btn-ghost" id="btnUma" onclick="efrConsultarUma()">Consultar só esta placa</button>
+      <span style="font-size:10px;opacity:.75">1 consulta = 1 cobrança</span>
     </div>
     <div class="status-line" id="statusLine"></div>
   </div>
@@ -249,8 +255,10 @@ function status(txt, cor){
   el.innerHTML = '<span style="color:'+(cor||'#fff')+'">'+txt+'</span>';
 }
 function setBtns(disabled){
-  document.getElementById('btnTestar').disabled = disabled;
-  document.getElementById('btnConsultar').disabled = disabled;
+  ['btnTestar','btnConsultar','btnUma'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  });
 }
 
 function fns(){ return firebase.app().functions(FN_REGION); }
@@ -277,43 +285,90 @@ function efrTestar(){
     .finally(function(){ setBtns(false); });
 }
 
-function efrConsultar(){
-  if (!confirm('A consulta vai percorrer todos os veículos da frota.\n\nCada veículo consultado é cobrado pelo Serpro. Deseja continuar?')) return;
-  setBtns(true); status('⏳ Iniciando consulta…','#ffe');
-  fns().httpsCallable('dispararConsultaMultas')({ background: true }).then(function(r){
+// Consulta UMA placa — modo direto, resposta rápida (não usa background)
+function efrConsultarUma(){
+  var el = document.getElementById('placaUnica');
+  var placa = (el ? el.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (!placa){ status('⚠ Digite uma placa.','#fbb'); return; }
+  setBtns(true); status('⏳ Consultando placa '+placa+'…','#ffe');
+  fns().httpsCallable('dispararConsultaMultas')({ placa: placa }).then(function(r){
     var d = r.data||{};
-    if (d.iniciado){
-      status('⏳ Consulta em andamento… pode levar alguns minutos. O resultado aparece aqui sozinho.','#ffe');
-      acompanharProgresso();
-    } else {
-      var msg = '✓ '+d.placas+' veículo(s) · '+d.novas+' nova(s)';
-      if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
-      status(msg,'#9f9');
-      carregarDados();
-    }
+    var msg = '✓ Placa '+placa+' · '+(d.novas||0)+' multa(s) nova(s)';
+    if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
+    if (d.erros && d.erros.length) msg += ' · ⚠ '+d.erros[0].erro;
+    status(msg,'#9f9');
+    carregarDados();
   }).catch(function(e){ status('⚠ '+traduzErro(e),'#fbb'); })
     .finally(function(){ setBtns(false); });
 }
 
-// Acompanha a varredura pelo banco, já que ela roda em segundo plano
-var _obsProgresso = null;
-function acompanharProgresso(){
-  if (_obsProgresso) return;
-  var ref = dbRef.ref('loka_db/efrotas_status');
-  _obsProgresso = function(snap){
-    var st = snap.val();
-    if (!st) return;
-    if (st.emAndamento === false && st.ultimaExecucao){
-      var msg = '✓ '+(st.placasConsultadas||0)+' veículo(s) · '+(st.novas||0)+' nova(s)';
-      if (st.atualizadas) msg += ' · '+st.atualizadas+' atualizada(s)';
-      if (st.erros && st.erros.length) msg += ' · ⚠ '+st.erros.length+' com erro';
-      status(msg,'#9f9');
-      carregarDados();
-      ref.off('value', _obsProgresso);
-      _obsProgresso = null;
+// ── Consulta da frota em LOTES ──
+var TAMANHO_LOTE = 10;
+var _lote = { inicio: 0, novas: 0, atualizadas: 0, erros: 0, rodando: false };
+
+function efrConsultar(){
+  if (!confirm('A consulta percorre a frota em lotes de ' + TAMANHO_LOTE + ' veículos.\n\nCada veículo consultado é cobrado pelo Serpro. Continuar?')) return;
+  _lote = { inicio: 0, novas: 0, atualizadas: 0, erros: 0, rodando: true };
+  rodarLote();
+}
+
+function efrContinuar(){ _lote.rodando = true; rodarLote(); }
+
+function efrPararLote(){
+  _lote.rodando = false;
+  mostrarProgresso(true);
+}
+
+function rodarLote(){
+  setBtns(true);
+  status('⏳ Consultando veículos ' + (_lote.inicio + 1) + ' a ' + (_lote.inicio + TAMANHO_LOTE) + '…', '#ffe');
+
+  fns().httpsCallable('dispararConsultaMultas')({
+    inicio: _lote.inicio,
+    tamanhoLote: TAMANHO_LOTE
+  }).then(function(r){
+    var d = r.data || {};
+    _lote.novas += (d.novas || 0);
+    _lote.atualizadas += (d.atualizadas || 0);
+    _lote.erros += (d.erros ? d.erros.length : 0);
+    _lote.inicio = d.proximo || (_lote.inicio + TAMANHO_LOTE);
+    _lote.total = d.totalFrota || 0;
+    _lote.restantes = d.restantes || 0;
+
+    carregarDados();
+
+    if (d.concluido) {
+      _lote.rodando = false;
+      status('✓ Frota completa! ' + _lote.total + ' veículo(s) · ' + _lote.novas + ' multa(s) nova(s)'
+        + (_lote.atualizadas ? ' · ' + _lote.atualizadas + ' atualizada(s)' : '')
+        + (_lote.erros ? ' · ⚠ ' + _lote.erros + ' com erro' : ''), '#9f9');
+      setBtns(false);
+      return;
     }
-  };
-  ref.on('value', _obsProgresso);
+    mostrarProgresso(false);
+    setBtns(false);
+  }).catch(function(e){
+    _lote.rodando = false;
+    status('⚠ ' + traduzErro(e) + ' — o progresso foi salvo, use "Continuar" para retomar.', '#fbb');
+    setBtns(false);
+  });
+}
+
+function mostrarProgresso(pausado){
+  var feito = _lote.inicio;
+  var total = _lote.total || 0;
+  var pct = total ? Math.round((feito / total) * 100) : 0;
+  var el = document.getElementById('statusLine');
+  el.innerHTML =
+    '<div style="color:#9f9">' + (pausado ? '⏸ Pausado' : '✓ Lote concluído') + ' — '
+      + feito + ' de ' + total + ' veículo(s) (' + pct + '%) · '
+      + _lote.novas + ' multa(s) nova(s)'
+      + (_lote.erros ? ' · ⚠ ' + _lote.erros + ' com erro' : '') + '</div>'
+    + '<div style="background:rgba(255,255,255,.2);border-radius:6px;height:6px;margin:6px 0;max-width:320px">'
+      + '<div style="background:#9f9;height:6px;border-radius:6px;width:' + pct + '%"></div></div>'
+    + '<button class="btn btn-green" style="font-size:11px;margin-right:6px" onclick="efrContinuar()">▶ Continuar ('
+      + _lote.restantes + ' restantes)</button>'
+    + '<button class="btn btn-ghost" style="font-size:11px" onclick="efrPararLote()">Parar</button>';
 }
 
 // ── Carrega multas e status do banco ──
