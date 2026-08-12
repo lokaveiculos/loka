@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v79-20260812-1600 -->
+<!-- LOKA deploy: v80-20260812-1700 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -661,6 +661,7 @@ tr:hover td{background:#f8f9fe;}
             <option value="pendente">⏳ Pendentes</option>
             <option value="parcial">◑ Parciais</option>
             <option value="recebido">✅ Recebidos</option>
+            <option value="renegociado">🤝 Renegociadas</option>
           </select>
           <select class="filter-sel" id="recTipo" onchange="finRenderReceber()">
             <option value="">Todos os tipos</option>
@@ -670,6 +671,7 @@ tr:hover td{background:#f8f9fe;}
             <option value="Seguro">🛡️ Seguro</option>
             <option value="Peças">⚙️ Peças</option>
             <option value="Pneus">🛞 Pneus</option>
+            <option value="Renegociação">🤝 Renegociação</option>
             <option value="Outros">📌 Outros</option>
           </select>
           <select class="filter-sel" id="recOrdenar" onchange="finRenderReceber()">
@@ -680,6 +682,7 @@ tr:hover td{background:#f8f9fe;}
             <option value="venc_desc">Vencimento (novo→antigo)</option>
             <option value="valor">Maior valor</option>
           </select>
+          <button class="btn" id="btnRenegociar" onclick="renClicarBotao()" style="background:#9d174d;color:#fff;white-space:nowrap">🤝 Renegociar</button>
           <button class="btn btn-outline" onclick="finRestaurarSeed('receber')" style="font-size:11px" title="Recarregar dados originais">🔄 Restaurar</button>
           <button class="btn" style="background:#0d7a3e;color:#fff;font-size:11px;white-space:nowrap" onclick="relatorioReceber()" title="Gerar relatório para imprimir ou PDF">📄 Relatório</button>
           <button class="btn btn-green" onclick="finAddLinha('receber')">+ Nova Conta</button>
@@ -1120,7 +1123,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v79-20260812-1600';
+var LOKA_BUILD = 'v80-20260812-1700';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -6567,8 +6570,8 @@ function finLimparDataReceber() {
   var f=document.getElementById('recDataFim'); if(f)f.value='';
   finRenderReceber();
 }
-var REC_TIPOS = ['Fatura','Multas','Avarias','Seguro','Peças','Pneus','Outros'];
-var REC_TIPO_COR = {Fatura:'#2B4BF2',Multas:'#c0392b',Avarias:'#b45309',Seguro:'#0e7490','Peças':'#7c3aed',Pneus:'#0d7a3e',Outros:'#5a607a'};
+var REC_TIPOS = ['Fatura','Multas','Avarias','Seguro','Peças','Pneus','Renegociação','Outros'];
+var REC_TIPO_COR = {Fatura:'#2B4BF2',Multas:'#c0392b',Avarias:'#b45309',Seguro:'#0e7490','Peças':'#7c3aed',Pneus:'#0d7a3e','Renegociação':'#9d174d',Outros:'#5a607a'};
 
 // Select de tipo para linha de Contas a Receber
 function tipoSelect(r, i){
@@ -6727,6 +6730,7 @@ function finRenderReceber() {
 
   // calcular status efetivo considerando recebimento parcial
   function statusReal(r){
+    if (r.status==='renegociado') return 'renegociado';
     var receb = Number(r.recebido)||0;
     var val = Number(r.valor)||0;
     if (r.status==='recebido' || (val>0 && receb>=val)) return 'recebido';
@@ -6756,22 +6760,23 @@ function finRenderReceber() {
   // Stats
   var stats = document.getElementById('receberStats');
   if (stats) {
-    var tTotal=0, tReceb=0, tSaldo=0, nPend=0, nParc=0, nRec=0;
+    var tTotal=0, tReceb=0, tSaldo=0, nPend=0, nParc=0, nRec=0, nReneg=0;
     rows.forEach(function(r){
       if(!r) return;
       var v=Number(r.valor)||0, rc=Number(r.recebido)||0;
-      tTotal+=v; tReceb+=rc; tSaldo+=(v-rc);
       var st=statusReal(r);
+      if (st==='renegociado') { nReneg++; tReceb+=rc; return; } // saldo migrou p/ as parcelas do acordo
+      tTotal+=v; tReceb+=rc; tSaldo+=(v-rc);
       if(st==='recebido') nRec++; else if(st==='parcial') nParc++; else nPend++;
     });
     stats.innerHTML =
       '<div class="stat" style="border-left-color:#b45309"><div class="stat-value" style="font-size:15px">'+brl(tSaldo)+'</div><div class="stat-label">Saldo a Receber ('+(nPend+nParc)+')</div></div>'+
       '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+brl(tReceb)+'</div><div class="stat-label">Já Recebido ('+nRec+' quit. · '+nParc+' parc.)</div></div>'+
-      '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">'+brl(tTotal)+'</div><div class="stat-label">Total Geral</div></div>';
+      '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">'+brl(tTotal)+'</div><div class="stat-label">Total Geral'+(nReneg?' · '+nReneg+' reneg.':'')+'</div></div>';
   }
 
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">'
-    + '<thead><tr>' + ['Cliente','Tipo','Valor (R$)','Recebido (R$)','Saldo','Vencimento','Histórico','Status','Recebido em',''].map(finTH).join('') + '</tr></thead><tbody>';
+    + '<thead><tr>' + ['🤝','Cliente','Tipo','Valor (R$)','Recebido (R$)','Saldo','Vencimento','Histórico','Status','Recebido em',''].map(finTH).join('') + '</tr></thead><tbody>';
   var totalVis=0, recebVis=0;
   visiveis.forEach(function(o){
     var r=o.r, i=o.idx;
@@ -6783,9 +6788,12 @@ function finRenderReceber() {
     function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'receber\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
     var stBadge = st==='recebido' ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">✅ Recebido</span>'
       : st==='parcial' ? '<span style="background:#dbeafe;color:#1e40af;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">◑ Parcial</span>'
+      : st==='renegociado' ? '<span style="background:#fce7f3;color:#9d174d;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">🤝 Renegociada</span>'
       : '<span style="background:#fef3cd;color:#b45309;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">⏳ Pendente</span>';
-    var bg = st==='recebido' ? 'background:#f5fdf8' : st==='parcial' ? 'background:#f5f9ff' : '';
+    var bg = st==='recebido' ? 'background:#f5fdf8' : st==='parcial' ? 'background:#f5f9ff' : st==='renegociado' ? 'background:#fdf5f9;opacity:.75' : '';
+    var podeRen = (st==='pendente' || st==='parcial');
     html += '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
+      + '<td style="padding:4px 6px;text-align:center">'+(podeRen ? '<input type="checkbox" class="ren-sel" data-idx="'+i+'" onchange="renAtualizarBotao()">' : '')+'</td>'
       + '<td style="padding:4px 6px">'+inp('cliente','120px')+'</td>'
       + '<td style="padding:4px 6px">'+tipoSelect(r,i)+'</td>'
       + '<td style="padding:4px 6px">'+inp('valor','95px','text-align:right;font-weight:700')+'</td>'
@@ -6800,7 +6808,10 @@ function finRenderReceber() {
       + '<td style="padding:4px 6px;text-align:center;white-space:nowrap">'
         + (st==='recebido'
             ? '<button onclick="finReceberToggle('+i+',false)" title="Reverter" style="background:#fef3cd;color:#b45309;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">↩</button>'
-            : '<button onclick="finReceberParcial('+i+')" title="Registrar recebimento (parcial ou total)" style="background:#e8f5ef;color:#0d7a3e;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">💵 Receber</button>')
+            : st==='renegociado'
+            ? '<span title="Substituída pelas parcelas do acordo '+(r.renegociacaoId||'')+'" style="font-size:10px;color:#9d174d;font-weight:700">acordo</span>'
+            : '<button onclick="finReceberParcial('+i+')" title="Registrar recebimento (parcial ou total)" style="background:#e8f5ef;color:#0d7a3e;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">💵 Receber</button>'
+              + ' <button onclick="abrirRenegociacao(['+i+'])" title="Renegociar esta conta" style="background:#fce7f3;color:#9d174d;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700;font-size:10px">🤝</button>')
         + ' <button onclick="finDel(\'receber\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑</button>'
       + '</td></tr>';
   });
@@ -6809,9 +6820,142 @@ function finRenderReceber() {
     + '<td style="padding:9px 10px;text-align:right;font-family:monospace">'+brl(totalVis)+'</td>'
     + '<td style="padding:9px 10px;text-align:right;font-family:monospace;color:#0d7a3e">'+brl(recebVis)+'</td>'
     + '<td style="padding:9px 10px;text-align:right;font-family:monospace;color:#c0392b">'+brl(totalVis-recebVis)+'</td>'
-    + '<td colspan="5"></td></tr></tfoot>';
+    + '<td colspan="5"></td><td></td></tr></tfoot>';
   html += '</table></div>';
   grid.innerHTML = html;
+}
+
+
+// ══ RENEGOCIAÇÃO DE CONTAS A RECEBER ═════════════════════════════════════════
+// Marca as contas originais como "renegociadas" (histórico preservado) e cria
+// as parcelas do novo acordo vinculadas a elas (renegociacaoId).
+var _renSelecao = [];
+
+function renAtualizarBotao(){
+  var n = document.querySelectorAll('#finGridReceber .ren-sel:checked').length;
+  var b = document.getElementById('btnRenegociar');
+  if (b) b.textContent = n ? ('🤝 Renegociar ('+n+')') : '🤝 Renegociar';
+}
+function renClicarBotao(){
+  var idxs = Array.prototype.map.call(document.querySelectorAll('#finGridReceber .ren-sel:checked'), function(c){ return parseInt(c.dataset.idx); });
+  if (!idxs.length) { toast('Marque na coluna 🤝 as contas pendentes que deseja renegociar (podem ser várias do mesmo cliente).', '#b45309'); return; }
+  abrirRenegociacao(idxs);
+}
+function abrirRenegociacao(idxs){
+  finInit();
+  var rows = db.financeiro.receber;
+  var itens = idxs.map(function(i){ return {i:i, r:rows[i]}; }).filter(function(o){ return o.r; });
+  if (!itens.length) return;
+  // Todas do mesmo cliente (um acordo é por cliente)
+  var cli = (itens[0].r.cliente||'').trim();
+  var mistura = itens.some(function(o){ return (o.r.cliente||'').trim() !== cli; });
+  if (mistura) { toast('⚠️ Selecione contas de UM único cliente por acordo (há clientes diferentes marcados).', '#c0392b'); return; }
+  // Só pendentes/parciais
+  itens = itens.filter(function(o){ var st=o.r.status; return st!=='recebido' && st!=='renegociado'; });
+  if (!itens.length) { toast('As contas selecionadas já estão recebidas ou renegociadas.', '#b45309'); return; }
+
+  _renSelecao = itens.map(function(o){ return o.i; });
+  var saldo = 0;
+  var listaHtml = itens.map(function(o){
+    var v=Number(o.r.valor)||0, rc=Number(o.r.recebido)||0, sd=v-rc; saldo+=sd;
+    return '<tr><td style="padding:4px 8px;font-size:11px">'+(o.r.historico||o.r.tipo||'—')+'</td>'
+      + '<td style="padding:4px 8px;font-size:11px;text-align:center">'+(o.r.vencimento? o.r.vencimento.split('-').reverse().join('/') : '—')+'</td>'
+      + '<td style="padding:4px 8px;font-size:11px;text-align:right;font-family:monospace;font-weight:700">'+brl(sd)+'</td></tr>';
+  }).join('');
+
+  document.getElementById('renCliente').textContent = cli || '(sem cliente)';
+  document.getElementById('renLista').innerHTML =
+    '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+    + '<th style="padding:4px 8px;font-size:9px;text-align:left">CONTA</th>'
+    + '<th style="padding:4px 8px;font-size:9px">VENC.</th>'
+    + '<th style="padding:4px 8px;font-size:9px;text-align:right">SALDO</th></tr></thead><tbody>'
+    + listaHtml + '</tbody></table>';
+  document.getElementById('renSaldo').textContent = brl(saldo);
+  document.getElementById('renSaldo').dataset.valor = saldo;
+  document.getElementById('renDesconto').value = '';
+  document.getElementById('renJuros').value = '';
+  document.getElementById('renParcelas').value = '1';
+  var hoje = new Date(); hoje.setMonth(hoje.getMonth()+1);
+  document.getElementById('renPrimeiroVenc').value = hoje.toISOString().slice(0,10);
+  document.getElementById('renObs').value = '';
+  renCalc();
+  openM('mRenegociar');
+}
+function renCalc(){
+  var saldo = Number(document.getElementById('renSaldo').dataset.valor)||0;
+  var desc = parseBRnum(document.getElementById('renDesconto').value);
+  var jur  = parseBRnum(document.getElementById('renJuros').value);
+  var n    = Math.max(1, parseInt(document.getElementById('renParcelas').value)||1);
+  var total = Math.max(0, saldo - desc + jur);
+  var parcela = Math.floor((total / n) * 100) / 100;
+  var ultima = Math.round((total - parcela*(n-1)) * 100) / 100;
+  document.getElementById('renTotal').textContent = brl(total);
+  document.getElementById('renResumoParcelas').textContent =
+    n === 1 ? ('1 parcela de ' + brl(total))
+            : (n + '× de ' + brl(parcela) + (ultima!==parcela ? ' (última: '+brl(ultima)+')' : ''));
+}
+function parseBRnum(v){
+  v = String(v==null?'':v).trim(); if(!v) return 0;
+  v = v.replace(/[R$\s.]/g,'').replace(',', '.');
+  var n = parseFloat(v); return isNaN(n)?0:n;
+}
+function renAddMeses(iso, k){
+  var p = iso.split('-').map(Number);
+  var d = new Date(p[0], p[1]-1+k, 1);
+  var ultimoDia = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(p[2], ultimoDia));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function confirmarRenegociacao(){
+  finInit();
+  var rows = db.financeiro.receber;
+  var itens = _renSelecao.map(function(i){ return rows[i]; }).filter(function(r){ return r && r.status!=='recebido' && r.status!=='renegociado'; });
+  if (!itens.length) { toast('Nada a renegociar.', '#b45309'); closeM('mRenegociar'); return; }
+
+  var saldo = Number(document.getElementById('renSaldo').dataset.valor)||0;
+  var desc = parseBRnum(document.getElementById('renDesconto').value);
+  var jur  = parseBRnum(document.getElementById('renJuros').value);
+  var n    = Math.max(1, parseInt(document.getElementById('renParcelas').value)||1);
+  var venc1 = document.getElementById('renPrimeiroVenc').value;
+  var obs  = (document.getElementById('renObs').value||'').trim();
+  if (!venc1) { toast('⚠️ Informe o vencimento da 1ª parcela', '#b45309'); return; }
+  var total = Math.max(0, saldo - desc + jur);
+  if (total <= 0) { toast('⚠️ O total do acordo deve ser maior que zero', '#b45309'); return; }
+  if (desc > 0 && !confirm('Confirmar acordo com desconto de '+brl(desc)+'?')) return;
+
+  var renId = 'ren_' + Date.now();
+  var hojeISO = new Date().toISOString().slice(0,10);
+  var cli = itens[0].cliente || '';
+  var origemDesc = itens.map(function(r){ return (r.historico||r.tipo||'conta'); }).join(' + ');
+  if (origemDesc.length > 90) origemDesc = itens.length + ' conta(s) renegociada(s)';
+
+  // 1) marca as originais
+  itens.forEach(function(r){
+    r.status = 'renegociado';
+    r.renegociacaoId = renId;
+    r.renegociadoEm = hojeISO;
+  });
+  // 2) cria as parcelas do acordo
+  var parcela = Math.floor((total / n) * 100) / 100;
+  for (var k=0; k<n; k++){
+    var valorK = (k===n-1) ? Math.round((total - parcela*(n-1))*100)/100 : parcela;
+    rows.push({
+      cliente: cli,
+      tipo: 'Renegociação',
+      valor: valorK,
+      recebido: 0,
+      vencimento: renAddMeses(venc1, k),
+      historico: 'Acordo ' + (k+1) + '/' + n + ' — ' + origemDesc + (obs ? ' · ' + obs : ''),
+      status: 'pendente',
+      recebidoEm: '',
+      renegociacaoId: renId,
+      criadoEm: new Date().toISOString()
+    });
+  }
+  saveDB();
+  closeM('mRenegociar');
+  finRenderReceber();
+  toast('🤝 Acordo criado: ' + (n===1 ? '1 parcela' : n+' parcelas') + ' de ' + brl(total) + ' no total. As contas originais ficaram marcadas como renegociadas.', '#0d7a3e');
 }
 
 function finReceberToggle(idx, receber) {
@@ -9331,6 +9475,37 @@ function mltConfirmarImportacao(){
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeM('mUsuarios')">Fechar</button>
     <button class="btn" id="btnGerPerfis" onclick="abrirPerfis()" style="display:none;margin-left:auto;background:#0E1B4D;color:#fff">🔐 Perfis de Acesso</button>
+  </div>
+</div></div>
+
+<!-- MODAL: RENEGOCIAÇÃO -->
+<div class="modal-bg" id="mRenegociar"><div class="modal" style="max-width:560px">
+  <div class="modal-head" style="background:#9d174d">
+    <h3>🤝 Renegociar Contas</h3>
+    <button class="modal-close" onclick="closeM('mRenegociar')">✕</button>
+  </div>
+  <div class="modal-body">
+    <p style="font-size:12px;margin:0 0 8px">Cliente: <strong id="renCliente">—</strong></p>
+    <div id="renLista" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px;max-height:170px;overflow-y:auto"></div>
+    <div style="background:#EEF1FD;border-radius:8px;padding:9px 12px;font-size:12px;display:flex;justify-content:space-between;margin-bottom:12px">
+      <span>Saldo devedor selecionado</span><strong id="renSaldo" data-valor="0">R$ 0,00</strong>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Desconto (R$)</label><input class="fi" id="renDesconto" placeholder="0,00" oninput="renCalc()"></div>
+      <div class="fg"><label class="fl">Juros / acréscimo (R$)</label><input class="fi" id="renJuros" placeholder="0,00" oninput="renCalc()"></div>
+      <div class="fg"><label class="fl">Nº de parcelas</label><input class="fi" id="renParcelas" type="number" min="1" max="36" value="1" oninput="renCalc()"></div>
+      <div class="fg"><label class="fl">Vencimento da 1ª parcela</label><input class="fi" id="renPrimeiroVenc" type="date"></div>
+    </div>
+    <div class="fg"><label class="fl">Observação (opcional)</label><input class="fi" id="renObs" placeholder="Ex: acordo verbal em 12/08, pix mensal"></div>
+    <div style="background:#fce7f3;border-radius:8px;padding:10px 12px;font-size:12px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between"><span>Total do acordo</span><strong id="renTotal">R$ 0,00</strong></div>
+      <div style="color:#9d174d;font-weight:700;margin-top:3px" id="renResumoParcelas">—</div>
+    </div>
+    <p style="font-size:10px;color:var(--muted);margin:10px 2px 0">As contas originais serão marcadas como <strong>🤝 Renegociadas</strong> (o histórico e o que já foi recebido ficam preservados) e as parcelas do acordo entram como novas contas a receber, com vencimento mensal.</p>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mRenegociar')">Cancelar</button>
+    <button class="btn" onclick="confirmarRenegociacao()" style="margin-left:auto;background:#9d174d;color:#fff">🤝 Confirmar Acordo</button>
   </div>
 </div></div>
 
