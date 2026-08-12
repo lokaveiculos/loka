@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v77-20260810-1600 -->
+<!-- LOKA deploy: v79-20260812-1600 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
 (function(){
@@ -249,6 +250,7 @@ tr:hover td{background:#f8f9fe;}
     <div data-label="Manutenção" class="nav-item" id="ni-manutencao" onclick="showPanel('manutencao')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Manutenção</div>
      <div data-label="Fornecedores" class="nav-item" id="ni-fornecedores" onclick="showPanel('fornecedores')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9"/><path d="M9 22V12h6v10"/></svg>Fornecedores</div>
     <div data-label="Multas" class="nav-item" id="ni-multas" onclick="showPanel('multas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas</div>
+    <div data-label="e-Frotas" class="nav-item" id="ni-efrotas" onclick="showPanel('efrotas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2"/></svg>e-Frotas</div>
     <div data-label="Financeiro" class="nav-item" id="ni-financeiro" onclick="showPanel('financeiro')" style="display:none"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro</div>
     <div data-label="Formulários" class="nav-item" id="ni-formularios" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
     <div data-label="Contratos Gerados" class="nav-item" id="ni-contratos" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
@@ -575,6 +577,24 @@ tr:hover td{background:#f8f9fe;}
         <div id="mltConferencia"></div>
       </div>
 
+    </div>
+
+    <!-- ══ e-FROTAS (SENATRAN/Serpro) ══ -->
+    <div class="panel" id="panel-efrotas" style="display:none;width:100%">
+      <div style="max-width:860px">
+        <div id="efStatusCard" style="margin-bottom:14px"></div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+          <div class="sec-label" style="margin-top:0">Consultas</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+            <input class="fi" id="efPlaca" placeholder="Placa (opcional)" style="max-width:150px;text-transform:uppercase" autocomplete="off">
+            <button class="btn btn-outline" onclick="efTestarConexao()">🔌 Testar conexão</button>
+            <button class="btn btn-blue" onclick="efConsultarPlaca()">🛰 Consultar esta placa</button>
+            <button class="btn" style="background:#b45309;color:#fff" onclick="efConsultarFrota()">🚗 Consultar TODA a frota</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin:10px 2px 0">⚠️ Ambiente de <strong>produção</strong>: cada consulta ao Serpro é <strong>cobrada</strong> (uma por placa). A varredura da frota inteira consulta todos os veículos de uma vez. A consulta diária automática está desligada por controle de custo.</p>
+        </div>
+        <div id="efLog"></div>
+      </div>
     </div>
 
     <div class="panel" id="panel-financeiro" style="display:none;width:100%">
@@ -1100,7 +1120,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v77-20260810-1600';
+var LOKA_BUILD = 'v79-20260812-1600';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1139,10 +1159,11 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
     fornecedores: 'Fornecedores',
   multas: 'Multas',
+  efrotas: 'e-Frotas (SENATRAN)',
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
   historico:'Histórico de Locações', faturas:'Faturas', manutencao:'Manutenção', financeiro:'Financeiro', reserva:'Reservas', cadastro:'Pré-Cadastro'
@@ -1178,9 +1199,9 @@ function _perfilAtual() {
 }
 
 // Todos os painéis controláveis por permissão
-var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
-var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',efrotas:'e-Frotas (SENATRAN)',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
   editarPrecos:'Editar preços dos veículos',
   gerenciarUsuarios:'Gerenciar usuários',
@@ -2301,6 +2322,7 @@ function _reRenderPainelAtivo() {
     if (nome === 'faturas')     { if(typeof renderFaturas==='function') renderFaturas(); }
     if (nome === 'financeiro')  { if(typeof finRender==='function') finRender(_finAbaAtual); }
     if (nome === 'multas')      { if(typeof mltRender==='function') mltRender(); }
+    if (nome === 'efrotas')     { if(typeof renderEfrotas==='function') renderEfrotas(); }
     // Atualizar stats do dashboard só se NÃO estiver nele (evita render duplo)
     if (nome !== 'dashboard') {
       try {
@@ -7555,6 +7577,132 @@ function gerarRelatorioMensal() {
     +'<br><button onclick="window.print()" style="padding:10px 20px;background:#0E1B4D;color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-weight:700;cursor:pointer">🖨️ Imprimir</button>'
     +'</body></html>';
   var w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MÓDULO e-FROTAS (SENATRAN/Serpro) — frontend das Cloud Functions
+// Backend: loka_efrotas_deploy v10 (dispararConsultaMultas,
+// testarConexaoEfrotas), região southamerica-east1, chamada pelo
+// protocolo HTTP das callables (sem SDK extra).
+// ═══════════════════════════════════════════════════════════════════
+// Se as Functions estiverem publicadas em OUTRO projeto Firebase,
+// ajuste apenas esta constante:
+var EFROTAS_FUNCS_BASE = 'https://southamerica-east1-loka-b8dd2.cloudfunctions.net';
+
+var _EFROTAS_REGIAO = 'southamerica-east1';
+function _efrotasCall(fn, data) {
+  // Caminho principal: SDK de Functions (httpsCallable) — o mesmo mecanismo
+  // já TESTADO contra o backend publicado (unificação com o pacote sistema v8).
+  if (typeof firebase !== 'undefined' && firebase.functions) {
+    return firebase.app().functions(_EFROTAS_REGIAO).httpsCallable(fn)(data || {})
+      .then(function(res){ return res.data; });
+  }
+  // Plano B (se o SDK não carregar): protocolo HTTP das callables via fetch
+  return fetch(EFROTAS_FUNCS_BASE + '/' + fn, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: data || {} })
+  }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(j){
+      if (!r.ok || j.error) {
+        var msg = (j.error && (j.error.message || j.error.status)) || ('HTTP ' + r.status);
+        if (r.status === 404) msg = 'Função não encontrada (404). O backend e-Frotas já foi publicado? Confira EFROTAS_FUNCS_BASE.';
+        throw new Error(msg);
+      }
+      return j.result;
+    });
+  });
+}
+
+var _efStatusWired = false;
+function renderEfrotas() {
+  // Escuta o status em tempo real (uma única vez) — acompanha varreduras em segundo plano
+  if (!_efStatusWired && typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+    _efStatusWired = true;
+    try {
+      firebase.database().ref('loka_db/efrotas_status').on('value', function(snap){
+        window._efStatus = snap.val();
+        var card = document.getElementById('efStatusCard');
+        if (card && document.getElementById('panel-efrotas').style.display !== 'none') _efPintarStatus();
+      });
+    } catch(e){}
+  }
+  _efPintarStatus();
+}
+
+function _efPintarStatus() {
+  var card = document.getElementById('efStatusCard');
+  if (!card) return;
+  var st = window._efStatus || (db && db.efrotas_status) || null;
+  if (!st) {
+    card.innerHTML = '<div style="background:#EEF1FD;border-radius:12px;padding:14px 16px;font-size:12px">'
+      + '🛰 <strong>e-Frotas ainda não executou nenhuma consulta.</strong><br>'
+      + '<span style="color:var(--muted)">Use "Testar conexão" para validar o certificado digital, depois consulte uma placa.</span></div>';
+    return;
+  }
+  var quando = st.ultimaExecucao ? new Date(st.ultimaExecucao).toLocaleString('pt-BR') : '—';
+  var erros = (st.erros && st.erros.length) ? st.erros : [];
+  card.innerHTML =
+    '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">'
+    + '<div class="sec-label" style="margin-top:0">Status da última consulta'
+    + (st.emAndamento ? ' <span class="badge bm" style="margin-left:6px">⏳ em andamento…</span>' : '')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:10px;font-size:12px">'
+    + '<div><span style="color:var(--muted);font-size:10px">QUANDO</span><br><strong>' + quando + '</strong></div>'
+    + '<div><span style="color:var(--muted);font-size:10px">AMBIENTE</span><br><strong>' + (st.ambiente||'—') + '</strong></div>'
+    + '<div><span style="color:var(--muted);font-size:10px">PLACAS</span><br><strong>' + (st.placasConsultadas!=null?st.placasConsultadas:'—') + '</strong></div>'
+    + '<div><span style="color:var(--muted);font-size:10px">MULTAS NOVAS</span><br><strong style="color:' + (st.novas?'#c0392b':'#0d7a3e') + '">' + (st.novas!=null?st.novas:'—') + '</strong></div>'
+    + '<div><span style="color:var(--muted);font-size:10px">ATUALIZADAS</span><br><strong>' + (st.atualizadas!=null?st.atualizadas:'—') + '</strong></div>'
+    + '</div>'
+    + (st.erroGeral ? '<div style="margin-top:10px;font-size:11px;color:#c0392b">❌ ' + st.erroGeral + '</div>' : '')
+    + (erros.length ? '<div style="margin-top:10px;font-size:11px;color:#b45309">⚠️ ' + erros.length + ' placa(s) com erro: '
+        + erros.slice(0,5).map(function(e){ return e.placa; }).join(', ') + (erros.length>5?'…':'') + '</div>' : '')
+    + '</div>';
+}
+
+function _efLog(html, cor) {
+  var el = document.getElementById('efLog');
+  if (el) el.innerHTML = '<div style="background:' + (cor||'#EEF1FD') + ';border-radius:10px;padding:12px 14px;font-size:12px">' + html + '</div>';
+}
+function _efPlacaCampo() {
+  return ((document.getElementById('efPlaca')||{}).value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+
+function efTestarConexao() {
+  var placa = _efPlacaCampo();
+  _efLog('⏳ Testando conexão com o e-Frotas (certificado + handshake)' + (placa ? ' usando a placa ' + placa : '') + '…');
+  _efrotasCall('testarConexaoEfrotas', placa ? { placa: placa } : {}).then(function(r){
+    _efLog('✅ <strong>Conexão OK!</strong><br><pre style="white-space:pre-wrap;font-size:11px;margin:8px 0 0">' + JSON.stringify(r, null, 2) + '</pre>', '#e8f5ef');
+  }).catch(function(e){
+    _efLog('❌ <strong>Falha no teste:</strong> ' + e.message, '#fdeaea');
+  });
+}
+
+function efConsultarPlaca() {
+  var placa = _efPlacaCampo();
+  if (!placa) { toast('⚠️ Digite a placa a consultar', '#b45309'); return; }
+  if (!confirm('Consultar as infrações da placa ' + placa + ' no e-Frotas?\n\nEsta consulta é COBRADA pelo Serpro (1 consulta).')) return;
+  _efLog('⏳ Consultando ' + placa + ' no e-Frotas…');
+  _efrotasCall('dispararConsultaMultas', { placa: placa }).then(function(r){
+    _efLog('✅ <strong>' + placa + ' consultada.</strong> Novas: <strong>' + (r.novas||0) + '</strong> · Atualizadas: ' + (r.atualizadas||0)
+      + ((r.erros&&r.erros.length)?('<br>⚠️ ' + r.erros.map(function(e){return e.placa+': '+e.erro;}).join('<br>')):'')
+      + '<br><span style="color:var(--muted)">As multas novas já estão no painel Multas.</span>', '#e8f5ef');
+    if (typeof mltRender === 'function') try { mltRender(); } catch(e){}
+  }).catch(function(e){
+    _efLog('❌ <strong>Falha na consulta:</strong> ' + e.message, '#fdeaea');
+  });
+}
+
+function efConsultarFrota() {
+  var n = (db && db.veiculos || []).filter(function(v){ return v && v.placa; }).length;
+  if (!n) { toast('Nenhum veículo cadastrado', '#b45309'); return; }
+  if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA varredura roda em segundo plano; acompanhe pelo status acima.')) return;
+  _efLog('⏳ Varredura da frota iniciada (' + n + ' placas). Acompanhe o status acima — o card atualiza sozinho quando terminar.');
+  _efrotasCall('dispararConsultaMultas', { background: true }).then(function(r){
+    _efLog('🛰 ' + (r.msg || 'Varredura em andamento…'));
+  }).catch(function(e){
+    _efLog('❌ <strong>Falha ao iniciar:</strong> ' + e.message, '#fdeaea');
+  });
 }
 
 // ── BACKUP / RESTORE ─────────────────────────────────────────
