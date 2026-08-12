@@ -277,7 +277,7 @@ function traduzErro(e){
 
 function efrTestar(){
   setBtns(true); status('⏳ Testando certificado e conexão…','#ffe');
-  fns().httpsCallable('testarConexaoEfrotas')({}).then(function(r){
+  fns().httpsCallable('testarConexaoEfrotas', { timeout: 540000 })({}).then(function(r){
     var d = r.data||{};
     if (d.ok) status('✓ '+(d.msg||'Conexão OK')+' (HTTP '+(d.http||'?')+')','#9f9');
     else status('⚠ '+traduzErro({message:d.erro||''}),'#fbb');
@@ -291,7 +291,7 @@ function efrConsultarUma(){
   var placa = (el ? el.value : '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
   if (!placa){ status('⚠ Digite uma placa.','#fbb'); return; }
   setBtns(true); status('⏳ Consultando placa '+placa+'…','#ffe');
-  fns().httpsCallable('dispararConsultaMultas')({ placa: placa }).then(function(r){
+  fns().httpsCallable('dispararConsultaMultas', { timeout: 540000 })({ placa: placa }).then(function(r){
     var d = r.data||{};
     var msg = '✓ Placa '+placa+' · '+(d.novas||0)+' multa(s) nova(s)';
     if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
@@ -303,7 +303,7 @@ function efrConsultarUma(){
 }
 
 // ── Consulta da frota em LOTES ──
-var TAMANHO_LOTE = 10;
+var TAMANHO_LOTE = 5;   // lotes menores = resposta mais rápida, menos risco de timeout
 var _lote = { inicio: 0, novas: 0, atualizadas: 0, erros: 0, rodando: false };
 
 function efrConsultar(){
@@ -323,7 +323,7 @@ function rodarLote(){
   setBtns(true);
   status('⏳ Consultando veículos ' + (_lote.inicio + 1) + ' a ' + (_lote.inicio + TAMANHO_LOTE) + '…', '#ffe');
 
-  fns().httpsCallable('dispararConsultaMultas')({
+  fns().httpsCallable('dispararConsultaMultas', { timeout: 540000 })({
     inicio: _lote.inicio,
     tamanhoLote: TAMANHO_LOTE
   }).then(function(r){
