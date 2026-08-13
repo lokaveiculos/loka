@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v80-20260812-1700 -->
+<!-- LOKA deploy: v81-20260813-0900 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1123,7 +1123,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v80-20260812-1700';
+var LOKA_BUILD = 'v81-20260813-0900';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1486,6 +1486,18 @@ function lokaLogout() {
 // A lista antiga de encerrados mora DENTRO do loka_db, então qualquer gravação
 // total (restaurar backup, set de aparelho desatualizado) apagava a vacina
 // junto com a doença. Este nó separado sobrevive a qualquer set no loka_db.
+// Assinatura de um contrato: cliente + placas + retirada + devolução.
+// Identifica o MESMO contrato mesmo que ele volte com ID diferente.
+function _assinaturaAtivo(a){
+  if (!a) return '';
+  var norm = function(x){ return String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
+  var placas = (typeof _placasDoAtivo==='function' ? _placasDoAtivo(a) : []).sort().join('');
+  var cli = norm(a.clienteNome || a.cliente).slice(0,30);
+  var ret = norm(a.retirada), dev = norm(a.devolucao);
+  if (!placas && !cli) return '';
+  return 'sig_' + cli + '_' + placas + '_' + ret + '_' + dev;
+}
+
 var _tombSemeado = false;
 function _iniciarTombstones(){
   if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
@@ -1519,6 +1531,8 @@ function _semearTombstones(){
     });
     (Array.isArray(db.historico) ? db.historico : Object.values(db.historico||{})).forEach(function(h){
       if (h && h.id && !t[h.id] && !falt[h.id]) falt[h.id] = Date.now();
+      var sg = _assinaturaAtivo(h);
+      if (sg && !t[sg] && !falt[sg]) falt[sg] = Date.now();
     });
     var n = Object.keys(falt).length;
     if (n) {
@@ -1536,12 +1550,20 @@ function _setDBProtegido(dados, cb){
       var lista = Object.assign({}, dados.encerrados || {}, tomb || {}, window._tombstones || {});
       var hist = {};
       (Array.isArray(dados.historico) ? dados.historico : Object.values(dados.historico||{})).forEach(function(h){ if (h && h.id) hist[h.id] = 1; });
+      var sigsP = {};
+      Object.keys(lista).forEach(function(k){ if (k.indexOf('sig_')===0) sigsP[k]=1; });
+      (Array.isArray(dados.historico) ? dados.historico : Object.values(dados.historico||{})).forEach(function(h){ var sg=_assinaturaAtivo(h); if (sg) sigsP[sg]=1; });
       var antes = (dados.ativos||[]).length;
-      dados.ativos = (dados.ativos||[]).filter(function(a){ return !(a && a.id && (lista[a.id] || hist[a.id])); });
+      dados.ativos = (dados.ativos||[]).filter(function(a){
+        if (!a) return false;
+        var sg=_assinaturaAtivo(a);
+        return !((a.id && (lista[a.id] || hist[a.id])) || (sg && sigsP[sg]));
+      });
       var rem = antes - dados.ativos.length;
       if (rem > 0) console.warn('[SET-PROTEGIDO] ' + rem + ' contrato(s) encerrado(s) impedido(s) de ressuscitar.');
       dados.encerrados = Object.assign({}, dados.encerrados || {}, tomb || {});
       dados._ultimaEscrita = Date.now();
+      dados._writerBuild = (typeof LOKA_BUILD!=='undefined' ? LOKA_BUILD : 'v81');
     } catch(e){ console.warn('[SET-PROTEGIDO]', e && e.message); }
     firebase.database().ref('loka_db').set(dados)
       .then(function(){ if (cb) cb(null); })
@@ -1567,6 +1589,15 @@ function aplicarEncerrados(dados){
     if (window._tombstones) {
       Object.keys(window._tombstones).forEach(function(id){ lista[id] = lista[id] || window._tombstones[id]; });
     }
+    // FONTE 4: ASSINATURAS — pega o fantasma mesmo quando ele volta com ID novo.
+    // Assinatura = cliente + placas + retirada + devolução. Vem das lápides
+    // (chaves sig_) e do próprio histórico (todo contrato encerrado gera uma).
+    var sigs = {};
+    Object.keys(lista).forEach(function(k){ if (k.indexOf('sig_')===0) sigs[k]=1; });
+    var _histArr = (dados && dados.historico) || (db && db.historico) || [];
+    (Array.isArray(_histArr) ? _histArr : Object.values(_histArr||{})).forEach(function(h){
+      var sg = _assinaturaAtivo(h); if (sg) sigs[sg]=1;
+    });
     // FONTE 2: histórico — qualquer id que já foi para o histórico está encerrado.
     // O histórico é permanente (nunca apagado), então é uma barreira à prova de falhas.
     var histIds = {};
@@ -1575,17 +1606,19 @@ function aplicarEncerrados(dados){
       if (h && h.id) histIds[h.id] = true;
     });
 
-    if (db.ativos && (Object.keys(lista).length || Object.keys(histIds).length)) {
+    if (db.ativos && (Object.keys(lista).length || Object.keys(histIds).length || Object.keys(sigs).length)) {
       var removidos = 0;
+      var vistos = {};   // p/ colapsar duplicatas (mesma assinatura, IDs diferentes)
       db.ativos = db.ativos.filter(function(a){
-        if (!a || !a.id) return true;
-        if (lista[a.id] || histIds[a.id]) {
-          removidos++;
-          return false;
-        }
+        if (!a) return false;
+        var sg = _assinaturaAtivo(a);
+        // fantasma: ID conhecido OU assinatura de contrato já encerrado
+        if ((a.id && (lista[a.id] || histIds[a.id])) || (sg && sigs[sg])) { removidos++; return false; }
+        // duplicata: mesma assinatura já apareceu nesta lista — mantém só a primeira
+        if (sg) { if (vistos[sg]) { removidos++; return false; } vistos[sg] = 1; }
         return true;
       });
-      if (removidos > 0) console.warn('[ENCERRADOS] '+removidos+' ativo(s) removido(s) por constarem como encerrados (lista/histórico).');
+      if (removidos > 0) console.warn('[ENCERRADOS] '+removidos+' ativo(s) removido(s) (encerrados/fantasmas/duplicatas).');
     }
   } catch(e){ console.error('aplicarEncerrados:', e); }
 }
@@ -1633,6 +1666,7 @@ function inicializarCom(dados, origem) {
     _dadosCarregados = true;
     // Ativar sincronização em tempo real
     setupRealtimeSync(); registrarVersaoAtual(); escutarVersao(); iniciarVerificacaoPublicacao(); _iniciarTombstones(); setTimeout(backupAutomatico, 8000);
+    try { firebase.database().ref('loka_db/_writerBuild').set(typeof LOKA_BUILD!=='undefined'?LOKA_BUILD:'v81'); } catch(e){}
   }
 
   // 2. Tentar carregar do Firebase (protege contra localStorage vazio)
@@ -1655,32 +1689,24 @@ function inicializarCom(dados, origem) {
       }
 
       if (nLS > 0) {
-        // Se o localStorage é mais recente, ele vence (você salvou algo há pouco)
-        if (tsLs > tsFb) {
-          local.ativos    = cleanArr(local.ativos);
-          local.veiculos  = cleanVeics(local.veiculos);
-          local.clients   = cleanArr(local.clients);
-          local.historico = cleanArr(local.historico);
-          local.contratos = cleanArr(local.contratos);
-          db = local;
-        normalizarDB();
-          inicializarCom(local, null);
-          // Reenvia para o Firebase COM PROTEÇÃO: remove contratos já encerrados
-          // (lápides) antes de gravar — impede aparelho desatualizado de ressuscitar
-          try { _setDBProtegido(db); } catch(e) {}
-          return;
-        }
-
-        var nLsAtv = (local.ativos||[]).length;
-        var nFbAtv = fbData ? (fbData.ativos||[]).length : 0;
-
-        // Empate de carimbo: se Firebase tem mais ativos, usar Firebase
-        if (nFbAtv > nLsAtv && tsFb >= tsLs) {
+        // ═══════════════════════════════════════════════════════════════
+        // POLÍTICA v81 — O FIREBASE É A ÚNICA FONTE DA VERDADE NO LOAD.
+        // O localStorage NUNCA mais sobrescreve o banco compartilhado.
+        // (Era exatamente por aqui que aparelhos com dados antigos
+        // ressuscitavam contratos já encerrados em outros aparelhos.)
+        // O local só é usado quando o Firebase está vazio/indisponível.
+        // ═══════════════════════════════════════════════════════════════
+        var _fbTemDados = fbData && ((fbData.clients||[]).length || (fbData.ativos||[]).length || (fbData.historico||[]).length);
+        if (_fbTemDados) {
+          if (tsLs > tsFb) {
+            // Guarda a cópia local para eventual recuperação manual — mas NÃO sobe
+            try { localStorage.setItem('loka_db_local_descartado', JSON.stringify({ quando: new Date().toISOString(), dados: local })); } catch(e) {}
+            console.warn('[LOAD] localStorage mais recente que o Firebase foi DESCARTADO (política Firebase-vence). Cópia em loka_db_local_descartado.');
+          }
           inicializarCom(fbData, null);
           return;
         }
-
-        // localStorage OK — usa ele e limpa nulls
+        // Firebase vazio/indisponível → modo offline com o local
         db = local;
         db.ativos    = cleanArr(db.ativos);
         db.veiculos  = cleanVeics(db.veiculos);
@@ -1689,39 +1715,10 @@ function inicializarCom(dados, origem) {
         db.contratos = cleanArr(db.contratos);
         db.multas    = cleanArr(db.multas);
         db.checklists = cleanArr(db.checklists);
-
-        // PROTEÇÃO CONTRA PERDA DE DADOS:
-        // A escolha acima considera apenas clientes/ativos. Módulos como multas,
-        // checklists e financeiro podem estar mais completos no Firebase — se o
-        // localStorage estiver defasado, preservamos a versão do Firebase para
-        // que o próximo saveDB() não apague esses registros.
-        if (fbData) {
-          var _fbMultas = cleanArr(fbData.multas);
-          if (_fbMultas.length > db.multas.length) db.multas = _fbMultas;
-
-          var _fbChecks = cleanArr(fbData.checklists);
-          if (_fbChecks.length > db.checklists.length) db.checklists = _fbChecks;
-
-          var _fbBaixas = cleanArr(fbData.baixasHistorico);
-          if (_fbBaixas.length > cleanArr(db.baixasHistorico).length) db.baixasHistorico = _fbBaixas;
-
-          // Financeiro é objeto: usa o do Firebase se o local estiver vazio/ausente
-          var _lfin = JSON.stringify(db.financeiro || {});
-          var _ffin = JSON.stringify(fbData.financeiro || {});
-          if (_ffin.length > _lfin.length) db.financeiro = fbData.financeiro;
-        }
-
-        // Sincronizar Firebase SOMENTE se local tem mais clientes OU mais ativos.
-        // ATENÇÃO: "local tem mais ativos" é exatamente o cenário do aparelho
-        // desatualizado (o Firebase tem menos ativos porque contratos foram
-        // encerrados em outro aparelho). Por isso a gravação é PROTEGIDA:
-        // remove das listas os contratos com lápide antes de subir.
-        if (nLS > nFB || nLsAtv > nFbAtv) {
-          try { _setDBProtegido(db); } catch(e) {}
-        }
+        normalizarDB();
         preencherCliSel(); checkAlertas(); showPanel('dashboard');
-        // Ativar sincronização em tempo real
         setupRealtimeSync(); registrarVersaoAtual(); escutarVersao(); iniciarVerificacaoPublicacao(); _iniciarTombstones(); setTimeout(backupAutomatico, 8000);
+    try { firebase.database().ref('loka_db/_writerBuild').set(typeof LOKA_BUILD!=='undefined'?LOKA_BUILD:'v81'); } catch(e){}
         return;
       }
 
@@ -1969,6 +1966,7 @@ function _gravarDbNoFirebase() {
       _isSaving = true;
       _escritasPendentes++;
       _mostrarSyncBadge('💾 Salvando...');
+      db._writerBuild = (typeof LOKA_BUILD!=='undefined' ? LOKA_BUILD : 'v81');
       firebase.database().ref('loka_db').set(db).then(function() {
         _escritasPendentes = Math.max(0, _escritasPendentes - 1);
         if (_escritasPendentes === 0) {
@@ -3605,6 +3603,11 @@ function confirmarEnc() {
     firebase.database().ref('loka_encerrados/' + _idEncerrado).set(Date.now());
     if (!window._tombstones) window._tombstones = {};
     window._tombstones[_idEncerrado] = Date.now();
+    var _sigEnc = _assinaturaAtivo((db.ativos||[]).find(function(x){ return x && x.id===_idEncerrado; }));
+    if (_sigEnc) {
+      firebase.database().ref('loka_encerrados/' + _sigEnc).set(Date.now());
+      window._tombstones[_sigEnc] = Date.now();
+    }
   } catch(e){ console.warn('[ENCERRAMENTO] lápide:', e && e.message); }
   var _updates = {};
   _updates['encerrados/' + _idEncerrado] = Date.now();
