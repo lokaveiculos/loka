@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v81-20260813-0900 -->
+<!-- LOKA deploy: v82-20260815-1000 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1123,7 +1123,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v81-20260813-0900';
+var LOKA_BUILD = 'v82-20260815-1000';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1491,9 +1491,16 @@ function lokaLogout() {
 function _assinaturaAtivo(a){
   if (!a) return '';
   var norm = function(x){ return String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
-  var placas = (typeof _placasDoAtivo==='function' ? _placasDoAtivo(a) : []).sort().join('');
+  // Data à prova de formato: "2026-08-11" e "11/08/2026" geram a MESMA chave (20260811)
+  var normData = function(x){
+    var d = String(x||'').replace(/\D/g,'');
+    if (d.length === 8 && d.slice(0,2) !== '20') d = d.slice(4,8) + d.slice(2,4) + d.slice(0,2); // DDMMYYYY → YYYYMMDD
+    return d;
+  };
+  var placas = (typeof _placasDoAtivo==='function' ? _placasDoAtivo(a) : [])
+    .map(norm).filter(Boolean).sort().join('');
   var cli = norm(a.clienteNome || a.cliente).slice(0,30);
-  var ret = norm(a.retirada), dev = norm(a.devolucao);
+  var ret = normData(a.retirada), dev = normData(a.devolucao);
   if (!placas && !cli) return '';
   return 'sig_' + cli + '_' + placas + '_' + ret + '_' + dev;
 }
