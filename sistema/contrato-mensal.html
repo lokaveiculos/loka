@@ -906,7 +906,7 @@ function registrarContratoMensal() {
     db_data.contratos.unshift({
       id: 'ct_reg_'+Date.now(),
       clienteNome: nome, placa: placas[0]||'',
-      veiculoNome: veicNomes.join(', '),
+      veiculoNome: veiculoNomes.join(', '),
       tipo: 'mensal',
       retirada: hoje, devolucao: '', vigencia: vigencia,
       valor: valor, caucao: caucao,
