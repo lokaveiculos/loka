@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v83-20260817-1015 -->
+<!-- LOKA deploy: v84-20260817-1130 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -590,8 +590,9 @@ tr:hover td{background:#f8f9fe;}
             <button class="btn btn-outline" onclick="efTestarConexao()">🔌 Testar conexão</button>
             <button class="btn btn-blue" onclick="efConsultarPlaca()">🛰 Consultar esta placa</button>
             <button class="btn" style="background:#b45309;color:#fff" onclick="efAbrirSeletor()">🚗 Selecionar placas e consultar</button>
+          <button class="btn btn-outline" style="font-size:11px" onclick="efDiagnostico()">🩺 Diagnóstico</button>
           </div>
-          <p style="font-size:11px;color:var(--muted);margin:10px 2px 0">⚠️ Ambiente de <strong>produção</strong>: cada consulta ao Serpro é <strong>cobrada</strong> (uma por placa). A varredura da frota inteira consulta todos os veículos de uma vez. A consulta diária automática está desligada por controle de custo.</p>
+          <p style="font-size:11px;color:var(--muted);margin:10px 2px 0">⚠️ Ambiente de <strong>produção</strong>: cada consulta ao Serpro é <strong>cobrada</strong> (uma por placa). A consulta roda em lotes, só nas placas que você selecionar. A consulta diária automática está desligada por controle de custo.</p>
         </div>
         <div id="efSeletor"></div>
         <div id="efLog"></div>
@@ -1124,7 +1125,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v83-20260817-1015';
+var LOKA_BUILD = 'v84-20260817-1130';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9623,6 +9624,85 @@ function efConsultarSelecionadas(){
   efFecharSeletor();
   _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:placas.length, restantes:placas.length, placas:placas };
   _efRodarLote();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// DIAGNÓSTICO e-FROTAS — testa cada camada e mostra onde falha
+// ═══════════════════════════════════════════════════════════════
+function efDiagnostico(){
+  var el = document.getElementById('efLog');
+  if (!el) return;
+  el.innerHTML = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">'
+    + '<div class="sec-label" style="margin:0 0 10px">Diagnóstico do e-Frotas</div>'
+    + '<div id="efDiagLista" style="font-size:12px;line-height:1.9"></div></div>';
+  var lista = document.getElementById('efDiagLista');
+  var linhas = [];
+
+  function add(nome, estado, detalhe){
+    var icone = estado === 'ok' ? '✅' : (estado === 'erro' ? '❌' : (estado === 'aviso' ? '⚠️' : '⏳'));
+    var cor   = estado === 'ok' ? 'var(--green)' : (estado === 'erro' ? 'var(--red)' : (estado === 'aviso' ? 'var(--amber)' : 'var(--muted)'));
+    linhas.push('<div>' + icone + ' <strong>' + nome + '</strong>'
+      + (detalhe ? ' — <span style="color:' + cor + '">' + detalhe + '</span>' : '') + '</div>');
+    lista.innerHTML = linhas.join('');
+  }
+
+  // 1. Firebase carregado
+  try {
+    add('SDK Firebase', typeof firebase !== 'undefined' ? 'ok' : 'erro',
+        typeof firebase !== 'undefined' ? 'carregado' : 'não carregou');
+  } catch(e){ add('SDK Firebase', 'erro', e.message); }
+
+  // 2. SDK de Functions
+  try {
+    var temFn = !!(firebase && firebase.app && firebase.app().functions);
+    add('SDK Functions', temFn ? 'ok' : 'erro', temFn ? 'disponível' : 'firebase-functions-compat.js não carregou');
+  } catch(e){ add('SDK Functions', 'erro', e.message); }
+
+  // 3. Dados locais
+  try {
+    var nv = (db && db.veiculos ? (Array.isArray(db.veiculos) ? db.veiculos.length : Object.keys(db.veiculos).length) : 0);
+    var nm = (db && db.multas ? (Array.isArray(db.multas) ? db.multas.length : Object.keys(db.multas).length) : 0);
+    var na = (db && db.ativos ? (Array.isArray(db.ativos) ? db.ativos.length : Object.keys(db.ativos).length) : 0);
+    add('Dados carregados', nv ? 'ok' : 'aviso',
+        nv + ' veículo(s) · ' + nm + ' multa(s) · ' + na + ' locação(ões) ativa(s)');
+    // alerta de formato
+    if (db && db.veiculos && !Array.isArray(db.veiculos)) {
+      add('Formato dos veículos', 'aviso', 'veio como objeto (o backend já trata isso)');
+    }
+  } catch(e){ add('Dados carregados', 'erro', e.message); }
+
+  // 4. Permissões de leitura nos nós usados
+  var nos = ['loka_db','loka_users','loka_perfis','loka_encerrados','loka_backups_meta','faturas','reservas'];
+  var pend = nos.length;
+  nos.forEach(function(no){
+    firebase.database().ref(no).limitToFirst(1).once('value')
+      .then(function(){ add('Ler /' + no, 'ok', 'permitido'); })
+      .catch(function(e){ add('Ler /' + no, 'erro', e.message); })
+      .finally(function(){ if (--pend === 0) _efDiagFuncao(add); });
+  });
+}
+
+function _efDiagFuncao(add){
+  add('Chamando a função de teste…', 'load', 'aguarde');
+  var t0 = Date.now();
+  firebase.app().functions(_EFROTAS_REGIAO)
+    .httpsCallable('testarConexaoEfrotas', { timeout: 120000 })({})
+    .then(function(res){
+      var seg = ((Date.now() - t0)/1000).toFixed(1);
+      var d = res.data || {};
+      if (d.ok) add('Função testarConexao', 'ok', (d.msg || 'respondeu') + ' (' + seg + 's)');
+      else add('Função testarConexao', 'erro', (d.erro || 'falhou') + ' (' + seg + 's)');
+    })
+    .catch(function(e){
+      var seg = ((Date.now() - t0)/1000).toFixed(1);
+      var msg = e.message || String(e);
+      if (msg.indexOf('deadline') >= 0) msg = 'TIMEOUT após ' + seg + 's — a função não respondeu';
+      if (msg.indexOf('not-found') >= 0) msg = 'função não encontrada — o backend foi publicado?';
+      if (msg.indexOf('internal') >= 0) msg = 'erro interno na função — veja os logs no Firebase';
+      if (msg.indexOf('permission') >= 0 || msg.indexOf('unauthenticated') >= 0) msg = 'invocação bloqueada — libere no Cloud Run (aba Segurança)';
+      add('Função testarConexao', 'erro', msg);
+    });
 }
 
 </script>
