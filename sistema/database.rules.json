@@ -1,16 +1,46 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true,
+    ".read": false,
+    ".write": false,
     "loka_db": {
       ".read": true,
-      ".write": true
+      ".write": "newData.child('_writerBuild').exists()"
     },
     "loka_users": {
       ".read": true,
       ".write": true
     },
     "_pass": {
+      ".read": false,
+      ".write": false
+    },
+    "faturas": {
+      ".read": true,
+      ".write": true
+    },
+    "reservas": {
+      ".read": true,
+      ".write": true
+    },
+    "efrotas_status": {
+      ".read": true,
+      ".write": true
+    },
+    "loka_perfis": {
+      ".read": true,
+      ".write": true
+    },
+    "loka_encerrados": {
+      ".read": true,
+      "$id": {
+        ".write": "newData.exists()"
+      }
+    },
+    "loka_backups": {
+      ".read": true,
+      ".write": true
+    },
+    "loka_backups_meta": {
       ".read": true,
       ".write": true
     }

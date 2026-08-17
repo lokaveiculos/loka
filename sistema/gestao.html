@@ -589,10 +589,11 @@ tr:hover td{background:#f8f9fe;}
             <input class="fi" id="efPlaca" placeholder="Placa (opcional)" style="max-width:150px;text-transform:uppercase" autocomplete="off">
             <button class="btn btn-outline" onclick="efTestarConexao()">🔌 Testar conexão</button>
             <button class="btn btn-blue" onclick="efConsultarPlaca()">🛰 Consultar esta placa</button>
-            <button class="btn" style="background:#b45309;color:#fff" onclick="efConsultarFrota()">🚗 Consultar TODA a frota</button>
+            <button class="btn" style="background:#b45309;color:#fff" onclick="efAbrirSeletor()">🚗 Selecionar placas e consultar</button>
           </div>
           <p style="font-size:11px;color:var(--muted);margin:10px 2px 0">⚠️ Ambiente de <strong>produção</strong>: cada consulta ao Serpro é <strong>cobrada</strong> (uma por placa). A varredura da frota inteira consulta todos os veículos de uma vez. A consulta diária automática está desligada por controle de custo.</p>
         </div>
+        <div id="efSeletor"></div>
         <div id="efLog"></div>
       </div>
     </div>
@@ -7748,7 +7749,10 @@ function _efrotasCall(fn, data) {
   // Caminho principal: SDK de Functions (httpsCallable) — o mesmo mecanismo
   // já TESTADO contra o backend publicado (unificação com o pacote sistema v8).
   if (typeof firebase !== 'undefined' && firebase.functions) {
-    return firebase.app().functions(_EFROTAS_REGIAO).httpsCallable(fn)(data || {})
+    // timeout ampliado: o padrão (70s) estoura enquanto a function acorda
+    // e processa o certificado digital.
+    return firebase.app().functions(_EFROTAS_REGIAO)
+      .httpsCallable(fn, { timeout: 540000 })(data || {})
       .then(function(res){ return res.data; });
   }
   // Plano B (se o SDK não carregar): protocolo HTTP das callables via fetch
@@ -7847,15 +7851,68 @@ function efConsultarPlaca() {
   });
 }
 
+// ── Varredura da frota EM LOTES ──────────────────────────────
+// Lotes pequenos evitam o timeout que a varredura inteira causava,
+// mostram progresso e permitem parar no meio (controle de custo).
+var EF_TAMANHO_LOTE = 5;
+var _efLote = { inicio:0, novas:0, atualizadas:0, erros:0, total:0, restantes:0 };
+
 function efConsultarFrota() {
   var n = (db && db.veiculos || []).filter(function(v){ return v && v.placa; }).length;
   if (!n) { toast('Nenhum veículo cadastrado', '#b45309'); return; }
-  if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA varredura roda em segundo plano; acompanhe pelo status acima.')) return;
-  _efLog('⏳ Varredura da frota iniciada (' + n + ' placas). Acompanhe o status acima — o card atualiza sozinho quando terminar.');
-  _efrotasCall('dispararConsultaMultas', { background: true }).then(function(r){
-    _efLog('🛰 ' + (r.msg || 'Varredura em andamento…'));
+  if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.')) return;
+  _efLote = { inicio:0, novas:0, atualizadas:0, erros:0, total:n, restantes:n };
+  _efRodarLote();
+}
+
+function _efPararLote() {
+  _efLog('⏸ Varredura pausada em ' + _efLote.inicio + ' de ' + _efLote.total + ' veículo(s). '
+    + 'Novas até aqui: <strong>' + _efLote.novas + '</strong>.'
+    + '<br><button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-top:6px" onclick="_efRodarLote()">▶ Retomar</button>');
+}
+
+function _efRodarLote() {
+  _efLog('⏳ Consultando veículos ' + (_efLote.inicio + 1) + ' a ' + (_efLote.inicio + EF_TAMANHO_LOTE) + '…');
+  // Envia só as placas deste lote (se houver seleção) — assim o backend
+  // consulta exatamente o que o operador escolheu.
+  var _params = { inicio: _efLote.inicio, tamanhoLote: EF_TAMANHO_LOTE };
+  if (_efLote.placas && _efLote.placas.length) {
+    _params.placas = _efLote.placas;
+  }
+  _efrotasCall('dispararConsultaMultas', _params).then(function(r){
+    _efLote.novas       += (r.novas || 0);
+    _efLote.atualizadas += (r.atualizadas || 0);
+    _efLote.erros       += (r.erros ? r.erros.length : 0);
+    _efLote.baixadas    = (_efLote.baixadas || 0) + (r.baixadas || 0);
+    _efLote.inicio      = r.proximo || (_efLote.inicio + EF_TAMANHO_LOTE);
+    _efLote.total       = r.totalFrota || _efLote.total;
+    _efLote.restantes   = r.restantes || 0;
+
+    if (typeof mltRender === 'function') try { mltRender(); } catch(e){}
+
+    if (r.concluido) {
+      _efLog('✅ <strong>Consulta concluída!</strong> ' + _efLote.total + ' veículo(s) · Novas: <strong>'
+        + _efLote.novas + '</strong> · Atualizadas: ' + _efLote.atualizadas
+        + (_efLote.baixadas ? ' · 💚 <strong>' + _efLote.baixadas + '</strong> baixada(s) automaticamente (pagas no SENATRAN)' : '')
+        + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : '')
+        + '<br><span style="color:var(--muted)">As multas já estão no painel Multas.</span>', '#e8f5ef');
+      return;
+    }
+
+    var pct = _efLote.total ? Math.round((_efLote.inicio / _efLote.total) * 100) : 0;
+    _efLog('✅ <strong>Lote concluído</strong> — ' + _efLote.inicio + ' de ' + _efLote.total
+      + ' (' + pct + '%) · Novas: <strong>' + _efLote.novas + '</strong>'
+      + (_efLote.baixadas ? ' · 💚 ' + _efLote.baixadas + ' baixada(s)' : '')
+      + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : '')
+      + '<div style="background:#EEF1FD;border-radius:6px;height:6px;margin:8px 0;max-width:320px">'
+      + '<div style="background:#0d7a3e;height:6px;border-radius:6px;width:' + pct + '%"></div></div>'
+      + '<button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-right:6px" onclick="_efRodarLote()">▶ Continuar ('
+      + _efLote.restantes + ' restantes)</button>'
+      + '<button class="btn btn-outline" style="font-size:11px;padding:6px 12px" onclick="_efPararLote()">Parar</button>', '#e8f5ef');
   }).catch(function(e){
-    _efLog('❌ <strong>Falha ao iniciar:</strong> ' + e.message, '#fdeaea');
+    _efLog('❌ <strong>Falha no lote:</strong> ' + e.message
+      + '<br><span style="color:var(--muted)">O progresso foi salvo.</span>'
+      + '<br><button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-top:6px" onclick="_efRodarLote()">▶ Tentar novamente</button>', '#fdeaea');
   });
 }
 
@@ -9289,6 +9346,160 @@ function mltConfirmarImportacao(){
   toast('✅ '+n+' multa(s) importada(s)','#0d7a3e');
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════
+// SELETOR DE PLACAS — escolhe quais veículos consultar no e-Frotas
+// ═══════════════════════════════════════════════════════════════
+var _efSel = {};        // { placaNormalizada: true }
+var _efFiltroSel = '';
+
+function _efNormPlaca(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+function _efVeiculosLista(){
+  return (db && db.veiculos || []).filter(function(v){ return v && v.placa; });
+}
+
+// Placas que já têm multa pendente — atalho útil de seleção
+function _efPlacasComPendencia(){
+  var set = {};
+  (db && db.multas || []).forEach(function(m){
+    if (!m) return;
+    if (m.status === 'paga' || m.status === 'cancelada' || m.status === 'cobrada') return;
+    if (m.placa) set[_efNormPlaca(m.placa)] = true;
+  });
+  return set;
+}
+
+// Placas com locação ativa hoje
+function _efPlacasComLocacao(){
+  var set = {};
+  (db && db.ativos || []).forEach(function(a){
+    if (a && a.placa) set[_efNormPlaca(a.placa)] = true;
+  });
+  return set;
+}
+
+function efAbrirSeletor(){
+  var lista = _efVeiculosLista();
+  if (!lista.length){ toast('Nenhum veículo cadastrado', '#b45309'); return; }
+  // começa tudo desmarcado — o operador escolhe o que gastar
+  if (!Object.keys(_efSel).length) _efSel = {};
+  _efRenderSeletor();
+}
+
+function efFecharSeletor(){
+  var el = document.getElementById('efSeletor');
+  if (el) el.innerHTML = '';
+}
+
+function _efMarcarTodas(v){
+  var lista = _efVeiculosLista();
+  if (v) lista.forEach(function(x){ _efSel[_efNormPlaca(x.placa)] = true; });
+  else _efSel = {};
+  _efRenderSeletor();
+}
+
+function _efMarcarGrupo(qual){
+  var set = (qual === 'pendencia') ? _efPlacasComPendencia() : _efPlacasComLocacao();
+  _efSel = {};
+  Object.keys(set).forEach(function(p){ _efSel[p] = true; });
+  _efRenderSeletor();
+}
+
+function _efToggle(placa, marcado){
+  var p = _efNormPlaca(placa);
+  if (marcado) _efSel[p] = true; else delete _efSel[p];
+  _efAtualizarContador();
+}
+
+function _efFiltrarSel(v){
+  _efFiltroSel = String(v||'').toUpperCase();
+  _efRenderSeletor(true);
+}
+
+function _efSelecionadas(){
+  return Object.keys(_efSel).filter(function(k){ return _efSel[k]; });
+}
+
+function _efAtualizarContador(){
+  var el = document.getElementById('efContadorSel');
+  if (el) {
+    var n = _efSelecionadas().length;
+    el.innerHTML = '<strong>' + n + '</strong> placa(s) selecionada(s)'
+      + (n ? ' · <span style="color:var(--amber)">' + n + ' consulta(s) cobrada(s)</span>' : '');
+  }
+  var bt = document.getElementById('efBtnConsultarSel');
+  if (bt) bt.disabled = (_efSelecionadas().length === 0);
+}
+
+function _efRenderSeletor(manterFoco){
+  var el = document.getElementById('efSeletor');
+  if (!el) return;
+  var lista = _efVeiculosLista();
+  var pend = _efPlacasComPendencia();
+  var loc  = _efPlacasComLocacao();
+
+  var visiveis = lista.filter(function(v){
+    if (!_efFiltroSel) return true;
+    var alvo = (_efNormPlaca(v.placa) + ' ' + (v.marca||'') + ' ' + (v.modelo||'')).toUpperCase();
+    return alvo.indexOf(_efFiltroSel) >= 0;
+  });
+
+  var h = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<div class="sec-label" style="margin:0;flex:1">Selecione as placas a consultar</div>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="efFecharSeletor()">✕ Fechar</button>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarTodas(true)">Marcar todas</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarTodas(false)">Desmarcar todas</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarGrupo(\'pendencia\')">Só com multa pendente</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarGrupo(\'locacao\')">Só com locação ativa</button>'
+    + '</div>'
+
+    + '<input class="fi" placeholder="Filtrar placa ou modelo…" value="' + _efFiltroSel + '" '
+    + 'oninput="_efFiltrarSel(this.value)" style="margin-bottom:10px;max-width:280px">'
+
+    + '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
+
+  if (!visiveis.length) {
+    h += '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhum veículo encontrado.</div>';
+  } else {
+    visiveis.forEach(function(v){
+      var p = _efNormPlaca(v.placa);
+      var marcada = !!_efSel[p];
+      var tags = '';
+      if (pend[p]) tags += '<span style="font-size:9px;background:#fff4e5;color:#b45309;padding:1px 6px;border-radius:10px;margin-left:6px">multa pendente</span>';
+      if (loc[p])  tags += '<span style="font-size:9px;background:#eaeeff;color:#2B4BF2;padding:1px 6px;border-radius:10px;margin-left:6px">alugado</span>';
+      h += '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--light);cursor:pointer">'
+        + '<input type="checkbox" ' + (marcada ? 'checked' : '') + ' onchange="_efToggle(\'' + p + '\', this.checked)">'
+        + '<span style="font-weight:700;font-size:12px;min-width:80px">' + (v.placa || '—') + '</span>'
+        + '<span style="font-size:11px;color:var(--muted)">' + ((v.marca||'') + ' ' + (v.modelo||'')).trim() + '</span>'
+        + tags + '</label>';
+    });
+  }
+
+  h += '</div>'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">'
+    + '<div id="efContadorSel" style="flex:1;font-size:12px;color:var(--muted)"></div>'
+    + '<button class="btn btn-blue" id="efBtnConsultarSel" onclick="efConsultarSelecionadas()">🛰 Consultar selecionadas</button>'
+    + '</div></div>';
+
+  el.innerHTML = h;
+  _efAtualizarContador();
+}
+
+// ── Consulta as placas selecionadas, em lotes ──
+function efConsultarSelecionadas(){
+  var placas = _efSelecionadas();
+  if (!placas.length){ toast('⚠️ Selecione ao menos uma placa', '#b45309'); return; }
+  if (!confirm('Consultar ' + placas.length + ' placa(s) no e-Frotas?\n\n💰 São ' + placas.length + ' consulta(s) COBRADA(S) pelo Serpro.')) return;
+  efFecharSeletor();
+  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:placas.length, restantes:placas.length, placas:placas };
+  _efRodarLote();
+}
 
 </script>
 <!-- MODAL: EDITAR RESERVA -->
