@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v82-20260815-1000 -->
+<!-- LOKA deploy: v83-20260817-1015 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1124,7 +1124,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v82-20260815-1000';
+var LOKA_BUILD = 'v83-20260817-1015';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9353,6 +9353,8 @@ function mltConfirmarImportacao(){
 // ═══════════════════════════════════════════════════════════════
 var _efSel = {};        // { placaNormalizada: true }
 var _efFiltroSel = '';
+var _efFiltroFinal = '';    // filtro por final de placa (último dígito)
+var _efFiltroCliente = '';  // filtro por cliente com locação ativa
 
 function _efNormPlaca(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
@@ -9369,6 +9371,36 @@ function _efPlacasComPendencia(){
     if (m.placa) set[_efNormPlaca(m.placa)] = true;
   });
   return set;
+}
+
+// Mapa placa -> { clienteId, clienteNome } a partir das locações ativas
+function _efPlacaCliente(){
+  var mapa = {};
+  (db && db.ativos || []).forEach(function(a){
+    if (a && a.placa) {
+      mapa[_efNormPlaca(a.placa)] = {
+        id: a.clienteId || '',
+        nome: a.clienteNome || ''
+      };
+    }
+  });
+  return mapa;
+}
+
+// Lista de clientes que têm veículo alugado agora (para o seletor)
+function _efClientesComVeiculo(){
+  var mapa = _efPlacaCliente();
+  var vistos = {}, lista = [];
+  Object.keys(mapa).forEach(function(p){
+    var c = mapa[p];
+    var chave = c.id || c.nome;
+    if (chave && !vistos[chave]) {
+      vistos[chave] = true;
+      lista.push({ id: c.id, nome: c.nome || '(sem nome)' });
+    }
+  });
+  lista.sort(function(a,b){ return String(a.nome).localeCompare(String(b.nome)); });
+  return lista;
 }
 
 // Placas com locação ativa hoje
@@ -9418,6 +9450,59 @@ function _efFiltrarSel(v){
   _efRenderSeletor(true);
 }
 
+function _efFiltrarFinal(v){
+  _efFiltroFinal = String(v||'').trim();
+  _efRenderSeletor(true);
+}
+
+function _efFiltrarCliente(v){
+  _efFiltroCliente = String(v||'');
+  _efRenderSeletor(true);
+}
+
+function _efLimparFiltros(){
+  _efFiltroSel = ''; _efFiltroFinal = ''; _efFiltroCliente = '';
+  _efRenderSeletor();
+}
+
+// Marca todas as placas atualmente VISÍVEIS (respeitando os filtros)
+function _efMarcarVisiveis(v){
+  _efVisiveisAtuais().forEach(function(x){
+    var p = _efNormPlaca(x.placa);
+    if (v) _efSel[p] = true; else delete _efSel[p];
+  });
+  _efRenderSeletor();
+}
+
+// Aplica os três filtros e devolve os veículos visíveis
+function _efVisiveisAtuais(){
+  var mapaCli = _efPlacaCliente();
+  return _efVeiculosLista().filter(function(v){
+    var p = _efNormPlaca(v.placa);
+
+    // filtro texto (placa ou modelo)
+    if (_efFiltroSel) {
+      var alvo = (p + ' ' + (v.marca||'') + ' ' + (v.modelo||'')).toUpperCase();
+      if (alvo.indexOf(_efFiltroSel) < 0) return false;
+    }
+
+    // filtro por final de placa (último caractere)
+    if (_efFiltroFinal) {
+      if (p.charAt(p.length - 1) !== _efFiltroFinal.toUpperCase()) return false;
+    }
+
+    // filtro por cliente (quem está com o carro agora)
+    if (_efFiltroCliente) {
+      var c = mapaCli[p];
+      if (!c) return false;
+      var chave = c.id || c.nome;
+      if (String(chave) !== String(_efFiltroCliente)) return false;
+    }
+
+    return true;
+  });
+}
+
 function _efSelecionadas(){
   return Object.keys(_efSel).filter(function(k){ return _efSel[k]; });
 }
@@ -9433,6 +9518,31 @@ function _efAtualizarContador(){
   if (bt) bt.disabled = (_efSelecionadas().length === 0);
 }
 
+// Options do filtro "final de placa" — só os finais que existem na frota
+function _efOpcoesFinal(){
+  var finais = {};
+  _efVeiculosLista().forEach(function(v){
+    var p = _efNormPlaca(v.placa);
+    if (p) finais[p.charAt(p.length - 1)] = true;
+  });
+  var h = '<option value="">Final da placa: todos</option>';
+  Object.keys(finais).sort().forEach(function(f){
+    h += '<option value="' + f + '"' + (_efFiltroFinal === f ? ' selected' : '') + '>Final ' + f + '</option>';
+  });
+  return h;
+}
+
+// Options do filtro de cliente — quem está com veículo alugado agora
+function _efOpcoesCliente(){
+  var h = '<option value="">Cliente: todos</option>';
+  _efClientesComVeiculo().forEach(function(c){
+    var chave = c.id || c.nome;
+    h += '<option value="' + String(chave).replace(/"/g,'&quot;') + '"'
+      + (String(_efFiltroCliente) === String(chave) ? ' selected' : '') + '>' + c.nome + '</option>';
+  });
+  return h;
+}
+
 function _efRenderSeletor(manterFoco){
   var el = document.getElementById('efSeletor');
   if (!el) return;
@@ -9440,11 +9550,8 @@ function _efRenderSeletor(manterFoco){
   var pend = _efPlacasComPendencia();
   var loc  = _efPlacasComLocacao();
 
-  var visiveis = lista.filter(function(v){
-    if (!_efFiltroSel) return true;
-    var alvo = (_efNormPlaca(v.placa) + ' ' + (v.marca||'') + ' ' + (v.modelo||'')).toUpperCase();
-    return alvo.indexOf(_efFiltroSel) >= 0;
-  });
+  var mapaCli = _efPlacaCliente();
+  var visiveis = _efVisiveisAtuais();
 
   var h = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">'
     + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
@@ -9459,8 +9566,23 @@ function _efRenderSeletor(manterFoco){
     + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarGrupo(\'locacao\')">Só com locação ativa</button>'
     + '</div>'
 
-    + '<input class="fi" placeholder="Filtrar placa ou modelo…" value="' + _efFiltroSel + '" '
-    + 'oninput="_efFiltrarSel(this.value)" style="margin-bottom:10px;max-width:280px">'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'
+    + '<input class="fi" placeholder="Placa ou modelo…" value="' + _efFiltroSel + '" '
+      + 'oninput="_efFiltrarSel(this.value)" style="max-width:200px">'
+    + '<select class="fs" onchange="_efFiltrarFinal(this.value)" style="max-width:150px">'
+      + _efOpcoesFinal() + '</select>'
+    + '<select class="fs" onchange="_efFiltrarCliente(this.value)" style="max-width:220px">'
+      + _efOpcoesCliente() + '</select>'
+    + ((_efFiltroSel || _efFiltroFinal || _efFiltroCliente)
+        ? '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efLimparFiltros()">Limpar filtros</button>'
+        : '')
+    + '</div>'
+    + ((_efFiltroSel || _efFiltroFinal || _efFiltroCliente)
+        ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+          + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarVisiveis(true)">✓ Marcar os ' + visiveis.length + ' filtrados</button>'
+          + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarVisiveis(false)">Desmarcar filtrados</button>'
+          + '</div>'
+        : '')
 
     + '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
 
@@ -9472,7 +9594,9 @@ function _efRenderSeletor(manterFoco){
       var marcada = !!_efSel[p];
       var tags = '';
       if (pend[p]) tags += '<span style="font-size:9px;background:#fff4e5;color:#b45309;padding:1px 6px;border-radius:10px;margin-left:6px">multa pendente</span>';
-      if (loc[p])  tags += '<span style="font-size:9px;background:#eaeeff;color:#2B4BF2;padding:1px 6px;border-radius:10px;margin-left:6px">alugado</span>';
+      var cli = mapaCli[p];
+      if (cli && cli.nome) tags += '<span style="font-size:9px;background:#eaeeff;color:#2B4BF2;padding:1px 6px;border-radius:10px;margin-left:6px">' + cli.nome + '</span>';
+      else if (loc[p])  tags += '<span style="font-size:9px;background:#eaeeff;color:#2B4BF2;padding:1px 6px;border-radius:10px;margin-left:6px">alugado</span>';
       h += '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--light);cursor:pointer">'
         + '<input type="checkbox" ' + (marcada ? 'checked' : '') + ' onchange="_efToggle(\'' + p + '\', this.checked)">'
         + '<span style="font-weight:700;font-size:12px;min-width:80px">' + (v.placa || '—') + '</span>'
