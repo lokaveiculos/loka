@@ -12,7 +12,8 @@ antes do como, em português do Brasil, com comandos prontos para colar).
    Publicação = GitHub Pages, propaga em 1–10 min. Sempre lembrar de dar
    **Ctrl+Shift+R** e conferir o build no rodapé.
 2. **Teste no navegador a cada pedido.** Depois de publicar, abrir a página no
-   navegador e verificar se a funcionalidade está OK (console, rede, render).
+   **Chrome** (real, com as sessões do Rogel) e verificar se a funcionalidade
+   está OK — render, console de erros, rede.
    Se a página exigir login, pedir ao Rogel que autentique — nunca digitar senhas.
 3. **Não alterar páginas sem pedido explícito.** O sistema está em pleno
    funcionamento. Mudanças pontuais apenas; nunca reescrever o sistema inteiro
@@ -31,7 +32,7 @@ antes do como, em português do Brasil, com comandos prontos para colar).
 |---|---|
 | `C:\...\Github\loka` | **Repo git** (origin: lokaveiculos/loka) → GitHub Pages |
 | `loka\sistema\` | Todas as páginas publicadas em `lokaveiculos.com.br/sistema/` |
-| `C:\...\Github\deploy` | Backend Cloud Functions e-Frotas — **NÃO é repo git** |
+| `C:\...\Github\deploy` | Backend Cloud Functions e-Frotas — **repo git local** (sem remote) |
 
 URLs de produção:
 - Sistema: https://lokaveiculos.com.br/sistema/gestao.html
@@ -49,7 +50,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v84-20260817-1130** |
+| `gestao.html` | **v85-20260818-1515** |
 | `fatura.html` | v75-20260812-1700 |
 | `multas.html` | **sem carimbo de versão** (pendência) |
 
@@ -124,3 +125,17 @@ responder **No**.
 - `functions/index.js:226-235` — o handler do callable repassa só
   `placa`, `inicio`, `tamanhoLote`. **`placas` nunca chega.**
 - Correção: acrescentar `placas: d.placas` ao objeto repassado.
+
+## Decisões registradas (18/08/2026)
+
+- **`PROMPT-MIGRACAO_1.md` foi descartado** por decisão do Rogel. Ele descreve um
+  pacote "v16" com marcadores `[FIX-n]` e uma função `diagnosticoBanco` que **não
+  existem** na pasta `deploy`. A fonte da verdade do backend é o
+  `deploy/CONFERENCIA.md`. Não seguir aquele prompt.
+- **A pasta `deploy` agora é repo git local** (commit inicial `f6cfdc6`), ainda
+  **sem remote**. `node_modules`, `.pfx`/`.pem`/`.key`, `.env` e `*.zip` ficam de
+  fora pelo `.gitignore`. Definir o remote depende de decisão do Rogel:
+  repositório **privado** é o recomendado (o `loka` é servido pelo GitHub Pages,
+  então versionar o backend lá dentro exporia o código-fonte na web).
+- **Navegador de teste: Chrome real.** As páginas exigem login; eu nunca digito
+  senha — peço ao Rogel que autentique e sigo a partir dali.
