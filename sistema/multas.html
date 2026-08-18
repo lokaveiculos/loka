@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v7-20260818-1645 -->
+<!-- LOKA deploy: v9-20260818-1715 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -96,6 +96,21 @@
   .barra{background:var(--light); border-radius:6px; height:6px; margin:8px 0; max-width:320px}
   .barra > div{background:var(--green); height:6px; border-radius:6px}
   .rodape{text-align:center; font-size:10px; color:var(--muted); padding:14px 0}
+
+  /* ── Tabela de multas: larguras ── */
+  /* A infração é o texto mais longo e empurrava o resto; fica contida e
+     quebra dentro da própria célula. Valor e data nunca quebram. */
+  .col-infracao{max-width:300px; word-break:break-word}
+  .col-valor{white-space:nowrap; text-align:right}
+  .col-data,.col-placa,.col-ait{white-space:nowrap}
+
+  /* ── Modo embutido (?embed=1) ── */
+  /* Quando a página abre dentro do painel do gestao.html, o cabeçalho e o
+     botão "voltar" são redundantes: o menu lateral do sistema já cumpre esse
+     papel. O padding do body também sai, porque o painel já tem o dele. */
+  body.embed{padding:0; max-width:none}
+  body.embed .topbar{display:none}
+  body.embed .rodape{padding-bottom:4px}
 </style>
 </head>
 <body>
@@ -193,7 +208,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v7-20260818-1645';
+var LOKA_BUILD = 'v9-20260818-1715';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -255,13 +270,24 @@ function gateEntrar(){
   });
 }
 
+// Modo embutido: a página abre dentro do painel do gestao.html (?embed=1).
+// Esconde o cabeçalho próprio, já que o menu lateral do sistema faz esse papel.
+var EMBUTIDO = /[?&]embed=1/.test(location.search);
+if (EMBUTIDO) document.body.classList.add('embed');
+
 // entrada automática se a sessão do sistema estiver ativa
 (function(){
   if (sessaoValida()){ gateOk(); }
 })();
 
 // ── Helpers de formato ──
-function brl(v){ return 'R$ ' + (Number(v)||0).toFixed(2).replace('.',','); }
+// Formato financeiro brasileiro completo: separador de milhar (.) e dois
+// decimais com vírgula. Ex.: 30411.43 → "R$ 30.411,43"
+function brl(v){
+  return 'R$ ' + (Number(v)||0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  });
+}
 function fmtPlaca(p){
   var s = String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if (s.length!==7) return s||'—';
@@ -380,9 +406,60 @@ function _efPintarStatus(){
     + '<div><span class="muted" style="font-size:10px">ATUALIZADAS</span><br><strong>' + (st.atualizadas!=null?st.atualizadas:'—') + '</strong></div>'
     + '</div>'
     + (st.erroGeral ? '<div style="margin-top:10px;font-size:11px;color:var(--red)">❌ ' + st.erroGeral + '</div>' : '')
-    + (erros.length ? '<div style="margin-top:10px;font-size:11px;color:var(--amber)">⚠️ ' + erros.length + ' placa(s) com erro: '
-        + erros.slice(0,5).map(function(e){ return e.placa; }).join(', ') + (erros.length>5?'…':'') + '</div>' : '')
+    + (erros.length ? _efTabelaErros(erros) : '')
     + '</div>';
+}
+
+// Lista TODAS as placas com erro, com o motivo traduzido. Antes mostrava só
+// as 5 primeiras e um "…", escondendo placas que o operador precisa ver.
+function _efTabelaErros(erros){
+  return '<div style="margin-top:12px">'
+    + '<div class="sec-label" style="color:var(--amber)">⚠️ ' + erros.length + ' placa(s) com erro</div>'
+    + '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px">'
+    + '<table style="font-size:11px"><thead><tr>'
+    + '<th style="width:90px">Placa</th><th style="width:150px">Motivo</th><th>Detalhe do Serpro</th>'
+    + '</tr></thead><tbody>'
+    + erros.map(function(e){
+        var t = _efExplicarErro(e.erro);
+        return '<tr>'
+          + '<td class="col-placa"><strong>' + (e.placa||'—') + '</strong></td>'
+          + '<td style="color:' + t.cor + ';font-weight:600">' + t.titulo + '</td>'
+          + '<td style="color:var(--muted)">' + t.detalhe + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div></div>';
+}
+
+// Traduz a mensagem crua do Serpro para algo acionável.
+function _efExplicarErro(msg){
+  var m = String(msg||'');
+  if (/HTTP 403/.test(m)) return {
+    titulo: 'Fora da frota',
+    cor: 'var(--amber)',
+    detalhe: 'O Serpro não autoriza consultar esta placa: ela não consta na frota do CNPJ da LOKÁ no e-Frotas. '
+           + 'Confira se o veículo ainda é da empresa, se a placa está correta no cadastro, ou se falta incluí-lo no portal do e-Frotas.'
+  };
+  if (/HTTP 429/.test(m)) return {
+    titulo: 'Limite de acessos',
+    cor: 'var(--amber)',
+    detalhe: 'O Serpro recusou por excesso de chamadas. Espere um pouco e refaça só estas placas.'
+  };
+  if (/HTTP 401|certificad/i.test(m)) return {
+    titulo: 'Certificado',
+    cor: 'var(--red)',
+    detalhe: 'Problema de autenticação com o certificado digital. ' + m
+  };
+  if (/HTTP 5\d\d/.test(m)) return {
+    titulo: 'Falha no Serpro',
+    cor: 'var(--red)',
+    detalhe: 'Erro no lado do Serpro. Costuma ser temporário — tente estas placas mais tarde. ' + m
+  };
+  if (/timeout|ETIMEDOUT|Tempo esgotado/i.test(m)) return {
+    titulo: 'Tempo esgotado',
+    cor: 'var(--red)',
+    detalhe: 'A resposta demorou demais. Tente novamente só estas placas. ' + m
+  };
+  return { titulo: 'Erro', cor: 'var(--red)', detalhe: m || 'Sem detalhe.' };
 }
 
 // ── Testar conexão / consultar uma placa ──────────────────────
@@ -438,13 +515,13 @@ function efConsultarPlaca(){
 // 400ms (respeita o limite do Serpro), então 25 cabe com folga larga.
 // Lembre: um lote = 25 consultas COBRADAS de uma vez.
 var EF_TAMANHO_LOTE = 25;
-var _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:0, restantes:0 };
+var _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:0, restantes:0 };
 
 function efConsultarFrota(){
   var n = _efVeiculosLista().length;
   if (!n){ toast('Nenhum veículo cadastrado'); return; }
   if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.')) return;
-  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:n, restantes:n };
+  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:n, restantes:n };
   _efRodarLote();
 }
 
@@ -469,6 +546,7 @@ function _efRodarLote(){
     _efLote.novas       += (r.novas || 0);
     _efLote.atualizadas += (r.atualizadas || 0);
     _efLote.erros       += (r.erros ? r.erros.length : 0);
+    if (r.erros && r.erros.length) _efLote.errosLista = _efLote.errosLista.concat(r.erros);
     _efLote.baixadas     = (_efLote.baixadas || 0) + (r.baixadas || 0);
     _efLote.inicio       = r.proximo || (_efLote.inicio + EF_TAMANHO_LOTE);
     _efLote.total        = r.totalFrota || _efLote.total;
@@ -480,7 +558,10 @@ function _efRodarLote(){
       _efLog('✅ <strong>Consulta concluída!</strong> ' + _efLote.total + ' veículo(s) · Novas: <strong>'
         + _efLote.novas + '</strong> · Atualizadas: ' + _efLote.atualizadas
         + (_efLote.baixadas ? ' · 💚 <strong>' + _efLote.baixadas + '</strong> baixada(s) automaticamente (pagas no SENATRAN)' : '')
-        + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : ''), '#e8f5ef');
+        + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : '')
+        // Ao concluir, mostra TODAS as placas que falharam, com o motivo —
+        // acumuladas ao longo de todos os lotes, não só do último.
+        + (_efLote.errosLista.length ? _efTabelaErros(_efLote.errosLista) : ''), '#e8f5ef');
       status('✓ Concluído · ' + _efLote.novas + ' nova(s)', '#9f9');
       setBtns(false);
       return;
@@ -731,7 +812,7 @@ function efConsultarSelecionadas(){
   if (!placas.length){ toast('⚠️ Selecione ao menos uma placa'); return; }
   if (!confirm('Consultar ' + placas.length + ' placa(s) no e-Frotas?\n\n💰 São ' + placas.length + ' consulta(s) COBRADA(S) pelo Serpro.')) return;
   efFecharSeletor();
-  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:placas.length, restantes:placas.length, placas:placas };
+  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:placas.length, restantes:placas.length, placas:placas };
   _efRodarLote();
 }
 
@@ -967,12 +1048,12 @@ function renderTabela(multas){
       : '<span class="muted" style="font-size:10px" title="O Serpro precisa de placa + código do órgão + AIT + código da infração. Reconsulte esta placa para preencher.">—</span>';
 
     return '<tr>'
-      + '<td><strong>'+fmtPlaca(m.placa)+'</strong></td>'
-      + '<td class="fmt-mono">'+(m.ait||'—')+tag+'</td>'
-      + '<td>'+brData(m.dataInfracao)+'</td>'
-      + '<td>'+(m.descricao||'—')+'</td>'
+      + '<td class="col-placa"><strong>'+fmtPlaca(m.placa)+'</strong></td>'
+      + '<td class="fmt-mono col-ait">'+(m.ait||'—')+tag+'</td>'
+      + '<td class="col-data">'+brData(m.dataInfracao)+'</td>'
+      + '<td class="col-infracao">'+(m.descricao||'—')+'</td>'
       + '<td>'+loc+'</td>'
-      + '<td class="fmt-mono">'+brl(m.valor)+'</td>'
+      + '<td class="fmt-mono col-valor">'+brl(m.valor)+'</td>'
       + '<td><span class="badge" style="background:'+st.b+';color:'+st.c+'">'+st.r+'</span></td>'
       + '<td>'+doc+'</td>'
       + '</tr>';

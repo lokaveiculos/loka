@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v86-20260818-1650 -->
+<!-- LOKA deploy: v87-20260818-1715 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -250,7 +250,7 @@ tr:hover td{background:#f8f9fe;}
     <div data-label="Manutenção" class="nav-item" id="ni-manutencao" onclick="showPanel('manutencao')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Manutenção</div>
      <div data-label="Fornecedores" class="nav-item" id="ni-fornecedores" onclick="showPanel('fornecedores')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9"/><path d="M9 22V12h6v10"/></svg>Fornecedores</div>
     <div data-label="Multas" class="nav-item" id="ni-multas" onclick="showPanel('multas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas</div>
-    <div data-label="Multas (novo)" class="nav-item" id="ni-multasnovo" onclick="abrirMultasNovo()"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h9.47"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/><path d="M17 14h5v5"/><path d="M22 14l-6 6"/></svg>Multas (novo)</div>
+    <div data-label="Multas e-Frotas" class="nav-item" id="ni-multasefrotas" onclick="showPanel('multasefrotas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas e-Frotas</div>
     <div data-label="Financeiro" class="nav-item" id="ni-financeiro" onclick="showPanel('financeiro')" style="display:none"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro</div>
     <div data-label="Formulários" class="nav-item" id="ni-formularios" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
     <div data-label="Contratos Gerados" class="nav-item" id="ni-contratos" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
@@ -580,6 +580,16 @@ tr:hover td{background:#f8f9fe;}
     </div>
 
     <!-- ══ e-FROTAS (SENATRAN/Serpro) ══ -->
+    <!-- Multas e-Frotas: a multas.html roda embutida aqui, em ?embed=1.
+         Assim ela continua sendo a única fonte da funcionalidade (e segue
+         funcionando sozinha pela URL direta), mas o operador não sai do
+         sistema nem perde o menu lateral. O src só é preenchido quando o
+         painel é aberto — ver showPanel(). -->
+    <div class="panel" id="panel-multasefrotas" style="display:none;width:100%">
+      <iframe id="frameMultasEfrotas" title="Multas e-Frotas"
+              style="width:100%;height:calc(100vh - 150px);min-height:520px;border:1px solid var(--border);border-radius:12px;background:#EEF1FD"></iframe>
+    </div>
+
     <div class="panel" id="panel-efrotas" style="display:none;width:100%">
       <div style="max-width:860px">
         <div id="efStatusCard" style="margin-bottom:14px"></div>
@@ -1125,7 +1135,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v86-20260818-1650';
+var LOKA_BUILD = 'v87-20260818-1715';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1164,11 +1174,12 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
     fornecedores: 'Fornecedores',
   multas: 'Multas',
   efrotas: 'e-Frotas (SENATRAN)',
+  multasefrotas: 'Multas e-Frotas',
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
   historico:'Histórico de Locações', faturas:'Faturas', manutencao:'Manutenção', financeiro:'Financeiro', reserva:'Reservas', cadastro:'Pré-Cadastro'
@@ -1204,7 +1215,7 @@ function _perfilAtual() {
 }
 
 // Todos os painéis controláveis por permissão
-var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
 var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',efrotas:'e-Frotas (SENATRAN)',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
@@ -1259,7 +1270,15 @@ function _listaPerfis() {
   return chaves.map(_getPerfilDef);
 }
 function _permsAtual(){ return _getPerfilDef(_perfilAtual()); }
-function _podePainel(name){ return _permsAtual().paineis.indexOf(name) >= 0; }
+function _podePainel(name){
+  var p = _permsAtual().paineis;
+  if (p.indexOf(name) >= 0) return true;
+  // "multasefrotas" nasceu depois dos perfis salvos em loka_perfis, que não o
+  // listam. Sem este fallback, quem tem Multas liberado veria o item no menu
+  // e seria barrado ao clicar. Quem pode Multas pode Multas e-Frotas.
+  if (name === 'multasefrotas') return p.indexOf('multas') >= 0;
+  return false;
+}
 function _podeAcao(a){ return !!((_permsAtual().acoes||{})[a]); }
 function _isOficina(){ return _perfilAtual()==='oficina'; } // compat.
 
@@ -1338,10 +1357,13 @@ function _aplicarPermissoesUI() {
     var ni = document.getElementById('ni-'+p);
     if (ni) ni.style.display = (def.paineis.indexOf(p)>=0) ? 'flex' : 'none';
   });
-  // "Multas (novo)" abre multas.html numa aba nova. Não é painel, então fica
-  // fora de _TODOS_PAINEIS; a visibilidade espelha a do painel Multas.
-  var niMN = document.getElementById('ni-multasnovo');
-  if (niMN) niMN.style.display = (def.paineis.indexOf('multas')>=0) ? 'flex' : 'none';
+  // "Multas e-Frotas" virou painel de verdade e já entra no laço acima por
+  // _TODOS_PAINEIS. Perfis antigos, salvos antes dele existir, não o listam —
+  // então quem pode ver Multas também pode ver este.
+  var niME = document.getElementById('ni-multasefrotas');
+  if (niME && def.paineis.indexOf('multasefrotas') < 0 && def.paineis.indexOf('multas') >= 0) {
+    niME.style.display = 'flex';
+  }
   var niRel = document.getElementById('ni-relatorio');
   if (niRel) niRel.style.display = (def.acoes && def.acoes.verRelatorio) ? 'flex' : 'none';
   var bGU = document.getElementById('btnGerUsers');
@@ -1384,10 +1406,11 @@ function _carregarPerfis(cb) {
   }).catch(function(){ if(cb) cb(); });
 }
 
-// Abre a nova página de multas (multas.html) numa aba separada.
-// O ?v= fura o cache do GitHub Pages, mesmo padrão usado pela fatura.
+// Mantida por compatibilidade: a página de multas agora abre embutida no
+// painel "Multas e-Frotas". Esta função só é usada se alguém quiser a versão
+// em aba separada (ex.: para imprimir).
 function abrirMultasNovo() {
-  if (!_podePainel('multas')) return;
+  if (!_podePainel('multasefrotas')) return;
   window.open('multas.html?v=' + Date.now(), '_blank');
 }
 
@@ -1412,6 +1435,13 @@ function showPanel(name) {
       else ni.classList.remove('active');
     }
   }
+  // Multas e-Frotas: carrega o iframe só na primeira abertura, para não
+  // pesar o carregamento do sistema com uma página que talvez nem seja usada.
+  if (name === 'multasefrotas') {
+    var fr = document.getElementById('frameMultasEfrotas');
+    if (fr && !fr.src) fr.src = 'multas.html?embed=1&v=' + Date.now();
+  }
+
   // Atualiza título
   var t = document.getElementById('pageTitle');
   if (t) t.textContent = TITLES[name] || name;
