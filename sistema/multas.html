@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v6-20260818-1630 -->
+<!-- LOKA deploy: v7-20260818-1645 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -162,9 +162,9 @@
       <table>
         <thead><tr>
           <th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th>
-          <th>Locatário</th><th>Valor</th><th>Situação</th>
+          <th>Locatário</th><th>Valor</th><th>Situação</th><th>Documento</th>
         </tr></thead>
-        <tbody id="tbody"><tr><td colspan="7" class="empty">Carregando…</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="8" class="empty">Carregando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -193,7 +193,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v6-20260818-1630';
+var LOKA_BUILD = 'v7-20260818-1645';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -912,7 +912,7 @@ function carregarDados(){
     _efPintarStatus();
   }).catch(function(e){
     document.getElementById('tbody').innerHTML =
-      '<tr><td colspan="7" class="empty">Erro ao carregar: '+e.message+'</td></tr>';
+      '<tr><td colspan="8" class="empty">Erro ao carregar: '+e.message+'</td></tr>';
   });
 }
 
@@ -944,7 +944,7 @@ function renderTabela(multas){
 
   if (!lista.length){
     document.getElementById('tbody').innerHTML =
-      '<tr><td colspan="7" class="empty">Nenhuma multa veio do e-Frotas ainda.<br>'
+      '<tr><td colspan="8" class="empty">Nenhuma multa veio do e-Frotas ainda.<br>'
       + '<span style="font-size:11px">Esta tabela lista só o que a consulta automática trouxer. '
       + 'As multas importadas de PDF continuam no painel <strong>Multas</strong> do sistema.</span></td></tr>';
     return;
@@ -956,6 +956,16 @@ function renderTabela(multas){
       : '<span style="color:var(--amber)">⚠ não identificado</span>';
     var tag = m.origem==='efrotas'
       ? ' <span class="badge" style="background:#eaeeff;color:#2B4BF2">e-Frotas</span>' : '';
+
+    // O PDF só pode ser pedido com os 4 identificadores. Multas antigas não
+    // os têm — em vez de um botão que falha, explicamos o porquê.
+    var temTudo = m.placa && m.codigoOrgao && m.ait && m.codigoInfracao;
+    var doc = temTudo
+      ? '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;white-space:nowrap" '
+        + 'onclick="abrirPdfMulta(this,\'' + _esc(m.placa) + '\',\'' + _esc(m.codigoOrgao) + '\',\''
+        + _esc(m.ait) + '\',\'' + _esc(m.codigoInfracao) + '\')">📄 Abrir</button>'
+      : '<span class="muted" style="font-size:10px" title="O Serpro precisa de placa + código do órgão + AIT + código da infração. Reconsulte esta placa para preencher.">—</span>';
+
     return '<tr>'
       + '<td><strong>'+fmtPlaca(m.placa)+'</strong></td>'
       + '<td class="fmt-mono">'+(m.ait||'—')+tag+'</td>'
@@ -964,8 +974,51 @@ function renderTabela(multas){
       + '<td>'+loc+'</td>'
       + '<td class="fmt-mono">'+brl(m.valor)+'</td>'
       + '<td><span class="badge" style="background:'+st.b+';color:'+st.c+'">'+st.r+'</span></td>'
+      + '<td>'+doc+'</td>'
       + '</tr>';
   }).join('');
+}
+
+// Escapa aspas e barras para o valor caber dentro do onclick="…'…'…"
+function _esc(v){ return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+// ── Abre o PDF da notificação (SNE) da infração ───────────────
+// Pede o documento ao backend, que busca no Serpro e devolve em base64.
+// ⚠️ É uma consulta ao Serpro — presumir cobrada, então confirma antes.
+function abrirPdfMulta(botao, placa, codigoOrgao, ait, codigoInfracao){
+  if (!confirm('Baixar o documento da multa ' + ait + ' (placa ' + placa + ')?\n\n'
+      + '💰 É uma consulta ao Serpro e deve ser cobrada.')) return;
+
+  var rotulo = botao ? botao.innerHTML : '';
+  if (botao){ botao.disabled = true; botao.innerHTML = '⏳'; }
+  status('⏳ Buscando o documento da multa ' + ait + '…','#ffe');
+
+  _efrotasCall('dispararConsultaMultas', {
+    pdfInfracao: { placa: placa, codigoOrgao: codigoOrgao, ait: ait, codigoInfracao: codigoInfracao, tipo: 'NA' }
+  }).then(function(r){
+    r = r || {};
+    if (!r.ok || !r.base64){
+      var m = r.erro || 'O e-Frotas não devolveu o arquivo.';
+      status('⚠ ' + m, '#fbb');
+      _efLog('❌ <strong>Documento não veio:</strong> ' + m, '#fdeaea');
+      return;
+    }
+    // base64 → blob → aba nova. Sem download forçado: o navegador exibe.
+    var bin = atob(String(r.base64).replace(/\s/g,''));
+    var bytes = new Uint8Array(bin.length);
+    for (var i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+    var aba = window.open(url, '_blank');
+    if (!aba) status('⚠ O navegador bloqueou a aba. Libere o pop-up e tente de novo.','#fbb');
+    else status('✓ Documento aberto em nova aba','#9f9');
+    // Libera a memória depois que a aba já leu o blob
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  }).catch(function(e){
+    status('⚠ ' + traduzErro(e), '#fbb');
+    _efLog('❌ <strong>Falha ao buscar o documento:</strong> ' + e.message, '#fdeaea');
+  }).finally(function(){
+    if (botao){ botao.disabled = false; botao.innerHTML = rotulo; }
+  });
 }
 
 function renderSync(st){
