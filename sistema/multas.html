@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<!-- LOKA deploy: v1-20260818-1523 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -79,6 +80,22 @@
   .gate .err{color:var(--red); font-size:12px; min-height:16px}
   .muted{color:var(--muted)}
   .fmt-mono{font-variant-numeric:tabular-nums}
+
+  /* ── Componentes migrados do painel e-Frotas do gestao.html ── */
+  .fi,.fs{
+    padding:8px 10px; border:1px solid var(--border); border-radius:8px;
+    font-size:12px; font-family:inherit; background:var(--field); color:var(--dark);
+  }
+  .fi:focus,.fs:focus{outline:2px solid var(--blue); outline-offset:-1px}
+  .sec-label{font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.4px}
+  .box{background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:14px}
+  .chip{font-size:9px; padding:1px 6px; border-radius:10px; margin-left:6px; white-space:nowrap}
+  .ef-row{display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--light); cursor:pointer}
+  .ef-row:hover{background:var(--field)}
+  .ef-lista{max-height:320px; overflow-y:auto; border:1px solid var(--border); border-radius:8px}
+  .barra{background:var(--light); border-radius:6px; height:6px; margin:8px 0; max-width:320px}
+  .barra > div{background:var(--green); height:6px; border-radius:6px}
+  .rodape{text-align:center; font-size:10px; color:var(--muted); padding:14px 0}
 </style>
 </head>
 <body>
@@ -113,11 +130,21 @@
       digitar nada. A consulta roda só quando você pedir: cada veículo consultado é cobrado pelo Serpro.
     </p>
     <div class="hero-actions">
-      <button class="btn btn-ghost" id="btnTestar" onclick="efrTestar()">Testar conexão</button>
-      <button class="btn btn-green" id="btnConsultar" onclick="efrConsultar()">🔄 Consultar agora</button>
+      <input class="fi" id="efPlaca" placeholder="Placa (opcional)" autocomplete="off"
+             style="max-width:150px;text-transform:uppercase">
+      <button class="btn btn-ghost"  id="btnTestar"    onclick="efTestarConexao()">🔌 Testar conexão</button>
+      <button class="btn btn-blue"   id="btnPlaca"     onclick="efConsultarPlaca()">🛰 Consultar esta placa</button>
+      <button class="btn"            id="btnSeletor"   onclick="efAbrirSeletor()" style="background:var(--amber);color:#fff">🚗 Selecionar placas</button>
+      <button class="btn btn-green"  id="btnConsultar" onclick="efConsultarFrota()">🔄 Consultar toda a frota</button>
+      <button class="btn btn-ghost"  id="btnDiag"      onclick="efDiagnostico()">🩺 Diagnóstico</button>
     </div>
     <div class="status-line" id="statusLine"></div>
   </div>
+
+  <!-- Painel de status / seletor de placas / log — migrados do gestao.html -->
+  <div id="efStatusCard"></div>
+  <div id="efSeletor"></div>
+  <div id="efLog"></div>
 
   <div id="configWarn" class="note" style="display:none">
     <strong>⚙ Falta configurar os endpoints do e-Frotas.</strong>
@@ -145,6 +172,8 @@
     <h3>Última consulta realizada</h3>
     <div id="syncInfo" class="muted" style="font-size:12px">Sem execução registrada ainda.</div>
   </div>
+
+  <div class="rodape" id="rodapeBuild"></div>
 </div>
 
 <!-- Config do Firebase (mesma do sistema) -->
@@ -161,6 +190,14 @@ const FIREBASE_CONFIG = {
 firebase.initializeApp(FIREBASE_CONFIG);
 var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
+
+// Carimbo de versão — precisa bater com o comentário da linha 4.
+var LOKA_BUILD = 'v1-20260818-1523';
+try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
+
+// Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
+// Preenchido por carregarDados() e lido pelo seletor de placas.
+var DB = null;
 
 // ── Porta de entrada: reaproveita a sessão do sistema principal ──
 // O gestao.html grava 'loka_sess' no localStorage ao logar. Se existir,
@@ -249,8 +286,10 @@ function status(txt, cor){
   el.innerHTML = '<span style="color:'+(cor||'#fff')+'">'+txt+'</span>';
 }
 function setBtns(disabled){
-  document.getElementById('btnTestar').disabled = disabled;
-  document.getElementById('btnConsultar').disabled = disabled;
+  ['btnTestar','btnPlaca','btnSeletor','btnConsultar','btnDiag'].forEach(function(id){
+    var b = document.getElementById(id);
+    if (b) b.disabled = disabled;
+  });
 }
 
 function fns(){ return firebase.app().functions(FN_REGION); }
@@ -260,6 +299,7 @@ function traduzErro(e){
   if (m.indexOf('unauthenticated')>=0) return 'Sessão expirada — recarregue a página.';
   if (m.indexOf('not-found')>=0 || m.indexOf('NOT_FOUND')>=0) return 'Função não encontrada — o backend foi publicado?';
   if (m.indexOf('internal')>=0) return 'Erro no servidor — confira os logs do Firebase.';
+  if (m.indexOf('deadline')>=0) return 'A função não respondeu a tempo (timeout).';
   if (m.indexOf('não configurado')>=0 || m.indexOf('CONFIRMAR')>=0){
     document.getElementById('configWarn').style.display='block';
     return 'Endpoints do e-Frotas ainda não configurados (veja o aviso abaixo).';
@@ -267,35 +307,494 @@ function traduzErro(e){
   return m;
 }
 
-function efrTestar(){
-  setBtns(true); status('⏳ Testando certificado e conexão…','#ffe');
-  fns().httpsCallable('testarConexaoEfrotas')({}).then(function(r){
-    var d = r.data||{};
-    if (d.ok) status('✓ '+(d.msg||'Conexão OK')+' (HTTP '+(d.http||'?')+')','#9f9');
-    else status('⚠ '+traduzErro({message:d.erro||''}),'#fbb');
-  }).catch(function(e){ status('⚠ '+traduzErro(e),'#fbb'); })
-    .finally(function(){ setBtns(false); });
+// Aviso curto na faixa do topo (equivale ao toast() do gestao.html)
+function toast(msg, cor){ status(msg, cor || '#ffe'); }
+
+// O Firebase devolve array com "buracos" como objeto ({0:…,2:…}).
+// Sem normalizar, .filter/.map quebram — armadilha conhecida do projeto.
+function _arr(v){
+  if (Array.isArray(v)) return v.filter(Boolean);
+  if (v && typeof v === 'object') return Object.keys(v).map(function(k){ return v[k]; }).filter(Boolean);
+  return [];
 }
 
-function efrConsultar(){
-  if (!confirm('A consulta vai percorrer todos os veículos da frota.\n\nCada veículo consultado é cobrado pelo Serpro. Deseja continuar?')) return;
-  setBtns(true); status('⏳ Iniciando consulta…','#ffe');
-  fns().httpsCallable('dispararConsultaMultas')({ background: true }).then(function(r){
-    var d = r.data||{};
-    if (d.iniciado){
-      status('⏳ Consulta em andamento… pode levar alguns minutos. O resultado aparece aqui sozinho.','#ffe');
-      acompanharProgresso();
+// ── Chamada às Cloud Functions ────────────────────────────────
+// Timeout ampliado: o padrão do SDK (70s) estoura enquanto a função acorda
+// e processa o certificado digital. Plano B por fetch se o SDK não carregar.
+var EFROTAS_FUNCS_BASE = 'https://' + FN_REGION + '-loka-b8dd2.cloudfunctions.net';
+
+function _efrotasCall(fn, data){
+  if (typeof firebase !== 'undefined' && firebase.functions) {
+    return firebase.app().functions(FN_REGION)
+      .httpsCallable(fn, { timeout: 540000 })(data || {})
+      .then(function(res){ return res.data; });
+  }
+  return fetch(EFROTAS_FUNCS_BASE + '/' + fn, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: data || {} })
+  }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(j){
+      if (!r.ok || j.error) {
+        var msg = (j.error && (j.error.message || j.error.status)) || ('HTTP ' + r.status);
+        if (r.status === 404) msg = 'Função não encontrada (404). O backend e-Frotas já foi publicado?';
+        throw new Error(msg);
+      }
+      return j.result;
+    });
+  });
+}
+
+function _efLog(html, cor){
+  var el = document.getElementById('efLog');
+  if (el) el.innerHTML = '<div style="background:' + (cor||'#fff') + ';border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:12px;margin-bottom:14px">' + html + '</div>';
+}
+
+function _efPlacaCampo(){
+  return ((document.getElementById('efPlaca')||{}).value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+
+// ── Status da última consulta (card rico) ─────────────────────
+function _efPintarStatus(){
+  var card = document.getElementById('efStatusCard');
+  if (!card) return;
+  var st = window._efStatus || (DB && DB.efrotas_status) || null;
+  if (!st){
+    card.innerHTML = '<div class="box" style="background:var(--light);border:none">'
+      + '🛰 <strong>e-Frotas ainda não executou nenhuma consulta.</strong><br>'
+      + '<span class="muted">Use "Testar conexão" para validar o certificado digital, depois consulte uma placa.</span></div>';
+    return;
+  }
+  var quando = st.ultimaExecucao ? new Date(st.ultimaExecucao).toLocaleString('pt-BR') : '—';
+  var erros = (st.erros && st.erros.length) ? st.erros : [];
+  card.innerHTML = '<div class="box">'
+    + '<div class="sec-label">Status da última consulta'
+    + (st.emAndamento ? ' <span class="badge" style="background:#fff4e5;color:var(--amber);margin-left:6px">⏳ em andamento…</span>' : '')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:10px;font-size:12px">'
+    + '<div><span class="muted" style="font-size:10px">QUANDO</span><br><strong>' + quando + '</strong></div>'
+    + '<div><span class="muted" style="font-size:10px">AMBIENTE</span><br><strong>' + (st.ambiente||'—') + '</strong></div>'
+    + '<div><span class="muted" style="font-size:10px">PLACAS</span><br><strong>' + (st.placasConsultadas!=null?st.placasConsultadas:'—') + '</strong></div>'
+    + '<div><span class="muted" style="font-size:10px">MULTAS NOVAS</span><br><strong style="color:' + (st.novas?'var(--red)':'var(--green)') + '">' + (st.novas!=null?st.novas:'—') + '</strong></div>'
+    + '<div><span class="muted" style="font-size:10px">ATUALIZADAS</span><br><strong>' + (st.atualizadas!=null?st.atualizadas:'—') + '</strong></div>'
+    + '</div>'
+    + (st.erroGeral ? '<div style="margin-top:10px;font-size:11px;color:var(--red)">❌ ' + st.erroGeral + '</div>' : '')
+    + (erros.length ? '<div style="margin-top:10px;font-size:11px;color:var(--amber)">⚠️ ' + erros.length + ' placa(s) com erro: '
+        + erros.slice(0,5).map(function(e){ return e.placa; }).join(', ') + (erros.length>5?'…':'') + '</div>' : '')
+    + '</div>';
+}
+
+// ── Testar conexão / consultar uma placa ──────────────────────
+function efTestarConexao(){
+  var placa = _efPlacaCampo();
+  setBtns(true);
+  status('⏳ Testando certificado e conexão…','#ffe');
+  _efLog('⏳ Testando conexão com o e-Frotas (certificado + handshake)' + (placa ? ' usando a placa ' + placa : '') + '…');
+  _efrotasCall('testarConexaoEfrotas', placa ? { placa: placa } : {}).then(function(d){
+    d = d || {};
+    if (d.ok){
+      status('✓ ' + (d.msg||'Conexão OK') + (d.http ? (' (HTTP ' + d.http + ')') : ''), '#9f9');
+      _efLog('✅ <strong>Conexão OK!</strong><br><pre style="white-space:pre-wrap;font-size:11px;margin:8px 0 0">' + JSON.stringify(d, null, 2) + '</pre>', '#e8f5ef');
     } else {
-      var msg = '✓ '+d.placas+' veículo(s) · '+d.novas+' nova(s)';
-      if (d.atualizadas) msg += ' · '+d.atualizadas+' atualizada(s)';
-      status(msg,'#9f9');
-      carregarDados();
+      status('⚠ ' + traduzErro({ message: d.erro || '' }), '#fbb');
+      _efLog('❌ <strong>Falha no teste:</strong> ' + (d.erro || 'sem detalhe'), '#fdeaea');
     }
-  }).catch(function(e){ status('⚠ '+traduzErro(e),'#fbb'); })
-    .finally(function(){ setBtns(false); });
+  }).catch(function(e){
+    status('⚠ ' + traduzErro(e), '#fbb');
+    _efLog('❌ <strong>Falha no teste:</strong> ' + e.message, '#fdeaea');
+  }).finally(function(){ setBtns(false); });
 }
 
-// Acompanha a varredura pelo banco, já que ela roda em segundo plano
+function efConsultarPlaca(){
+  var placa = _efPlacaCampo();
+  if (!placa){ toast('⚠️ Digite a placa a consultar'); return; }
+  if (!confirm('Consultar as infrações da placa ' + placa + ' no e-Frotas?\n\nEsta consulta é COBRADA pelo Serpro (1 consulta).')) return;
+  setBtns(true);
+  status('⏳ Consultando ' + placa + '…','#ffe');
+  _efLog('⏳ Consultando ' + placa + ' no e-Frotas…');
+  _efrotasCall('dispararConsultaMultas', { placa: placa }).then(function(r){
+    r = r || {};
+    _efLog('✅ <strong>' + placa + ' consultada.</strong> Novas: <strong>' + (r.novas||0) + '</strong> · Atualizadas: ' + (r.atualizadas||0)
+      + ((r.erros && r.erros.length) ? ('<br>⚠️ ' + r.erros.map(function(e){ return e.placa + ': ' + e.erro; }).join('<br>')) : ''), '#e8f5ef');
+    status('✓ ' + placa + ' · ' + (r.novas||0) + ' nova(s)', '#9f9');
+    carregarDados();
+  }).catch(function(e){
+    status('⚠ ' + traduzErro(e), '#fbb');
+    _efLog('❌ <strong>Falha na consulta:</strong> ' + e.message, '#fdeaea');
+  }).finally(function(){ setBtns(false); });
+}
+
+// ── Varredura EM LOTES ────────────────────────────────────────
+// Lotes pequenos evitam o timeout que a varredura inteira causava,
+// mostram progresso e permitem parar no meio (controle de custo).
+var EF_TAMANHO_LOTE = 5;
+var _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:0, restantes:0 };
+
+function efConsultarFrota(){
+  var n = _efVeiculosLista().length;
+  if (!n){ toast('Nenhum veículo cadastrado'); return; }
+  if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.')) return;
+  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:n, restantes:n };
+  _efRodarLote();
+}
+
+function _efPararLote(){
+  _efLog('⏸ Varredura pausada em ' + _efLote.inicio + ' de ' + _efLote.total + ' veículo(s). '
+    + 'Novas até aqui: <strong>' + _efLote.novas + '</strong>.'
+    + '<br><button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-top:6px" onclick="_efRodarLote()">▶ Retomar</button>');
+  setBtns(false);
+}
+
+function _efRodarLote(){
+  setBtns(true);
+  _efLog('⏳ Consultando veículos ' + (_efLote.inicio + 1) + ' a ' + (_efLote.inicio + EF_TAMANHO_LOTE) + '…');
+  status('⏳ Consulta em lotes em andamento…','#ffe');
+  // Envia só as placas deste lote (se houver seleção) — assim o backend
+  // consulta exatamente o que o operador escolheu.
+  var _params = { inicio: _efLote.inicio, tamanhoLote: EF_TAMANHO_LOTE };
+  if (_efLote.placas && _efLote.placas.length) _params.placas = _efLote.placas;
+
+  _efrotasCall('dispararConsultaMultas', _params).then(function(r){
+    r = r || {};
+    _efLote.novas       += (r.novas || 0);
+    _efLote.atualizadas += (r.atualizadas || 0);
+    _efLote.erros       += (r.erros ? r.erros.length : 0);
+    _efLote.baixadas     = (_efLote.baixadas || 0) + (r.baixadas || 0);
+    _efLote.inicio       = r.proximo || (_efLote.inicio + EF_TAMANHO_LOTE);
+    _efLote.total        = r.totalFrota || _efLote.total;
+    _efLote.restantes    = r.restantes || 0;
+
+    carregarDados();
+
+    if (r.concluido){
+      _efLog('✅ <strong>Consulta concluída!</strong> ' + _efLote.total + ' veículo(s) · Novas: <strong>'
+        + _efLote.novas + '</strong> · Atualizadas: ' + _efLote.atualizadas
+        + (_efLote.baixadas ? ' · 💚 <strong>' + _efLote.baixadas + '</strong> baixada(s) automaticamente (pagas no SENATRAN)' : '')
+        + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : ''), '#e8f5ef');
+      status('✓ Concluído · ' + _efLote.novas + ' nova(s)', '#9f9');
+      setBtns(false);
+      return;
+    }
+
+    var pct = _efLote.total ? Math.round((_efLote.inicio / _efLote.total) * 100) : 0;
+    _efLog('✅ <strong>Lote concluído</strong> — ' + _efLote.inicio + ' de ' + _efLote.total
+      + ' (' + pct + '%) · Novas: <strong>' + _efLote.novas + '</strong>'
+      + (_efLote.baixadas ? ' · 💚 ' + _efLote.baixadas + ' baixada(s)' : '')
+      + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : '')
+      + '<div class="barra"><div style="width:' + pct + '%"></div></div>'
+      + '<button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-right:6px" onclick="_efRodarLote()">▶ Continuar ('
+      + _efLote.restantes + ' restantes)</button>'
+      + '<button class="btn btn-outline" style="font-size:11px;padding:6px 12px" onclick="_efPararLote()">Parar</button>', '#e8f5ef');
+    status('Lote ' + pct + '% · aguardando você continuar', '#ffe');
+    setBtns(false);
+  }).catch(function(e){
+    _efLog('❌ <strong>Falha no lote:</strong> ' + e.message
+      + '<br><span class="muted">O progresso foi salvo.</span>'
+      + '<br><button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-top:6px" onclick="_efRodarLote()">▶ Tentar novamente</button>', '#fdeaea');
+    status('⚠ ' + traduzErro(e), '#fbb');
+    setBtns(false);
+  });
+}
+
+// ── Seletor de placas ─────────────────────────────────────────
+var _efSel = {};            // { placaNormalizada: true }
+var _efFiltroSel = '';      // texto (placa ou modelo)
+var _efFiltroFinal = '';    // final da placa
+var _efFiltroCliente = '';  // cliente com locação ativa
+
+function _efNormPlaca(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+function _efVeiculosLista(){
+  return _arr(DB && DB.veiculos).filter(function(v){ return v && v.placa; });
+}
+
+// Placas que já têm multa pendente — atalho útil de seleção
+function _efPlacasComPendencia(){
+  var set = {};
+  _arr(DB && DB.multas).forEach(function(m){
+    if (!m) return;
+    if (m.status === 'paga' || m.status === 'cancelada' || m.status === 'cobrada') return;
+    if (m.placa) set[_efNormPlaca(m.placa)] = true;
+  });
+  return set;
+}
+
+// Mapa placa -> { id, nome } a partir das locações ativas
+function _efPlacaCliente(){
+  var mapa = {};
+  _arr(DB && DB.ativos).forEach(function(a){
+    if (a && a.placa) mapa[_efNormPlaca(a.placa)] = { id: a.clienteId || '', nome: a.clienteNome || '' };
+  });
+  return mapa;
+}
+
+function _efClientesComVeiculo(){
+  var mapa = _efPlacaCliente(), vistos = {}, lista = [];
+  Object.keys(mapa).forEach(function(p){
+    var c = mapa[p], chave = c.id || c.nome;
+    if (chave && !vistos[chave]){ vistos[chave] = true; lista.push({ id:c.id, nome:c.nome || '(sem nome)' }); }
+  });
+  lista.sort(function(a,b){ return String(a.nome).localeCompare(String(b.nome)); });
+  return lista;
+}
+
+function _efPlacasComLocacao(){
+  var set = {};
+  _arr(DB && DB.ativos).forEach(function(a){ if (a && a.placa) set[_efNormPlaca(a.placa)] = true; });
+  return set;
+}
+
+function efAbrirSeletor(){
+  if (!_efVeiculosLista().length){ toast('Nenhum veículo cadastrado'); return; }
+  _efRenderSeletor();
+  var el = document.getElementById('efSeletor');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function efFecharSeletor(){
+  var el = document.getElementById('efSeletor');
+  if (el) el.innerHTML = '';
+}
+
+function _efMarcarTodas(v){
+  if (v) _efVeiculosLista().forEach(function(x){ _efSel[_efNormPlaca(x.placa)] = true; });
+  else _efSel = {};
+  _efRenderSeletor();
+}
+
+function _efMarcarGrupo(qual){
+  var set = (qual === 'pendencia') ? _efPlacasComPendencia() : _efPlacasComLocacao();
+  _efSel = {};
+  Object.keys(set).forEach(function(p){ _efSel[p] = true; });
+  _efRenderSeletor();
+}
+
+function _efToggle(placa, marcado){
+  var p = _efNormPlaca(placa);
+  if (marcado) _efSel[p] = true; else delete _efSel[p];
+  _efAtualizarContador();
+}
+
+function _efFiltrarSel(v){ _efFiltroSel = String(v||'').toUpperCase(); _efRenderSeletor(true); }
+function _efFiltrarFinal(v){ _efFiltroFinal = String(v||'').trim(); _efRenderSeletor(true); }
+function _efFiltrarCliente(v){ _efFiltroCliente = String(v||''); _efRenderSeletor(true); }
+function _efLimparFiltros(){ _efFiltroSel=''; _efFiltroFinal=''; _efFiltroCliente=''; _efRenderSeletor(); }
+
+// Marca todas as placas atualmente VISÍVEIS (respeitando os filtros)
+function _efMarcarVisiveis(v){
+  _efVisiveisAtuais().forEach(function(x){
+    var p = _efNormPlaca(x.placa);
+    if (v) _efSel[p] = true; else delete _efSel[p];
+  });
+  _efRenderSeletor();
+}
+
+// Aplica os três filtros e devolve os veículos visíveis
+function _efVisiveisAtuais(){
+  var mapaCli = _efPlacaCliente();
+  return _efVeiculosLista().filter(function(v){
+    var p = _efNormPlaca(v.placa);
+    if (_efFiltroSel){
+      var alvo = (p + ' ' + (v.marca||'') + ' ' + (v.modelo||'')).toUpperCase();
+      if (alvo.indexOf(_efFiltroSel) < 0) return false;
+    }
+    if (_efFiltroFinal){
+      if (p.charAt(p.length - 1) !== _efFiltroFinal.toUpperCase()) return false;
+    }
+    if (_efFiltroCliente){
+      var c = mapaCli[p];
+      if (!c) return false;
+      if (String(c.id || c.nome) !== String(_efFiltroCliente)) return false;
+    }
+    return true;
+  });
+}
+
+function _efSelecionadas(){
+  return Object.keys(_efSel).filter(function(k){ return _efSel[k]; });
+}
+
+function _efAtualizarContador(){
+  var el = document.getElementById('efContadorSel');
+  if (el){
+    var n = _efSelecionadas().length;
+    el.innerHTML = '<strong>' + n + '</strong> placa(s) selecionada(s)'
+      + (n ? ' · <span style="color:var(--amber)">' + n + ' consulta(s) cobrada(s)</span>' : '');
+  }
+  var bt = document.getElementById('efBtnConsultarSel');
+  if (bt) bt.disabled = (_efSelecionadas().length === 0);
+}
+
+// Options do filtro "final de placa" — só os finais que existem na frota
+function _efOpcoesFinal(){
+  var finais = {};
+  _efVeiculosLista().forEach(function(v){
+    var p = _efNormPlaca(v.placa);
+    if (p) finais[p.charAt(p.length - 1)] = true;
+  });
+  var h = '<option value="">Final da placa: todos</option>';
+  Object.keys(finais).sort().forEach(function(f){
+    h += '<option value="' + f + '"' + (_efFiltroFinal === f ? ' selected' : '') + '>Final ' + f + '</option>';
+  });
+  return h;
+}
+
+// Options do filtro de cliente — quem está com veículo alugado agora
+function _efOpcoesCliente(){
+  var h = '<option value="">Cliente: todos</option>';
+  _efClientesComVeiculo().forEach(function(c){
+    var chave = c.id || c.nome;
+    h += '<option value="' + String(chave).replace(/"/g,'&quot;') + '"'
+      + (String(_efFiltroCliente) === String(chave) ? ' selected' : '') + '>' + c.nome + '</option>';
+  });
+  return h;
+}
+
+function _efRenderSeletor(){
+  var el = document.getElementById('efSeletor');
+  if (!el) return;
+  var pend = _efPlacasComPendencia();
+  var loc  = _efPlacasComLocacao();
+  var mapaCli = _efPlacaCliente();
+  var visiveis = _efVisiveisAtuais();
+  var temFiltro = !!(_efFiltroSel || _efFiltroFinal || _efFiltroCliente);
+
+  var h = '<div class="box">'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<div class="sec-label" style="flex:1">Selecione as placas a consultar</div>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="efFecharSeletor()">✕ Fechar</button>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarTodas(true)">Marcar todas</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarTodas(false)">Desmarcar todas</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarGrupo(\'pendencia\')">Só com multa pendente</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarGrupo(\'locacao\')">Só com locação ativa</button>'
+    + '</div>'
+
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'
+    + '<input class="fi" placeholder="Placa ou modelo…" value="' + _efFiltroSel + '" oninput="_efFiltrarSel(this.value)" style="max-width:200px">'
+    + '<select class="fs" onchange="_efFiltrarFinal(this.value)" style="max-width:150px">' + _efOpcoesFinal() + '</select>'
+    + '<select class="fs" onchange="_efFiltrarCliente(this.value)" style="max-width:220px">' + _efOpcoesCliente() + '</select>'
+    + (temFiltro ? '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efLimparFiltros()">Limpar filtros</button>' : '')
+    + '</div>'
+    + (temFiltro
+        ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+          + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarVisiveis(true)">✓ Marcar os ' + visiveis.length + ' filtrados</button>'
+          + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_efMarcarVisiveis(false)">Desmarcar filtrados</button>'
+          + '</div>'
+        : '')
+
+    + '<div class="ef-lista">';
+
+  if (!visiveis.length){
+    h += '<div style="padding:20px;text-align:center;font-size:12px" class="muted">Nenhum veículo encontrado.</div>';
+  } else {
+    visiveis.forEach(function(v){
+      var p = _efNormPlaca(v.placa);
+      var tags = '';
+      if (pend[p]) tags += '<span class="chip" style="background:#fff4e5;color:var(--amber)">multa pendente</span>';
+      var cli = mapaCli[p];
+      if (cli && cli.nome) tags += '<span class="chip" style="background:#eaeeff;color:var(--blue)">' + cli.nome + '</span>';
+      else if (loc[p])     tags += '<span class="chip" style="background:#eaeeff;color:var(--blue)">alugado</span>';
+      h += '<label class="ef-row">'
+        + '<input type="checkbox" ' + (_efSel[p] ? 'checked' : '') + ' onchange="_efToggle(\'' + p + '\', this.checked)">'
+        + '<span style="font-weight:700;font-size:12px;min-width:80px">' + (v.placa || '—') + '</span>'
+        + '<span style="font-size:11px" class="muted">' + ((v.marca||'') + ' ' + (v.modelo||'')).trim() + '</span>'
+        + tags + '</label>';
+    });
+  }
+
+  h += '</div>'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">'
+    + '<div id="efContadorSel" style="flex:1;font-size:12px" class="muted"></div>'
+    + '<button class="btn btn-blue" id="efBtnConsultarSel" onclick="efConsultarSelecionadas()">🛰 Consultar selecionadas</button>'
+    + '</div></div>';
+
+  el.innerHTML = h;
+  _efAtualizarContador();
+}
+
+// Consulta as placas selecionadas, em lotes
+function efConsultarSelecionadas(){
+  var placas = _efSelecionadas();
+  if (!placas.length){ toast('⚠️ Selecione ao menos uma placa'); return; }
+  if (!confirm('Consultar ' + placas.length + ' placa(s) no e-Frotas?\n\n💰 São ' + placas.length + ' consulta(s) COBRADA(S) pelo Serpro.')) return;
+  efFecharSeletor();
+  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:placas.length, restantes:placas.length, placas:placas };
+  _efRodarLote();
+}
+
+// ── Diagnóstico: testa cada camada e mostra onde falha (custo zero) ──
+function efDiagnostico(){
+  var el = document.getElementById('efLog');
+  if (!el) return;
+  el.innerHTML = '<div class="box"><div class="sec-label" style="margin-bottom:10px">Diagnóstico do e-Frotas</div>'
+    + '<div id="efDiagLista" style="font-size:12px;line-height:1.9"></div></div>';
+  var lista = document.getElementById('efDiagLista');
+  var linhas = [];
+
+  function add(nome, estado, detalhe){
+    var icone = estado === 'ok' ? '✅' : (estado === 'erro' ? '❌' : (estado === 'aviso' ? '⚠️' : '⏳'));
+    var cor   = estado === 'ok' ? 'var(--green)' : (estado === 'erro' ? 'var(--red)' : (estado === 'aviso' ? 'var(--amber)' : 'var(--muted)'));
+    linhas.push('<div>' + icone + ' <strong>' + nome + '</strong>'
+      + (detalhe ? ' — <span style="color:' + cor + '">' + detalhe + '</span>' : '') + '</div>');
+    lista.innerHTML = linhas.join('');
+  }
+
+  try {
+    add('SDK Firebase', typeof firebase !== 'undefined' ? 'ok' : 'erro',
+        typeof firebase !== 'undefined' ? 'carregado' : 'não carregou');
+  } catch(e){ add('SDK Firebase', 'erro', e.message); }
+
+  try {
+    var temFn = !!(firebase && firebase.app && firebase.app().functions);
+    add('SDK Functions', temFn ? 'ok' : 'erro', temFn ? 'disponível' : 'firebase-functions-compat.js não carregou');
+  } catch(e){ add('SDK Functions', 'erro', e.message); }
+
+  try {
+    var nv = _efVeiculosLista().length;
+    var nm = _arr(DB && DB.multas).length;
+    var na = _arr(DB && DB.ativos).length;
+    add('Dados carregados', nv ? 'ok' : 'aviso', nv + ' veículo(s) · ' + nm + ' multa(s) · ' + na + ' locação(ões) ativa(s)');
+    if (DB && DB.veiculos && !Array.isArray(DB.veiculos)) {
+      add('Formato dos veículos', 'aviso', 'veio como objeto (já tratado por _arr)');
+    }
+  } catch(e){ add('Dados carregados', 'erro', e.message); }
+
+  var nos = ['loka_db','loka_users','loka_perfis','loka_encerrados','loka_backups_meta','faturas','reservas'];
+  var pend = nos.length;
+  nos.forEach(function(no){
+    dbRef.ref(no).limitToFirst(1).once('value')
+      .then(function(){ add('Ler /' + no, 'ok', 'permitido'); })
+      .catch(function(e){ add('Ler /' + no, 'erro', e.message); })
+      .finally(function(){ if (--pend === 0) _efDiagFuncao(add); });
+  });
+}
+
+function _efDiagFuncao(add){
+  add('Chamando a função de teste…', 'load', 'aguarde');
+  var t0 = Date.now();
+  firebase.app().functions(FN_REGION)
+    .httpsCallable('testarConexaoEfrotas', { timeout: 120000 })({})
+    .then(function(res){
+      var seg = ((Date.now() - t0)/1000).toFixed(1);
+      var d = res.data || {};
+      if (d.ok) add('Função testarConexao', 'ok', (d.msg || 'respondeu') + ' (' + seg + 's)');
+      else add('Função testarConexao', 'erro', (d.erro || 'falhou') + ' (' + seg + 's)');
+    })
+    .catch(function(e){
+      var seg = ((Date.now() - t0)/1000).toFixed(1);
+      var msg = e.message || String(e);
+      if (msg.indexOf('deadline') >= 0) msg = 'TIMEOUT após ' + seg + 's — a função não respondeu';
+      if (msg.indexOf('not-found') >= 0) msg = 'função não encontrada — o backend foi publicado?';
+      if (msg.indexOf('internal') >= 0) msg = 'erro interno na função — veja os logs no Firebase';
+      if (msg.indexOf('permission') >= 0 || msg.indexOf('unauthenticated') >= 0) msg = 'invocação bloqueada — libere no Cloud Run (aba Segurança)';
+      add('Função testarConexao', 'erro', msg);
+    });
+}
+
+// Acompanha a varredura pelo banco, caso ela rode em segundo plano
 var _obsProgresso = null;
 function acompanharProgresso(){
   if (_obsProgresso) return;
@@ -304,10 +803,10 @@ function acompanharProgresso(){
     var st = snap.val();
     if (!st) return;
     if (st.emAndamento === false && st.ultimaExecucao){
-      var msg = '✓ '+(st.placasConsultadas||0)+' veículo(s) · '+(st.novas||0)+' nova(s)';
-      if (st.atualizadas) msg += ' · '+st.atualizadas+' atualizada(s)';
-      if (st.erros && st.erros.length) msg += ' · ⚠ '+st.erros.length+' com erro';
-      status(msg,'#9f9');
+      var msg = '✓ ' + (st.placasConsultadas||0) + ' veículo(s) · ' + (st.novas||0) + ' nova(s)';
+      if (st.atualizadas) msg += ' · ' + st.atualizadas + ' atualizada(s)';
+      if (st.erros && st.erros.length) msg += ' · ⚠ ' + st.erros.length + ' com erro';
+      status(msg, '#9f9');
       carregarDados();
       ref.off('value', _obsProgresso);
       _obsProgresso = null;
@@ -317,13 +816,16 @@ function acompanharProgresso(){
 }
 
 // ── Carrega multas e status do banco ──
+// O retrato do loka_db fica em DB (global): o seletor de placas precisa de
+// veiculos, ativos e multas, que antes não saíam desta função.
 function carregarDados(){
-  dbRef.ref('loka_db').get().then(function(snap){
-    var db = snap.val() || {};
-    var multas = (db.multas || []).filter(Boolean);
+  return dbRef.ref('loka_db').get().then(function(snap){
+    DB = snap.val() || {};
+    var multas = _arr(DB.multas);
     renderCards(multas);
     renderTabela(multas);
-    renderSync(db.efrotas_status);
+    renderSync(DB.efrotas_status);
+    _efPintarStatus();
   }).catch(function(e){
     document.getElementById('tbody').innerHTML =
       '<tr><td colspan="7" class="empty">Erro ao carregar: '+e.message+'</td></tr>';
@@ -393,8 +895,14 @@ function iniciar(){
   carregarDados();
   // atualização ao vivo quando o backend gravar
   dbRef.ref('loka_db/efrotas_status').on('value', function(snap){
-    renderSync(snap.val());
+    window._efStatus = snap.val();
+    renderSync(window._efStatus);
+    _efPintarStatus();
   });
+  // se uma varredura já estiver rodando em segundo plano, acompanha
+  acompanharProgresso();
+  var r = document.getElementById('rodapeBuild');
+  if (r) r.textContent = 'build ' + LOKA_BUILD;
 }
 </script>
 </body>
