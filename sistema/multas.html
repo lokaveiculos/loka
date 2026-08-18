@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v2-20260818-1545 -->
+<!-- LOKA deploy: v3-20260818-1552 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -192,7 +192,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v2-20260818-1545';
+var LOKA_BUILD = 'v3-20260818-1552';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -843,9 +843,13 @@ function acompanharProgresso(){
 function carregarDados(){
   return dbRef.ref('loka_db').get().then(function(snap){
     DB = snap.val() || {};
-    var multas = _arr(DB.multas);
-    renderCards(multas);
-    renderTabela(multas);
+    var todas = _arr(DB.multas);
+    // Esta página mostra SÓ o que o e-Frotas trouxe. As multas importadas de
+    // PDF continuam intactas no painel Multas do gestao.html — aqui elas não
+    // aparecem, para dar de ver exatamente o que a consulta automática carrega.
+    var doEfrotas = todas.filter(function(m){ return m && m.origem === 'efrotas'; });
+    renderCards(doEfrotas, todas);
+    renderTabela(doEfrotas);
     renderSync(DB.efrotas_status);
     _efPintarStatus();
   }).catch(function(e){
@@ -854,20 +858,21 @@ function carregarDados(){
   });
 }
 
-function renderCards(multas){
-  var doEfrotas = multas.filter(function(m){ return m.origem==='efrotas'; });
-  var aberto=0, pago=0, semLoc=0;
-  multas.forEach(function(m){
+// Os três primeiros cards contam SÓ o e-Frotas. O último mostra o total do
+// sistema (incluindo as importadas por PDF) como referência, para ficar claro
+// que elas continuam lá, no painel Multas do gestão.
+function renderCards(doEfrotas, todas){
+  var aberto=0, semLoc=0;
+  doEfrotas.forEach(function(m){
     var v = Number(m.valor)||0;
     if (m.status!=='paga' && m.status!=='cancelada') aberto+=v;
-    if (m.dataPagamento) pago += (Number(m.valorPago)||v);
     if (!m.clienteId && m.status!=='cancelada') semLoc++;
   });
   document.getElementById('cards').innerHTML =
-     card('Multas no total', multas.length)
-   + card('Via e-Frotas', doEfrotas.length)
-   + card('Em aberto', brl(aberto), 'var(--red)')
-   + card('Sem locatário', semLoc, semLoc?'var(--amber)':'var(--dark)');
+     card('Via e-Frotas', doEfrotas.length, doEfrotas.length?'var(--dark)':'var(--muted)')
+   + card('Em aberto (e-Frotas)', brl(aberto), aberto?'var(--red)':'var(--muted)')
+   + card('Sem locatário (e-Frotas)', semLoc, semLoc?'var(--amber)':'var(--muted)')
+   + card('No sistema (todas as origens)', todas.length, 'var(--muted)');
 }
 function card(label,value,cor){
   return '<div class="card"><div class="label">'+label+'</div>'
@@ -881,7 +886,9 @@ function renderTabela(multas){
 
   if (!lista.length){
     document.getElementById('tbody').innerHTML =
-      '<tr><td colspan="7" class="empty">Nenhuma multa ainda. Rode uma consulta ou importe pelo sistema.</td></tr>';
+      '<tr><td colspan="7" class="empty">Nenhuma multa veio do e-Frotas ainda.<br>'
+      + '<span style="font-size:11px">Esta tabela lista só o que a consulta automática trouxer. '
+      + 'As multas importadas de PDF continuam no painel <strong>Multas</strong> do sistema.</span></td></tr>';
     return;
   }
   document.getElementById('tbody').innerHTML = lista.map(function(m){
