@@ -52,7 +52,7 @@ DNS via Cloudflare.
 |---|---|
 | `gestao.html` | **v85-20260818-1515** |
 | `fatura.html` | v75-20260812-1700 |
-| `multas.html` | **sem carimbo de versão** (pendência) |
+| `multas.html` | **v3-20260818-1552** |
 
 ## Modelo de dados — `loka_db`
 
@@ -112,7 +112,7 @@ responder **No**.
 | 1 | 🐞 `dispararConsultaMultas` **descarta `d.placas`** — o front envia, o backend ignora e varre a frota do índice 0. Custo real em consultas pagas. Ver abaixo. | 🔴 |
 | 2 | Senhas em **texto puro** em `sistema/index.html` (inclui master) — considerar comprometidas | 🔴 |
 | 3 | Regras do banco abertas (`.read/.write: true`) → exposição LGPD. Aplicar TRANSICAO v11 (exige `_writerBuild`), depois ALVO (exige login) | 🔴 |
-| 4 | `multas.html` tem erros conhecidos + não tem carimbo de versão | 🟠 |
+| 4 | 🐞 No `gestao.html`, "Testar conexão" e "Diagnóstico" do painel e-Frotas **não avisam que custam** 1 consulta cobrada cada (já corrigido na `multas.html` v2) | 🟠 |
 | 5 | Migrar login para **Firebase Auth** | 🟠 |
 | 6 | TLS e-Frotas: `validarServidor = false` em `efrotas-client.js:76` — embutir cadeia ICP-Brasil | 🟠 |
 | 7 | Reservas/Pré-Cadastro gravam sem login — precisam Auth anônimo ou Cloud Function antes do ALVO | 🟡 |
@@ -139,3 +139,27 @@ responder **No**.
   então versionar o backend lá dentro exporia o código-fonte na web).
 - **Navegador de teste: Chrome real.** As páginas exigem login; eu nunca digito
   senha — peço ao Rogel que autentique e sigo a partir dali.
+
+## Backups fora do repo
+
+`C:\Users\Usuario\OneDrive\Desktop\Github\backups-loka` — **nunca versionar**.
+O repo `loka` é servido pelo GitHub Pages, então qualquer coisa commitada ali
+fica pública na web, e esses arquivos têm dados de cliente (LGPD).
+Primeiro backup: `loka_db-COMPLETO-20260818-153545.json` (banco inteiro),
+`multas-20260818-153545.json` / `.csv` (336 multas).
+
+Baixar o banco inteiro a qualquer momento:
+```bash
+curl -s "https://loka-b8dd2-default-rtdb.firebaseio.com/loka_db.json" -o backup.json
+```
+
+## `multas.html` — escopo da página (18/08/2026)
+
+A página lista **apenas** multas com `origem === 'efrotas'`. As 336 importadas
+por PDF (sem campo `origem`, R$ 73.510,67 em aberto, todas com locatário)
+continuam no painel **Multas** do `gestao.html` — decisão do Rogel: a página
+nova começa zerada, para dar de ver o que a consulta automática realmente
+carrega. **Nada foi apagado do banco**; a página só lê.
+
+⚠️ O e-Frotas **nunca gravou uma multa em produção**: `origem='efrotas'` = 0
+registros. É o sintoma que o backend precisa resolver (ver pendência 1).
