@@ -208,3 +208,19 @@ O projeto barra a **criação** de funções novas:
 Atualizar funções existentes funciona normalmente. Por isso o diagnóstico de
 banco é um **modo** da `dispararConsultaMultas` (`{ soDiagnostico: true }`), e
 não uma função separada. Evite adicionar novos `exports` sem resolver a política.
+
+## Papel do banco concedido — 18/08/2026, 16h
+
+Concedido **Administrador do Firebase Realtime Database** à conta
+`633462890390-compute@developer.gserviceaccount.com` (a que executa as
+Functions v2, confirmada na linha `serviceAccountName` do YAML do Cloud Run).
+
+Antes ela tinha só: Editor do Cloud Build, Editor do Cloud Functions, Gravador
+de registros, Gravador do Artifact Registry, Leitor de objetos do Storage —
+nenhum papel de banco. A conta `firebase-adminsdk-fbsvc@…` **já tinha** o papel,
+mas não é ela que roda a função.
+
+⚠️ **Conceder o papel não basta na hora:** o Cloud Run reaproveita instâncias
+quentes, que carregam o token antigo em cache. Para valer, é preciso **forçar
+revisão nova** — `firebase deploy --only functions` — ou esperar a instância
+ociosa morrer (mín. de instâncias = 0).
