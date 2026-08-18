@@ -1,3 +1,4 @@
+| 1 | 🔴 **CONFIRMADO 18/08/2026:** a conta de serviço das Functions v2 **não consegue ler o Realtime Database**. Diagnóstico deu timeout de 20s em `ler loka_db/veiculos`. É por isso que o e-Frotas nunca gravou multa. Conserto no IAM — ver abaixo. | 🔴 |
 # SISTEMA LOKÁ — Contexto do projeto
 
 LOKÁ Aluguel de Veículos · Feira de Santana/BA · CNPJ 39.911.638/0001-10.
@@ -163,3 +164,47 @@ carrega. **Nada foi apagado do banco**; a página só lê.
 
 ⚠️ O e-Frotas **nunca gravou uma multa em produção**: `origem='efrotas'` = 0
 registros. É o sintoma que o backend precisa resolver (ver pendência 1).
+
+## 🔴 Causa raiz do e-Frotas (confirmada em 18/08/2026)
+
+**A conta de serviço que executa as Functions v2 não tem acesso ao Realtime
+Database.** Confirmado pelo diagnóstico de custo zero da `multas.html`
+("🗄 Testar o banco"):
+
+```
+✅ abrir referência do banco — loka-b8dd2-default-rtdb.firebaseio.com (0ms)
+❌ ler loka_db/veiculos — Tempo esgotado (20s)   (20003ms)
+```
+
+Por isso `testarConexaoEfrotas` responde OK (nunca toca no banco) e
+`dispararConsultaMultas` nunca termina (a primeira coisa que faz é ler o banco).
+Explica também o `loka_db/efrotas_status` inexistente.
+
+**Conserto (sem mexer em código):** conceder o papel **Firebase Realtime
+Database Admin** (`roles/firebasedatabase.admin`) à conta de serviço do runtime
+no IAM do projeto `loka-b8dd2`.
+
+Functions v2 rodam sobre Cloud Run e usam por padrão a **Compute Engine default
+service account**. O project number é **633462890390** (é o `messagingSenderId`
+do `firebase-config.js`), então a conta provável é:
+
+```
+633462890390-compute@developer.gserviceaccount.com
+```
+
+Confirmar na aba **Detalhes** da função no console antes de conceder.
+
+## Avisos do deploy a tratar
+
+| Prazo | Aviso |
+|---|---|
+| **30/10/2026** | Node.js 20 será descomissionado — sem atualizar o runtime, não dá mais para publicar |
+| — | `firebase-functions` desatualizado (`^5.1.0`); atualizar tem *breaking changes*, fazer com calma |
+
+## Org Policy do projeto
+
+O projeto barra a **criação** de funções novas:
+`Build service account needs to be specified due to Org Policies`.
+Atualizar funções existentes funciona normalmente. Por isso o diagnóstico de
+banco é um **modo** da `dispararConsultaMultas` (`{ soDiagnostico: true }`), e
+não uma função separada. Evite adicionar novos `exports` sem resolver a política.
