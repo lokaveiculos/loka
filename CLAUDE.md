@@ -224,3 +224,19 @@ mas não é ela que roda a função.
 quentes, que carregam o token antigo em cache. Para valer, é preciso **forçar
 revisão nova** — `firebase deploy --only functions` — ou esperar a instância
 ociosa morrer (mín. de instâncias = 0).
+
+### ✅ Confirmado funcionando — 18/08/2026, 16h20
+
+Depois da concessão do papel e de ~4 min de propagação (sem precisar de novo
+deploy — a instância quente expirou sozinha), o diagnóstico passou:
+
+```
+✅ abrir referência do banco   (0ms)
+✅ ler loka_db/veiculos — leu 1 registro   (145ms)
+✅ gravar loka_db/_diagnostico — gravou    (291ms)
+✅ apagar loka_db/_diagnostico — limpo     (435ms)
+```
+
+De 20 000 ms de timeout para 145 ms. **A causa raiz era o IAM, e está corrigida.**
+Falta validar ponta a ponta com uma consulta real (cobrada) e conferir se a
+multa é gravada com `origem='efrotas'` e o `efrotas_status` passa a existir.
