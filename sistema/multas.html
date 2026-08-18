@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v4-20260818-1608 -->
+<!-- LOKA deploy: v5-20260818-1625 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -193,7 +193,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v4-20260818-1608';
+var LOKA_BUILD = 'v5-20260818-1625';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -733,29 +733,54 @@ function efConsultarSelecionadas(){
 }
 
 // ── Sonda do banco — custo zero ───────────────────────────────
-// Chama diagnosticoBanco, que só lê/escreve no Realtime Database e nunca
-// fala com o Serpro. É o teste certo para o sintoma "testar conexão responde,
-// mas consultar a placa não faz nada".
+// Roda dentro da dispararConsultaMultas, com { soDiagnostico: true }: ela sai
+// antes de carregar o certificado e antes de qualquer chamada ao Serpro, e só
+// testa o acesso ao banco. Não é função separada porque a Org Policy do projeto
+// barra a criação de funções novas no Cloud Build.
+// É o teste certo para o sintoma "testar conexão responde, mas consultar a
+// placa não faz nada".
 function efDiagnosticoBanco(){
   setBtns(true);
   status('⏳ Testando o acesso da função ao banco…','#ffe');
   _efLog('⏳ Rodando o diagnóstico do banco (não consulta o Serpro, não custa nada)…');
-  _efrotasCall('diagnosticoBanco', {}).then(function(r){
+  // A placa impossível é uma trava de segurança: se o backend publicado ainda
+  // for a versão que não conhece 'soDiagnostico', ele ignora o parâmetro e cai
+  // na varredura normal — que, filtrada por uma placa que não existe na frota,
+  // consulta ZERO veículos no Serpro. Sem ela, essa versão varreria a frota
+  // inteira e cobraria uma consulta por veículo.
+  _efrotasCall('dispararConsultaMultas', {
+    soDiagnostico: true,
+    placas: ['DIAGNOSTICO0']
+  }).then(function(r){
     r = r || {};
-    var linhas = (r.passos||[]).map(function(p){
-      return '<div>' + (p.ok ? '✅' : '❌') + ' <strong>' + p.passo + '</strong>'
-        + (p.detalhe ? ' — <span style="color:' + (p.ok?'var(--green)':'var(--red)') + '">' + p.detalhe + '</span>' : '')
-        + ' <span class="muted">(' + p.ms + 'ms)</span></div>';
-    }).join('');
-    _efLog('<div class="sec-label" style="margin-bottom:8px">Diagnóstico do banco</div>'
-      + '<div style="line-height:1.9">' + linhas + '</div>'
-      + (r.veredito ? '<div style="margin-top:10px;padding:10px;border-radius:8px;background:'
-          + (r.ok?'#e8f5ef':'#fdeaea') + '"><strong>' + r.veredito + '</strong></div>' : ''),
-      r.ok ? '#fff' : '#fff');
-    status(r.ok ? '✓ Banco acessível pela função' : '⚠ A função não acessa o banco', r.ok ? '#9f9' : '#fbb');
+
+    // Resposta da versão nova: relatório passo a passo.
+    if (r.diagnostico) {
+      var linhas = (r.passos||[]).map(function(p){
+        return '<div>' + (p.ok ? '✅' : '❌') + ' <strong>' + p.passo + '</strong>'
+          + (p.detalhe ? ' — <span style="color:' + (p.ok?'var(--green)':'var(--red)') + '">' + p.detalhe + '</span>' : '')
+          + ' <span class="muted">(' + p.ms + 'ms)</span></div>';
+      }).join('');
+      _efLog('<div class="sec-label" style="margin-bottom:8px">Diagnóstico do banco</div>'
+        + '<div style="line-height:1.9">' + linhas + '</div>'
+        + (r.veredito ? '<div style="margin-top:10px;padding:10px;border-radius:8px;background:'
+            + (r.ok?'#e8f5ef':'#fdeaea') + '"><strong>' + r.veredito + '</strong></div>' : ''));
+      status(r.ok ? '✓ Banco acessível pela função' : '⚠ A função não acessa o banco', r.ok ? '#9f9' : '#fbb');
+      return;
+    }
+
+    // Resposta da versão anterior: ela rodou a varredura com 0 placas. Não
+    // custou nada, mas o simples fato de ter respondido já prova que a função
+    // leu o banco e gravou o efrotas_status.
+    _efLog('✅ <strong>O backend respondeu e não travou.</strong><br>'
+      + 'Consultou ' + (r.placas||0) + ' placa(s) no Serpro (nenhuma, como esperado).<br>'
+      + '<span class="muted">Isso já mostra que a função conseguiu ler o banco e gravar o status. '
+      + 'Para o relatório detalhado, publique a versão nova do backend.</span>', '#e8f5ef');
+    status('✓ O backend leu e gravou no banco', '#9f9');
+    carregarDados();
   }).catch(function(e){
     var m = e.message||'';
-    if (m.indexOf('not-found')>=0) m = 'Função diagnosticoBanco ainda não publicada — falta rodar o deploy.';
+    if (m.indexOf('not-found')>=0) m = 'Backend ainda não publicado — falta rodar o deploy das Functions.';
     _efLog('❌ <strong>Falha no diagnóstico do banco:</strong> ' + m, '#fdeaea');
     status('⚠ ' + m, '#fbb');
   }).finally(function(){ setBtns(false); });
