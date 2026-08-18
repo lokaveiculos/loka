@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v5-20260818-1625 -->
+<!-- LOKA deploy: v6-20260818-1630 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -193,7 +193,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v5-20260818-1625';
+var LOKA_BUILD = 'v6-20260818-1630';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -434,7 +434,10 @@ function efConsultarPlaca(){
 // ── Varredura EM LOTES ────────────────────────────────────────
 // Lotes pequenos evitam o timeout que a varredura inteira causava,
 // mostram progresso e permitem parar no meio (controle de custo).
-var EF_TAMANHO_LOTE = 5;
+// 25 placas por lote. A função tem 540s de teto e a pausa entre placas é de
+// 400ms (respeita o limite do Serpro), então 25 cabe com folga larga.
+// Lembre: um lote = 25 consultas COBRADAS de uma vez.
+var EF_TAMANHO_LOTE = 25;
 var _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:0, restantes:0 };
 
 function efConsultarFrota(){
