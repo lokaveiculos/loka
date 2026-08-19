@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v9-20260818-1715 -->
+<!-- LOKA deploy: v10-20260818-1740 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -111,6 +111,10 @@
   body.embed{padding:0; max-width:none}
   body.embed .topbar{display:none}
   body.embed .rodape{padding-bottom:4px}
+  /* Embutida, a autenticação é do sistema: o gate nasce escondido para não
+     piscar na tela. Só reaparece se a sessão do pai tiver mesmo expirado. */
+  body.embed #gate{display:none}
+  body.embed.sem-sessao #gate{display:block; margin:40px auto}
 </style>
 </head>
 <body>
@@ -208,7 +212,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v9-20260818-1715';
+var LOKA_BUILD = 'v10-20260818-1740';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -231,6 +235,23 @@ var SESSION_KEY = 'loka_session';
 function sessaoValida(){
   try {
     var tok = sessionStorage.getItem(SESSION_KEY);
+
+    // Embutida no gestao.html: herda a sessão do documento pai.
+    // O pai já barrou quem não está logado (ele redireciona para index.html
+    // antes de renderizar), então quem chegou aqui dentro passou pelo login.
+    // O acesso a parent.sessionStorage só é permitido pelo navegador se a
+    // origem for a mesma — de outro domínio isso lança e cai no gate normal.
+    if (!tok && EMBUTIDO) {
+      try {
+        tok = window.parent.sessionStorage.getItem(SESSION_KEY);
+        if (tok) {
+          sessionStorage.setItem(SESSION_KEY, tok);
+          var u = window.parent.sessionStorage.getItem('loka_user');
+          if (u) sessionStorage.setItem('loka_user', u);
+        }
+      } catch(e){ /* origem diferente: segue para o gate */ }
+    }
+
     if (!tok) return null;
     var d = JSON.parse(atob(tok));
     if (!d || !d.exp || Date.now() > d.exp) return null;
@@ -272,12 +293,26 @@ function gateEntrar(){
 
 // Modo embutido: a página abre dentro do painel do gestao.html (?embed=1).
 // Esconde o cabeçalho próprio, já que o menu lateral do sistema faz esse papel.
-var EMBUTIDO = /[?&]embed=1/.test(location.search);
+// Exige estar mesmo dentro de um iframe: abrir a URL com ?embed=1 direto no
+// navegador não conta, e continua caindo no gate normal.
+var EMBUTIDO = /[?&]embed=1/.test(location.search) && window.parent !== window;
 if (EMBUTIDO) document.body.classList.add('embed');
 
-// entrada automática se a sessão do sistema estiver ativa
+// Entrada automática se a sessão do sistema estiver ativa.
 (function(){
-  if (sessaoValida()){ gateOk(); }
+  if (sessaoValida()){ gateOk(); return; }
+  // Embutido e ainda assim sem sessão: o pai é quem manda. Em vez de pedir
+  // senha de novo dentro do painel, avisa e manda refazer o login no sistema.
+  if (EMBUTIDO){
+    document.body.classList.add('sem-sessao');
+    var g = document.getElementById('gate');
+    if (g) g.innerHTML = '<div class="logo" style="margin:0 auto 8px">L</div>'
+      + '<div style="font-weight:800">Sessão expirada</div>'
+      + '<div class="muted" style="font-size:12px;margin:8px 0 14px">'
+      + 'Sua sessão do sistema terminou. Entre novamente para ver as multas.</div>'
+      + '<button class="btn btn-blue" style="width:100%" '
+      + 'onclick="window.top.location.href=\'index.html\'">Fazer login</button>';
+  }
 })();
 
 // ── Helpers de formato ──
