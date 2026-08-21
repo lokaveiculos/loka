@@ -86,6 +86,16 @@ proibido excluir), `loka_backups`, `loka_backups_meta`, `faturas`, `reservas`.
 7. **"A versão não mudou"** → cache, ou o arquivo publicado é de outra linhagem.
    Conferir o Raw no GitHub, linha 4.
 8. **Aparelho desatualizado corrompe o banco**, não só mostra tela velha.
+9. **Curinga `'*'` nas permissões** (v89). "Todos" não grava a lista item a item:
+   grava `paineis:['*']` em `loka_perfis`, `acoes:{'*':true}`, e
+   `oficinasAssoc:['*']` / `clientesAssoc:['*']` em `loka_users`. É proposital —
+   assim a permissão alcança o que for criado **depois** (foi o que faltou quando
+   o painel `multasefrotas` nasceu e ficou fora de todos os perfis salvos).
+   Quem lê permissão precisa passar por `_temCuringa()` / `_paineisEfetivos()` /
+   `_podeAcao()`, nunca por `indexOf` direto na lista.
+   ⚠️ `_ACOES_RESTRITIVAS` (`manutencaoEscopoOficina`, `manutencaoEscopoCliente`,
+   `multasEscopoCliente`) **não entram no curinga**: elas *limitam* a visão, então
+   incluí-las em "Todas as ações" faria o perfil ver menos, não mais.
 
 ## Backend e-Frotas (`Github\deploy`)
 
