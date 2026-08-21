@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v88-20260818-1725 -->
+<!-- LOKA deploy: v89-20260821-1139 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1136,7 +1136,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v88-20260818-1725';
+var LOKA_BUILD = 'v89-20260821-1139';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1218,7 +1218,7 @@ function _perfilAtual() {
 // Todos os painéis controláveis por permissão
 var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
-var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',efrotas:'e-Frotas (SENATRAN)',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
   editarPrecos:'Editar preços dos veículos',
   gerenciarUsuarios:'Gerenciar usuários',
@@ -1229,6 +1229,26 @@ var _ACAO_LABEL   = {
   manutencaoEscopoCliente:'Manutenção: ver só as placas locadas ao cliente associado',
   multasEscopoCliente:'Multas: ver só as multas dos clientes associados'
 };
+
+// ── CURINGA "TODOS" ────────────────────────────────────────────
+// Marcar "Todos" não grava a lista item a item: grava o curinga '*'. Assim a
+// permissão vale também para o que for criado DEPOIS (uma tela nova, um cliente
+// novo, uma oficina nova) sem precisar reabrir o cadastro de cada usuário.
+// Foi exatamente esse o problema do painel "Multas e-Frotas", que nasceu depois
+// dos perfis salvos em loka_perfis e ficou de fora de todos eles.
+var _CURINGA = '*';
+function _temCuringa(lista){ return Array.isArray(lista) && lista.indexOf(_CURINGA) >= 0; }
+// Expande o curinga para a lista real de painéis (usado onde o código precisa
+// percorrer/contar painéis, não apenas testar um).
+function _paineisEfetivos(def){
+  var p = (def && def.paineis) || [];
+  return _temCuringa(p) ? _TODOS_PAINEIS.slice() : p;
+}
+// Ações que RESTRINGEM o que o usuário enxerga (são escopos, não liberações).
+// Ficam de fora do curinga: marcar "Todas as ações" deve ampliar o acesso, e
+// ligar estas deixaria o perfil vendo MENOS — o contrário do esperado.
+var _ACOES_RESTRITIVAS = ['manutencaoEscopoOficina','manutencaoEscopoCliente','multasEscopoCliente'];
+function _acoesTemCuringa(acoes){ return !!(acoes && acoes[_CURINGA]); }
 
 // Perfis EMBUTIDOS (fallback — sempre existem, não podem ser excluídos)
 var _PERFIS_BUILTIN = {
@@ -1273,6 +1293,7 @@ function _listaPerfis() {
 function _permsAtual(){ return _getPerfilDef(_perfilAtual()); }
 function _podePainel(name){
   var p = _permsAtual().paineis;
+  if (_temCuringa(p)) return true;   // perfil com "Todas as telas"
   if (p.indexOf(name) >= 0) return true;
   // "multasefrotas" nasceu depois dos perfis salvos em loka_perfis, que não o
   // listam. Sem este fallback, quem tem Multas liberado veria o item no menu
@@ -1280,7 +1301,13 @@ function _podePainel(name){
   if (name === 'multasefrotas') return p.indexOf('multas') >= 0;
   return false;
 }
-function _podeAcao(a){ return !!((_permsAtual().acoes||{})[a]); }
+function _podeAcao(a){
+  var ac = _permsAtual().acoes || {};
+  if (ac[a]) return true;
+  // "Todas as ações" libera o resto, menos os escopos restritivos (ver _ACOES_RESTRITIVAS)
+  if (_acoesTemCuringa(ac) && _ACOES_RESTRITIVAS.indexOf(a) < 0) return true;
+  return false;
+}
 function _isOficina(){ return _perfilAtual()==='oficina'; } // compat.
 
 // Modo do painel de Manutenção conforme o perfil (incluir / escopos)
@@ -1354,21 +1381,23 @@ function _placasDosClientes(ids) {
 // Aplica as permissões na interface (menu, botões) conforme o perfil logado
 function _aplicarPermissoesUI() {
   var def = _permsAtual();
+  var _pain = _paineisEfetivos(def);   // já com o curinga "Todos" expandido
   _TODOS_PAINEIS.forEach(function(p){
     var ni = document.getElementById('ni-'+p);
-    if (ni) ni.style.display = (def.paineis.indexOf(p)>=0) ? 'flex' : 'none';
+    if (ni) ni.style.display = (_pain.indexOf(p)>=0) ? 'flex' : 'none';
   });
   // "Multas e-Frotas" virou painel de verdade e já entra no laço acima por
   // _TODOS_PAINEIS. Perfis antigos, salvos antes dele existir, não o listam —
   // então quem pode ver Multas também pode ver este.
   var niME = document.getElementById('ni-multasefrotas');
-  if (niME && def.paineis.indexOf('multasefrotas') < 0 && def.paineis.indexOf('multas') >= 0) {
+  if (niME && _pain.indexOf('multasefrotas') < 0 && _pain.indexOf('multas') >= 0) {
     niME.style.display = 'flex';
   }
+  // _podeAcao já entende o curinga "Todas as ações"
   var niRel = document.getElementById('ni-relatorio');
-  if (niRel) niRel.style.display = (def.acoes && def.acoes.verRelatorio) ? 'flex' : 'none';
+  if (niRel) niRel.style.display = _podeAcao('verRelatorio') ? 'flex' : 'none';
   var bGU = document.getElementById('btnGerUsers');
-  if (bGU) bGU.style.display = (def.acoes && def.acoes.gerenciarUsuarios) ? 'inline-block' : 'none';
+  if (bGU) bGU.style.display = _podeAcao('gerenciarUsuarios') ? 'inline-block' : 'none';
   // Perfil de manutenção restrito (oficina / clientes): ajusta a toolbar e a busca global
   var modo = _modoManutencao();
   if (modo.restrito || _multasRestrito()) {
@@ -1386,8 +1415,8 @@ function _aplicarPermissoesUI() {
   var _vis = document.querySelector('.panel[style*="block"]');
   if (_vis) {
     var _atual = _vis.id.replace('panel-','');
-    if (def.paineis.indexOf(_atual) < 0) {
-      var _dest = (def.paineis.indexOf('dashboard')>=0) ? 'dashboard' : (def.paineis[0]||null);
+    if (_pain.indexOf(_atual) < 0) {
+      var _dest = (_pain.indexOf('dashboard')>=0) ? 'dashboard' : (_pain[0]||null);
       if (_dest && _dest !== _atual) showPanel(_dest);
     }
   }
@@ -1418,7 +1447,7 @@ function abrirMultasNovo() {
 function showPanel(name) {
   // Controle de acesso por perfil (orientado a dados)
   if (!_podePainel(name)) {
-    var perm = _permsAtual().paineis || [];
+    var perm = _paineisEfetivos(_permsAtual());
     var destino = (perm.indexOf('dashboard')>=0) ? 'dashboard' : (perm[0]||null);
     if (destino && destino !== name) return showPanel(destino);
     return; // perfil sem painel liberado
@@ -4301,9 +4330,13 @@ function salvarUsuario() {
     nome:     nome,
     senha:    senha || (editId !== '' ? _usuariosFirebase[parseInt(editId)].senha : ''),
     perfil:   perfil,
-    oficinasAssoc: Array.prototype.map.call(document.querySelectorAll('#uOficinasAssoc .assoc-oficina:checked'), function(c){ return c.value; }),
+    // "Todas"/"Todos" grava o curinga '*': vale também para oficinas e clientes
+    // cadastrados depois, sem precisar reabrir este usuário.
+    oficinasAssoc: _lerTodos('uOficinasAssoc','assoc-oficina') ? [_CURINGA]
+      : Array.prototype.map.call(document.querySelectorAll('#uOficinasAssoc .assoc-oficina:checked'), function(c){ return c.value; }),
     oficinaAssoc: '',  // legado (limpo — usamos oficinasAssoc)
-    clientesAssoc: Array.prototype.map.call(document.querySelectorAll('#uClientesAssoc .assoc-cliente:checked'), function(c){ return c.value; }),
+    clientesAssoc: _lerTodos('uClientesAssoc','assoc-cliente') ? [_CURINGA]
+      : Array.prototype.map.call(document.querySelectorAll('#uClientesAssoc .assoc-cliente:checked'), function(c){ return c.value; }),
     clienteAssoc: ''   // legado (limpo — usamos clientesAssoc)
   };
 
@@ -4334,7 +4367,7 @@ function editarUsuario(n) {
   // Marca as oficinas associadas (garante que oficinas fora do catálogo também apareçam)
   var _ofs = _oficinasDe(u);
   var _cont = document.getElementById('uOficinasAssoc');
-  if (_cont) {
+  if (_cont && !_temCuringa(_ofs)) {
     _ofs.forEach(function(nome){
       if (!_cont.querySelector('.assoc-oficina[value="'+String(nome).replace(/"/g,'&quot;')+'"]')) {
         var lbl = document.createElement('label');
@@ -4348,6 +4381,9 @@ function editarUsuario(n) {
   var _cids = _clientesDe(u);
   var _contC = document.getElementById('uClientesAssoc');
   if (_contC) _contC.querySelectorAll('.assoc-cliente').forEach(function(c){ c.checked = _cids.indexOf(c.value) >= 0; });
+  // "Todas"/"Todos" por último: marcar o curinga desabilita a escolha item a item
+  _setTodos('uOficinasAssoc','assoc-oficina', _temCuringa(_ofs));
+  _setTodos('uClientesAssoc','assoc-cliente', _temCuringa(_cids));
   _toggleAssocFields();
   document.getElementById('uEditId').value = String(n);
 }
@@ -4371,21 +4407,23 @@ function _preencherAssocFields() {
   var todas = {}; Object.keys(forn).forEach(function(n){ todas[n]=1; }); Object.keys(usadas).forEach(function(n){ todas[n]=1; });
   var nomes = Object.keys(todas).filter(Boolean).sort(function(a,b){ return a.localeCompare(b); });
   var cont = document.getElementById('uOficinasAssoc');
-  if (cont) cont.innerHTML = nomes.length ? nomes.map(function(n){
+  if (cont) cont.innerHTML = _htmlTodos('assoc-oficina','Todas as oficinas')
+    + (nomes.length ? nomes.map(function(n){
     var reg = forn[n];
     return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
       + '<input type="checkbox" class="assoc-oficina" value="'+n.replace(/"/g,'&quot;')+'"> <span>'+n
       + (reg ? '' : ' <span style="font-size:8px;background:#fef3cd;color:#b45309;padding:1px 4px;border-radius:3px" title="Nome usado em manutenções, mas ainda não está no cadastro de Fornecedores">não cadastrada</span>')
       + '</span></label>';
-  }).join('') : '<span style="font-size:11px;color:var(--muted)">Nenhuma oficina encontrada. Cadastre em <strong>Fornecedores</strong>.</span>';
+  }).join('') : '<span style="font-size:11px;color:var(--muted)">Nenhuma oficina encontrada. Cadastre em <strong>Fornecedores</strong>.</span>');
   // Clientes (checkboxes — pode marcar mais de um)
   var contC = document.getElementById('uClientesAssoc');
   if (contC) {
     var clis = (db && db.clients||[]).slice().filter(Boolean).sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
-    contC.innerHTML = clis.length ? clis.map(function(c){
+    contC.innerHTML = _htmlTodos('assoc-cliente','Todos os clientes')
+      + (clis.length ? clis.map(function(c){
       return '<label class="cli-assoc-item" data-nome="'+(c.nome||'').toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
         + '<input type="checkbox" class="assoc-cliente" value="'+c.id+'"> <span>'+(c.nome||'(sem nome)')+'</span></label>';
-    }).join('') : '<span style="font-size:11px;color:var(--muted)">Nenhum cliente cadastrado.</span>';
+    }).join('') : '<span style="font-size:11px;color:var(--muted)">Nenhum cliente cadastrado.</span>');
   }
 }
 
@@ -4434,6 +4472,8 @@ function limparFormUsuario() {
   var _oc = document.getElementById('uOficinasAssoc'); if(_oc) _oc.querySelectorAll('.assoc-oficina').forEach(function(c){ c.checked=false; });
   var _cc = document.getElementById('uClientesAssoc'); if(_cc) _cc.querySelectorAll('.assoc-cliente').forEach(function(c){ c.checked=false; });
   var _bc = document.getElementById('uBuscaClienteAssoc'); if(_bc){ _bc.value=''; _filtrarClientesAssoc(); }
+  _setTodos('uOficinasAssoc','assoc-oficina', false);
+  _setTodos('uClientesAssoc','assoc-cliente', false);
   _toggleAssocFields();
   document.getElementById('uEditId').value = '';
   var t = document.getElementById('userFormTitulo'); if(t) t.textContent='Novo Usuário';
@@ -4447,17 +4487,58 @@ function abrirPerfis() {
   openM('mPerfis');
 }
 
+// ── Checkbox "Todos" das listas de permissão ───────────────────
+// Encabeça a lista e grava o curinga '*' em vez dos itens um a um.
+function _htmlTodos(classe, rotulo, obs) {
+  return '<label style="grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;'
+    + 'color:var(--dark);background:#EEF1FD;border:1px solid var(--border);border-radius:6px;padding:7px 9px;margin-bottom:3px">'
+    + '<input type="checkbox" class="'+classe+'-todos" onchange="_toggleTodos(this,\''+classe+'\')"> '
+    + '<span>'+rotulo+'</span>'
+    + '<span style="font-size:9px;font-weight:600;color:var(--muted);margin-left:auto;text-align:right">'+(obs||'inclusive os futuros')+'</span>'
+    + '</label>';
+}
+// Com "Todos" marcado, a escolha item a item fica desligada e esmaecida —
+// o curinga já cobre tudo, inclusive o que ainda não existe.
+function _toggleTodos(el, classe) {
+  var cont = el.parentNode && el.parentNode.parentNode;
+  if (!cont) return;
+  Array.prototype.forEach.call(cont.querySelectorAll('.'+classe), function(c){
+    // data-sempre: itens que continuam clicáveis mesmo com "Todos" ligado
+    // (os escopos que LIMITAM a visão — ver _ACOES_RESTRITIVAS)
+    if (c.getAttribute('data-sempre')) return;
+    c.disabled = el.checked;
+    if (c.parentNode) c.parentNode.style.opacity = el.checked ? '.45' : '1';
+  });
+}
+function _setTodos(contId, classe, ligado) {
+  var cont = document.getElementById(contId);
+  var t = cont && cont.querySelector('.'+classe+'-todos');
+  if (!t) return;
+  t.checked = !!ligado;
+  _toggleTodos(t, classe);
+}
+function _lerTodos(contId, classe) {
+  var cont = document.getElementById(contId);
+  var t = cont && cont.querySelector('.'+classe+'-todos');
+  return !!(t && t.checked);
+}
+
 // Monta os checkboxes de painéis e ações no formulário de perfil
 function montarCheckboxesPerfil() {
   var cp = document.getElementById('perfPaineis');
-  if (cp) cp.innerHTML = _TODOS_PAINEIS.map(function(p){
+  if (cp) cp.innerHTML = _htmlTodos('perf-painel','Todas as telas')
+    + _TODOS_PAINEIS.map(function(p){
     return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
       + '<input type="checkbox" class="perf-painel" value="'+p+'"> '+_PAINEL_LABEL[p]+'</label>';
   }).join('');
   var ca = document.getElementById('perfAcoes');
-  if (ca) ca.innerHTML = Object.keys(_ACAO_LABEL).map(function(a){
+  if (ca) ca.innerHTML = _htmlTodos('perf-acao','Todas as ações','menos os escopos de oficina/cliente')
+    + Object.keys(_ACAO_LABEL).map(function(a){
+    var restr = _ACOES_RESTRITIVAS.indexOf(a) >= 0;
     return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
-      + '<input type="checkbox" class="perf-acao" value="'+a+'"> '+_ACAO_LABEL[a]+'</label>';
+      + '<input type="checkbox" class="perf-acao" value="'+a+'"'+(restr?' data-sempre="1"':'')+'> '+_ACAO_LABEL[a]
+      + (restr ? ' <span style="font-size:8px;background:#fef3cd;color:#b45309;padding:1px 4px;border-radius:3px" title="Esta opção LIMITA o que o usuário vê. Por isso ela não entra em Todas as ações.">limita</span>' : '')
+      + '</label>';
   }).join('');
 }
 
@@ -4477,7 +4558,9 @@ function renderPerfis() {
       return '<tr style="border-bottom:1px solid #f0f2f8">'
         + '<td style="padding:8px 12px;font-weight:700">'+p.nome+(p.builtin?' <span class="badge bg" style="font-size:8px">padrão</span>':'')+'</td>'
         + '<td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;background:#f0f2f9;padding:1px 6px;border-radius:3px">'+p.chave+'</span></td>'
-        + '<td style="padding:8px 12px;text-align:center">'+(p.paineis?p.paineis.length:0)+'</td>'
+        + '<td style="padding:8px 12px;text-align:center">'+(_temCuringa(p.paineis)
+            ? '<span class="badge bg" style="font-size:9px">todas</span>'
+            : (p.paineis?p.paineis.length:0))+'</td>'
         + '<td style="padding:8px 12px"><div style="display:flex;gap:5px;justify-content:center">'
           + '<button class="icon-btn" onclick="editarPerfil(\''+p.chave+'\')" title="Editar permissões">✏️</button>'
           + (p.builtin ? '' : '<button class="icon-btn" onclick="excluirPerfil(\''+p.chave+'\')" title="Excluir" style="border-color:#c0392b;color:#c0392b">🗑</button>')
@@ -4500,6 +4583,9 @@ function editarPerfil(chave) {
   document.querySelectorAll('.perf-painel').forEach(function(c){ c.checked = pain.indexOf(c.value)>=0; });
   var ac = p.acoes || {};
   document.querySelectorAll('.perf-acao').forEach(function(c){ c.checked = !!ac[c.value]; });
+  // "Todos" (curinga) — marcar depois dos individuais, porque ele os desabilita
+  _setTodos('perfPaineis','perf-painel', _temCuringa(pain));
+  _setTodos('perfAcoes','perf-acao', _acoesTemCuringa(ac));
 }
 
 function salvarPerfil() {
@@ -4514,9 +4600,20 @@ function salvarPerfil() {
     if (_PERFIS_BUILTIN[chave] || _perfisCustom[chave]) { toast('⚠️ Já existe um perfil com esta chave', '#c0392b'); return; }
   }
 
-  var paineis = Array.prototype.map.call(document.querySelectorAll('.perf-painel:checked'), function(c){ return c.value; });
+  // "Todas as telas" grava o curinga '*' — vale para telas criadas depois
+  var _todasTelas = _lerTodos('perfPaineis','perf-painel');
+  var paineis = _todasTelas ? [_CURINGA]
+    : Array.prototype.map.call(document.querySelectorAll('.perf-painel:checked'), function(c){ return c.value; });
   var acoes = {};
   Array.prototype.forEach.call(document.querySelectorAll('.perf-acao'), function(c){ acoes[c.value] = c.checked; });
+  if (_lerTodos('perfAcoes','perf-acao')) {
+    acoes = {}; acoes[_CURINGA] = true;
+    // Os escopos que LIMITAM não entram no curinga, mas continuam gravados se
+    // estiverem marcados — dá para ter "todas as ações" e ainda assim restringir.
+    Array.prototype.forEach.call(document.querySelectorAll('.perf-acao'), function(c){
+      if (_ACOES_RESTRITIVAS.indexOf(c.value) >= 0 && c.checked) acoes[c.value] = true;
+    });
+  }
 
   if (!paineis.length && !acoes.manutencaoIncluir && !acoes.manutencaoEscopoOficina && !acoes.manutencaoEscopoCliente) {
     if (!confirm('Este perfil não terá acesso a nenhum painel. Deseja salvar mesmo assim?')) return;
@@ -4557,6 +4654,8 @@ function limparFormPerfil() {
   var e=document.getElementById('perfEditKey'); if(e) e.value='';
   var t=document.getElementById('perfFormTitulo'); if(t) t.textContent='Novo Perfil';
   document.querySelectorAll('.perf-painel,.perf-acao').forEach(function(c){ c.checked=false; });
+  _setTodos('perfPaineis','perf-painel', false);
+  _setTodos('perfAcoes','perf-acao', false);
 }
 
 // Sugere a chave a partir do nome (só ao criar)
@@ -5122,8 +5221,11 @@ function _manutColetarSaida() {
   var fs = ((document.getElementById('fManutStatus')||{}).value)||'';
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
   var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
-  var setOficinas = (modo.escopoOficina && _assocCache) ? new Set((_assocCache.oficinas||[]).map(function(o){ return String(o).trim().toLowerCase(); })) : null;
-  var placasCliente = (modo.escopoCliente && _assocCache) ? _placasDosClientes(_assocCache.clientes||[]) : null;
+  // Curinga "Todas as oficinas" / "Todos os clientes": filtro nulo = vê tudo
+  var setOficinas = (modo.escopoOficina && _assocCache && !_temCuringa(_assocCache.oficinas))
+    ? new Set((_assocCache.oficinas||[]).map(function(o){ return String(o).trim().toLowerCase(); })) : null;
+  var placasCliente = (modo.escopoCliente && _assocCache && !_temCuringa(_assocCache.clientes))
+    ? _placasDosClientes(_assocCache.clientes||[]) : null;
 
   var lista = (db.manutencoes||[]).filter(function(m){
     if (!m) return false;
@@ -5138,11 +5240,17 @@ function _manutColetarSaida() {
   });
 
   var filtros = [];
-  if (modo.escopoOficina) filtros.push('Oficina(s): '+(((_assocCache&&_assocCache.oficinas)||[]).join(', ')||'—'));
+  if (modo.escopoOficina) {
+    var _ofs = (_assocCache&&_assocCache.oficinas)||[];
+    filtros.push('Oficina(s): '+(_temCuringa(_ofs) ? 'todas' : (_ofs.join(', ')||'—')));
+  }
   if (modo.escopoCliente) {
     var ids = (_assocCache&&_assocCache.clientes)||[];
-    var nomes = (db.clients||[]).filter(function(c){ return c && ids.indexOf(c.id)>=0; }).map(function(c){ return c.nome; });
-    filtros.push('Cliente(s): '+(nomes.join(', ')||'—'));
+    if (_temCuringa(ids)) filtros.push('Cliente(s): todos');
+    else {
+      var nomes = (db.clients||[]).filter(function(c){ return c && ids.indexOf(c.id)>=0; }).map(function(c){ return c.nome; });
+      filtros.push('Cliente(s): '+(nomes.join(', ')||'—'));
+    }
   }
   if (q) filtros.push('Busca: "'+q+'"');
   if (fs) filtros.push('Status: '+fs);
@@ -5339,11 +5447,17 @@ function renderManutencaoRestrito(modo) {
 
   // Cabeçalho de contexto
   var ctx = '';
-  if (modo.escopoOficina) ctx += 'Oficina(s): <strong>'+((_assocCache.oficinas||[]).join(', ')||'— nenhuma associada —')+'</strong>';
+  if (modo.escopoOficina) {
+    var _ofsCtx = _assocCache.oficinas || [];
+    ctx += 'Oficina(s): <strong>'+(_temCuringa(_ofsCtx) ? 'todas' : (_ofsCtx.join(', ')||'— nenhuma associada —'))+'</strong>';
+  }
   if (modo.escopoCliente) {
     var _ids = _assocCache.clientes || [];
-    var _nomes = (db.clients||[]).filter(function(c){ return c && _ids.indexOf(c.id)>=0; }).map(function(c){ return c.nome||'(sem nome)'; });
-    ctx += (ctx?' · ':'') + 'Cliente(s): <strong>'+(_nomes.join(', ')||'— nenhum associado —')+'</strong>';
+    if (_temCuringa(_ids)) ctx += (ctx?' · ':'') + 'Cliente(s): <strong>todos</strong>';
+    else {
+      var _nomes = (db.clients||[]).filter(function(c){ return c && _ids.indexOf(c.id)>=0; }).map(function(c){ return c.nome||'(sem nome)'; });
+      ctx += (ctx?' · ':'') + 'Cliente(s): <strong>'+(_nomes.join(', ')||'— nenhum associado —')+'</strong>';
+    }
   }
 
   if (stats) stats.innerHTML =
@@ -8273,7 +8387,9 @@ function mltFiltradas(){
   var q = f.q.toLowerCase().trim();
   // Escopo por cliente (perfis restritos, ex.: Clientes): só as multas dos clientes associados
   var escSet = null;
-  if (typeof _multasRestrito === 'function' && _multasRestrito() && _assocCache) {
+  // Curinga "Todos os clientes": não monta o conjunto, então nada é filtrado
+  if (typeof _multasRestrito === 'function' && _multasRestrito() && _assocCache
+      && !_temCuringa(_assocCache.clientes)) {
     escSet = {}; (_assocCache.clientes||[]).forEach(function(id){ escSet[id] = 1; });
   }
   return mltMultas().filter(function(m){
