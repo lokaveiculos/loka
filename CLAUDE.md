@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v85-20260818-1515** |
+| `gestao.html` | **v89-20260821-1139** |
 | `fatura.html` | v75-20260812-1700 |
 | `multas.html` | **v3-20260818-1552** |
 
