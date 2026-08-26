@@ -269,6 +269,7 @@ Publicado sem reescrever o sistema — só ajustes pontuais.
 | 19/08/2026 | Publicado em `/automais` (commit `494dadc`) |
 | 21/08/2026 | **Removido do ar a pedido do Rogel** (revert `4b8de64`) |
 | 26/08/2026 | Rogel reportou "a tela do CRM não abre" — era o próprio revert. Republicado como **v2** (`a38f002`) já sem senha no código |
+| 26/08/2026 | Rogel: "abriu sem o CRM". Diagnóstico: **o `AutoMais_Deploy.zip` nunca teve CRM** (zero ocorrências da palavra nos 13 arquivos). O CRM foi então **criado do zero** — `crm.html`, **v3** (`4e2df17`) |
 
 ## Onde está
 
@@ -303,7 +304,34 @@ sozinho no fim do arquivo. Por isso `AUTOMAIS_BUILD` não existe nessa página.
 
 | Arquivo | Build |
 |---|---|
-| todos os HTML de `automais/` | **v2-20260826-1150** |
+| todos os HTML de `automais/` | **v3-20260826-1310** |
+
+## CRM (`automais/sistema/crm.html`) — criado em 26/08/2026
+
+**Não veio no zip — foi escrito do zero.** Reaproveita o esqueleto real do
+`cadastros.html` (head, sidebar, topbar, modal e utilitários das linhas 1–235),
+com o miolo de JS próprio. Se o layout comum mudar, essa página não acompanha
+sozinha — foi cópia, não include.
+
+Coleção Firestore nova: **`leads`**.
+⚠️ `leads` **não está em `COLS`** do `firebase-shared.js`, então
+`loadFromFirestore()` não a carrega — `crm.html` lê por conta própria em
+`carregarLeads()`. Se um dia entrar em `COLS`, remover a leitura duplicada.
+
+Etapas do funil (escolhidas pelo Rogel, com a análise do banco no meio):
+`novo → contato → visita → proposta → banco → fechado` + `perdido`.
+
+Campos do lead: `nome telefone email veiculo_id origem vendedor etapa
+proximo_contato valor_proposta troca troca_desc obs motivo_perda
+criadoEm atualizadoEm fechadoEm`.
+
+Recursos: quadro estilo kanban com **arrastar e soltar** entre colunas,
+filtro por vendedor/origem/busca, marcação de **retorno atrasado** (data de
+`proximo_contato` vencida e lead ainda em aberto), link direto de WhatsApp
+(`wa.me/55` + telefone sem máscara) e três indicadores no topo.
+
+O item **CRM** foi adicionado ao menu lateral das 7 páginas com sidebar.
+`despesa_form.html` não tem menu — ficou de fora de propósito.
 
 ## Autenticação (reescrita na v2 — 26/08/2026)
 
