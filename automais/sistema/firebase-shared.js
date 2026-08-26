@@ -1,5 +1,5 @@
-// AUTOMAIS deploy: v2-20260826-1150
-var AUTOMAIS_BUILD = 'v2-20260826-1150';
+// AUTOMAIS deploy: v3-20260826-1310
+var AUTOMAIS_BUILD = 'v3-20260826-1310';
 // ── Firebase Config ──────────────────────────────────────────
 var firebaseConfig = {
   apiKey: "AIzaSyCMCeez7sN3G-R7AqWbPbS1XbbNBwDNdg0",
