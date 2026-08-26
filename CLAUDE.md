@@ -252,130 +252,124 @@ Falta validar ponta a ponta com uma consulta real (cobrada) e conferir se a
 multa é gravada com `origem='efrotas'` e o `efrotas_status` passa a existir.
 
 ---
-
-# SISTEMA AUTO MAIS (CRM de venda de veículos)
+# SISTEMA AUTO MAIS
 
 AUTO MAIS COMERCIO E CORRETORA DE VEÍCULOS LTDA · CNPJ 05.622.137/0001-00
 Rua Juarez Távora, 346 — São João — Feira de Santana/BA.
-Mesmo dono (Rogel). **Empresa e banco separados da LOKÁ.**
+Mesmo dono (Rogel). **Empresa, repositório e banco separados da LOKÁ.**
 
-Origem: pacote `AutoMais_Deploy.zip` entregue pronto pelo Rogel (13 arquivos).
-Publicado sem reescrever o sistema — só ajustes pontuais.
+## 🔴 LEIA ANTES DE MEXER — qual é o sistema de verdade
 
-## Linha do tempo (importante para não repetir confusão)
-
-| Data | O quê |
+| | |
 |---|---|
-| 19/08/2026 | Publicado em `/automais` (commit `494dadc`) |
-| 21/08/2026 | **Removido do ar a pedido do Rogel** (revert `4b8de64`) |
-| 26/08/2026 | Rogel reportou "a tela do CRM não abre" — era o próprio revert. Republicado como **v2** (`a38f002`) já sem senha no código |
-| 26/08/2026 | Rogel: "abriu sem o CRM". Diagnóstico: **o `AutoMais_Deploy.zip` nunca teve CRM** (zero ocorrências da palavra nos 13 arquivos). O CRM foi então **criado do zero** — `crm.html`, **v3** (`4e2df17`) |
+| **Repo** | `C:\...\Github\automaiscar` → `github.com/lokaveiculos/automaiscar` |
+| **Domínio** | **`automaiscar.com.br`** (GitHub Pages, `CNAME` no repo) |
+| **Sistema** | https://automaiscar.com.br/sistema/login.html |
+| **CRM** | https://automaiscar.com.br/sistema/crm.html — **já existe**, no menu como "CRM / Leads" |
 
-## Onde está
+⚠️ **O `AutoMais_Deploy.zip` NÃO é a fonte da verdade.** É um pacote antigo,
+anterior ao CRM. Em 26/08/2026 ele foi publicado por engano dentro do repo
+`loka` (em `/automais`), e um segundo CRM foi construído lá — duplicando algo
+que já existia. Como as duas cópias apontavam para o **mesmo** Firestore
+(`automais-6afbb`), aquilo virou uma segunda porta para os dados reais rodando
+código velho. **A cópia foi removida** (commit `7d0546f` no repo `loka`).
 
-| Onde | O quê |
-|---|---|
-| `loka/automais/index.html` | Site institucional "Em Breve" (público) |
-| `loka/automais/sistema/` | O CRM, 9 páginas |
+**Regra:** trabalho da Auto Mais é no repo `automaiscar`. Nunca em `loka/automais`.
+Antes de "criar" qualquer tela para a Auto Mais, conferir se ela já existe em
+`automaiscar/sistema/` — o zip que o Rogel tiver em mãos pode estar defasado.
 
-- Site: https://lokaveiculos.com.br/automais/
-- CRM: https://lokaveiculos.com.br/automais/sistema/login.html
+## Estrutura do repo `automaiscar`
 
-⚠️ Mora **dentro do repo `loka`** para aproveitar o GitHub Pages existente.
-O domínio próprio `automaiscar.com.br` ainda **não** aponta pra cá.
+```
+CNAME                 automaiscar.com.br
+index.html            site institucional "Em Breve" (público)
+login.html            ⚠️ órfão — hoje só redireciona para sistema/login.html
+sistema/              O SISTEMA DE VERDADE
+  login.html index.html crm.html veiculos.html vendas.html
+  contratos.html cadastros.html despesas.html despesa_form.html
+  gestao.html ds.css firebase-shared.js logo-wm.png
+*.zip                 backups soltos, servidos publicamente pelo Pages
+```
+
+⚠️ Há uma **cópia velha e duplicada** dos HTML na **raiz** do repo
+(`cadastros.html`, `contratos.html`, `despesas.html`, `gestao.html`,
+`veiculos.html`, `vendas.html`, `index.html`). Elas ficam no ar e ninguém
+aponta para elas. Só `sistema/` vale. Limpar é pendência A3.
+
+Menu do sistema: Painel · Vendas · **CRM / Leads** · Contratos · Veículos ·
+Clientes/Fornec. · Despesas · Manutenção.
 
 ## Stack (diferente da LOKÁ — não confundir)
 
 | | LOKÁ | Auto Mais |
 |---|---|---|
+| Repo | `loka` | **`automaiscar`** |
+| Domínio | lokaveiculos.com.br | **automaiscar.com.br** |
 | Banco | Realtime Database | **Firestore** |
 | Projeto Firebase | `loka-b8dd2` | **`automais-6afbb`** |
 | SDK | compat 9.23.0 | compat **10.7.1** |
-| Carimbo | `LOKA deploy:` / `LOKA_BUILD` | `AUTOMAIS deploy:` / `AUTOMAIS_BUILD` |
 
 Coleções: `veiculos clientes fornecedores contratos vendas manutencoes
-usuarios despesas` + `config/empresa`.
+usuarios despesas leads` + `config/empresa`.
 Compartilhado: `sistema/firebase-shared.js` (cache localStorage `automais_v3`,
-sessão `am_user` válida por 8h, helpers `fsave`/`fdel`). CSS em `sistema/ds.css`.
+sessão `am_user` válida por 8h, helpers `fsave`/`fdel`).
 ⚠️ `login.html` **não** carrega o `firebase-shared.js` — inicializa o Firebase
-sozinho no fim do arquivo. Por isso `AUTOMAIS_BUILD` não existe nessa página.
+sozinho no fim do arquivo.
 
-## Build atual
+Em 26/08/2026 o banco tinha: 24 veículos, 12 clientes, 12 contratos,
+22 despesas, 1 venda, 4 usuários.
 
-| Arquivo | Build |
-|---|---|
-| todos os HTML de `automais/` | **v3-20260826-1310** |
+## Autenticação (corrigida em 26/08/2026)
 
-## CRM (`automais/sistema/crm.html`) — criado em 26/08/2026
+Antes: `USERS_FIXOS` no `login.html` com `rogel` / `daniel01` **em texto puro**,
+num arquivo que o GitHub Pages serve publicamente. Estava assim tanto em
+`sistema/login.html` quanto no `login.html` órfão da raiz e dentro do
+`AutoMais_GitHub.zip` (que o Pages entregava a quem pedisse).
 
-**Não veio no zip — foi escrito do zero.** Reaproveita o esqueleto real do
-`cadastros.html` (head, sidebar, topbar, modal e utilitários das linhas 1–235),
-com o miolo de JS próprio. Se o layout comum mudar, essa página não acompanha
-sozinha — foi cópia, não include.
-
-Coleção Firestore nova: **`leads`**.
-⚠️ `leads` **não está em `COLS`** do `firebase-shared.js`, então
-`loadFromFirestore()` não a carrega — `crm.html` lê por conta própria em
-`carregarLeads()`. Se um dia entrar em `COLS`, remover a leitura duplicada.
-
-Etapas do funil (escolhidas pelo Rogel, com a análise do banco no meio):
-`novo → contato → visita → proposta → banco → fechado` + `perdido`.
-
-Campos do lead: `nome telefone email veiculo_id origem vendedor etapa
-proximo_contato valor_proposta troca troca_desc obs motivo_perda
-criadoEm atualizadoEm fechadoEm`.
-
-Recursos: quadro estilo kanban com **arrastar e soltar** entre colunas,
-filtro por vendedor/origem/busca, marcação de **retorno atrasado** (data de
-`proximo_contato` vencida e lead ainda em aberto), link direto de WhatsApp
-(`wa.me/55` + telefone sem máscara) e três indicadores no topo.
-
-O item **CRM** foi adicionado ao menu lateral das 7 páginas com sidebar.
-`despesa_form.html` não tem menu — ficou de fora de propósito.
-
-## Autenticação (reescrita na v2 — 26/08/2026)
-
-Antes: `USERS_FIXOS` no `login.html` com `rogel` / `daniel01` em texto puro,
-num arquivo servido publicamente. **Removido.**
-
-Agora o `login.html`:
+Agora `sistema/login.html`:
 1. consulta a coleção `usuarios` do Firestore (`where login == u`);
-2. confere a senha por **SHA-256 + salt aleatório** (`senhaHash` + `salt`),
-   via `crypto.subtle` — exige HTTPS, o que o site tem;
+2. confere por **SHA-256 + salt aleatório** (`senhaHash` + `salt`), via
+   `crypto.subtle` — exige HTTPS, que o site tem;
 3. aceita registros **legados em texto puro** (campo `senha`) e os **converte
-   para hash no primeiro login certo**, apagando o texto puro do banco
-   (`_migrarParaHash`);
-4. cai no cache `localStorage` só se o Firestore estiver fora do ar.
+   para hash no primeiro login certo**, apagando o texto puro (`_migrarParaHash`);
+4. cai no cache `localStorage` só se o Firestore estiver fora do ar;
+5. mostra um bloco **"Nenhum administrador cadastrado"** enquanto não existir
+   usuário com `perfil:'admin'` — some sozinho depois de criado.
 
-**Primeiro acesso:** como não sobrou admin no código, o `login.html` mostra um
-bloco "Nenhum administrador cadastrado" **enquanto não existir nenhum usuário
-com `perfil:'admin'`**. Criado o admin, o bloco some sozinho. Há dupla checagem
-antes de gravar, para não criar dois.
+Providências tomadas junto: `login.html` da raiz virou redirecionamento (era de
+junho/2026, órfão, sem banco, com a senha dentro); `AutoMais_GitHub.zip` saiu do
+versionamento e entrou no `.gitignore` (o arquivo continua no computador do Rogel).
 
-Em 26/08/2026 a coleção tinha 3 usuários — `thaina`, `sandro`, `bruno`, todos
-`perfil:'atendimento'` e senha em texto puro. Nenhum admin.
+Usuários em 26/08/2026: `rogel` (admin, **senhaHash** — criado pelo próprio
+Rogel na tela de primeiro acesso) e `thaina`, `sandro`, `bruno`
+(`perfil:'atendimento'`, ainda em texto puro — migram no próximo login de cada um).
+
+## Regras do Firestore
+
+**Não estão uniformes.** `usuarios`, `veiculos` etc. respondem HTTP 200 sem
+login pela API REST; já `leads` responde **403 PERMISSION_DENIED**. Ou seja,
+existem regras por coleção, e a maioria está aberta. Mapear antes de mexer.
 
 ## Pendências abertas — Auto Mais
 
 | # | Pendência | Prioridade |
 |---|---|---|
-| A1 | 🔴 Regras do Firestore **abertas** — `GET .../documents/usuarios` responde **HTTP 200 sem login**. Qualquer um lê e grava. O hash protege a senha, mas não impede alguém de criar/alterar registros. **É a pendência mais séria da Auto Mais.** | 🔴 |
-| A2 | 🟠 Migrar login para **Firebase Auth** — resolve A1 de vez e elimina senha guardada por conta própria | 🟠 |
-| A3 | 🟠 `appId` do `firebaseConfig` parece placeholder (`...web:1e9c3d7e5b5b5b5b5b5b5b`). Firestore só precisa de `projectId`+`apiKey`, então não quebrou — conferir antes de usar Analytics/Auth | 🟠 |
-| A4 | 🟡 Apontar `automaiscar.com.br` para cá, ou mover pra repo próprio **privado** | 🟡 |
-| A5 | 🟡 Trocar as senhas de `thaina`, `sandro` e `bruno` — estiveram em texto puro num banco aberto, considerar comprometidas | 🟡 |
+| A1 | 🔴 Regras do Firestore abertas na maioria das coleções — dados de cliente expostos (LGPD) | 🔴 |
+| A2 | 🟠 Migrar login para **Firebase Auth** — resolve A1 e acaba com senha gerida por conta própria | 🟠 |
+| A3 | 🟠 Limpar a cópia velha dos HTML na **raiz** do repo `automaiscar` (7 arquivos no ar que ninguém usa) | 🟠 |
+| A4 | 🟠 `AutoMais_Deploy.zip` e `files.zip` continuam versionados e baixáveis em `automaiscar.com.br/*.zip` | 🟠 |
+| A5 | 🟡 Trocar as senhas de `thaina`, `sandro` e `bruno` — estiveram em texto puro num banco aberto | 🟡 |
+| A6 | 🟡 `appId` do `firebaseConfig` parece placeholder (`...web:1e9c3d7e5b5b5b5b5b5b5b`) — Firestore não precisa dele, conferir antes de usar Analytics/Auth | 🟡 |
+| A7 | 🟢 Mensagens de commit do repo `automaiscar` são ilegíveis (`asdf`, `JHGF`, `1127`) | 🟢 |
 
-## Correções aplicadas no deploy
+## Testado em 26/08/2026
 
-- `index.html` vinha com `href="/sistema/login.html"` (**absoluto**): numa
-  subpasta isso mandava o visitante pro sistema da **LOKÁ**. Corrigido para
-  relativo. ✅ verificado no navegador.
-
-## Testado em 26/08/2026 (navegador, sem login)
-
-- ✅ `USERS_FIXOS` não existe mais na página publicada; `grep daniel01` = 0
-- ✅ `crypto.subtle` disponível, funções de hash carregadas
-- ✅ bloco de primeiro acesso aparece (confirma que não há admin no banco)
-- ✅ console sem erros
+- ✅ `USERS_FIXOS` não existe mais em nenhum HTML/JS do repo; `grep daniel01` = 0
+- ✅ `automaiscar.com.br/login.html` (antigo) redireciona para `sistema/login.html`
+- ✅ `automaiscar.com.br/AutoMais_GitHub.zip` → HTTP 404
+- ✅ tela de login carrega, `crypto.subtle` disponível, console sem erros
+- ✅ bloco de primeiro acesso **oculto** (correto: o admin `rogel` já existe)
 - ✅ 14 testes de senha passando (hash, senha errada, legado em texto puro)
-- ⏳ **falta testar logado** — Rogel precisa criar o admin; eu não digito senha
+- ✅ `lokaveiculos.com.br/automais/*` → HTTP 404 (cópia removida)
+- ✅ sistema da LOKÁ intacto (`gestao`, `multas`, `fatura` → HTTP 200)
+- ⏳ **falta testar logado** — o Rogel precisa entrar; eu não digito senha
