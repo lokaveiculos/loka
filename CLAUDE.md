@@ -250,3 +250,104 @@ deploy — a instância quente expirou sozinha), o diagnóstico passou:
 De 20 000 ms de timeout para 145 ms. **A causa raiz era o IAM, e está corrigida.**
 Falta validar ponta a ponta com uma consulta real (cobrada) e conferir se a
 multa é gravada com `origem='efrotas'` e o `efrotas_status` passa a existir.
+
+---
+
+# SISTEMA AUTO MAIS (CRM de venda de veículos)
+
+AUTO MAIS COMERCIO E CORRETORA DE VEÍCULOS LTDA · CNPJ 05.622.137/0001-00
+Rua Juarez Távora, 346 — São João — Feira de Santana/BA.
+Mesmo dono (Rogel). **Empresa e banco separados da LOKÁ.**
+
+Origem: pacote `AutoMais_Deploy.zip` entregue pronto pelo Rogel (13 arquivos).
+Publicado sem reescrever o sistema — só ajustes pontuais.
+
+## Linha do tempo (importante para não repetir confusão)
+
+| Data | O quê |
+|---|---|
+| 19/08/2026 | Publicado em `/automais` (commit `494dadc`) |
+| 21/08/2026 | **Removido do ar a pedido do Rogel** (revert `4b8de64`) |
+| 26/08/2026 | Rogel reportou "a tela do CRM não abre" — era o próprio revert. Republicado como **v2** (`a38f002`) já sem senha no código |
+
+## Onde está
+
+| Onde | O quê |
+|---|---|
+| `loka/automais/index.html` | Site institucional "Em Breve" (público) |
+| `loka/automais/sistema/` | O CRM, 9 páginas |
+
+- Site: https://lokaveiculos.com.br/automais/
+- CRM: https://lokaveiculos.com.br/automais/sistema/login.html
+
+⚠️ Mora **dentro do repo `loka`** para aproveitar o GitHub Pages existente.
+O domínio próprio `automaiscar.com.br` ainda **não** aponta pra cá.
+
+## Stack (diferente da LOKÁ — não confundir)
+
+| | LOKÁ | Auto Mais |
+|---|---|---|
+| Banco | Realtime Database | **Firestore** |
+| Projeto Firebase | `loka-b8dd2` | **`automais-6afbb`** |
+| SDK | compat 9.23.0 | compat **10.7.1** |
+| Carimbo | `LOKA deploy:` / `LOKA_BUILD` | `AUTOMAIS deploy:` / `AUTOMAIS_BUILD` |
+
+Coleções: `veiculos clientes fornecedores contratos vendas manutencoes
+usuarios despesas` + `config/empresa`.
+Compartilhado: `sistema/firebase-shared.js` (cache localStorage `automais_v3`,
+sessão `am_user` válida por 8h, helpers `fsave`/`fdel`). CSS em `sistema/ds.css`.
+⚠️ `login.html` **não** carrega o `firebase-shared.js` — inicializa o Firebase
+sozinho no fim do arquivo. Por isso `AUTOMAIS_BUILD` não existe nessa página.
+
+## Build atual
+
+| Arquivo | Build |
+|---|---|
+| todos os HTML de `automais/` | **v2-20260826-1150** |
+
+## Autenticação (reescrita na v2 — 26/08/2026)
+
+Antes: `USERS_FIXOS` no `login.html` com `rogel` / `daniel01` em texto puro,
+num arquivo servido publicamente. **Removido.**
+
+Agora o `login.html`:
+1. consulta a coleção `usuarios` do Firestore (`where login == u`);
+2. confere a senha por **SHA-256 + salt aleatório** (`senhaHash` + `salt`),
+   via `crypto.subtle` — exige HTTPS, o que o site tem;
+3. aceita registros **legados em texto puro** (campo `senha`) e os **converte
+   para hash no primeiro login certo**, apagando o texto puro do banco
+   (`_migrarParaHash`);
+4. cai no cache `localStorage` só se o Firestore estiver fora do ar.
+
+**Primeiro acesso:** como não sobrou admin no código, o `login.html` mostra um
+bloco "Nenhum administrador cadastrado" **enquanto não existir nenhum usuário
+com `perfil:'admin'`**. Criado o admin, o bloco some sozinho. Há dupla checagem
+antes de gravar, para não criar dois.
+
+Em 26/08/2026 a coleção tinha 3 usuários — `thaina`, `sandro`, `bruno`, todos
+`perfil:'atendimento'` e senha em texto puro. Nenhum admin.
+
+## Pendências abertas — Auto Mais
+
+| # | Pendência | Prioridade |
+|---|---|---|
+| A1 | 🔴 Regras do Firestore **abertas** — `GET .../documents/usuarios` responde **HTTP 200 sem login**. Qualquer um lê e grava. O hash protege a senha, mas não impede alguém de criar/alterar registros. **É a pendência mais séria da Auto Mais.** | 🔴 |
+| A2 | 🟠 Migrar login para **Firebase Auth** — resolve A1 de vez e elimina senha guardada por conta própria | 🟠 |
+| A3 | 🟠 `appId` do `firebaseConfig` parece placeholder (`...web:1e9c3d7e5b5b5b5b5b5b5b`). Firestore só precisa de `projectId`+`apiKey`, então não quebrou — conferir antes de usar Analytics/Auth | 🟠 |
+| A4 | 🟡 Apontar `automaiscar.com.br` para cá, ou mover pra repo próprio **privado** | 🟡 |
+| A5 | 🟡 Trocar as senhas de `thaina`, `sandro` e `bruno` — estiveram em texto puro num banco aberto, considerar comprometidas | 🟡 |
+
+## Correções aplicadas no deploy
+
+- `index.html` vinha com `href="/sistema/login.html"` (**absoluto**): numa
+  subpasta isso mandava o visitante pro sistema da **LOKÁ**. Corrigido para
+  relativo. ✅ verificado no navegador.
+
+## Testado em 26/08/2026 (navegador, sem login)
+
+- ✅ `USERS_FIXOS` não existe mais na página publicada; `grep daniel01` = 0
+- ✅ `crypto.subtle` disponível, funções de hash carregadas
+- ✅ bloco de primeiro acesso aparece (confirma que não há admin no banco)
+- ✅ console sem erros
+- ✅ 14 testes de senha passando (hash, senha errada, legado em texto puro)
+- ⏳ **falta testar logado** — Rogel precisa criar o admin; eu não digito senha
