@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v89-20260821-1139 -->
+<!-- LOKA deploy: v90-20260915-1620 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1136,7 +1136,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v89-20260821-1139';
+var LOKA_BUILD = 'v90-20260915-1620';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7983,8 +7983,14 @@ function _efPlacaCampo() {
   return ((document.getElementById('efPlaca')||{}).value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 }
 
+// ⚠️ "Testar conexão" NÃO é de graça: o backend valida o handshake consultando
+// uma placa de verdade no Serpro (a informada, ou SHG1J02 por padrão), e o
+// ambiente é 'producao'. Ou seja, 1 consulta COBRADA por teste.
 function efTestarConexao() {
   var placa = _efPlacaCampo();
+  if (!confirm('Testar a conexão com o e-Frotas?\n\nO teste consulta a placa '
+      + (placa || 'SHG1J02') + ' no Serpro para validar o certificado.\n'
+      + '💰 Isso conta como 1 consulta COBRADA.')) return;
   _efLog('⏳ Testando conexão com o e-Frotas (certificado + handshake)' + (placa ? ' usando a placa ' + placa : '') + '…');
   _efrotasCall('testarConexaoEfrotas', placa ? { placa: placa } : {}).then(function(r){
     _efLog('✅ <strong>Conexão OK!</strong><br><pre style="white-space:pre-wrap;font-size:11px;margin:8px 0 0">' + JSON.stringify(r, null, 2) + '</pre>', '#e8f5ef');
@@ -9788,6 +9794,9 @@ function efConsultarSelecionadas(){
 // ═══════════════════════════════════════════════════════════════
 // DIAGNÓSTICO e-FROTAS — testa cada camada e mostra onde falha
 // ═══════════════════════════════════════════════════════════════
+// As camadas 1 a 4 (SDK, dados, permissões de leitura) são de graça.
+// A última — chamar a função no servidor — consulta uma placa real no Serpro
+// e é COBRADA, então fica atrás de um botão em vez de rodar sozinha no fim.
 function efDiagnostico(){
   var el = document.getElementById('efLog');
   if (!el) return;
@@ -9837,8 +9846,21 @@ function efDiagnostico(){
     firebase.database().ref(no).limitToFirst(1).once('value')
       .then(function(){ add('Ler /' + no, 'ok', 'permitido'); })
       .catch(function(e){ add('Ler /' + no, 'erro', e.message); })
-      .finally(function(){ if (--pend === 0) _efDiagFuncao(add); });
+      .finally(function(){ if (--pend === 0) _efDiagOferecerFuncao(add); });
   });
+}
+
+// A checagem da função é a única parte paga do diagnóstico — só roda se pedirem.
+var _efDiagAdd = null;
+function _efDiagOferecerFuncao(add){
+  _efDiagAdd = add;
+  add('Chamada da função no servidor', 'aviso', 'não executada — custa 1 consulta no Serpro');
+  var lista = document.getElementById('efDiagLista');
+  if (!lista) return;
+  var box = document.createElement('div');
+  box.innerHTML = '<button class="btn btn-outline" style="font-size:11px;padding:6px 12px;margin-top:8px" '
+    + 'onclick="_efDiagFuncao(_efDiagAdd)">🛰 Testar a função agora (1 consulta cobrada)</button>';
+  lista.appendChild(box);
 }
 
 function _efDiagFuncao(add){
