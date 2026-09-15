@@ -595,3 +595,56 @@ usuário inativo, banco fora do ar, página sem o SDK de auth).
 - Apagar os campos `senha` em texto puro que sobraram na coleção `usuarios` —
   viram peso morto, quem guarda senha agora é o Auth
 - `daniel01` está **queimada** (esteve pública na web)
+
+## 🔧 Auditoria do sistema Auto Mais — 15/09/2026 (commit `0d50387`)
+
+Varredura de todas as 10 páginas procurando o mesmo defeito que deixou o CRM em
+branco: **função chamada que nunca foi definida**. Achou 8 defeitos reais, todos
+corrigidos e publicados.
+
+### O maior: 8 funções perdidas do shared em 09/06/2026
+O commit `28b5874` enxugou o `sistema/firebase-shared.js` de **11.662 → 8.831
+bytes** e levou junto `exportCSV`, `exportPrint` e as **seis máscaras**. As
+páginas nunca pararam de chamá-las. Por **mais de três meses**:
+- nenhuma máscara de CPF/CNPJ/telefone/CEP/placa formatava
+- nenhum botão de exportar funcionava (Veículos, Vendas, Despesas, Relatórios)
+
+⚠️ **Consequência nos dados:** os cadastros feitos nesse período têm CPF e
+telefone gravados **sem formatação** (`66726212534`). O conserto é só daqui para
+frente — os registros antigos continuam crus até alguém normalizar.
+
+### Os outros
+| # | Defeito | Efeito |
+|---|---|---|
+| 2 | `maskPhone` usava `(\d{4,5})`, guloso | Fixo de 10 dígitos saía `(75) 32252-932`. É o formato do telefone da própria loja |
+| 3 | `dlVanda` no onclick (erro de digitação) | Botão de **excluir venda** nunca funcionou |
+| 4 | `gerarCV` removida em 19/06, ainda chamada | "Ver contrato" e impressão termo+checklist quebrados |
+| 5 | `gerarCompra`/`gerarConsig` só no `contratos.html` | Imprimir contrato de compra/consignação **pela tela de Vendas** quebrava |
+| 6 | Chamada órfã de `verChecklist` | Estourava a cada venda registrada, dentro de `setTimeout` |
+
+Sobre o **6**: o checklist **não** foi ressuscitado. Ele já existe na forma nova
+(`gerarChecklist_html`, marcado por padrão no seletor de documentos) — a chamada
+velha é que ficou para trás. Ressuscitar a tela antiga exigiria trazer de volta
+CSS que também já não existe.
+
+**Não corrigido de propósito:** `impVendaDocsPorCt()` no `contratos.html` chama
+`impTermoChecklist()`, que só existe no `vendas.html`. Mas é **código morto** —
+ninguém chama. Consertar exigiria duplicar uma cadeia de geradores de contrato
+sem ganho nenhum de uso.
+
+### Como auditar de novo
+O analisador fica em `scratchpad/auditoria.js` (não versionado). Ele extrai o
+`<script>` inline de cada página, junta as globais do shared e aponta o que é
+chamado sem existir — inclusive via `onclick` do HTML, que foi por onde o
+`toggleTheme` do CRM passou batido.
+
+⚠️ **Ele tem 3 falsos positivos conhecidos:** `exportPrint` (a limpeza de strings
+tropeça na regex `/"/g` de dentro do `exportCSV`) e `Comissao` (é rótulo de tela,
+não chamada). Conferir na mão antes de "consertar" qualquer coisa que ele aponte.
+
+### Testado no ar, logado, em 15/09
+- ✅ CPF digitado vira `123.456.789-01`; fixo vira `(75) 3225-2932`
+- ✅ as 8 funções existem na página (`typeof` = function)
+- ✅ `vendas.html`: `gerarCV`, `gerarCompra`, `gerarConsig`, `dlVenda` presentes;
+  `dlVanda` e a chamada órfã sumiram do HTML servido
+- ✅ console sem erros — só o aviso conhecido do `leads`
