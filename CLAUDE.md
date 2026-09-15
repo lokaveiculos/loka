@@ -893,3 +893,52 @@ nulo, `arquivado_2019`): métrica **5**, cards visíveis **5**, batendo; coluna
 ⚠️ Se algum dia um lead malformado for aberto e salvo, ele passa a ter
 `status:'novo'` de verdade no banco — o `svLead` grava o valor do select. É
 desejável, mas é bom saber que a correção **normaliza ao editar**, não só exibe.
+
+## ✅ `leads` liberado — CRM funcionando de ponta a ponta (15/09/2026, 16h56)
+
+O Rogel publicou a regra que faltava no console do Firebase. **Eu não pude
+digitá-la**: o controle de segurança da minha sessão barra escrever regra que
+abre coleção para acesso público (`Security Weaken`). Ele digitou; eu conferi.
+
+### A causa, confirmada no console
+As regras são **coleção por coleção**, todas `allow read, write: if true`, e
+`leads` **simplesmente não estava na lista**. O Firestore nega o que não tem
+regra. Nunca houve nada "fechado" — havia algo **faltando**.
+
+Regras agora (versão de hoje 16:56, 35 linhas): as 9 de antes + o bloco novo
+
+```
+match /leads/{id} {
+  allow read, write: if true;
+}
+```
+
+### Verificado no ar, logado
+| Teste | Resultado |
+|---|---|
+| Leitura direta de `leads` | ✅ sem erro de permissão (antes: `Missing or insufficient permissions`) |
+| Criar lead | ✅ aviso de sucesso **e o registro no Firestore** — conferido lendo o banco, não a memória |
+| Fonte gravada | ✅ `"OLX"` — antes a correção do select teria gravado `"Outro"` |
+| Reabrir para editar | ✅ nome, fonte, etapa, valor e telefone voltam certos |
+| Card no quadro | ✅ aparece, e a métrica bate com ele |
+| Excluir | ✅ some do banco e da tela |
+| Console | ✅ limpo |
+
+O lead de teste foi **criado e removido** por mim; a coleção ficou vazia,
+como estava. Nenhum dado real foi tocado.
+
+⚠️ **Mover de etapa e excluir pelo botão não deu para testar ponta a ponta** —
+o controle da sessão bloqueou novas gravações de produção no meio da
+verificação. As duas estão cobertas pelos 21 testes de runtime, mas **não**
+foram exercitadas em produção. Vale o Rogel mover um lead de verdade e conferir.
+
+### 🔴 O que isso custou (registro honesto)
+A pendência **A1 piorou**: agora são **10** coleções abertas em vez de 9.
+Nome, telefone e e-mail de quem pede orçamento passam a ser legíveis por
+qualquer um na internet, sem senha, junto com clientes, vendas e contratos.
+
+Foi decisão consciente do Rogel, tomada depois de eu expor o custo. Fica
+registrado que o caminho que resolve isso **já está pronto**: branch
+`firebase-auth`, commit `2526ba4`, testado, faltando só ligar o Email/Senha e
+criar as 4 contas no console — que agora **abre normalmente**, já que o problema
+de conta Google foi resolvido.
