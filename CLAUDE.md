@@ -120,7 +120,7 @@ responder **No**.
 
 | # | Pendência | Prioridade |
 |---|---|---|
-| 1 | 🐞 `dispararConsultaMultas` **descarta `d.placas`** — o front envia, o backend ignora e varre a frota do índice 0. Custo real em consultas pagas. Ver abaixo. | 🔴 |
+| 1 | ✅ RESOLVIDO 18/08 — `dispararConsultaMultas` já repassa `d.placas`; o seletor de placas é respeitado |  |
 | 2 | Senhas em **texto puro** em `sistema/index.html` (inclui master) — considerar comprometidas | 🔴 |
 | 3 | Regras do banco abertas (`.read/.write: true`) → exposição LGPD. Aplicar TRANSICAO v11 (exige `_writerBuild`), depois ALVO (exige login) | 🔴 |
 | 4 | 🐞 No `gestao.html`, "Testar conexão" e "Diagnóstico" do painel e-Frotas **não avisam que custam** 1 consulta cobrada cada (já corrigido na `multas.html` v2) | 🟠 |
@@ -130,12 +130,9 @@ responder **No**.
 | 8 | Unificar nomes de oficina no histórico ("JT CAR MECANICA" / "JT CAR MECÂNICA" / "JT Car"…) | 🟡 |
 | 9 | Limpar código morto: `mrComprovantes`, `pagDataIni/pagDataFim` | 🟢 |
 
-### Detalhe da pendência 1 (bug confirmado)
-- `gestao.html:7877` monta `_params.placas` quando há seleção.
-- `functions/index.js:90` — `executarVarredura` **sabe** ler `opts.placas`.
-- `functions/index.js:226-235` — o handler do callable repassa só
-  `placa`, `inicio`, `tamanhoLote`. **`placas` nunca chega.**
-- Correção: acrescentar `placas: d.placas` ao objeto repassado.
+### Pendência 1 — resolvida
+Corrigido em 18/08/2026: o handler passou a repassar `placas: d.placas`.
+Validado em produção: lote de 25 placas respeitou a seleção.
 
 ## Decisões registradas (18/08/2026)
 
@@ -501,3 +498,42 @@ sandbox bloqueia leitura de produção), então não se sabe se a conta dele ain
 tem `senhaHash` válido. Restaurar às cegas pode trancá-lo para fora.
 Em 15/09 ele preferiu **não mexer** por ora. A senha `daniel01` deve ser
 considerada **queimada** — esteve pública na web.
+
+## Estado do e-Frotas em 15/09/2026 — BLOQUEADO por faturamento
+
+A conta de faturamento **`01D058-0F50AD-F87B9C` ("Minha conta de faturamento 1",
+org rodlogtransportes.com) está FECHADA.** O projeto `loka-b8dd2` continua
+vinculado a ela — o vínculo existe, mas aponta para uma conta encerrada, o que
+não paga nada.
+
+Reabrir exige cadastrar cartão (o Google pede ao clicar em "Reabrir conta de
+faturamento"). Provável motivo do encerramento: meio de pagamento inválido numa
+conta sem uso — o custo do projeto é ~R$ 0,00/mês.
+
+**Enquanto estiver fechada:**
+- `dispararConsultaMultas` → HTTP 500 em ~0,25s, **inclusive no modo
+  `soDiagnostico`**. A função declara `secrets:[…]`, injetados na inicialização;
+  sem faturamento o Secret Manager recusa e o container nem sobe.
+- `firebase deploy --only functions` → falha ao ler `EFROTAS_PFX_B64`.
+- Log: `The request failed because billing is disabled for this project.`
+
+**Não afetado:** GitHub Pages, Realtime Database, todo o sistema de gestão.
+Só o e-Frotas depende de Cloud Functions.
+
+**Teste de custo zero para saber se voltou** (não toca no Serpro):
+```bash
+curl -s -X POST "https://southamerica-east1-loka-b8dd2.cloudfunctions.net/dispararConsultaMultas" \
+  -H "Content-Type: application/json" \
+  -d '{"data":{"soDiagnostico":true,"placas":["DIAGNOSTICO0"]}}' -w "\nHTTP %{http_code}\n"
+```
+A placa inexistente é trava de segurança: se o backend publicado for uma versão
+que não conhece `soDiagnostico`, ele cai na varredura normal e consulta ZERO
+placas em vez da frota inteira.
+
+### Esperando deploy (commit `afb75e6` no repo deploy)
+
+Correção pronta e **não publicada**, por causa do bloqueio: o callable só
+repassa ao navegador a mensagem de um `HttpsError`; `Error` comum vira só
+"internal", sem texto. Era por isso que o operador via `INTERNAL` puro enquanto
+a explicação ficava no log. `comoHttpsError()` preserva a mensagem.
+Publicar assim que o faturamento voltar.
