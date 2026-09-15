@@ -648,3 +648,46 @@ não chamada). Conferir na mão antes de "consertar" qualquer coisa que ele apon
 - ✅ `vendas.html`: `gerarCV`, `gerarCompra`, `gerarConsig`, `dlVenda` presentes;
   `dlVanda` e a chamada órfã sumiram do HTML servido
 - ✅ console sem erros — só o aviso conhecido do `leads`
+
+## 🧹 Normalização de CPF/telefone/CEP — Auto Mais, 15/09/2026
+
+Consequência direta dos três meses com as máscaras quebradas: o que foi digitado
+nesse período entrou cru no banco (`66726212534`). Normalizado.
+
+**64 campos em 24 registros**, zero falhas:
+
+| Coleção | Campo | Corrigidos |
+|---|---|---|
+| `clientes` | `telefone` | 19 |
+| `clientes` | `cep` | 18 |
+| `clientes` | `cpf` | 17 |
+| `fornecedores` | `cpf` | 5 |
+| `fornecedores` | `telefone` | 5 |
+
+Feito pelo navegador, na sessão do Rogel (o sandbox bloqueia escrita direta em
+produção): altera o objeto em memória, grava o registro inteiro com `fsave` e
+atualiza o cache. Conferido **relendo do Firestore** com o cache local limpo.
+
+**Backup:** `C:\...\Github\backups-automais\normalizacao-cpf-telefone-20260915.txt`
+— fora dos repositórios, como manda a regra (o `automaiscar` é público pelo Pages).
+
+⚠️ **A operação é reversível sem o backup:** as máscaras só *acrescentam*
+pontuação, nunca mudam dígito. Tirar tudo que não é número devolve o original.
+
+### Regra de segurança usada
+Só foi tocado o que tinha **contagem de dígitos válida** — CPF 11, CNPJ 14,
+telefone 10 ou 11, CEP 8. Qualquer coisa fora disso ficou intacta, para não
+mascarar dado torto e fazer parecer certo.
+
+### 🔴 Achado que virou pendência: CNPJ dentro do campo `cpf`
+O cliente **id 7 ("Tux net serviços")** tem `cpf = "07652235000107"` — 14
+dígitos, um CNPJ. É pessoa jurídica cadastrada como cliente. **Não foi tocado.**
+
+O problema real não é a formatação: é que a tela de Clientes usa `maskCPF`, que
+**corta em 11 dígitos**. Se alguém abrir e salvar esse cliente, o CNPJ é
+**truncado e perdido em silêncio**. A tela de Fornecedores já usa `maskCPFCNPJ`,
+que aceita os dois. Corrigir é trocar a máscara do formulário de Clientes —
+uma linha (`cadastros.html:281`). Não feito por não ter sido pedido.
+
+Nota menor: o fornecedor id 3 tem `cpf = 00000000000` (preenchimento de
+ocasião). Virou `000.000.000-00` — continua obviamente falso.
