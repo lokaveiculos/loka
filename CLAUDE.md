@@ -414,7 +414,7 @@ modal, mover etapa, tema, `renderIcons` sem lucide carregado).
 ⚠️ **Python não funciona nesta máquina** — o `python` do PATH é o atalho da
 Microsoft Store, sem interpretador. Usar **Node** (`v24`) para scripts.
 
-## 🔴 FATURAMENTO DESATIVADO — 15/09/2026
+## ✅ FATURAMENTO — resolvido em 15/09/2026 (histórico abaixo)
 
 **O projeto `loka-b8dd2` está com o faturamento desativado.** É a causa do
 `INTERNAL` na consulta de multas — não há bug de código envolvido.
@@ -499,7 +499,7 @@ tem `senhaHash` válido. Restaurar às cegas pode trancá-lo para fora.
 Em 15/09 ele preferiu **não mexer** por ora. A senha `daniel01` deve ser
 considerada **queimada** — esteve pública na web.
 
-## Estado do e-Frotas em 15/09/2026 — BLOQUEADO por faturamento
+## Histórico: e-Frotas bloqueado por faturamento (15/09/2026 — RESOLVIDO)
 
 A conta de faturamento **`01D058-0F50AD-F87B9C` ("Minha conta de faturamento 1",
 org rodlogtransportes.com) está FECHADA.** O projeto `loka-b8dd2` continua
@@ -715,3 +715,66 @@ sem formatação (`07652235000107`). Agora é seguro formatá-lo — a tela acei
 mas a gravação foi **bloqueada pelo controle de permissões da sessão**
 ("Modify Shared Resources"). Não é urgente: o valor está correto, só não está
 pontuado, e editar o cadastro já não destrói mais o número.
+
+---
+
+## ✅ DESFECHO — 15/09/2026, 16h40 · e-Frotas VOLTOU A FUNCIONAR
+
+Primeira execução bem-sucedida desde 18/08:
+
+```
+quando : 2026-09-15T19:38:37Z    placas: 1
+novas  : 0    atualizadas: 0     erros: []
+```
+
+**A causa nunca foi código.** A conta de faturamento do projeto estava
+**encerrada**, e sem ela a função morria antes de existir: ela declara
+`secrets:[…]`, injetados na inicialização, e o Secret Manager recusa sem
+faturamento. Por isso nem o modo `soDiagnostico` (que não toca no Serpro)
+respondia.
+
+### A sequência que resolveu
+
+1. **Reabrir a conta de faturamento** (não bastou vincular — o projeto já
+   estava vinculado a uma conta *fechada*, o que não paga nada). Reabrir exigiu
+   cadastrar cartão.
+2. **`firebase deploy --only functions`** — obrigatório. Reabrir o faturamento
+   libera a cobrança mas **não recria o serviço**: as revisões ficam
+   desativadas e o Cloud Run responde `429 / no available instance` até uma
+   publicação nova subir revisão.
+3. Aguardar a cota da região se restabelecer (o `429` persistiu por alguns
+   minutos depois do deploy e cedeu sozinho).
+
+### Como reconhecer isso de novo
+
+| Sintoma | Significa |
+|---|---|
+| `billing is disabled for this project` no log | conta de faturamento fechada |
+| HTTP 500 em ~0,25s, **inclusive no `soDiagnostico`** | idem — o container nem sobe |
+| `firebase deploy` falha lendo `EFROTAS_PFX_B64` | idem |
+| `429` + `no available instance`, mas o container sobe no rollout | faturamento OK; falta deploy e/ou cota se restabelecendo |
+
+Distinção que custou tempo: a tela de **vinculação** mostra a conta ligada ao
+projeto e parece correta mesmo com a conta encerrada. O estado real aparece na
+tela de **gerenciamento da conta** (faixa vermelha + botão "Reabrir conta de
+faturamento"). Conta: `01D058-0F50AD-F87B9C`, org `rodlogtransportes.com`.
+
+⚠️ O custo do projeto é ~R$ 0,00/mês — o Blaze é exigência da plataforma para
+*ter* Cloud Functions, não cobrança por uso. Provável motivo do encerramento:
+cartão inválido numa conta sem consumo. **Vale criar um orçamento com alerta**
+(Faturamento → Orçamentos e alertas) e conferir a validade do cartão, senão
+isso se repete.
+
+### Limitação conhecida do repasse de erro
+
+`comoHttpsError()` (commit `afb75e6`, publicado) faz o motivo do erro chegar à
+tela — mas **só para erros de dentro da função**: banco, certificado, gravação.
+Num `429` o Cloud Run rejeita **antes** de executar o código, o `try/catch`
+nunca roda, e o navegador recebe `internal` sem texto mesmo. Se aparecer
+"Erro no servidor sem detalhe", suspeite de infraestrutura (cota/faturamento),
+não de bug no código.
+
+Outro detalhe de leitura de tela: a `multas.html` **não limpa o log de erro
+sozinha**. Um aviso vermelho antigo continua visível enquanto o card de status,
+que escuta o banco ao vivo, já mostra um resultado novo e bom. Ao investigar,
+confie no `efrotas_status` (e em `erros: []`), não no aviso da tela.
