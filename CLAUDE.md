@@ -778,3 +778,54 @@ Outro detalhe de leitura de tela: a `multas.html` **não limpa o log de erro
 sozinha**. Um aviso vermelho antigo continua visível enquanto o card de status,
 que escuta o banco ao vivo, já mostra um resultado novo e bom. Ao investigar,
 confie no `efrotas_status` (e em `erros: []`), não no aviso da tela.
+
+## 🔍 Verificação completa do CRM — 15/09/2026
+
+Testado no ar, logado, injetando 7 leads de mentira **só na memória** (nada foi
+gravado no banco; cache local limpo ao fim).
+
+### Funciona
+- ✅ 28 funções presentes; página renderiza, ícones e tema OK
+- ✅ 4 cards de métrica com números corretos (Ativos, Retornos Vencidos, Ganhos,
+  Valor — e o Valor soma **só os ganhos**, que é o certo)
+- ✅ os 5 filtros: busca livre (nome **e telefone**), fonte, responsável, etapa,
+  e o botão "Mostrar perdidos"
+- ✅ "Perdido" oculto por padrão
+- ✅ badges de retorno: atrasado, hoje, futuro, e data vazia não quebra
+- ✅ busca sem resultado não quebra a tela
+- ✅ modal novo/edição: 10 campos presentes, dados carregam, **Responsável já vem
+  preenchido com quem está logado**
+- ✅ o "+ Adicionar" de cada coluna já abre o lead naquela etapa
+- ✅ link do WhatsApp monta certo (`wa.me/55` + telefone)
+- ✅ validação recusa salvar sem Nome e Telefone
+
+### 🔴 Corrigido: o select de Fonte apagava a origem do lead (`e93c75e`)
+`crm.html:234` tinha `(l.fonte||''===f)`. Por **precedência de operador** o `===`
+resolve antes do `||`, então era lido como `l.fonte || (''===f)`. Com qualquer
+fonte preenchida, **todas** as opções recebiam `selected`, o navegador ficava com
+a última ("Outro"), e salvar gravava "Outro" por cima da origem real.
+
+Perda silenciosa justo do dado que diz **qual canal traz cliente**. O select de
+Etapa, logo acima, já estava certo, e o erro não aparecia em nenhum outro lugar.
+
+### 🟠 Aberto: o CRM avisa "salvo" mesmo quando não salvou
+`svLead` termina com `sDB(); fsave('leads',obj); cm(); render(); toast('Lead
+cadastrado!','ok')`. O `fsave` é **disparado sem ninguém conferir o resultado** —
+em caso de erro ele só escreve no console.
+
+Hoje, com o `leads` negando gravação, isso significa: a pessoa cadastra, vê o
+aviso verde, **o lead aparece no quadro** (porque foi para a memória e para o
+`localStorage` pelo `sDB()`) e **nunca chegou ao banco**. Some ao trocar de
+aparelho ou limpar o cache. Vale para `svLead`, `moverEtapa` e `dlLead`.
+
+⚠️ Consertar de verdade depende de liberar o `leads` (console do Firebase).
+Mas **mesmo com o banco liberado** o padrão continua errado: convém passar
+callback ao `fsave` e só dar o aviso de sucesso quando a gravação confirmar.
+
+### 🟡 Aberto: lead sem etapa fica invisível
+O quadro monta as colunas com `l.status === et.id`. Um lead sem `status` não
+entra em coluna nenhuma, **mas conta em "Leads Ativos"** — o número não bate com
+o que se vê. Comprovado: métrica marcou 5, o quadro mostrou 4.
+
+Hoje é latente (o `svLead` sempre grava um status), mas vira real assim que lead
+entrar por importação ou por formulário do site.
