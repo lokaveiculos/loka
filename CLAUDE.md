@@ -454,3 +454,50 @@ e então repetir `firebase deploy --only functions`. Nada a corrigir no código.
 limites bem menores (100 conexões simultâneas, 1 GB armazenado, 10 GB/mês de
 transferência). O sistema segue funcionando, mas sob teto — vale conferir o
 consumo enquanto o faturamento estiver fora.
+
+### Testado logado em 15/09/2026 (Rogel autenticou, eu dirigi a página)
+
+- ✅ `crm.html` **renderiza** — kanban, 4 cards de métricas, filtros, sessão
+  ("Logado como Rogel (Admin)"). O bug da tela branca acabou.
+- ✅ ícones do menu aparecem (lucide carregando)
+- ✅ modal "+ Novo Lead" abre e já traz o **Responsável** preenchido pela sessão
+- ✅ botão "Aparência" alterna claro/escuro, troca o ícone e **persiste** no reload
+- ✅ sessão sobrevive ao reload (não volta para o login)
+- 🔴 **`leads` dá `Missing or insufficient permissions`** no console
+  (`firebase-shared.js:53`). O CRM não lê nem grava lead nenhum.
+
+⚠️ Os **"0 leads" na tela não querem dizer "não há leads"** — querem dizer
+"não consegui ler". Não confundir os dois ao olhar o painel.
+
+## 🔴 Próximo bloqueio do CRM: regras do Firestore em `leads`
+
+O sistema **não usa Firebase Auth** — a sessão é própria, em `localStorage`
+(`am_user`, 8h). Para o Firestore, o cliente é **anônimo**. As demais coleções
+estão abertas e por isso funcionam; `leads` tem regra exigindo autenticação,
+então é a única que nega. Já estava mapeado ("Regras do Firestore não estão
+uniformes"), agora está confirmado em produção e com o erro exato.
+
+Consertar `leads` isolado (abrindo a regra) faria o CRM funcionar, mas **pioraria
+a A1** — dados de lead expostos. O caminho certo é a **A2 (Firebase Auth)**, que
+resolve A1 e `leads` de uma vez. Decisão do Rogel.
+
+## 🔴 REGRESSÃO — login voltou a ter senha em texto puro (11/09/2026)
+
+O commit **`81d597b`** (11/09 10:50, mensagem "1050") **desfez a correção de
+26/08**: trocou o `sistema/login.html` seguro pela versão de junho
+(−146 linhas, +31). Saíram `crypto.subtle`, `senhaHash`, `salt` e a migração
+automática; **voltou o `USERS_FIXOS` com `rogel` / `daniel01` em texto puro**,
+num arquivo que o GitHub Pages serve publicamente.
+
+Confirmado no ar em 15/09: `USERS_FIXOS` presente, `daniel01` presente,
+`crypto.subtle` ausente. A versão segura continua guardada em **`5352cff`**.
+
+⚠️ Foi o mesmo padrão do CRM duplicado de agosto: **upload manual de arquivos
+antigos pelo GitHub** (as mensagens "1050", "1107", "0929" são desse lote).
+Antes de subir arquivo por fora, conferir se ele não é mais velho que o repo.
+
+⚠️ **Não restaurar sem o Rogel presente:** não dá para ler o banco daqui (o
+sandbox bloqueia leitura de produção), então não se sabe se a conta dele ainda
+tem `senhaHash` válido. Restaurar às cegas pode trancá-lo para fora.
+Em 15/09 ele preferiu **não mexer** por ora. A senha `daniel01` deve ser
+considerada **queimada** — esteve pública na web.
