@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v10-20260818-1740 -->
+<!-- LOKA deploy: v11-20260915-1050 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -212,7 +212,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v10-20260818-1740';
+var LOKA_BUILD = 'v11-20260915-1050';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -360,7 +360,11 @@ function traduzErro(e){
   var m = (e && e.message) || 'Erro desconhecido';
   if (m.indexOf('unauthenticated')>=0) return 'Sessão expirada — recarregue a página.';
   if (m.indexOf('not-found')>=0 || m.indexOf('NOT_FOUND')>=0) return 'Função não encontrada — o backend foi publicado?';
-  if (m.indexOf('internal')>=0) return 'Erro no servidor — confira os logs do Firebase.';
+  // 'internal' sozinho é o caso sem texto. Quando o backend manda o motivo
+  // junto, mostramos o motivo — era o que faltava para o operador entender o
+  // que houve sem precisar abrir o log do Firebase.
+  if (/^internal$/i.test(m.trim())) return 'Erro no servidor sem detalhe — confira os logs do Firebase.';
+  if (m.indexOf('internal')>=0) return m.replace(/^internal:?\s*/i,'');
   if (m.indexOf('deadline')>=0) return 'A função não respondeu a tempo (timeout).';
   if (m.indexOf('não configurado')>=0 || m.indexOf('CONFIRMAR')>=0){
     document.getElementById('configWarn').style.display='block';
