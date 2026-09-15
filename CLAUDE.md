@@ -53,7 +53,7 @@ DNS via Cloudflare.
 |---|---|
 | `gestao.html` | **v89-20260821-1139** |
 | `fatura.html` | v75-20260812-1700 |
-| `multas.html` | **v3-20260818-1552** |
+| `multas.html` | **v11-20260915-1050** |
 
 ## Modelo de dados — `loka_db`
 
@@ -416,3 +416,41 @@ modal, mover etapa, tema, `renderIcons` sem lucide carregado).
 
 ⚠️ **Python não funciona nesta máquina** — o `python` do PATH é o atalho da
 Microsoft Store, sem interpretador. Usar **Node** (`v24`) para scripts.
+
+## 🔴 FATURAMENTO DESATIVADO — 15/09/2026
+
+**O projeto `loka-b8dd2` está com o faturamento desativado.** É a causa do
+`INTERNAL` na consulta de multas — não há bug de código envolvido.
+
+```
+Error: Request to .../secrets/EFROTAS_PFX_B64 had HTTP Error: 403,
+This API method requires billing to be enabled.
+Please enable billing on project #loka-b8dd2
+```
+
+Evidência coletada em 15/09:
+
+| Serviço | Estado |
+|---|---|
+| GitHub Pages (gestao/multas/fatura) | ✅ HTTP 200 |
+| Realtime Database | ✅ HTTP 200 |
+| Cloud Functions | ❌ HTTP 500, **inclusive no modo `soDiagnostico`** |
+| `firebase deploy` | ❌ falha ao ler o secret |
+
+A função morre antes de rodar qualquer linha do código: ela declara
+`secrets: [EFROTAS_PFX_B64, ...]`, que o runtime injeta **na inicialização**.
+Sem faturamento, o Secret Manager recusa e o processo nem sobe. Por isso nem o
+diagnóstico de custo zero responde.
+
+`loka_db/efrotas_status` congelado em **18/08 19:33** marca a última execução
+bem-sucedida. As multas `origem='efrotas'` subiram de 133 (18/08) para 184
+depois disso, então o faturamento caiu em algum momento entre 18/08 e 15/09.
+
+**Conserto:** reativar o faturamento no console
+(`https://console.cloud.google.com/billing/linkedaccount?project=loka-b8dd2`)
+e então repetir `firebase deploy --only functions`. Nada a corrigir no código.
+
+⚠️ Sem Blaze o projeto cai para o plano Spark, cujo Realtime Database tem
+limites bem menores (100 conexões simultâneas, 1 GB armazenado, 10 GB/mês de
+transferência). O sistema segue funcionando, mas sob teto — vale conferir o
+consumo enquanto o faturamento estiver fora.
