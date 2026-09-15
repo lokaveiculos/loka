@@ -861,3 +861,35 @@ modal_continua_aberto: true  texto_digitado_preservado: "TESTE Claude - nao salv
 ⚠️ Isso **não** destrava o CRM — o `leads` continua negando. O que mudou é que
 agora o sistema **diz a verdade**: em vez de fingir que salvou, avisa que não
 salvou e por quê, sem perder o que foi digitado.
+
+### ✅ Corrigido: lead sem etapa não some mais do quadro (`f89445e`)
+
+O quadro montava as colunas com `l.status === et.id`. Lead **sem status** — ou
+com status que não existe mais nas `ETAPAS` — não casava com coluna nenhuma e
+simplesmente não era desenhado. Mas continuava contando em "Leads Ativos"
+(`status !== 'ganho' && status !== 'perdido'`). O número não batia com o que se
+via, e o lead ficava **inalcançável**: invisível, sem como filtrar nem mover.
+
+A convenção já existia no arquivo — `etapa(id)` devolve `ETAPAS[0]` quando não
+reconhece o id. Faltava perguntar isso para um **lead**, não para um id. Entrou
+`etapaIdDoLead(l)`, usado em dois lugares:
+
+1. no agrupamento em colunas
+2. **no filtro por etapa**, que tinha o mesmo defeito — filtrar por "Novo Lead"
+   não trazia os leads sem status
+
+Sem status, vazio, nulo ou desconhecido → cai em **"Novo Lead"**: visível,
+filtrável e movível. As métricas não mudaram de comportamento; elas já tratavam
+esses leads como ativos, e agora o quadro concorda com elas.
+
+**Validado:** 15 testes de runtime, incluindo a invariante que estava quebrada —
+*o número de "Leads Ativos" tem de ser igual ao de cards ativos no quadro*.
+Os 21 testes de gravação seguem passando.
+
+**Conferido no ar** com leads propositalmente malformados (sem status, vazio,
+nulo, `arquivado_2019`): métrica **5**, cards visíveis **5**, batendo; coluna
+"Novo Lead" com 4 (1 correto + 3 malformados).
+
+⚠️ Se algum dia um lead malformado for aberto e salvo, ele passa a ter
+`status:'novo'` de verdade no banco — o `svLead` grava o valor do select. É
+desejável, mas é bom saber que a correção **normaliza ao editar**, não só exibe.
