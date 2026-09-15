@@ -537,3 +537,61 @@ repassa ao navegador a mensagem de um `HttpsError`; `Error` comum vira só
 "internal", sem texto. Era por isso que o operador via `INTERNAL` puro enquanto
 a explicação ficava no log. `comoHttpsError()` preserva a mensagem.
 Publicar assim que o faturamento voltar.
+
+## 🔐 Migração para Firebase Auth — Auto Mais (em andamento, 15/09/2026)
+
+**Estado: código pronto no branch `firebase-auth` (commit `2526ba4`), NÃO publicado.**
+O `main` e o site no ar continuam como estavam. Publicar o login novo antes de
+as contas existirem no Firebase trancaria todo mundo para fora.
+
+### Por que
+A sessão era só do navegador (`localStorage.am_user`), invisível para o
+Firestore. O banco via **visitante anônimo** — daí as regras terem de ficar
+abertas (A1) e a `leads`, única fechada, negar (CRM sem funcionar).
+
+### O que mudou no código
+| Arquivo | Mudança |
+|---|---|
+| `firebase-shared.js` | `checkAuth` via `onAuthStateChanged`, **mesma assinatura** — as 8 páginas não foram reescritas. `loginParaEmail`/`emailParaLogin`, `logout` com `signOut`, sessão de 8h mantida |
+| `login.html` | `signInWithEmailAndPassword`; **`USERS_FIXOS` removido** (mata a regressão de 11/09) |
+| 8 páginas do menu | só o `<script>` do `firebase-auth-compat.js` |
+| `despesa_form.html` | avisa em vez de falhar calado quando a sessão expira |
+| `firestore.rules` | regras novas exigindo login — **não aplicar ainda** |
+
+### Decisões tomadas (pelo Rogel, 15/09)
+- **Login continua sendo `rogel`.** O código completa com `@automaiscar.com.br`
+  por trás (`AM_DOMINIO`). Quem digitar o e-mail inteiro também entra.
+  ⚠️ Consequência: "esqueci a senha" por e-mail só funciona se a caixa existir
+  de verdade. Enquanto não existir, **quem repõe senha é o Rogel, no console**.
+- **A tela de Usuários do `gestao.html` fica como está.** Por isso as regras
+  exigem só "estar logado", sem separar admin de atendimento — não dá para
+  fazer regra por perfil sem os documentos de `usuarios` terem id = uid do Auth.
+  ⚠️ Ela continua gravando `senha` em texto puro no banco e **não cria conta no
+  Auth** — usuário criado por ali não consegue entrar. Criar gente nova é no
+  console do Firebase até isso ser refeito.
+
+### Cuidados embutidos no código (não remover)
+- Sessão vencida faz **`signOut()` antes** de redirecionar. Sem isso o Auth
+  reconheceria o usuário no `login.html` e o sistema entraria em **vai-e-vem
+  sem fim** entre as duas páginas.
+- Página sem o `firebase-auth-compat.js` **falha fechado** (manda pro login) de
+  propósito — vale mais barrar do que deixar passar sem identidade.
+- Banco fora do ar **não** impede de trabalhar: cai num perfil padrão.
+- Quem não tem registro em `usuarios` entra como **atendimento, nunca admin**.
+
+### Ordem obrigatória (apertar as regras é o ÚLTIMO passo)
+1. Ligar **E-mail/senha** no console do Firebase — Rogel
+2. Criar as contas e definir as senhas — Rogel (eu nunca digito senha)
+3. Publicar o branch no `main` — **banco ainda aberto**
+4. Todos confirmam que entram
+5. Só então publicar o `firestore.rules`
+6. Conferir tudo, inclusive o `leads`
+
+Validado: `node --check` nos 10 arquivos + **18 testes de runtime** da
+autenticação, incluindo os casos que trancariam todo mundo (sessão vencida,
+usuário inativo, banco fora do ar, página sem o SDK de auth).
+
+### Depois que estiver no ar
+- Apagar os campos `senha` em texto puro que sobraram na coleção `usuarios` —
+  viram peso morto, quem guarda senha agora é o Auth
+- `daniel01` está **queimada** (esteve pública na web)
