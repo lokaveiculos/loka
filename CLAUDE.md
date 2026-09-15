@@ -373,3 +373,46 @@ existem regras por coleção, e a maioria está aberta. Mapear antes de mexer.
 - ✅ `lokaveiculos.com.br/automais/*` → HTTP 404 (cópia removida)
 - ✅ sistema da LOKÁ intacto (`gestao`, `multas`, `fatura` → HTTP 200)
 - ⏳ **falta testar logado** — o Rogel precisa entrar; eu não digito senha
+
+## CRM da Auto Mais — consertado em 15/09/2026 (commit `f8e005d`)
+
+O `sistema/crm.html` estava **abrindo em branco em produção**. Três defeitos
+somados, o primeiro sendo o fatal:
+
+1. 🔴 A página carregava o `firebase-shared.js` **sem antes carregar o SDK
+   compat do Firebase**. O shared chama `firebase.initializeApp()` logo na
+   linha 10 → `firebase is not defined` → o arquivo inteiro morre ali e
+   **nenhuma** função global passa a existir (`loadDB`, `checkAuth`, `toast`).
+2. 🔴 Faltava `var DB=loadDB();` na primeira linha do script inline.
+   O shared **não** declara `DB` — cada página declara a sua.
+3. 🟠 O lucide não era carregado e `renderIcons()` / `toggleTheme()` /
+   `updateThemeBtn()` não existiam: ícones do menu invisíveis e o botão
+   "Aparência" do topo chamava função inexistente.
+
+⚠️ **O `AutoMais_Deploy.zip` trazia só a correção 2.** Sozinha ela não
+resolveria nada — o item 1 quebra antes. Reforça a regra: o zip não é a fonte
+da verdade, conferir sempre contra o repo `automaiscar`.
+
+**Checklist para qualquer página nova do sistema Auto Mais** (o
+`despesa_form.html` é a exceção legítima — é avulso e traz o próprio `loadDB`):
+
+| Item | Por quê |
+|---|---|
+| `firebase-app-compat.js` + `firebase-firestore-compat.js` **antes** do shared | senão o shared morre na linha 10 |
+| `<script src="firebase-shared.js">` | globais do sistema |
+| `<script async ...lucide...>` com `onload="renderIcons()"` | ícones do menu |
+| `var DB=loadDB();` na 1ª linha do script inline | o shared não declara `DB` |
+| `id="main"` no HTML | `showLoading()` procura exatamente esse id |
+| `renderIcons()` / `toggleTheme()` / `updateThemeBtn()` locais | o topo chama os três |
+| `checkAuth(...)` no final | sessão de 8h |
+
+Auditoria em 15/09/2026: todas as 8 páginas do menu passam nesse checklist.
+
+### Validação sem custo
+Não há teste de runtime "de graça" no navegador sem login, então o padrão daqui
+em diante é: extrair o `<script>` inline e rodar com stubs no Node.
+22 testes passaram no CRM (render com lista cheia/vazia/ausente, filtros,
+modal, mover etapa, tema, `renderIcons` sem lucide carregado).
+
+⚠️ **Python não funciona nesta máquina** — o `python` do PATH é o atalho da
+Microsoft Store, sem interpretador. Usar **Node** (`v24`) para scripts.
