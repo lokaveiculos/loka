@@ -829,3 +829,35 @@ o que se vê. Comprovado: métrica marcou 5, o quadro mostrou 4.
 
 Hoje é latente (o `svLead` sempre grava um status), mas vira real assim que lead
 entrar por importação ou por formulário do site.
+
+### ✅ Corrigido: o CRM não avisa mais "salvo" sem ter salvado (`70f4dca`)
+
+`svLead` terminava com `sDB(); fsave(...); cm(); render(); toast('ok')`. O
+`fsave` era disparado e **ninguém conferia o resultado** — em caso de erro ele só
+escrevia no console. Como o lead já tinha entrado na memória e no `localStorage`,
+a pessoa via o aviso verde, via o card no quadro, e **nada disso tinha chegado ao
+banco**. Pior que não funcionar: parecia funcionar.
+
+| Função | Como ficou |
+|---|---|
+| `svLead` | Grava **primeiro**. Só mexe na lista, no cache e na tela depois que o banco confirma. Falhando, o modal fica **aberto** para não perder o que foi digitado, e o botão Salvar trava durante a gravação (evita duplicar) |
+| `moverEtapa` | Continua movendo na hora, mas **desfaz** se a gravação falhar — o quadro não pode mostrar uma etapa que o banco não tem |
+| `dlLead` | O lead só some da tela depois que a exclusão confirmar. O `onclick` do botão não chama mais `cm()` por conta própria, senão o modal fechava antes de saber o resultado |
+| `erroGravacao()` | Traduz a falha (permissão, conexão, resto). Toda mensagem começa por **"NÃO foi salvo"** — nunca deixa dúvida |
+| `fdel` (shared) | Ganhou callback opcional, que não tinha. Os 10 usos existentes seguem funcionando sem passar nada |
+
+**Validado:** `node --check` + **21 testes de runtime** cobrindo os **dois**
+caminhos de cada operação — gravação falhando e gravação dando certo.
+
+**Prova em produção** (o `leads` está mesmo bloqueado, então a falha é real):
+
+```
+avisos: [{ msg: "NAO foi salvo: o banco nao autoriza gravar em leads.
+            Fale com o responsavel.", tipo: "err" }]
+disse_que_salvou: false      leads_na_memoria: 0
+modal_continua_aberto: true  texto_digitado_preservado: "TESTE Claude - nao salvar"
+```
+
+⚠️ Isso **não** destrava o CRM — o `leads` continua negando. O que mudou é que
+agora o sistema **diz a verdade**: em vez de fingir que salvou, avisa que não
+salvou e por quê, sem perder o que foi digitado.
