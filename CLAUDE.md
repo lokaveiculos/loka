@@ -691,3 +691,27 @@ uma linha (`cadastros.html:281`). Não feito por não ter sido pedido.
 
 Nota menor: o fornecedor id 3 tem `cpf = 00000000000` (preenchimento de
 ocasião). Virou `000.000.000-00` — continua obviamente falso.
+
+### ✅ Máscara da tela de Clientes corrigida — 15/09/2026 (commit `b8b1919`)
+
+`cadastros.html:281` passou de `maskCPF` para **`maskCPFCNPJ`**, rótulo virou
+"CPF / CNPJ" e o placeholder deixou de prometer só CPF. É exatamente o que a
+tela de Fornecedores já fazia.
+
+Risco eliminado: abrir e salvar um cliente pessoa jurídica **truncava o CNPJ em
+silêncio** (a máscara cortava em 11 dígitos, e `svCli()` não valida contagem de
+dígitos — só exige o campo preenchido).
+
+Verificado no ar, com Ctrl+Shift+R:
+
+| Entrada | Formato de saída | Perdeu dígito? |
+|---|---|---|
+| CPF (11 díg.) | `###.###.###-##` | não |
+| CNPJ (14 díg.) | `##.###.###/####-##` | não |
+| Parcial (7 díg., digitando) | `###.###.#` | não |
+
+⚠️ **Pendência de uma linha de dados:** o cliente **id 7** continua com o CNPJ
+sem formatação (`07652235000107`). Agora é seguro formatá-lo — a tela aceita —
+mas a gravação foi **bloqueada pelo controle de permissões da sessão**
+("Modify Shared Resources"). Não é urgente: o valor está correto, só não está
+pontuado, e editar o cadastro já não destrói mais o número.
