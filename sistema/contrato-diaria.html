@@ -379,6 +379,13 @@
   .obs-area:focus { border-color: var(--blue); }
   .obs-area::placeholder { color: #b8bed8; font-style: italic; }
 
+  /* Espelho de impressão das observações.
+     O <textarea> tem altura fixa e NÃO cresce com o conteúdo: no papel ele
+     cortava tudo que passasse da primeira linha. Este bloco recebe o mesmo
+     texto, cresce conforme o conteúdo e é o que realmente sai impresso.
+     Invisível na tela; quem edita continua sendo o textarea. */
+  .obs-print { display: none; }
+
   /* ── Date & Signatures ── */
   .date-row {
     font-size: 13px;
@@ -560,10 +567,20 @@
   .clause strong, .clause b { font-weight:700 !important; }
 
   /* ── Observações ── */
-  .obs-area, .obs-input { min-height:6px !important; max-height:10px !important;
+  /* O textarea sai de cena na impressão: altura fixa cortava o texto.
+     Quem imprime é o espelho .obs-print, que cresce com o conteúdo. */
+  .obs-area { display:none !important; }
+  .obs-input { min-height:6px !important; max-height:10px !important;
     font-size:7px !important; padding:0 !important; border:none !important;
     border-bottom:0.4px solid #888 !important; border-radius:0 !important;
     background:transparent !important; resize:none !important; }
+  .obs-print { display:block !important; font-size:7px !important;
+    line-height:1.3 !important; white-space:pre-wrap !important;
+    word-break:break-word !important; padding:1px 0 !important;
+    border-bottom:0.4px solid #888 !important; min-height:8px !important;
+    font-family:'Source Serif 4', serif !important; color:#000 !important; }
+  /* Observação vazia não deve reservar espaço nem desenhar linha à toa. */
+  .obs-print:empty { border-bottom:none !important; min-height:0 !important; }
 
   /* ── Data ── */
   .date-row { font-size:8px !important; margin:3px 0 2px !important; }
@@ -845,6 +862,7 @@
     <div class="section">
       <div class="section-title">Observações</div>
       <textarea class="obs-area" placeholder="Insira observações adicionais aqui..."></textarea>
+      <div class="obs-print" aria-hidden="true"></div>
     </div>
 
     <!-- DATA E ASSINATURAS -->
@@ -1184,6 +1202,23 @@ function fillFields(data) {
   // ── Replica nome na assinatura ──
   if (data.nome && typeof replicateName === 'function') replicateName(data.nome);
 }
+// ── Observações: mantém o espelho de impressão em dia ──
+// O textarea não cresce com o conteúdo e cortava o texto no papel. O espelho
+// recebe o mesmo valor e é ele que sai impresso. Sincroniza a cada tecla e,
+// por garantia, logo antes de imprimir — assim também pega texto preenchido
+// por script ou colado sem disparar eventos.
+function sincronizarObs(){
+  document.querySelectorAll('.obs-area').forEach(function(ta){
+    var espelho = ta.parentElement && ta.parentElement.querySelector('.obs-print');
+    if (espelho) espelho.textContent = ta.value || '';
+  });
+}
+document.addEventListener('input', function(e){
+  if (e.target && e.target.classList && e.target.classList.contains('obs-area')) sincronizarObs();
+});
+window.addEventListener('beforeprint', sincronizarObs);
+document.addEventListener('DOMContentLoaded', sincronizarObs);
+
 // ── Máscara dos valores editáveis da Cláusula 11 ──
 // Formata em reais enquanto digita: 5000 → 50,00 → 5.000,00.
 // Trabalha em centavos para não brigar com a vírgula durante a digitação, e
