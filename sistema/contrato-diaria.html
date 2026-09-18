@@ -196,6 +196,26 @@
     transition: border-color .2s;
   }
   .field-input:focus { border-bottom-color: var(--blue); }
+
+  /* ── Valores editáveis dentro das cláusulas ──
+     Campo curto, embutido no meio do parágrafo. Herda fonte e tamanho do
+     texto ao redor para o contrato continuar lendo como contrato, não como
+     formulário. Só o sublinhado denuncia que dá para editar. */
+  .val-clausula {
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: inherit;
+    width: 5.6em;
+    text-align: center;
+    padding: 0 2px;
+    outline: none;
+    transition: border-color .2s, background .2s;
+  }
+  .val-clausula:focus { border-bottom-color: var(--blue); background: #f2f5ff; }
   .field-input::placeholder { color: #b8bed8; font-style: italic; }
 
   .col-2 { grid-template-columns: 1fr 1fr; }
@@ -518,6 +538,13 @@
     font-size:8px !important; padding:0 !important; height:auto !important;
     width:100% !important; display:block !important; line-height:1.2 !important; }
 
+  /* Na impressão o valor da cláusula é texto do contrato, não campo:
+     sem moldura, sem sublinhado, no mesmo corpo do parágrafo. */
+  .val-clausula { border:none !important; background:transparent !important;
+    font-size:inherit !important; font-weight:700 !important;
+    width:4.6em !important; padding:0 !important; display:inline !important;
+    text-align:left !important; color:#000 !important; }
+
   /* ── Tabelas ── */
   .data-table { margin:2px 0 !important; font-size:7.5px !important; }
   .data-table th { font-size:6px !important; padding:2px 3px !important; }
@@ -801,7 +828,7 @@
 
         <p class="clause"><strong>Cláusula 10ª – Da Caução.</strong> A caução deverá ser paga via Cartão de Crédito (pré-autorização) ou PIX. A restituição será realizada em até 72h após devolução e avaliação física do veículo, incluindo verificação de multas, pedágios etc. Caso o veículo seja devolvido sujo, a caução somente será devolvida após lavagem para averiguação de possíveis avarias.</p>
 
-        <p class="clause"><strong>Cláusula 11ª – Do Seguro.</strong> Havendo sinistro durante o período contratado, será devido: franquia de <strong>R$ 5.000,00</strong> por danos ao carro/PT; <strong>R$ 5.000,00</strong> por perda total ou roubo; e <strong>R$ 800,00</strong> por quebra de para-brisa; e <strong>R$ 600,00</strong> por unidade quebrada de faróis e lanternas.</p>
+        <p class="clause"><strong>Cláusula 11ª – Do Seguro.</strong> Havendo sinistro durante o período contratado, será devido: franquia de <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11Danos" value="5.000,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Franquia por danos ao carro"></strong> por danos ao carro/PT; <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11PerdaTotal" value="5.000,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Valor por perda total ou roubo"></strong> por perda total ou roubo; e <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11Parabrisa" value="800,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Valor por quebra de para-brisa"></strong> por quebra de para-brisa; e <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11Farois" value="600,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Valor por quebra de faróis e lanternas"></strong> por unidade quebrada de faróis e lanternas.</p>
 
         <p class="clause"><strong>Cláusula 12ª.</strong> O locatário será responsabilizado em caso de utilização do veículo em desacordo com o CTB, bem como se dirigir sob efeito de álcool ou de forma a colocar em risco a integridade do veículo e de terceiros.</p>
 
@@ -1157,6 +1184,18 @@ function fillFields(data) {
   // ── Replica nome na assinatura ──
   if (data.nome && typeof replicateName === 'function') replicateName(data.nome);
 }
+// ── Máscara dos valores editáveis da Cláusula 11 ──
+// Formata em reais enquanto digita: 5000 → 50,00 → 5.000,00.
+// Trabalha em centavos para não brigar com a vírgula durante a digitação, e
+// mantém o cursor no fim (o campo é curto, sempre se escreve pela direita).
+function moedaClausula(el){
+  var centavos = String(el.value || '').replace(/\D/g, '');
+  if (!centavos) { el.value = ''; return; }
+  centavos = centavos.slice(0, 11);                 // teto sensato: 999.999.999,99
+  var n = parseInt(centavos, 10) / 100;
+  el.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function showToast(msg, color) {
   document.querySelectorAll('.loka-toast').forEach(t=>t.remove());
   const t = document.createElement('div');

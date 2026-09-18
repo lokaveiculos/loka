@@ -76,6 +76,26 @@
   .field-label { font-family: 'Montserrat', sans-serif; font-size: 9.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
   .field-input { border: none; border-bottom: 1.5px solid var(--line); background: transparent; font-family: 'Source Serif 4', serif; font-size: 13.5px; color: var(--text); padding: 4px 2px; outline: none; width: 100%; transition: border-color .2s; }
   .field-input:focus { border-bottom-color: var(--blue); }
+
+  /* ── Valores editáveis dentro das cláusulas ──
+     Campo curto, embutido no meio do parágrafo. Herda fonte e tamanho do
+     texto ao redor para o contrato continuar lendo como contrato, não como
+     formulário. Só o sublinhado denuncia que dá para editar. */
+  .val-clausula {
+    border: none;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: inherit;
+    width: 5.6em;
+    text-align: center;
+    padding: 0 2px;
+    outline: none;
+    transition: border-color .2s, background .2s;
+  }
+  .val-clausula:focus { border-bottom-color: var(--blue); background: #f2f5ff; }
   .field-input::placeholder { color: #b8bed8; font-style: italic; }
   .col-2 { grid-template-columns: 1fr 1fr; }
   .col-3 { grid-template-columns: 2fr 1fr 1fr; }
@@ -163,6 +183,14 @@
   .field-input { border:none !important; background:transparent !important;
     border-bottom:0.4px solid #888 !important; border-radius:0 !important;
     font-size:8px !important; padding:0 !important; height:auto !important; width:100% !important; line-height:1.2 !important; }
+
+  /* Na impressão o valor da cláusula é texto do contrato, não campo:
+     sem moldura, sem sublinhado, no mesmo corpo do parágrafo. */
+  .val-clausula { border:none !important; background:transparent !important;
+    font-size:inherit !important; font-weight:700 !important;
+    width:4.6em !important; padding:0 !important; display:inline !important;
+    text-align:left !important; color:#000 !important; }
+
   .data-table { margin:2px 0 !important; }
   .data-table th { font-size:6px !important; padding:2px 3px !important; }
   .data-table td { font-size:7.5px !important; padding:2px 3px !important; }
@@ -405,7 +433,7 @@
 
         <p class="clause"><strong>Cláusula 10ª – Da Caução.</strong> A caução deverá ser paga via Cartão de Crédito (pré-autorização) ou PIX. A restituição será realizada em até 72h após devolução e avaliação física do veículo, incluindo verificação de multas, pedágios etc.</p>
 
-        <p class="clause"><strong>Cláusula 11ª – Do Seguro.</strong> Havendo sinistro durante o período contratado, será devido: franquia de <strong>R$ 5.000,00</strong> por danos ao carro/PT; <strong>R$ 5.000,00</strong> por perda total ou roubo; <strong>R$ 800,00</strong> por quebra de para-brisa; e <strong>R$ 600,00</strong> por quebra de faróis e lanternas.</p>
+        <p class="clause"><strong>Cláusula 11ª – Do Seguro.</strong> Havendo sinistro durante o período contratado, será devido: franquia de <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11Danos" value="5.000,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Franquia por danos ao carro"></strong> por danos ao carro/PT; <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11PerdaTotal" value="5.000,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Valor por perda total ou roubo"></strong> por perda total ou roubo; <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11Parabrisa" value="800,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Valor por quebra de para-brisa"></strong> por quebra de para-brisa; e <strong>R$&nbsp;<input class="val-clausula" type="text" id="c11Farois" value="600,00" inputmode="decimal" oninput="moedaClausula(this)" aria-label="Valor por quebra de faróis e lanternas"></strong> por quebra de faróis e lanternas.</p>
 
         <p class="clause"><strong>Cláusula 12ª – Demais Custos.</strong> A manutenção preventiva do veículo será por conta do LOCADOR, mediante apresentação de orçamento prévio. O LOCATÁRIO terá direito a 01 jogo de pneus a cada 40.000 km. Defeitos provenientes de mau uso ou avarias são de responsabilidade do LOCATÁRIO.</p>
 
@@ -650,6 +678,18 @@ function fillFields(data) {
 }
 
 /* ── Toast ── */
+// ── Máscara dos valores editáveis da Cláusula 11 ──
+// Formata em reais enquanto digita: 5000 → 50,00 → 5.000,00.
+// Trabalha em centavos para não brigar com a vírgula durante a digitação, e
+// mantém o cursor no fim (o campo é curto, sempre se escreve pela direita).
+function moedaClausula(el){
+  var centavos = String(el.value || '').replace(/\D/g, '');
+  if (!centavos) { el.value = ''; return; }
+  centavos = centavos.slice(0, 11);                 // teto sensato: 999.999.999,99
+  var n = parseInt(centavos, 10) / 100;
+  el.value = n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function showToast(msg, color) {
   document.querySelectorAll('.loka-toast').forEach(t => t.remove());
   const t = document.createElement('div');
