@@ -1046,3 +1046,32 @@ sobrescrevendo os do shared. O `brl` local formata em pt-BR (`130.000,00`),
 não `130000.00` — um teste que espere o formato cru falha sem haver defeito.
 Em teste com stubs: alimentar o DB pelo `localStorage` e substituir
 `toast`/`cm`/`render` **depois** de avaliar o script.
+
+### ✅ Histórico reconstruído — 19/09/2026 (o Rogel rodou o comando)
+
+O script de uma linha foi executado no console e **funcionou**. Conferido lendo
+o Firestore:
+
+| | Antes | Depois |
+|---|---|---|
+| Vendas registradas | 1 | **21** |
+| Contratos de venda sem venda | 20 | **0** |
+| Veículos `vendido` | 20 | **23** |
+| Faturamento somado | R$ 85.000 | **R$ 1.365.308,00** |
+| Ids duplicados | — | **nenhum** |
+
+A conta fecha: R$ 1.280.308 reconstruídos + R$ 85.000 da venda que já existia.
+Os três Renegade (RFW8F05, GIC-5E26, RDB-4I76) estão baixados.
+
+⚠️ **Primeira tentativa deu `Uncaught SyntaxError`.** O arquivo estava íntegro
+(`node --check` passava). A causa provável é a proteção do console do Chrome,
+que exige digitar `allow pasting` antes — quem cola duas vezes acaba com o
+código duplicado na linha. **Lição:** entregar script para colar sempre em
+**uma linha só** e avisar do `allow pasting`.
+
+⚠️ Também evitar entregar `.js` solto no Windows: duplo clique **executa** o
+arquivo fora do navegador. Os arquivos viraram `.txt`
+(`RECONSTRUIR-VENDAS-1-LINHA.txt` e `RECONSTRUIR-VENDAS-legivel.txt`).
+
+Com isso, a tela de Vendas e os filtros novos passam a ter dados de verdade, e
+os relatórios de faturamento deixam de mostrar quase zero.
