@@ -942,3 +942,75 @@ registrado que o caminho que resolve isso **já está pronto**: branch
 `firebase-auth`, commit `2526ba4`, testado, faltando só ligar o Email/Senha e
 criar as 4 contas no console — que agora **abre normalmente**, já que o problema
 de conta Google foi resolvido.
+
+## 🔴 Contrato de venda não baixava o veículo nem virava venda (19/09/2026, `28f431b`)
+
+Relato do Rogel: gera o contrato de venda, o veículo não é baixado como vendido
+e a venda não aparece na tela de Vendas.
+
+### A causa: duas portas com comportamentos diferentes
+| Tela | Cria contrato | Cria venda | Baixa veículo |
+|---|---|---|---|
+| **Vendas** → "Confirmar Venda" (`svVenda`) | ✅ | ✅ | ✅ |
+| **Contratos** → "Gerar contrato" (`svCt`) | ✅ | ❌ | ❌ |
+
+Não era intermitente nem cache: o `svCt` **nunca** fez isso. O único ponto do
+sistema que marcava `vendido` automaticamente era o `svVenda`.
+
+### O que os dados mostraram (19/09)
+- **21 contratos**, todos do tipo venda · **1 venda registrada**
+- **20 contratos de venda sem venda correspondente**
+- 20 veículos estavam `vendido`, mas só 1 pelo sistema — **19 foram marcados à mão**
+- 🔴 três vendas recentes seguiam com o carro **disponível**:
+  CV-2026-014 (RFW8F05), CV-2026-015 (GIC-5E26), CV-2026-016 (RDB-4I76)
+  — risco real de vender o mesmo carro duas vezes
+
+⚠️ A porta usada é a dos **Contratos** (20 de 21). Não adianta pedir para usarem
+a tela de Vendas: o sistema é que tinha de acompanhar o fluxo deles.
+
+### A correção
+`svCt`, quando `tipo === 'venda'`, passa a criar a venda (número derivado:
+`CV-2026-016` → `VD-2026-016`) e marcar o veículo como vendido.
+**Uma venda por contrato:** editar atualiza, não duplica. Compra e consignação
+seguem gravando só o contrato.
+
+Como agora são até três documentos numa operação, o aviso de sucesso passa por
+`_gravarTudo()` — só aparece depois que **todos** confirmarem; falhando algum,
+nada muda na tela e o modal fica aberto. Mesmo padrão do CRM. Saiu também o
+`toast` duplicado, que avisava duas vezes.
+
+**Decisão registrada:** se o veículo do contrato for **trocado** numa edição, o
+antigo continua marcado como vendido de propósito — liberar sozinho um carro que
+pode ter saído por outro contrato é pior do que deixar um a menos no estoque.
+
+Validado: `node --check` + **21 testes de runtime**.
+
+### ⏳ Histórico ainda NÃO reconstruído — ação pendente do Rogel
+Ele aprovou criar as 20 vendas faltantes, mas **as gravações de produção estão
+bloqueadas para mim nesta sessão** (`Modify Shared Resources`, e o navegador caiu
+com `Auto-Mode Bypass`). Não contornei.
+
+Preparado e **testado contra os dados reais** (14 testes, incl. idempotência):
+`C:\...\Github\backups-automais\RECONSTRUIR-VENDAS-20260919.js`
+— colar no console da tela de Contratos, logado. Pede confirmação, usa o
+`fsave` do próprio sistema (tipos idênticos) e pode rodar duas vezes sem
+duplicar.
+
+Ele cria **20 vendas (R$ 1.280.308,00, de 03/07 a 19/09)** e baixa os **3
+Renegade** pendentes.
+
+Backups em `backups-automais/`: `vendas-ANTES-backfill-20260919.json`,
+`veiculos-…`, `contratos-…` e o `plano-backfill-20260919.json`.
+
+⚠️ **Achado de qualidade de dado:** há números de contrato repetidos —
+`CV-2026-007`, `CV-2026-008` e `CV-2026-009` aparecem **duas vezes cada**, e dois
+contratos foram numerados com a placa (`SWI1J24`, `RPH2C27`). Há ainda
+`CV-2026-08` e `CV-2026-0012` fora do padrão. As vendas herdam esses números de
+propósito (para casar com o contrato). Corrigir a numeração é decisão do Rogel.
+
+### Armadilha para testes futuros
+`contratos.html` (e provavelmente outras páginas) define o **próprio `loadDB()`**,
+que sobrescreve o do shared e traz dados de exemplo embutidos. Num teste com
+stubs, alimentar pelo `localStorage` (`automais_v3`), não pelo stub de `loadDB`.
+Essas páginas também definem o próprio `toast`/`cm`/`render` — substituir
+**depois** de avaliar o script, senão o stub é sobrescrito.
