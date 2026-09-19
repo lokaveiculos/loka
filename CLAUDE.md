@@ -1014,3 +1014,35 @@ que sobrescreve o do shared e traz dados de exemplo embutidos. Num teste com
 stubs, alimentar pelo `localStorage` (`automais_v3`), não pelo stub de `loadDB`.
 Essas páginas também definem o próprio `toast`/`cm`/`render` — substituir
 **depois** de avaliar o script, senão o stub é sobrescrito.
+
+## ✅ Filtros na tela de Vendas — 19/09/2026 (commit `241ee3a`)
+
+Pedido do Rogel: filtrar vendas por **data, veículo e cliente**. Segue o desenho
+da tela de Despesas (card "Filtros"), para não inventar linguagem nova:
+**De · Até · Veículo · Cliente · Limpar**.
+
+| Decisão | Por quê |
+|---|---|
+| Subtítulo vira "X de Y vendas" e o total soma **só o filtrado** | mostrar o total geral embaixo de uma lista recortada faria a tela mentir |
+| Menus listam só veículos/clientes **que têm venda**, em ordem alfabética | opção que não filtra nada só atrapalha |
+| Menus preservam a seleção ao redesenhar (`selected`) | ⚠️ a tela de **Despesas tem esse defeito** no select de placa: filtra certo, mas o menu volta para "Todas as placas". Não repeti — vale corrigir lá |
+| Venda **sem data** sai do resultado quando há período | não dá para afirmar que ela cai no intervalo pedido |
+| As duas pontas do período são inclusivas | — |
+| "Nenhuma venda registrada" ≠ "Nenhuma venda encontrada com esses filtros" | some a dúvida de "sumiu tudo?" |
+| **Exportar CSV exporta o que está na tela** | mandar a lista inteira surpreenderia quem acabou de recortar um período |
+
+Validado: `node --check` + **30 testes de runtime** (cada filtro isolado e
+combinados, bordas do período, venda sem data, montagem/ordem dos menus,
+preservação da seleção, subtítulo, total, mensagens de vazio, Limpar, exportação
+e `DB.vendas` ausente).
+
+⏳ **Não conferido no navegador:** o Claude in Chrome ficou fora do ar nesta
+sessão. Verificado o possível sem ele — o HTML publicado traz os quatro campos,
+o botão Limpar e as funções novas, e o JS servido passa no `node --check`.
+
+### Armadilha (a mesma do `contratos.html`)
+`vendas.html` também define localmente `brl`, `vNome`, `cNome` e `loadDB`,
+sobrescrevendo os do shared. O `brl` local formata em pt-BR (`130.000,00`),
+não `130000.00` — um teste que espere o formato cru falha sem haver defeito.
+Em teste com stubs: alimentar o DB pelo `localStorage` e substituir
+`toast`/`cm`/`render` **depois** de avaliar o script.
