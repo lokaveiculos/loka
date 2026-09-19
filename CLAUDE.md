@@ -1075,3 +1075,60 @@ arquivo fora do navegador. Os arquivos viraram `.txt`
 
 Com isso, a tela de Vendas e os filtros novos passam a ter dados de verdade, e
 os relatórios de faturamento deixam de mostrar quase zero.
+
+## ✅ Manutenção → Despesa automática — 19/09/2026 (commit `d272d7d`)
+
+Pedido: opção "Manutenção" nas despesas + tudo que entra no menu Manutenção
+virar despesa sozinho. Antes os dois mundos eram separados: as 6 manutenções do
+banco somam **R$ 4.920 que não apareciam no financeiro**.
+
+Conferido antes de mexer: nenhuma estava lançada à mão (as 6 despesas
+Administrativas são energia, aluguel, OLX — sem relação). Não havia duplicata.
+
+| Onde | O quê |
+|---|---|
+| `despesas.html` | "Manutenção" no filtro e no formulário; **badge virou de 3 vias** — era binário (Operacional → "Op", *qualquer outra coisa* → "Adm"), então manutenção apareceria como "Adm" |
+| `gestao.html` | `svMnt` grava manutenção **e** despesa, ligadas por `manutencao_id` |
+
+Regras: a manutenção é a **fonte da verdade** — editar atualiza a mesma despesa
+(nunca duplica), excluir remove as duas, e a despesa **acompanha o valor**
+(sem valor não há custo; valor zerado remove a despesa antiga).
+`filtrarDespesas` não precisou mudar: já compara o tipo em minúsculas.
+
+⚠️ **Armadilha de nome:** na manutenção, `tipo` é o **serviço**
+("Revisão geral"); na despesa, `tipo` é a **categoria**. Mesmo nome, coisas
+diferentes.
+
+## ✅ Botão Importar na aba Manutenção — 19/09/2026 (commit `dca134e`)
+
+Mesmo modelo da LOKÁ: a oficina manda `LOKA-MANUT::<base64 do JSON>` e vira
+manutenção. Fluxo igual (colar → pré-visualizar → importar), visual do Auto
+Mais. Como manutenção agora gera despesa, **a importada gera também**.
+
+⚠️ **O mapeamento TROCA dois campos de lugar:** no código da oficina `tipo` é a
+natureza (preventiva/corretiva) e `descricao` é a lista de serviços; no Auto
+Mais `tipo` é o **serviço**. Então a lista de serviços vai para `tipo`, e
+natureza/km/retorno/valores/obs viram a `descricao`.
+
+### 🔧 Melhoria sobre o original da LOKÁ (vale levar para lá)
+Tirar os espaços junta o base64 que o WhatsApp quebrou — **mas também cola nele
+o texto que vier depois** na mensagem ("abraço", "obrigado"), porque essas
+letras são base64 válido. O original engasga nesse caso, sem explicar.
+Aqui `_decodificar()` vai encurtando pela direita até virar JSON válido.
+
+Outros cuidados: placa casa ignorando hífen e maiúscula; placa não cadastrada
+importa com alerta; avisa (sem bloquear) se já existe manutenção com mesma
+placa+data+valor; no lote os ids de despesa são distribuídos na mão, porque
+`nid()` repetiria o mesmo id para todos antes de gravar.
+
+**Validado com o código real enviado pelo Rogel:** 24 testes (decodificação,
+mapeamento, base64 quebrado em linhas, prefixo minúsculo, texto em volta, lote
+de 2, entradas corrompidas, alertas, falha de gravação).
+
+### ⏳ Pendente: as 6 manutenções antigas
+Continuam sem despesa (R$ 4.920). Script pronto e testado (12 testes, incl.
+idempotência), em **uma linha**:
+`backups-automais\LANCAR-DESPESAS-MANUTENCAO.txt` — rodar no console da tela de
+**Gestão**, aba Manutenção, após Ctrl+Shift+R. Ele reusa o
+`_despesaDeManutencao()` do próprio sistema, então o resultado é idêntico ao que
+o sistema passa a gerar sozinho.
