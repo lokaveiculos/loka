@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v90-20260915-1620** |
+| `gestao.html` | **v94-20260924-1115** |
 | `fatura.html` | v75-20260812-1700 |
 | `multas.html` | **v11-20260915-1050** |
 
@@ -411,8 +411,9 @@ em diante é: extrair o `<script>` inline e rodar com stubs no Node.
 22 testes passaram no CRM (render com lista cheia/vazia/ausente, filtros,
 modal, mover etapa, tema, `renderIcons` sem lucide carregado).
 
-⚠️ **Python não funciona nesta máquina** — o `python` do PATH é o atalho da
-Microsoft Store, sem interpretador. Usar **Node** (`v24`) para scripts.
+⚠️ **Python passou a funcionar** (3.14.7, verificado em 24/09/2026) — antes era
+só o atalho da Microsoft Store. Node (v24) segue disponível. No Windows, exportar
+`PYTHONIOENCODING=utf-8` ao imprimir acento, senão quebra no cp1252.
 
 ## ✅ FATURAMENTO — resolvido em 15/09/2026 (histórico abaixo)
 
@@ -1132,3 +1133,105 @@ idempotência), em **uma linha**:
 **Gestão**, aba Manutenção, após Ctrl+Shift+R. Ele reusa o
 `_despesaDeManutencao()` do próprio sistema, então o resultado é idêntico ao que
 o sistema passa a gerar sozinho.
+
+---
+
+## 📋 Módulo Multas — trabalho de 24/09/2026 (v91 → v94)
+
+### Filtro por órgão autuador, com multi-seleção (v91/v92)
+
+O trabalho não foi o filtro, foi o **dado**: o mesmo órgão chega escrito de
+várias formas — `238490-BA` e `238490 - PREF. DE BA SALVADOR`, `000100-RD` e
+`000100 - POLICIA RODOVIARIA FEDERAL`. Filtrar pelo texto cru criaria uma opção
+por grafia e **deixaria multas fora do resultado**.
+
+A chave é o **código** (6 dígitos), igual em todas as variações.
+21 grafias → **18 órgãos**, com as contagens somadas (238490: 77+2=79,
+000100: 20+1=21, 000300: 117+1=118). Conferido que a soma das opções bate com
+o total: nenhuma multa fica fora.
+
+O **nome** é aprendido dos próprios dados: se alguma multa traz o nome por
+extenso, ele passa a valer para todas daquele código. Sem tabela fixa, e sem
+inventar nome — onde não há, mostra "Órgão 105300".
+
+⚠️ Mesma armadilha da pendência 8 (nomes de oficina). Sempre que houver texto
+livre vindo de fonte externa, agrupar por código antes de filtrar.
+
+### Baixa em lote — marcar várias como pagas (v94)
+
+Não foi criado filtro novo: o painel **já filtra** por data (de/até), placa,
+locatário, órgão e status. A seleção age sobre o **filtrado** — "pagar tudo da
+RSC em agosto" é filtrar + selecionar todas + baixar.
+
+| Cuidado | Por quê |
+|---|---|
+| Paga/cancelada não entra na seleção | não dá para pagar duas vezes; "selecionar todas" pula |
+| O que sai do filtro sai da seleção | senão daria baixa em multa invisível na tela |
+| Valor é **por multa**, não o total | em branco usa o valor de cada uma; preenchido serve para desconto uniforme (40% do SNE) |
+| Exige dígito no valor | `mltNum('abc')` devolve **0**, e 0 é valor legítimo — sem validar, erro de digitação baixaria tudo por R$ 0,00 calado |
+
+Conferido no real: RSC em ago/2026 → 34 multas, 32 selecionáveis, R$ 4.914,10.
+
+### Aba Indicação de Condutor (v93)
+
+Faz tudo que **não** depende do Serpro. 485 multas a indicar, concentradas em
+**10 locatários** (RSC sozinha tem 280). Agrupa por locatário, gera o
+Formulário de Identificação do Condutor preenchido (um por página) e marca como
+indicada.
+
+- **PJ não tem CNH.** 5 dos 10 locatários são empresa e respondem por 480 das
+  485 multas: para eles o formulário pede razão social + CNPJ e traz a nota de
+  transferência de responsabilidade pelo contrato. Só PF pede CNH — e **2 das 5
+  PF não têm CNH cadastrada**.
+- **Prazo não é inventado.** Onde o órgão não informou, diz "consultar no órgão"
+  em vez de estimar: indicar fora do prazo não vale, e data chutada dá falsa
+  segurança.
+- "Marcar como indicada" avisa que **o envio é manual** — o sistema não sabe
+  sozinho que a indicação chegou ao órgão.
+
+## 🔴 CORREÇÃO de diagnóstico: por que `prazoIndicacao` vem vazio
+
+O CLAUDE.md dizia que o adaptador usava nomes de campo errados. **Estava errado.**
+O documento técnico de 24/09/2026 (enviado pelo Rogel) mostra que existem **duas
+consultas diferentes**:
+
+```
+/consultas/v1/infracoes/placa/{placa}                                   ← a que usamos (lista resumida)
+/consultas/v1/infracoes/codigoOrgao/{}/numeroAit/{}/codigoInfracao/{}   ← detalhe
+```
+
+`dataLimiteDefesaAutuacao`, `local`, RENAINF e documento do infrator só vêm na
+**consulta de detalhe**. O nome do campo no adaptador está certo; a consulta é
+que é outra. Por isso 0 de 251 multas do e-Frotas têm prazo.
+
+**394 das 485 multas a indicar já têm os 3 parâmetros** dessa consulta (foram
+gravados quando entrou o botão do PDF). Buscar o prazo custaria **394 consultas
+cobradas** — não feito, aguarda decisão do Rogel.
+
+## Indicação eletrônica via SNE — o que dá e o que não dá
+
+Do documento técnico de 24/09/2026:
+
+- O e-Frotas envia **eventos por webhook** (HTTP POST) para URL cadastrada.
+  **Evento 38** = Real Infrator Indicado · **Evento 41** = indicação autorizada
+  após aceite/assinatura no CDT ou Portal SENATRAN.
+- Webhook exige HTTPS, resposta em **1 segundo**, idempotência por
+  `tipoEvento + idRastreamento`, e guardar o payload bruto.
+- Regras: órgão habilitado, indicado com conta GOV.BR, infração de
+  responsabilidade do condutor, sem condutor por abordagem, não suspensa/cancelada,
+  sem indicação pendente válida. Indicação expira em 30 dias para aceite, **sem
+  prorrogar** o prazo do auto.
+
+⚠️ **Item 17 do documento, literal:** não se deve assumir endpoint REST público
+de POST para *efetivar* a indicação sem validar no Swagger habilitado para a
+empresa. Os eventos 38/41 apenas **notificam** que alguém indicou — não são o
+ato de indicar.
+
+**Bloqueios para o webhook:** o site é GitHub Pages (estático, não recebe POST),
+então precisaria de Cloud Function HTTP — e a Org Policy do projeto **barra criar
+função nova**. Contornável como já foi feito com o diagnóstico (modo dentro de
+função existente), mas exige decisão.
+
+**Próximo passo real (item 20 do documento):** obter acesso ao ambiente de
+**homologação** e importar o Swagger. Homologação usa Bearer Token e **não custa
+consulta**. Só isso responde se a indicação é automatizável.
