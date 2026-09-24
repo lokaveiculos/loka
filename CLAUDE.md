@@ -1235,3 +1235,17 @@ função existente), mas exige decisão.
 **Próximo passo real (item 20 do documento):** obter acesso ao ambiente de
 **homologação** e importar o Swagger. Homologação usa Bearer Token e **não custa
 consulta**. Só isso responde se a indicação é automatizável.
+
+### Decisão 24/09/2026: não buscar o prazo das multas antigas
+
+O Rogel decidiu **não** gastar as 394 consultas para preencher
+`dataLimiteDefesaAutuacao` no histórico. As multas já existentes ficam sem
+prazo, e a aba de Indicação mostra "consultar no órgão autuador" nelas.
+
+⚠️ **Isso não resolve o futuro.** A varredura usa
+`/consultas/v1/infracoes/placa/{placa}`, que **não devolve o prazo** — então
+multa nova também entra sem ele, independente de custo. Para o campo passar a
+vir preenchido seria preciso, ao gravar uma multa **nova**, chamar também
+`/consultas/v1/infracoes/codigoOrgao/{}/numeroAit/{}/codigoInfracao/{}`.
+Custo: 1 consulta extra por multa nova (não por multa existente).
+**Em aberto** — não implementar sem o Rogel pedir.
