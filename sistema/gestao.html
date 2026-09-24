@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v90-20260915-1620 -->
+<!-- LOKA deploy: v91-20260924-0930 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -528,6 +528,7 @@ tr:hover td{background:#f8f9fe;}
             <button type="button" onclick="mltLimparFinais()" title="Limpar finais" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 2px">✕</button>
           </div>
           <select class="filter-sel" id="mltFCliente" onchange="mltAplicarFiltro()"><option value="">Todos os clientes</option></select>
+          <select class="filter-sel" id="mltFOrgao" onchange="mltAplicarFiltro()"><option value="">Todos os órgãos</option></select>
           <select class="filter-sel" id="mltFStatus" onchange="mltAplicarFiltro()">
             <option value="">Todos os status</option>
             <option value="pendente">Pendente</option>
@@ -1136,7 +1137,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v90-20260915-1620';
+var LOKA_BUILD = 'v91-20260924-0930';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8140,7 +8141,7 @@ var MLT_GRAV = {
 
 var _mltEdit   = null;   // id em edição
 var _mltImport = [];     // buffer de conferência da importação
-var _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', de:'', ate:''};
+var _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', orgao:'', de:'', ate:''};
 
 // ── Helpers ────────────────────────────────────────────────────
 // Options de cliente reutilizadas no modal e na conferência
@@ -8276,6 +8277,7 @@ function mltInit(){
   if (!Array.isArray(db.multas)) db.multas = [];
   mltPreencherFiltroPlacas();
   mltPreencherFiltroClientes();
+  mltPreencherFiltroOrgaos();
   _aplicarRestricaoMultas();
   mltRender();
 }
@@ -8320,6 +8322,65 @@ function mltPreencherFiltroClientes(){
   Object.keys(ids).sort(function(a,b){ return String(ids[a]).localeCompare(String(ids[b])); })
     .forEach(function(id){ h += '<option value="'+id+'">'+ids[id]+'</option>'; });
   h += '<option value="__sem__">— Sem locatário (Loká) —</option>';
+  sel.innerHTML = h;
+  sel.value = atual;
+}
+
+// ── ÓRGÃO AUTUADOR ─────────────────────────────────────────────
+// O mesmo órgão chega escrito de várias formas: "238490-BA",
+// "238490 - PREF. DE BA SALVADOR", "000100-RD", "000100 - POLICIA RODOVIARIA
+// FEDERAL". Filtrar pelo texto cru criaria uma opção para cada grafia e
+// deixaria multas de fora. A chave é o CÓDIGO (6 dígitos), que é o mesmo em
+// todas as variações — é ele que agrupa.
+function mltOrgaoChave(m){
+  var t = String((m && m.orgao) || '').trim();
+  if (!t) return '';
+  var cod = t.match(/\d{4,6}/);            // 105300, 000300, 238490…
+  return cod ? cod[0] : t.toUpperCase();   // sem código (ex.: "SENATRAN"), usa o texto
+}
+
+// Nome de exibição: aprende com os próprios dados. Quando alguma multa traz
+// "238490 - PREF. DE BA SALVADOR", esse nome passa a valer para todas as que
+// só têm "238490-BA". Sem tabela fixa para manter.
+function mltOrgaoNomes(){
+  var nomes = {};
+  mltMultas().forEach(function(m){
+    var k = mltOrgaoChave(m); if (!k) return;
+    // Chave não numérica já É o nome (ex.: "SENATRAN") — não aprender de novo,
+    // senão o rótulo sai repetido: "SENATRAN — SENATRAN".
+    if (!/^\d+$/.test(k)) return;
+    var t = String(m.orgao || '').trim();
+    // Sobra do texto depois do código: se tiver letras de verdade, é um nome.
+    var resto = t.replace(/^\s*\d{4,6}\s*[-–—]?\s*/, '').trim();
+    var ehNome = resto.length > 3 && /[A-Za-zÀ-ÿ]{4,}/.test(resto);
+    if (ehNome && (!nomes[k] || resto.length > nomes[k].length)) nomes[k] = resto;
+  });
+  return nomes;
+}
+
+function mltOrgaoRotulo(k, nomes){
+  if (!k) return '';
+  if (nomes[k]) return k + ' — ' + nomes[k];
+  return /^\d+$/.test(k) ? 'Órgão ' + k : k;
+}
+
+function mltPreencherFiltroOrgaos(){
+  var sel = document.getElementById('mltFOrgao');
+  if (!sel) return;
+  var nomes = mltOrgaoNomes();
+  var cont = {}, semOrgao = 0;
+  mltMultas().forEach(function(m){
+    var k = mltOrgaoChave(m);
+    if (k) cont[k] = (cont[k] || 0) + 1; else semOrgao++;
+  });
+  var atual = sel.value;
+  var h = '<option value="">Todos os órgãos</option>';
+  Object.keys(cont)
+    .sort(function(a,b){ return cont[b] - cont[a]; })   // mais multas primeiro
+    .forEach(function(k){
+      h += '<option value="'+k+'">'+mltOrgaoRotulo(k, nomes)+' ('+cont[k]+')</option>';
+    });
+  if (semOrgao) h += '<option value="__sem__">— Sem órgão informado ('+semOrgao+') —</option>';
   sel.innerHTML = h;
   sel.value = atual;
 }
@@ -8373,16 +8434,17 @@ function mltAplicarFiltro(){
   _mltFiltro.q      = (document.getElementById('mltFBusca')||{}).value || '';
   _mltFiltro.status = (document.getElementById('mltFStatus')||{}).value || '';
   _mltFiltro.cliente= (document.getElementById('mltFCliente')||{}).value || '';
+  _mltFiltro.orgao  = (document.getElementById('mltFOrgao')||{}).value || '';
   _mltFiltro.de     = (document.getElementById('mltFDe')||{}).value || '';
   _mltFiltro.ate    = (document.getElementById('mltFAte')||{}).value || '';
   mltRender();
 }
 
 function mltLimparFiltro(){
-  ['mltFBusca','mltFStatus','mltFPlaca','mltFCliente','mltFDe','mltFAte'].forEach(function(id){
+  ['mltFBusca','mltFStatus','mltFPlaca','mltFCliente','mltFOrgao','mltFDe','mltFAte'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', de:'', ate:''};
+  _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', orgao:'', de:'', ate:''};
   // Limpar os botões de final de placa
   if (typeof mltLimparFinais === 'function') mltLimparFinais();
   else mltRender();
@@ -8414,6 +8476,11 @@ function mltFiltradas(){
     var d = mltISO(m.dataInfracao);
     if (f.de  && (!d || d < f.de))  return false;
     if (f.ate && (!d || d > f.ate)) return false;
+    if (f.orgao) {
+      var ko = mltOrgaoChave(m);
+      if (f.orgao === '__sem__') { if (ko) return false; }
+      else if (ko !== f.orgao) return false;
+    }
     if (q) {
       var alvo = [m.ait, m.placa, m.clienteNome, m.descricao, m.orgao, m.local]
         .join(' ').toLowerCase();
@@ -8751,6 +8818,7 @@ function mltSalvar(){
   closeM('mMulta');
   mltPreencherFiltroPlacas();
   mltPreencherFiltroClientes();
+  mltPreencherFiltroOrgaos();
   mltRender();
   toast('✅ Multa salva','#0d7a3e');
 }
@@ -9507,6 +9575,7 @@ function mltConfirmarImportacao(){
   if (st) st.innerHTML = '<span style="color:var(--green)">✓ '+n+' multa(s) importada(s)</span>';
   mltPreencherFiltroPlacas();
   mltPreencherFiltroClientes();
+  mltPreencherFiltroOrgaos();
   mltMostrarAba('lista');
   toast('✅ '+n+' multa(s) importada(s)','#0d7a3e');
 }
