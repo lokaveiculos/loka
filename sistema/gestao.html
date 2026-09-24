@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v91-20260924-0930 -->
+<!-- LOKA deploy: v92-20260924-0955 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -528,7 +528,13 @@ tr:hover td{background:#f8f9fe;}
             <button type="button" onclick="mltLimparFinais()" title="Limpar finais" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 2px">✕</button>
           </div>
           <select class="filter-sel" id="mltFCliente" onchange="mltAplicarFiltro()"><option value="">Todos os clientes</option></select>
-          <select class="filter-sel" id="mltFOrgao" onchange="mltAplicarFiltro()"><option value="">Todos os órgãos</option></select>
+          <div style="position:relative">
+            <button type="button" class="filter-sel" id="mltBtnOrgaos" onclick="mltAbrirOrgaos(event)"
+                    style="cursor:pointer;text-align:left;min-width:170px">Todos os órgãos ▾</button>
+            <div id="mltPainelOrgaos" style="display:none;position:absolute;z-index:60;top:100%;left:0;margin-top:4px;
+                 background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 20px rgba(14,27,77,.14);
+                 min-width:300px;max-width:380px;padding:10px"></div>
+          </div>
           <select class="filter-sel" id="mltFStatus" onchange="mltAplicarFiltro()">
             <option value="">Todos os status</option>
             <option value="pendente">Pendente</option>
@@ -1137,7 +1143,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v91-20260924-0930';
+var LOKA_BUILD = 'v92-20260924-0955';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8141,7 +8147,7 @@ var MLT_GRAV = {
 
 var _mltEdit   = null;   // id em edição
 var _mltImport = [];     // buffer de conferência da importação
-var _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', orgao:'', de:'', ate:''};
+var _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', orgaos:[], de:'', ate:''};
 
 // ── Helpers ────────────────────────────────────────────────────
 // Options de cliente reutilizadas no modal e na conferência
@@ -8364,26 +8370,105 @@ function mltOrgaoRotulo(k, nomes){
   return /^\d+$/.test(k) ? 'Órgão ' + k : k;
 }
 
+// Multi-seleção: com 18 órgãos, botões (como os de final de placa) não cabem
+// na barra. Segue o padrão do seletor de placas do e-Frotas — painel com
+// checkboxes, lista rolável e contagem por item.
 function mltPreencherFiltroOrgaos(){
-  var sel = document.getElementById('mltFOrgao');
-  if (!sel) return;
+  var painel = document.getElementById('mltPainelOrgaos');
+  if (!painel) return;
   var nomes = mltOrgaoNomes();
   var cont = {}, semOrgao = 0;
   mltMultas().forEach(function(m){
     var k = mltOrgaoChave(m);
     if (k) cont[k] = (cont[k] || 0) + 1; else semOrgao++;
   });
-  var atual = sel.value;
-  var h = '<option value="">Todos os órgãos</option>';
-  Object.keys(cont)
-    .sort(function(a,b){ return cont[b] - cont[a]; })   // mais multas primeiro
-    .forEach(function(k){
-      h += '<option value="'+k+'">'+mltOrgaoRotulo(k, nomes)+' ('+cont[k]+')</option>';
-    });
-  if (semOrgao) h += '<option value="__sem__">— Sem órgão informado ('+semOrgao+') —</option>';
-  sel.innerHTML = h;
-  sel.value = atual;
+  var sel = _mltFiltro.orgaos || [];
+  var chaves = Object.keys(cont).sort(function(a,b){ return cont[b] - cont[a]; });
+
+  var h = '<div style="display:flex;gap:6px;margin-bottom:8px">'
+        + '<button type="button" class="btn btn-outline" style="font-size:10px;padding:4px 9px" onclick="mltOrgaosTodos(true)">Marcar todos</button>'
+        + '<button type="button" class="btn btn-outline" style="font-size:10px;padding:4px 9px" onclick="mltOrgaosTodos(false)">Limpar</button>'
+        + '<button type="button" class="btn btn-outline" style="font-size:10px;padding:4px 9px;margin-left:auto" onclick="mltFecharOrgaos()">✕ Fechar</button>'
+        + '</div>'
+        + '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
+
+  chaves.forEach(function(k){
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #eef0f8;cursor:pointer;font-size:11px">'
+      +  '<input type="checkbox" '+(sel.indexOf(k)>=0?'checked':'')+' onchange="mltToggleOrgao(\''+k+'\')">'
+      +  '<span style="flex:1">'+mltOrgaoRotulo(k, nomes)+'</span>'
+      +  '<span style="color:var(--muted);font-weight:700">'+cont[k]+'</span></label>';
+  });
+  if (semOrgao) {
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:11px;font-style:italic">'
+      +  '<input type="checkbox" '+(sel.indexOf('__sem__')>=0?'checked':'')+' onchange="mltToggleOrgao(\'__sem__\')">'
+      +  '<span style="flex:1">Sem órgão informado</span>'
+      +  '<span style="color:var(--muted);font-weight:700">'+semOrgao+'</span></label>';
+  }
+  h += '</div>';
+  painel.innerHTML = h;
+  mltAtualizarBotaoOrgaos();
 }
+
+// O botão precisa dizer o que está filtrado sem obrigar a abrir o painel.
+function mltAtualizarBotaoOrgaos(){
+  var bt = document.getElementById('mltBtnOrgaos');
+  if (!bt) return;
+  var sel = _mltFiltro.orgaos || [];
+  if (!sel.length) { bt.textContent = 'Todos os órgãos ▾'; bt.style.fontWeight = ''; return; }
+  var nomes = mltOrgaoNomes();
+  bt.textContent = (sel.length === 1 ? mltOrgaoRotulo(sel[0], nomes).split(' — ')[0]
+                                     : sel.length + ' órgãos') + ' ▾';
+  bt.style.fontWeight = '700';
+}
+
+function mltToggleOrgao(k){
+  if (!_mltFiltro.orgaos) _mltFiltro.orgaos = [];
+  var i = _mltFiltro.orgaos.indexOf(k);
+  if (i >= 0) _mltFiltro.orgaos.splice(i, 1); else _mltFiltro.orgaos.push(k);
+  mltAtualizarBotaoOrgaos();
+  mltRender();
+}
+
+function mltOrgaosTodos(marcar){
+  if (!marcar) { _mltFiltro.orgaos = []; }
+  else {
+    var todas = [];
+    var temSem = false;
+    mltMultas().forEach(function(m){
+      var k = mltOrgaoChave(m);
+      if (!k) { temSem = true; return; }
+      if (todas.indexOf(k) < 0) todas.push(k);
+    });
+    if (temSem) todas.push('__sem__');
+    _mltFiltro.orgaos = todas;
+  }
+  mltPreencherFiltroOrgaos();
+  mltRender();
+}
+
+function mltAbrirOrgaos(ev){
+  if (ev) ev.stopPropagation();
+  var p = document.getElementById('mltPainelOrgaos');
+  if (!p) return;
+  var abrir = p.style.display === 'none';
+  p.style.display = abrir ? 'block' : 'none';
+  if (abrir) mltPreencherFiltroOrgaos();
+}
+
+function mltFecharOrgaos(){
+  var p = document.getElementById('mltPainelOrgaos');
+  if (p) p.style.display = 'none';
+}
+
+// Clicar fora fecha — senão o painel fica por cima da lista atrapalhando.
+document.addEventListener('click', function(e){
+  var p = document.getElementById('mltPainelOrgaos');
+  if (!p || p.style.display === 'none') return;
+  if (p.contains(e.target)) return;
+  var bt = document.getElementById('mltBtnOrgaos');
+  if (bt && bt.contains(e.target)) return;
+  p.style.display = 'none';
+});
 
 function mltPreencherFiltroPlacas(){
   var sel = document.getElementById('mltFPlaca');
@@ -8434,17 +8519,17 @@ function mltAplicarFiltro(){
   _mltFiltro.q      = (document.getElementById('mltFBusca')||{}).value || '';
   _mltFiltro.status = (document.getElementById('mltFStatus')||{}).value || '';
   _mltFiltro.cliente= (document.getElementById('mltFCliente')||{}).value || '';
-  _mltFiltro.orgao  = (document.getElementById('mltFOrgao')||{}).value || '';
   _mltFiltro.de     = (document.getElementById('mltFDe')||{}).value || '';
   _mltFiltro.ate    = (document.getElementById('mltFAte')||{}).value || '';
   mltRender();
 }
 
 function mltLimparFiltro(){
-  ['mltFBusca','mltFStatus','mltFPlaca','mltFCliente','mltFOrgao','mltFDe','mltFAte'].forEach(function(id){
+  ['mltFBusca','mltFStatus','mltFPlaca','mltFCliente','mltFDe','mltFAte'].forEach(function(id){
     var el = document.getElementById(id); if (el) el.value = '';
   });
-  _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', orgao:'', de:'', ate:''};
+  _mltFiltro = {q:'', status:'', placa:'', finais:[], cliente:'', orgaos:[], de:'', ate:''};
+  if (typeof mltAtualizarBotaoOrgaos === 'function') mltAtualizarBotaoOrgaos();
   // Limpar os botões de final de placa
   if (typeof mltLimparFinais === 'function') mltLimparFinais();
   else mltRender();
@@ -8476,10 +8561,12 @@ function mltFiltradas(){
     var d = mltISO(m.dataInfracao);
     if (f.de  && (!d || d < f.de))  return false;
     if (f.ate && (!d || d > f.ate)) return false;
-    if (f.orgao) {
+    // Multi-seleção: lista vazia = sem filtro (mostra tudo). Com itens
+    // marcados, a multa passa se o órgão dela estiver entre os escolhidos.
+    if (f.orgaos && f.orgaos.length) {
       var ko = mltOrgaoChave(m);
-      if (f.orgao === '__sem__') { if (ko) return false; }
-      else if (ko !== f.orgao) return false;
+      var alvo = ko || '__sem__';
+      if (f.orgaos.indexOf(alvo) < 0) return false;
     }
     if (q) {
       var alvo = [m.ait, m.placa, m.clienteNome, m.descricao, m.orgao, m.local]
