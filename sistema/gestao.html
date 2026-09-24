@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v93-20260924-1040 -->
+<!-- LOKA deploy: v94-20260924-1115 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -920,6 +920,32 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <!-- MODAL: ALUGUEL -->
+<div class="modal-bg" id="mBaixaMultas"><div class="modal" style="max-width:460px">
+  <div class="modal-head"><h3>Baixar multas como pagas</h3><button class="modal-close" onclick="closeM('mBaixaMultas')">&#10005;</button></div>
+  <div class="modal-body">
+    <div id="mltBaixaResumo" style="background:#EEF1FD;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px"></div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Data do pagamento *</label><input class="fi" id="mltBaixaData" type="date"></div>
+      <div class="fg"><label class="fl">Situa&ccedil;&atilde;o</label>
+        <select class="fs" id="mltBaixaStatus">
+          <option value="paga">Paga</option>
+          <option value="cobrada">Cobrada do locat&aacute;rio</option>
+          <option value="repassada">Repassada</option>
+        </select></div>
+    </div>
+    <div class="fg"><label class="fl">Valor pago <span style="font-weight:400;color:var(--muted)">— por multa, opcional</span></label>
+      <input class="fi" id="mltBaixaValor" placeholder="Em branco = valor de cada multa">
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">
+        Preencha s&oacute; se todas foram pagas pelo mesmo valor (ex.: desconto de 40% igual para todas).
+        Em branco, cada multa &eacute; baixada pelo pr&oacute;prio valor.</div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mBaixaMultas')">Cancelar</button>
+    <button class="btn btn-green" onclick="mltBaixaConfirmar()">&#128176; Confirmar baixa</button>
+  </div>
+</div></div>
+
 <div class="modal-bg" id="mMulta"><div class="modal">
   <div class="modal-head"><h3 id="mltModalTitulo">Nova Multa</h3><button class="modal-close" onclick="closeM('mMulta')">&#10005;</button></div>
   <div class="modal-body">
@@ -1161,7 +1187,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v93-20260924-1040';
+var LOKA_BUILD = 'v94-20260924-1115';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8932,8 +8958,15 @@ function mltRender(){
     return;
   }
 
-  var h = '<div class="table-card"><div class="table-scroll"><table>'
+  // Limpa da seleção o que saiu do filtro atual: manter marcada uma multa que
+  // não está mais na tela levaria a dar baixa em algo invisível.
+  var visiveis = {}; lista.forEach(function(m){ visiveis[m.id] = 1; });
+  Object.keys(_mltBaixaSel).forEach(function(id){ if (!visiveis[id]) delete _mltBaixaSel[id]; });
+
+  var h = mltBarraBaixa(lista)
+    + '<div class="table-card"><div class="table-scroll"><table>'
     + '<thead><tr>'
+    + '<th style="width:32px"><input type="checkbox" id="mltChkTodas" onchange="mltBaixaTodasVisiveis(this.checked)" title="Selecionar todas as filtradas"></th>'
     + '<th>Veículo</th><th>AIT / Infração</th><th>Data</th>'
     + '<th>Locatário</th><th>Valor</th><th>Pagamento</th><th>Prazos</th><th>Status</th><th></th>'
     + '</tr></thead><tbody>';
@@ -8973,7 +9006,13 @@ function mltRender(){
     var grav = m.gravidade && MLT_GRAV[m.gravidade]
       ? '<span style="font-size:9px;color:var(--muted)"> · '+MLT_GRAV[m.gravidade].rot+' ('+(m.pontos||MLT_GRAV[m.gravidade].pts)+' pts)</span>' : '';
 
-    h += '<tr>'
+    // Já paga ou cancelada não entra em baixa — evita "pagar" duas vezes.
+    var podeBaixar = (m.status !== 'paga' && m.status !== 'cancelada');
+    h += '<tr'+(_mltBaixaSel[m.id]?' style="background:#f2f5ff"':'')+'>'
+      + '<td>'+(podeBaixar
+          ? '<input type="checkbox" '+(_mltBaixaSel[m.id]?'checked':'')
+            + ' onchange="mltBaixaToggle(\''+m.id+'\', this.checked)">'
+          : '<span title="Já paga ou cancelada" style="color:var(--muted)">—</span>')+'</td>'
       + '<td><strong style="font-size:12px">'+mltFmtPlaca(m.placa)+'</strong>'
         + '<div style="font-size:10px;color:var(--muted)">'+(m.veiculoNome||'—')+'</div></td>'
       + '<td><div style="font-size:11px;font-weight:600">'+(m.ait||'—')+'</div>'
@@ -9190,6 +9229,105 @@ function mltExcluir(id){
   saveDB();
   mltRender();
   toast('Multa excluída','#5a607a');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BAIXA EM LOTE — marcar multas como pagas
+// ═══════════════════════════════════════════════════════════════
+// A seleção vale sobre o que está FILTRADO na tela. Os filtros que já existem
+// (data de/até, placa, locatário, órgão, status) fazem o recorte; aqui só se
+// marca e se dá baixa. Assim "pagar tudo da RSC em agosto" é: filtrar por
+// locatário + período, selecionar todas, baixar.
+var _mltBaixaSel = {};
+
+function mltBaixaToggle(id, v){
+  if (v) _mltBaixaSel[id] = 1; else delete _mltBaixaSel[id];
+  mltRender();
+}
+
+function mltBaixaTodasVisiveis(v){
+  mltFiltradas().forEach(function(m){
+    if (m.status === 'paga' || m.status === 'cancelada') return;   // não reabre paga
+    if (v) _mltBaixaSel[m.id] = 1; else delete _mltBaixaSel[m.id];
+  });
+  mltRender();
+}
+
+function mltBaixaSelecionadas(){
+  return mltFiltradas().filter(function(m){ return _mltBaixaSel[m.id]; });
+}
+
+// A barra só aparece quando há algo marcado — sem poluir a tela no uso normal.
+function mltBarraBaixa(lista){
+  var sel = lista.filter(function(m){ return _mltBaixaSel[m.id]; });
+  if (!sel.length) return '';
+  var soma = sel.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
+  return '<div style="background:#0E1B4D;color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:10px;'
+    + 'display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    + '<strong style="font-size:13px">' + sel.length + ' multa(s) selecionada(s)</strong>'
+    + '<span style="font-size:12px;opacity:.85">Total ' + brl(soma) + '</span>'
+    + '<button class="btn btn-green" style="font-size:11px;margin-left:auto" onclick="mltBaixaAbrir()">💰 Baixar como pagas</button>'
+    + '<button class="btn btn-outline" style="font-size:11px" onclick="mltBaixaLimpar()">Limpar seleção</button>'
+    + '</div>';
+}
+
+function mltBaixaLimpar(){ _mltBaixaSel = {}; mltRender(); }
+
+function mltBaixaAbrir(){
+  var sel = mltBaixaSelecionadas();
+  if (!sel.length) { toast('Selecione ao menos uma multa','#b45309'); return; }
+  var soma = sel.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
+  var hoje = new Date().toISOString().slice(0,10);
+
+  var el = document.getElementById('mltBaixaResumo');
+  if (el) {
+    el.innerHTML = '<strong>' + sel.length + ' multa(s)</strong> · valor somado <strong>' + brl(soma) + '</strong>';
+  }
+  var d = document.getElementById('mltBaixaData');   if (d) d.value = hoje;
+  var v = document.getElementById('mltBaixaValor');  if (v) v.value = '';
+  var s = document.getElementById('mltBaixaStatus'); if (s) s.value = 'paga';
+  openM('mBaixaMultas');
+}
+
+// Grava a baixa. O valor pago é opcional: em branco, cada multa é baixada pelo
+// próprio valor — é o caso comum. Preenchido, aquele valor vale para TODAS as
+// selecionadas, que serve para pagamento com desconto uniforme (os 40% do SNE,
+// por exemplo). Por isso o campo avisa que é por multa, não o total.
+function mltBaixaConfirmar(){
+  var sel = mltBaixaSelecionadas();
+  if (!sel.length) { closeM('mBaixaMultas'); return; }
+
+  var data  = (document.getElementById('mltBaixaData')||{}).value || '';
+  var vTxt  = (document.getElementById('mltBaixaValor')||{}).value || '';
+  var novo  = (document.getElementById('mltBaixaStatus')||{}).value || 'paga';
+  if (!data) { toast('Informe a data do pagamento','#b45309'); return; }
+
+  // mltNum devolve 0 para texto sem número ("abc"), e 0 é um valor pago
+  // legítimo — então exigir dígito antes, senão um erro de digitação baixaria
+  // tudo por R$ 0,00 sem avisar.
+  var vUnit = null;
+  if (vTxt.trim()) {
+    if (!/\d/.test(vTxt)) { toast('Valor pago inválido','#b45309'); return; }
+    vUnit = mltNum(vTxt);
+    if (isNaN(vUnit) || vUnit < 0) { toast('Valor pago inválido','#b45309'); return; }
+  }
+
+  var total = sel.reduce(function(s,m){ return s + (vUnit !== null ? vUnit : mltNum(m.valor)); }, 0);
+  if (!confirm('Baixar ' + sel.length + ' multa(s) como "' + (MLT_STATUS[novo]||{}).rot + '"?\n\n'
+    + 'Data: ' + mltBR(data) + '\n'
+    + 'Valor: ' + (vUnit !== null ? brl(vUnit) + ' em cada uma' : 'o valor de cada multa')
+    + '\nTotal: ' + brl(total))) return;
+
+  sel.forEach(function(m){
+    m.status        = novo;
+    m.dataPagamento = data;
+    m.valorPago     = (vUnit !== null ? vUnit : mltNum(m.valor));
+  });
+  _mltBaixaSel = {};
+  saveDB();
+  closeM('mBaixaMultas');
+  mltRender();
+  toast('✓ ' + sel.length + ' multa(s) baixada(s) — ' + brl(total), '#0d7a3e');
 }
 
 // ── RELATÓRIO ──────────────────────────────────────────────────
