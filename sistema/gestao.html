@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v92-20260924-0955 -->
+<!-- LOKA deploy: v93-20260924-1040 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -512,6 +512,7 @@ tr:hover td{background:#f8f9fe;}
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button id="mltTabLista"    class="btn btn-blue"    onclick="mltMostrarAba('lista')"    style="font-size:11px;padding:8px 14px">&#128220; Multas</button>
         <button id="mltTabImportar" class="btn btn-outline" onclick="mltMostrarAba('importar')" style="font-size:11px;padding:8px 14px">&#128228; Importar PDF</button>
+        <button id="mltTabIndicacao" class="btn btn-outline" onclick="mltMostrarAba('indicacao')" style="font-size:11px;padding:8px 14px">&#128100; Indica&ccedil;&atilde;o de Condutor</button>
       </div>
 
       <!-- ABA LISTA -->
@@ -582,6 +583,23 @@ tr:hover td{background:#f8f9fe;}
         </div>
         <div id="mltFila"></div>
         <div id="mltConferencia"></div>
+      </div>
+
+      <!-- ABA INDICAÇÃO DE CONDUTOR -->
+      <div id="mltAbaIndicacao" style="display:none">
+        <div id="mltIndResumo" class="stats" style="margin-bottom:12px"></div>
+        <div class="toolbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="flex:1;min-width:200px">
+            <strong style="font-size:13px;color:var(--dark)">Multas aguardando indicação</strong>
+            <div style="font-size:10px;color:var(--muted)">Agrupadas por locatário — o sistema já identificou quem estava com o veículo</div>
+          </div>
+          <select class="filter-sel" id="mltIndCliente" onchange="mltIndRender()" style="min-width:180px"></select>
+          <button class="btn btn-outline" onclick="mltIndMarcarTodas(true)"  style="font-size:11px">Marcar todas</button>
+          <button class="btn btn-outline" onclick="mltIndMarcarTodas(false)" style="font-size:11px">Limpar</button>
+          <button class="btn btn-blue"  onclick="mltIndGerarFormulario()" style="font-size:11px">&#128196; Gerar formul&aacute;rio</button>
+          <button class="btn btn-green" onclick="mltIndMarcarIndicadas()"  style="font-size:11px">&#10003; Marcar como indicadas</button>
+        </div>
+        <div id="mltIndGrid"></div>
       </div>
 
     </div>
@@ -1143,7 +1161,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v92-20260924-0955';
+var LOKA_BUILD = 'v93-20260924-1040';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8299,8 +8317,145 @@ function _aplicarRestricaoMultas(){
   if (r) mltMostrarAba('lista');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// INDICAÇÃO DE CONDUTOR
+// ═══════════════════════════════════════════════════════════════
+// A indicação oficial acontece no SNE/e-Frotas, por representante legal —
+// não há endpoint público confirmado para efetivá-la (ver documento técnico
+// de 24/09/2026, item 17). O que o sistema faz aqui é todo o trabalho que
+// antecede: dizer QUEM estava com o carro, reunir os dados e emitir o
+// formulário preenchido. O envio segue manual, no portal.
+var _mltIndSel = {};
+
+function mltIndCandidatas(){
+  return mltMultas().filter(function(m){
+    if (m.status === 'paga' || m.status === 'cancelada' || m.status === 'indicada') return false;
+    return !!m.clienteId;   // sem locatário identificado não há quem indicar
+  });
+}
+
+function mltIndCliente(m){
+  return (db.clients || []).filter(function(c){ return c.id === m.clienteId; })[0] || null;
+}
+
+// Dias restantes para indicar. Só existe quando o prazo veio do órgão —
+// não inventamos data: indicar fora do prazo não vale, e um prazo chutado
+// daria falsa segurança. Sem prazo, mostra "não informado".
+function mltIndDias(m){
+  return m.prazoIndicacao ? mltDiasAte(m.prazoIndicacao) : null;
+}
+
+function mltIndRender(){
+  var grid = document.getElementById('mltIndGrid');
+  if (!grid) return;
+  var filtroCli = (document.getElementById('mltIndCliente') || {}).value || '';
+  var todas = mltIndCandidatas();
+  var lista = filtroCli ? todas.filter(function(m){ return m.clienteId === filtroCli; }) : todas;
+
+  // Resumo
+  var res = document.getElementById('mltIndResumo');
+  if (res) {
+    var comPrazo = todas.filter(function(m){ return m.prazoIndicacao; }).length;
+    var vencendo = todas.filter(function(m){ var d = mltIndDias(m); return d !== null && d <= 5; }).length;
+    var clis = {}; todas.forEach(function(m){ clis[m.clienteId] = 1; });
+    res.innerHTML =
+        '<div class="stat"><div class="stat-num">' + todas.length + '</div><div class="stat-lbl">A indicar</div></div>'
+      + '<div class="stat"><div class="stat-num">' + Object.keys(clis).length + '</div><div class="stat-lbl">Locatários</div></div>'
+      + '<div class="stat"><div class="stat-num" style="color:' + (comPrazo ? 'var(--dark)' : '#b45309') + '">' + comPrazo + '</div><div class="stat-lbl">Com prazo do órgão</div></div>'
+      + '<div class="stat"><div class="stat-num" style="color:' + (vencendo ? 'var(--red)' : 'var(--dark)') + '">' + vencendo + '</div><div class="stat-lbl">Vencendo (5 dias)</div></div>';
+  }
+
+  // Filtro de locatário
+  var sel = document.getElementById('mltIndCliente');
+  if (sel && !sel.dataset.pronto) {
+    var nomes = {};
+    todas.forEach(function(m){ nomes[m.clienteId] = m.clienteNome || m.clienteId; });
+    var h = '<option value="">Todos os locatários</option>';
+    Object.keys(nomes).sort(function(a,b){ return String(nomes[a]).localeCompare(String(nomes[b])); })
+      .forEach(function(id){ h += '<option value="' + id + '">' + nomes[id] + '</option>'; });
+    sel.innerHTML = h;
+    sel.dataset.pronto = '1';
+  }
+
+  if (!lista.length) {
+    grid.innerHTML = '<div style="background:#fff;border-radius:10px;padding:28px;text-align:center;color:var(--muted);font-size:13px">'
+      + (todas.length ? 'Nenhuma multa para este locatário.' : 'Nenhuma multa aguardando indicação. 🎉') + '</div>';
+    return;
+  }
+
+  // Agrupa por locatário: são poucos locatários para muitas multas, então
+  // indicar em bloco é o caminho natural.
+  var grupos = {};
+  lista.forEach(function(m){ (grupos[m.clienteId] = grupos[m.clienteId] || []).push(m); });
+
+  var html = '';
+  Object.keys(grupos).sort(function(a,b){ return grupos[b].length - grupos[a].length; }).forEach(function(cid){
+    var ms = grupos[cid];
+    var c  = mltIndCliente(ms[0]);
+    var doc = c ? mltIndDoc(c) : null;
+    html += '<div style="background:#fff;border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
+      + '<div style="background:#f6f7fc;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      + '<input type="checkbox" onchange="mltIndMarcarGrupo(\'' + cid + '\', this.checked)" title="Marcar todas deste locatário">'
+      + '<strong style="font-size:13px;color:var(--dark)">' + (ms[0].clienteNome || '—') + '</strong>'
+      + (doc ? '<span class="badge" style="background:#eaeeff;color:#2B4BF2">' + doc.rotulo + ' ' + doc.fmt + '</span>'
+             : '<span class="badge" style="background:#fdecea;color:#c0392b">sem CPF/CNPJ no cadastro</span>')
+      + '<span style="margin-left:auto;font-size:11px;color:var(--muted)">' + ms.length + ' multa(s)</span>'
+      + '</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>';
+    ms.forEach(function(m){
+      var d = mltIndDias(m);
+      var prazo = m.prazoIndicacao
+        ? '<span style="color:' + (d !== null && d <= 5 ? 'var(--red)' : 'var(--dark)') + ';font-weight:700">'
+          + mltBR(m.prazoIndicacao) + (d !== null ? ' (' + d + 'd)' : '') + '</span>'
+        : '<span style="color:#b45309">não informado</span>';
+      html += '<tr style="border-bottom:1px solid #eef0f8">'
+        + '<td style="padding:7px 12px;width:28px"><input type="checkbox" ' + (_mltIndSel[m.id] ? 'checked' : '')
+          + ' onchange="mltIndToggle(\'' + m.id + '\', this.checked)"></td>'
+        + '<td style="padding:7px 4px"><strong>' + mltFmtPlaca(m.placa) + '</strong></td>'
+        + '<td style="padding:7px 4px;font-variant-numeric:tabular-nums">' + (m.ait || '—') + '</td>'
+        + '<td style="padding:7px 4px">' + mltBR(m.dataInfracao) + '</td>'
+        + '<td style="padding:7px 4px;color:var(--muted);max-width:280px">' + (m.descricao || '—') + '</td>'
+        + '<td style="padding:7px 12px;text-align:right">' + prazo + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+  grid.innerHTML = html;
+}
+
+// Documento do locatário: 14 dígitos = CNPJ (empresa), 11 = CPF (pessoa).
+// Quase todos os locatários da LOKÁ são empresas, e empresa não tem CNH —
+// por isso o formulário não exige CNH quando o indicado é pessoa jurídica.
+function mltIndDoc(c){
+  var d = String(c.cpf || '').replace(/\D/g, '');
+  if (d.length === 14) return { rotulo:'CNPJ', fmt: d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'), pj:true,  bruto:d };
+  if (d.length === 11) return { rotulo:'CPF',  fmt: d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),        pj:false, bruto:d };
+  return null;
+}
+
+function mltIndToggle(id, v){ if (v) _mltIndSel[id] = 1; else delete _mltIndSel[id]; }
+
+function mltIndMarcarGrupo(cid, v){
+  mltIndCandidatas().filter(function(m){ return m.clienteId === cid; })
+    .forEach(function(m){ if (v) _mltIndSel[m.id] = 1; else delete _mltIndSel[m.id]; });
+  mltIndRender();
+}
+
+function mltIndMarcarTodas(v){
+  if (!v) _mltIndSel = {};
+  else {
+    var filtroCli = (document.getElementById('mltIndCliente') || {}).value || '';
+    mltIndCandidatas().forEach(function(m){
+      if (!filtroCli || m.clienteId === filtroCli) _mltIndSel[m.id] = 1;
+    });
+  }
+  mltIndRender();
+}
+
+function mltIndSelecionadas(){
+  return mltIndCandidatas().filter(function(m){ return _mltIndSel[m.id]; });
+}
+
 function mltMostrarAba(aba){
-  ['lista','importar'].forEach(function(a){
+  ['lista','importar','indicacao'].forEach(function(a){
     var el = document.getElementById('mltAba' + a.charAt(0).toUpperCase() + a.slice(1));
     if (el) el.style.display = (a === aba) ? 'block' : 'none';
     var bt = document.getElementById('mltTab' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -8308,6 +8463,123 @@ function mltMostrarAba(aba){
   });
   if (aba === 'lista') mltRender();
   if (aba === 'importar') mltPreencherClientePadrao();
+  if (aba === 'indicacao') mltIndRender();
+}
+
+// ── Formulário de Identificação do Condutor ────────────────────
+// Um por multa, na ordem do locatário, cada um em sua página. Os dados que o
+// sistema conhece vêm preenchidos; o que depende do condutor (CNH, assinatura)
+// fica em branco para preencher à mão — é o que a locadora entrega hoje.
+function mltIndGerarFormulario(){
+  var sel = mltIndSelecionadas();
+  if (!sel.length) { toast('⚠️ Marque ao menos uma multa', '#b45309'); return; }
+
+  var esc = function(s){ return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var linha = function(rot, val){
+    return '<div class="c"><div class="r">' + rot + '</div><div class="v">' + (val || '&nbsp;') + '</div></div>';
+  };
+
+  var paginas = sel.map(function(m){
+    var c = mltIndCliente(m) || {};
+    var doc = mltIndDoc(c);
+    var v = (db.veiculos || []).filter(function(x){ return mltNormPlaca(x.placa) === mltNormPlaca(m.placa); })[0] || {};
+    return '<div class="pg">'
+      + '<div class="hd"><div><div class="t1">FORMULÁRIO DE IDENTIFICAÇÃO DO CONDUTOR INFRATOR</div>'
+      + '<div class="t2">Art. 257, §7º do Código de Trânsito Brasileiro</div></div>'
+      + '<div class="lg">LOKÁ</div></div>'
+
+      + '<div class="sec">1 · Auto de Infração</div>'
+      + '<div class="g">' + linha('Nº do AIT', esc(m.ait))
+      + linha('Órgão autuador', esc(m.orgao))
+      + linha('Data', mltBR(m.dataInfracao)) + linha('Hora', esc(m.horaInfracao))
+      + linha('Código da infração', esc(m.codigoInfracao)) + '</div>'
+      + '<div class="c full">' + '<div class="r">Descrição</div><div class="v">' + esc(m.descricao) + '</div></div>'
+      + (m.local ? '<div class="c full"><div class="r">Local</div><div class="v">' + esc(m.local) + '</div></div>' : '')
+
+      + '<div class="sec">2 · Veículo</div>'
+      + '<div class="g">' + linha('Placa', mltFmtPlaca(m.placa))
+      + linha('Marca / Modelo', esc((v.marca || '') + ' ' + (v.modelo || '')).trim() || esc(m.veiculoNome))
+      + linha('RENAVAM', esc(v.renavam)) + linha('Ano', esc(v.ano || v.anoModelo)) + '</div>'
+
+      + '<div class="sec">3 · Proprietário do veículo</div>'
+      + '<div class="g">' + linha('Razão social', 'LOKÁ ALUGUEL DE VEÍCULOS')
+      + linha('CNPJ', '39.911.638/0001-10')
+      + linha('Município / UF', 'Feira de Santana / BA') + '</div>'
+
+      + '<div class="sec">4 · Condutor / responsável identificado</div>'
+      + '<div class="g">' + linha(doc && doc.pj ? 'Razão social' : 'Nome completo', esc(c.nome))
+      + linha(doc ? doc.rotulo : 'CPF / CNPJ', doc ? doc.fmt : '')
+      + (doc && doc.pj ? '' : linha('CNH nº', esc(c.cnh)) + linha('Categoria', esc(c.cnhCat)))
+      + linha('Telefone', esc(c.telefone)) + '</div>'
+      + '<div class="c full"><div class="r">Endereço</div><div class="v">' + esc(c.endereco) + '</div></div>'
+
+      + (doc && doc.pj
+          ? '<p class="obs">Locatário pessoa jurídica: a responsabilidade pela infração é transferida à empresa acima, '
+            + 'conforme contrato de locação vigente na data da autuação. Cabe à empresa, se for o caso, indicar o condutor.</p>'
+          : '')
+
+      + '<div class="sec">5 · Declaração e assinaturas</div>'
+      + '<p class="dec">Declaro, sob as penas da lei, que na data e hora da infração acima o veículo estava sob '
+      + 'responsabilidade do condutor identificado no item 4, conforme contrato de locação firmado com a LOKÁ Aluguel de Veículos.</p>'
+      + '<div class="ass"><div><div class="ln"></div>Proprietário (LOKÁ)</div>'
+      + '<div><div class="ln"></div>Condutor / responsável identificado</div></div>'
+      + '<p class="rod">Prazo para indicação: <strong>'
+      + (m.prazoIndicacao ? mltBR(m.prazoIndicacao) : 'consultar no órgão autuador')
+      + '</strong> · Emitido pelo sistema LOKÁ em ' + new Date().toLocaleString('pt-BR') + '</p>'
+      + '</div>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Indicação de condutor — ' + sel.length + ' formulário(s)</title><style>'
+    + 'body{font-family:Montserrat,Arial,sans-serif;color:#0E1B4D;font-size:11px;margin:0;padding:0}'
+    + '.pg{padding:26px 30px;page-break-after:always}'
+    + '.pg:last-child{page-break-after:auto}'
+    + '.hd{display:flex;align-items:flex-start;gap:12px;border-bottom:2px solid #0E1B4D;padding-bottom:8px;margin-bottom:14px}'
+    + '.t1{font-size:14px;font-weight:900;letter-spacing:.2px}.t2{font-size:9px;color:#5a607a;margin-top:2px}'
+    + '.lg{margin-left:auto;font-size:18px;font-weight:900;color:#2B4BF2}'
+    + '.sec{background:#0E1B4D;color:#fff;font-size:9px;font-weight:800;text-transform:uppercase;'
+    + 'letter-spacing:.6px;padding:4px 8px;margin:14px 0 8px;border-radius:3px}'
+    + '.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}'
+    + '.c{margin-bottom:6px}.c.full{margin-top:6px}'
+    + '.r{font-size:8px;color:#5a607a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}'
+    + '.v{border-bottom:1px solid #9aa2c4;padding:2px 2px 3px;font-size:11px;min-height:15px}'
+    + '.obs{background:#eef1fd;border-left:3px solid #2B4BF2;padding:7px 10px;font-size:9.5px;margin:10px 0 0;line-height:1.5}'
+    + '.dec{font-size:10px;line-height:1.6;margin:8px 0 22px;text-align:justify}'
+    + '.ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;text-align:center;font-size:9px;color:#5a607a;margin-top:30px}'
+    + '.ln{border-top:1px solid #0E1B4D;margin-bottom:4px}'
+    + '.rod{margin-top:22px;font-size:8.5px;color:#5a607a;border-top:1px solid #e3e6f2;padding-top:6px}'
+    + '@media print{.noprint{display:none}@page{margin:10mm}}'
+    + '</style></head><body>'
+    + '<div class="noprint" style="padding:12px 30px;background:#eef1fd;display:flex;align-items:center;gap:12px">'
+    + '<strong style="font-size:12px">' + sel.length + ' formulário(s) — um por página</strong>'
+    + '<button onclick="window.print()" style="margin-left:auto;padding:8px 18px;background:#0E1B4D;color:#fff;'
+    + 'border:none;border-radius:6px;font-family:inherit;font-weight:700;cursor:pointer">🖨️ Imprimir</button></div>'
+    + paginas + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  else toast('⚠️ O navegador bloqueou a janela. Libere o pop-up.', '#b45309');
+}
+
+// Marca como indicadas. Grava a data para servir de comprovação interna —
+// o sistema não tem como saber sozinho que o envio ao órgão aconteceu.
+function mltIndMarcarIndicadas(){
+  var sel = mltIndSelecionadas();
+  if (!sel.length) { toast('⚠️ Marque ao menos uma multa', '#b45309'); return; }
+  if (!confirm('Marcar ' + sel.length + ' multa(s) como "Condutor Indicado"?\n\n'
+    + 'Use isto DEPOIS de enviar a indicação ao órgão — o sistema não faz o envio.')) return;
+
+  var hoje = new Date().toISOString().slice(0, 10);
+  sel.forEach(function(m){
+    m.status = 'indicada';
+    m.indicadoEm = hoje;
+  });
+  _mltIndSel = {};
+  saveDB();
+  mltIndRender();
+  if (typeof mltRender === 'function') mltRender();
+  toast('✓ ' + sel.length + ' multa(s) marcada(s) como indicada(s)', '#0d7a3e');
 }
 
 function mltPreencherClientePadrao(){
