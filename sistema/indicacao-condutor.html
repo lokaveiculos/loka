@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<!-- LOKA deploy: v1-20260925-0940 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indicação de Condutor · LOKÁ</title>
+<style>
+  :root{
+    --blue:#2B4BF2; --dark:#0E1B4D; --light:#EEF1FD; --field:#F7F8FF;
+    --border:#C5CCF5; --muted:#5a607a; --green:#0d7a3e; --red:#c0392b; --amber:#b45309;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:var(--light); color:var(--dark); line-height:1.5; padding:20px;
+    max-width:880px; margin:0 auto;}
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;
+    padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .logo{width:40px;height:40px;border-radius:10px;
+    background:linear-gradient(135deg,var(--dark),var(--blue));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800}
+  h1{font-size:17px;font-weight:800}
+  .sub{font-size:11px;color:var(--muted)}
+  .card{background:#fff;border-radius:12px;padding:18px 20px;margin-bottom:14px;
+    box-shadow:0 1px 4px rgba(14,27,77,.06)}
+  .sec{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.5px;margin-bottom:12px}
+  .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .fg{display:flex;flex-direction:column}
+  .fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.3px;margin-bottom:3px}
+  .fi{padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;
+    font-size:13px;font-family:inherit;background:var(--field);color:var(--dark);width:100%}
+  .fi:focus{outline:none;border-color:var(--blue)}
+  .fi.erro{border-color:var(--red);background:#fdecea}
+  .aviso{background:#fff4e5;border-left:4px solid var(--amber);border-radius:8px;
+    padding:11px 13px;font-size:12px;color:#7a4a00;margin-bottom:14px;line-height:1.55}
+  .acoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .btn{border:none;border-radius:8px;padding:10px 18px;font-size:12px;font-weight:700;
+    cursor:pointer;font-family:inherit}
+  .btn-blue{background:var(--blue);color:#fff}
+  .btn-outline{background:#fff;color:var(--dark);border:1.5px solid var(--border)}
+  .btn:hover{filter:brightness(1.05)}
+  .req{color:var(--red)}
+  .msg{font-size:12px;font-weight:600;margin-top:10px;min-height:18px}
+
+  /* ── Impressão: vira o documento a assinar ── */
+  @media print{
+    body{padding:0;max-width:none;background:#fff}
+    .noprint{display:none !important}
+    .card{box-shadow:none;border:none;padding:0 0 10px;margin-bottom:8px;border-radius:0}
+    .sec{background:var(--dark);color:#fff;padding:4px 8px;border-radius:3px;margin:12px 0 8px}
+    .fi{border:none;border-bottom:1px solid #9aa2c4;border-radius:0;background:transparent;
+      font-size:12px;padding:2px}
+    .fl{font-size:8px}
+    @page{margin:12mm}
+  }
+  .ass{display:grid;grid-template-columns:1fr 1fr;gap:40px;text-align:center;
+    font-size:10px;color:var(--muted);margin-top:34px}
+  .ln{border-top:1px solid var(--dark);margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">L</div>
+  <div>
+    <h1>Indicação de Condutor</h1>
+    <div class="sub">Dados necessários para indicar o condutor no SENATRAN · LOKÁ Aluguel de Veículos</div>
+  </div>
+</div>
+
+<div class="aviso noprint">
+  <strong>Como usar:</strong> preencha e imprima para colher a assinatura do condutor.
+  A indicação oficial é feita no <strong>portal do SENATRAN/SNE</strong> por representante
+  legal — este formulário reúne os dados e serve de comprovação interna, não substitui o envio.
+  <br><strong>Prazo legal: 15 dias</strong> a partir da notificação.
+</div>
+
+<div class="card">
+  <div class="sec">1 · Infração</div>
+  <div class="g">
+    <div class="fg"><label class="fl">Nº do AIT <span class="req">*</span></label>
+      <input class="fi" id="ait" placeholder="Ex.: E479002198"></div>
+    <div class="fg"><label class="fl">Código do órgão <span class="req">*</span></label>
+      <input class="fi" id="codigoOrgao" placeholder="Ex.: 105300" inputmode="numeric"></div>
+    <div class="fg"><label class="fl">Código da infração</label>
+      <input class="fi" id="codigoInfracao" placeholder="Ex.: 6610" inputmode="numeric"></div>
+    <div class="fg"><label class="fl">Placa <span class="req">*</span></label>
+      <input class="fi" id="placa" placeholder="ABC1D23" style="text-transform:uppercase"></div>
+    <div class="fg"><label class="fl">Data da infração <span class="req">*</span></label>
+      <input class="fi" id="data" type="date"></div>
+    <div class="fg"><label class="fl">Hora</label>
+      <input class="fi" id="hora" type="time"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="sec">2 · Condutor a indicar</div>
+  <div class="g">
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Nome completo / Razão social <span class="req">*</span></label>
+      <input class="fi" id="nome" placeholder="Como consta no documento"></div>
+    <div class="fg"><label class="fl">CPF ou CNPJ <span class="req">*</span></label>
+      <input class="fi" id="doc" placeholder="000.000.000-00" oninput="mascaraDoc(this)" maxlength="18"></div>
+    <div class="fg"><label class="fl">CNH <span class="sub" style="font-weight:400">— pessoa física</span></label>
+      <input class="fi" id="cnh" placeholder="Nº do registro" inputmode="numeric"></div>
+    <div class="fg"><label class="fl">Categoria</label>
+      <input class="fi" id="cnhCat" placeholder="Ex.: AB" style="text-transform:uppercase" maxlength="3"></div>
+    <div class="fg"><label class="fl">Telefone</label>
+      <input class="fi" id="telefone" placeholder="(75) 00000-0000"></div>
+    <div class="fg" style="grid-column:1/-1"><label class="fl">Endereço</label>
+      <input class="fi" id="endereco" placeholder="Rua, número, bairro, cidade/UF"></div>
+  </div>
+  <div class="aviso noprint" style="margin:14px 0 0">
+    O indicado precisa ter <strong>conta GOV.BR</strong> para aceitar a indicação, e o
+    aceite tem prazo próprio de 30 dias — que <strong>não prorroga</strong> o prazo do auto.
+  </div>
+</div>
+
+<div class="card">
+  <div class="sec">3 · Declaração</div>
+  <p style="font-size:12px;line-height:1.7;text-align:justify">
+    Declaro, sob as penas da lei, que na data e hora da infração indicada no item 1 o veículo
+    de placa <strong id="ecoPlaca">—</strong> estava sob responsabilidade do condutor
+    identificado no item 2, conforme contrato de locação firmado com a
+    <strong>LOKÁ Aluguel de Veículos</strong> — CNPJ 39.911.638/0001-10.
+  </p>
+  <div class="ass">
+    <div><div class="ln"></div>Proprietário (LOKÁ)</div>
+    <div><div class="ln"></div>Condutor indicado</div>
+  </div>
+</div>
+
+<div class="acoes noprint">
+  <button class="btn btn-blue" onclick="imprimir()">🖨️ Imprimir / Salvar PDF</button>
+  <button class="btn btn-outline" onclick="copiarDados()">📋 Copiar dados para o portal</button>
+  <button class="btn btn-outline" onclick="limpar()">Limpar</button>
+</div>
+<div class="msg noprint" id="msg"></div>
+
+<script>
+// Preenche a partir da URL, quando aberto pelo sistema (?ait=…&placa=…).
+// Assim o mesmo formulário serve para uso avulso e para uso a partir da multa.
+(function(){
+  var p = new URLSearchParams(location.search);
+  ['ait','codigoOrgao','codigoInfracao','placa','data','hora',
+   'nome','doc','cnh','cnhCat','telefone','endereco'].forEach(function(k){
+    var v = p.get(k); var el = document.getElementById(k);
+    if (v && el) el.value = v;
+  });
+  ecoar();
+})();
+
+function mascaraDoc(el){
+  var d = el.value.replace(/\D/g,'').slice(0,14);
+  if (d.length <= 11) {
+    el.value = d.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2')
+                .replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  } else {
+    el.value = d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3')
+                .replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2');
+  }
+}
+
+function ecoar(){
+  var p = (document.getElementById('placa').value || '').toUpperCase();
+  document.getElementById('ecoPlaca').textContent = p || '—';
+}
+document.getElementById('placa').addEventListener('input', ecoar);
+
+// Os obrigatórios são os que o SENATRAN exige para identificar a infração e o
+// indicado. Sem eles a indicação não é aceita, então o formulário barra antes
+// de imprimir em vez de deixar sair um papel inútil.
+var OBRIGATORIOS = [
+  ['ait','Nº do AIT'], ['codigoOrgao','Código do órgão'], ['placa','Placa'],
+  ['data','Data da infração'], ['nome','Nome do condutor'], ['doc','CPF ou CNPJ']
+];
+
+function validar(){
+  var faltando = [];
+  OBRIGATORIOS.forEach(function(par){
+    var el = document.getElementById(par[0]);
+    var vazio = !String(el.value || '').trim();
+    el.classList.toggle('erro', vazio);
+    if (vazio) faltando.push(par[1]);
+  });
+  var doc = document.getElementById('doc');
+  var d = String(doc.value||'').replace(/\D/g,'');
+  if (d && d.length !== 11 && d.length !== 14) {
+    doc.classList.add('erro');
+    faltando.push('CPF/CNPJ com 11 ou 14 dígitos');
+  }
+  return faltando;
+}
+
+function imprimir(){
+  var faltando = validar();
+  var msg = document.getElementById('msg');
+  if (faltando.length) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = '⚠ Falta preencher: ' + faltando.join(', ');
+    return;
+  }
+  msg.textContent = '';
+  window.print();
+}
+
+// Texto pronto para colar no portal — evita redigitar e errar.
+function copiarDados(){
+  var v = function(id){ return String((document.getElementById(id)||{}).value || '').trim(); };
+  var t = [
+    'AIT: ' + v('ait'),
+    'Órgão: ' + v('codigoOrgao'),
+    'Código da infração: ' + v('codigoInfracao'),
+    'Placa: ' + v('placa').toUpperCase(),
+    'Data/hora: ' + v('data') + (v('hora') ? ' ' + v('hora') : ''),
+    '',
+    'Condutor: ' + v('nome'),
+    'CPF/CNPJ: ' + v('doc'),
+    'CNH: ' + v('cnh') + (v('cnhCat') ? ' / ' + v('cnhCat') : ''),
+    'Telefone: ' + v('telefone'),
+    'Endereço: ' + v('endereco')
+  ].join('\n');
+  var msg = document.getElementById('msg');
+  navigator.clipboard.writeText(t).then(function(){
+    msg.style.color = 'var(--green)';
+    msg.textContent = '✓ Dados copiados — cole no portal do SENATRAN.';
+  }).catch(function(){
+    msg.style.color = 'var(--amber)';
+    msg.textContent = '⚠ O navegador bloqueou a cópia. Selecione e copie à mão.';
+  });
+}
+
+function limpar(){
+  if (!confirm('Limpar todos os campos?')) return;
+  document.querySelectorAll('.fi').forEach(function(el){ el.value = ''; el.classList.remove('erro'); });
+  document.getElementById('msg').textContent = '';
+  ecoar();
+}
+</script>
+</body>
+</html>

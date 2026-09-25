@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v94-20260924-1115 -->
+<!-- LOKA deploy: v95-20260925-0950 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -594,10 +594,14 @@ tr:hover td{background:#f8f9fe;}
             <div style="font-size:10px;color:var(--muted)">Agrupadas por locatário — o sistema já identificou quem estava com o veículo</div>
           </div>
           <select class="filter-sel" id="mltIndCliente" onchange="mltIndRender()" style="min-width:180px"></select>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">
+            <input type="checkbox" id="mltIndVerInd" onchange="mltIndAlternarIndicadas(this.checked)"> mostrar j&aacute; indicadas</label>
           <button class="btn btn-outline" onclick="mltIndMarcarTodas(true)"  style="font-size:11px">Marcar todas</button>
           <button class="btn btn-outline" onclick="mltIndMarcarTodas(false)" style="font-size:11px">Limpar</button>
           <button class="btn btn-blue"  onclick="mltIndGerarFormulario()" style="font-size:11px">&#128196; Gerar formul&aacute;rio</button>
-          <button class="btn btn-green" onclick="mltIndMarcarIndicadas()"  style="font-size:11px">&#10003; Marcar como indicadas</button>
+          <button class="btn btn-green"   id="mltBtnIndicar"    onclick="mltIndMarcarIndicadas()" style="font-size:11px">&#10003; Marcar como indicadas</button>
+          <button class="btn btn-outline" id="mltBtnDesindicar" onclick="mltIndDesindicar()" style="font-size:11px" title="Desfaz a indica&ccedil;&atilde;o das multas marcadas">&#8634; Desindicar</button>
+          <button class="btn btn-outline" onclick="mltIndExportarLog()" style="font-size:11px" title="Baixa o hist&oacute;rico completo de indica&ccedil;&otilde;es">&#128202; Hist&oacute;rico</button>
         </div>
         <div id="mltIndGrid"></div>
       </div>
@@ -771,6 +775,8 @@ tr:hover td{background:#f8f9fe;}
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div><div><div class="form-card-title">Checklist Vistoria</div><div class="form-card-sub">Inspeção do veículo</div></div></div><div class="form-card-body">Formulário de vistoria com assinatura digital. Versão compartilhável para uso externo (sem login).</div><div class="form-card-foot"><button class="btn btn-outline" onclick="window.open('checklist.html','_blank')">Abrir</button><button class="btn" style="background:#0d7a3e;color:#fff" onclick="window.open('checklist-compartilhavel.html','_blank')">📤 Compartilhável</button><button class="btn" style="background:#1a1a1a;color:#fff" onclick="window.open('checklist-offline.html','_blank')" title="Funciona sem internet — ideal para vistoria em campo">📶 Offline</button><button class="btn btn-outline" onclick="copiarLinkChecklistOffline()">📋 Copiar Link Offline</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#ede9fe"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div><div><div class="form-card-title">Manutenção (Oficina)</div><div class="form-card-sub">Formulário para oficinas</div></div></div><div class="form-card-body">Formulário para as oficinas preencherem os serviços realizados e gerarem o código para importação no sistema.</div><div class="form-card-foot"><button class="btn" style="background:#7c3aed;color:#fff" onclick="window.open('manutencao-oficina.html','_blank')">Abrir Formulário</button><button class="btn btn-outline" onclick="copiarLinkFormManutencao()">📋 Copiar Link</button></div></div>
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#e6f5ec"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="form-card-title">Tabela de Preços</div><div class="form-card-sub">Valores por categoria</div></div></div><div class="form-card-body">Tabela de preços por categoria (diária e mensal). Compartilhável com o cliente por link.</div><div class="form-card-foot"><button class="btn" style="background:#0d7a3e;color:#fff" onclick="window.open('precos.html','_blank')">Abrir Tabela</button><button class="btn btn-outline" onclick="copiarLinkPrecos()">📋 Copiar Link</button></div></div>
+
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#fdecea"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></div><div><div class="form-card-title">Indicação de Condutor</div><div class="form-card-sub">Transferir a multa ao condutor</div></div></div><div class="form-card-body">Formulário com os dados que o SENATRAN exige para indicar o condutor. Imprima para colher a assinatura ou copie os dados para colar no portal. <strong>Prazo legal: 15 dias.</strong></div><div class="form-card-foot"><button class="btn" style="background:#c0392b;color:#fff" onclick="window.open('indicacao-condutor.html','_blank')">Abrir Formulário</button><button class="btn btn-outline" onclick="copiarLinkIndicacao()">📋 Copiar Link</button></div></div>
 
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#EEF1FD"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><div class="form-card-title">Orçamento Online</div><div class="form-card-sub">Cliente cota e envia pedido</div></div></div><div class="form-card-body">Formulário mobile: o cliente escolhe categoria e período, vê o preço na hora e envia o pedido pelo WhatsApp.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="window.open('orcamento.html','_blank')">Abrir Orçamento</button><button class="btn btn-outline" onclick="copiarLinkOrcamento()">📋 Copiar Link</button></div></div>
       </div>
@@ -1187,7 +1193,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v94-20260924-1115';
+var LOKA_BUILD = 'v95-20260925-0950';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1278,7 +1284,8 @@ var _ACAO_LABEL   = {
   manutencaoIncluir:'Manutenção: incluir novas',
   manutencaoEscopoOficina:'Manutenção: ver só as placas da oficina associada',
   manutencaoEscopoCliente:'Manutenção: ver só as placas locadas ao cliente associado',
-  multasEscopoCliente:'Multas: ver só as multas dos clientes associados'
+  multasEscopoCliente:'Multas: ver só as multas dos clientes associados',
+  indicarCondutor:'Multas: indicar e desindicar condutor'
 };
 
 // ── CURINGA "TODOS" ────────────────────────────────────────────
@@ -1304,9 +1311,9 @@ function _acoesTemCuringa(acoes){ return !!(acoes && acoes[_CURINGA]); }
 // Perfis EMBUTIDOS (fallback — sempre existem, não podem ser excluídos)
 var _PERFIS_BUILTIN = {
   master:   { nome:'Master',   builtin:true, paineis:_TODOS_PAINEIS.slice(),
-              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true } },
+              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true, indicarCondutor:true } },
   admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
-              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true } },
+              acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true, indicarCondutor:true } },
   operador: { nome:'Operador', builtin:true,
               paineis:['dashboard','clientes','ativos','veiculos','faturas','manutencao','fornecedores','multas','formularios','contratos','historico','reserva','cadastro'],
               acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true } },
@@ -6077,6 +6084,13 @@ function copiarLinkChecklistOffline() {
   });
 }
 
+function copiarLinkIndicacao() {
+  var url = window.location.origin + window.location.pathname.replace('gestao.html','') + 'indicacao-condutor.html';
+  navigator.clipboard.writeText(url).then(function() {
+    toast('📋 Link do formulário de indicação copiado!','#0d7a3e');
+  }).catch(function() { prompt('Copie o link do formulário de indicação:', url); });
+}
+
 function copiarLinkPrecos() {
   var url = window.location.origin + window.location.pathname.replace('gestao.html','') + 'precos.html';
   navigator.clipboard.writeText(url).then(function() {
@@ -8353,11 +8367,22 @@ function _aplicarRestricaoMultas(){
 // formulário preenchido. O envio segue manual, no portal.
 var _mltIndSel = {};
 
+// Candidatas a indicar. Quando há multas JÁ indicadas selecionadas, elas
+// também aparecem — senão não haveria como desindicar pela tela.
 function mltIndCandidatas(){
   return mltMultas().filter(function(m){
-    if (m.status === 'paga' || m.status === 'cancelada' || m.status === 'indicada') return false;
+    if (m.status === 'paga' || m.status === 'cancelada') return false;
+    if (m.status === 'indicada') return !!_mltIndVerIndicadas;
     return !!m.clienteId;   // sem locatário identificado não há quem indicar
   });
+}
+var _mltIndVerIndicadas = false;
+function mltIndAlternarIndicadas(v){
+  _mltIndVerIndicadas = !!v;
+  if (!v) {  // saindo da visão, solta o que estava marcado ali
+    mltMultas().forEach(function(m){ if (m.status === 'indicada') delete _mltIndSel[m.id]; });
+  }
+  mltIndRender();
 }
 
 function mltIndCliente(m){
@@ -8403,8 +8428,17 @@ function mltIndRender(){
     sel.dataset.pronto = '1';
   }
 
+  // Só quem tem a ação liberada vê os botões que mexem no status. Ler a aba
+  // continua permitido para quem pode ver Multas — consultar não é agir.
+  var pode = _podeAcao('indicarCondutor');
+  ['mltBtnIndicar','mltBtnDesindicar'].forEach(function(id){
+    var b = document.getElementById(id);
+    if (b) b.style.display = pode ? '' : 'none';
+  });
+
   if (!lista.length) {
-    grid.innerHTML = '<div style="background:#fff;border-radius:10px;padding:28px;text-align:center;color:var(--muted);font-size:13px">'
+    grid.innerHTML = mltIndAvisos()
+      + '<div style="background:#fff;border-radius:10px;padding:28px;text-align:center;color:var(--muted);font-size:13px">'
       + (todas.length ? 'Nenhuma multa para este locatário.' : 'Nenhuma multa aguardando indicação. 🎉') + '</div>';
     return;
   }
@@ -8414,7 +8448,7 @@ function mltIndRender(){
   var grupos = {};
   lista.forEach(function(m){ (grupos[m.clienteId] = grupos[m.clienteId] || []).push(m); });
 
-  var html = '';
+  var html = mltIndAvisos();
   Object.keys(grupos).sort(function(a,b){ return grupos[b].length - grupos[a].length; }).forEach(function(cid){
     var ms = grupos[cid];
     var c  = mltIndCliente(ms[0]);
@@ -8436,7 +8470,12 @@ function mltIndRender(){
       html += '<tr style="border-bottom:1px solid #eef0f8">'
         + '<td style="padding:7px 12px;width:28px"><input type="checkbox" ' + (_mltIndSel[m.id] ? 'checked' : '')
           + ' onchange="mltIndToggle(\'' + m.id + '\', this.checked)"></td>'
-        + '<td style="padding:7px 4px"><strong>' + mltFmtPlaca(m.placa) + '</strong></td>'
+        + '<td style="padding:7px 4px"><strong>' + mltFmtPlaca(m.placa) + '</strong>'
+          + (m.status === 'indicada'
+              ? ' <span class="badge" style="background:#eaeeff;color:#2B4BF2" title="Indicado'
+                + (m.indicadoEm ? ' em ' + mltBR(m.indicadoEm) : '')
+                + (m.indicadoPor ? ' por ' + m.indicadoPor : '') + '">indicado</span>' : '')
+          + '</td>'
         + '<td style="padding:7px 4px;font-variant-numeric:tabular-nums">' + (m.ait || '—') + '</td>'
         + '<td style="padding:7px 4px">' + mltBR(m.dataInfracao) + '</td>'
         + '<td style="padding:7px 4px;color:var(--muted);max-width:280px">' + (m.descricao || '—') + '</td>'
@@ -8588,9 +8627,69 @@ function mltIndGerarFormulario(){
   else toast('⚠️ O navegador bloqueou a janela. Libere o pop-up.', '#b45309');
 }
 
+// ── Registro das movimentações ─────────────────────────────────
+// Indicar condutor tem efeito legal: transfere pontos para outra pessoa. Por
+// isso cada indicação e cada desindicação fica registrada com quem fez e
+// quando — o sistema não tinha trilha de auditoria nenhuma até aqui.
+function mltIndQuemSou(){
+  try {
+    var u = JSON.parse(sessionStorage.getItem('loka_user') || '{}');
+    return u.nome || u.usuario || '—';
+  } catch(e){ return '—'; }
+}
+
+function mltIndRegistrar(m, acao){
+  if (!db.indicacoes_log) db.indicacoes_log = [];
+  db.indicacoes_log.push({
+    id:        'il' + Date.now() + '_' + Math.floor(Math.random()*1000),
+    multaId:   m.id,
+    ait:       m.ait || '',
+    placa:     m.placa || '',
+    clienteId: m.clienteId || '',
+    cliente:   m.clienteNome || '',
+    acao:      acao,                       // 'indicada' | 'desindicada'
+    usuario:   mltIndQuemSou(),
+    quando:    new Date().toISOString()
+  });
+  // Segura o tamanho: é log de apoio, não arquivo permanente.
+  if (db.indicacoes_log.length > 2000) db.indicacoes_log = db.indicacoes_log.slice(-2000);
+}
+
+// Avisos: as movimentações do dia aparecem em destaque na aba, para quem abrir
+// o sistema ver o que foi indicado/desindicado sem procurar.
+function mltIndAvisos(){
+  var log = (db.indicacoes_log || []).slice();
+  if (!log.length) return '';
+  var limite = Date.now() - 7*24*3600*1000;      // últimos 7 dias
+  var recentes = log.filter(function(r){ return new Date(r.quando).getTime() >= limite; })
+                    .sort(function(a,b){ return b.quando.localeCompare(a.quando); });
+  if (!recentes.length) return '';
+
+  var linhas = recentes.slice(0, 12).map(function(r){
+    var ind = r.acao === 'indicada';
+    var q = new Date(r.quando);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #eef0f8;font-size:11px">'
+      + '<span class="badge" style="background:' + (ind?'#e6f5ec':'#fff4e5') + ';color:' + (ind?'#0d7a3e':'#b45309') + '">'
+      + (ind ? 'indicado' : 'desindicado') + '</span>'
+      + '<strong>' + mltFmtPlaca(r.placa) + '</strong>'
+      + '<span style="color:var(--muted)">' + (r.ait || '—') + '</span>'
+      + '<span style="flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.cliente || '') + '</span>'
+      + '<span style="color:var(--muted)">' + q.toLocaleDateString('pt-BR') + ' ' + q.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) + '</span>'
+      + '<span style="color:var(--blue);font-weight:600">' + r.usuario + '</span></div>';
+  }).join('');
+
+  return '<div style="background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
+    + '<div class="sec-label" style="margin-top:0">🔔 Movimentações dos últimos 7 dias ('
+    + recentes.length + ')</div>' + linhas
+    + (recentes.length > 12 ? '<div style="font-size:10px;color:var(--muted);padding-top:6px">… e mais '
+        + (recentes.length-12) + '. Use o Excel para a lista completa.</div>' : '')
+    + '</div>';
+}
+
 // Marca como indicadas. Grava a data para servir de comprovação interna —
 // o sistema não tem como saber sozinho que o envio ao órgão aconteceu.
 function mltIndMarcarIndicadas(){
+  if (!_podeAcao('indicarCondutor')) { toast('Seu perfil não pode indicar condutor','#b45309'); return; }
   var sel = mltIndSelecionadas();
   if (!sel.length) { toast('⚠️ Marque ao menos uma multa', '#b45309'); return; }
   if (!confirm('Marcar ' + sel.length + ' multa(s) como "Condutor Indicado"?\n\n'
@@ -8600,12 +8699,59 @@ function mltIndMarcarIndicadas(){
   sel.forEach(function(m){
     m.status = 'indicada';
     m.indicadoEm = hoje;
+    m.indicadoPor = mltIndQuemSou();
+    mltIndRegistrar(m, 'indicada');
   });
   _mltIndSel = {};
   saveDB();
   mltIndRender();
   if (typeof mltRender === 'function') mltRender();
   toast('✓ ' + sel.length + ' multa(s) marcada(s) como indicada(s)', '#0d7a3e');
+}
+
+// ── Desindicar ─────────────────────────────────────────────────
+// Desfaz a indicação: a multa volta a pendente e some o carimbo. Existe porque
+// indicação errada acontece (condutor trocado, multa que não era do locatário)
+// e, sem isso, a única saída seria editar a multa na mão.
+function mltIndDesindicar(){
+  if (!_podeAcao('indicarCondutor')) { toast('Seu perfil não pode desindicar','#b45309'); return; }
+  var ind = mltMultas().filter(function(m){ return m.status === 'indicada' && _mltIndSel[m.id]; });
+  if (!ind.length) { toast('Marque ao menos uma multa já indicada','#b45309'); return; }
+  if (!confirm('Desfazer a indicação de ' + ind.length + ' multa(s)?\n\n'
+    + 'Elas voltam para "Pendente". Se a indicação já foi enviada ao órgão, '
+    + 'desfazer aqui NÃO cancela lá — é preciso tratar no portal.')) return;
+
+  ind.forEach(function(m){
+    m.status = 'pendente';
+    delete m.indicadoEm;
+    delete m.indicadoPor;
+    mltIndRegistrar(m, 'desindicada');
+  });
+  _mltIndSel = {};
+  saveDB();
+  mltIndRender();
+  if (typeof mltRender === 'function') mltRender();
+  toast('✓ ' + ind.length + ' indicação(ões) desfeita(s)', '#b45309');
+}
+
+// Exporta o log completo — para conferência e para guardar fora do sistema.
+function mltIndExportarLog(){
+  var log = (db.indicacoes_log || []);
+  if (!log.length) { toast('Nenhuma movimentação registrada ainda','#b45309'); return; }
+  var linhas = [['Data/hora','Ação','Placa','AIT','Locatário','Usuário'].join(';')];
+  log.slice().sort(function(a,b){ return b.quando.localeCompare(a.quando); }).forEach(function(r){
+    var q = new Date(r.quando);
+    linhas.push([
+      q.toLocaleString('pt-BR'), r.acao, mltFmtPlaca(r.placa), r.ait || '',
+      (r.cliente || '').replace(/;/g,','), r.usuario
+    ].join(';'));
+  });
+  var blob = new Blob(['﻿' + linhas.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'indicacoes-condutor-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
 }
 
 function mltPreencherClientePadrao(){
