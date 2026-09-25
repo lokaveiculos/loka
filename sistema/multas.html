@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v11-20260915-1050 -->
+<!-- LOKA deploy: v12-20260925-1035 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -212,7 +212,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v11-20260915-1050';
+var LOKA_BUILD = 'v12-20260925-1035';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -531,6 +531,13 @@ function efTestarConexao(){
 function efConsultarPlaca(){
   var placa = _efPlacaCampo();
   if (!placa){ toast('⚠️ Digite a placa a consultar'); return; }
+  // Barra a placa inativa antes de gastar: o Serpro recusaria e cobraria.
+  var inat = _arr(DB && DB.veiculos).filter(function(v){
+    return v && _efNormPlaca(v.placa) === placa && !_efAtivo(v); })[0];
+  if (inat){
+    toast('Placa ' + placa + ' está INATIVA na frota — consulta bloqueada para não gastar à toa','#b45309');
+    return;
+  }
   if (!confirm('Consultar as infrações da placa ' + placa + ' no e-Frotas?\n\nEsta consulta é COBRADA pelo Serpro (1 consulta).')) return;
   setBtns(true);
   status('⏳ Consultando ' + placa + '…','#ffe');
@@ -559,7 +566,7 @@ var _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosList
 function efConsultarFrota(){
   var n = _efVeiculosLista().length;
   if (!n){ toast('Nenhum veículo cadastrado'); return; }
-  if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.')) return;
+  if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.' + (_efInativosCount() ? '\n\n(' + _efInativosCount() + ' veículo(s) inativo(s) ficam de fora — o Serpro recusaria e cobraria)' : ''))) return;
   _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:n, restantes:n };
   _efRodarLote();
 }
@@ -634,8 +641,17 @@ var _efFiltroCliente = '';  // cliente com locação ativa
 
 function _efNormPlaca(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
+// Só veículo ATIVO pode ser consultado. Inativo saiu da frota: o Serpro
+// recusa com 403 e a consulta é cobrada do mesmo jeito. O backend também
+// filtra — aqui é para o operador nem ver a placa no seletor.
+function _efAtivo(v){ return String((v && v.status) || '').toLowerCase() !== 'inativo'; }
+
 function _efVeiculosLista(){
-  return _arr(DB && DB.veiculos).filter(function(v){ return v && v.placa; });
+  return _arr(DB && DB.veiculos).filter(function(v){ return v && v.placa && _efAtivo(v); });
+}
+
+function _efInativosCount(){
+  return _arr(DB && DB.veiculos).filter(function(v){ return v && v.placa && !_efAtivo(v); }).length;
 }
 
 // Placas que já têm multa pendente — atalho útil de seleção
