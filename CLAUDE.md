@@ -1292,3 +1292,81 @@ determinar.
 
 ### Para retomar, falta saber
 1. qual empresa começa · 2. o que o contador determinou · 3. volume mensal
+
+## 🔴 Campos de busca só aceitavam uma letra — 26/09/2026 (`9789ef3`)
+
+Relato: "os campos de busca só permitem digitar 1 caractere por vez".
+
+**Causa:** o `oninput` chama um render que troca o **`#main` inteiro**. Isso
+destrói e recria o próprio campo — o cursor se perde e a tecla seguinte não
+entra em lugar nenhum. Não era o campo: era a tela sendo redesenhada por baixo
+dele.
+
+Atingia **11 campos em 6 telas** (CRM, Cadastros ×2, Veículos, Contratos,
+Vendas ×2, Despesas ×3, Gestão). **Dois eram meus**, do filtro de Vendas.
+
+Entrou `comFoco(render)` no shared: guarda quem estava focado e onde estava o
+cursor, redesenha, devolve os dois. Conserta sem reescrever os render. Aguenta
+campo de data (que não tem `selectionStart` em todo navegador), campo sem id e
+campo que some de vez.
+
+⚠️ **Padrão a seguir:** todo `oninput` que dispare render passa por `comFoco`.
+
+## ✅ Fornecedor: sugestão e cadastro rápido — 26/09/2026 (`9789ef3`, `603cbe7`)
+
+### Despesas e Manutenção: sugestão, não imposição
+Levantamento antes de mexer: dos **25 nomes já digitados à mão, só 2** batiam
+com os 6 fornecedores cadastrados. Trocar por lista **fechada** apagaria o
+fornecedor de **23 lançamentos** ao reabri-los. Por isso `<datalist>`: sugere os
+cadastrados e o campo **continua aceitando nome novo**. Zero migração.
+
+Decisão do Rogel: os 23 nomes antigos ficam como estão; a lista se padroniza
+com o uso.
+
+### Cadastro rápido (`novoFornecedorRapido`)
+Botão "+ Novo" ao lado dos campos. Nome obrigatório; telefone e CPF/CNPJ
+opcionais. Grava em `fornecedores` no **mesmo formato** do cadastro completo.
+
+⚠️ **Por que não usa `om()`:** o formulário de despesa/manutenção **já é um
+modal**, e `om()` troca o conteúdo do modal — abrir por cima apagaria tudo que a
+pessoa digitou. Por isso monta um overlay próprio, acima do modal.
+
+Cuidados: nome já cadastrado não vira duplicata (usa o existente e avisa);
+falha na gravação não inventa fornecedor nem preenche o campo.
+
+### Cadastro de veículo: o campo existia, mas com duas travas
+- ficava com `display:none` a menos que o tipo fosse consignado
+- `svVeic` gravava `proprietario_id: te==='consignado' ? ... : ''` — em estoque
+  **próprio a informação era jogada fora**
+
+Agora aparece sempre e é sempre gravado. **Não criei campo novo:** nos dois
+casos a pergunta é a mesma — *de quem veio o carro*. No consignado é o dono; no
+próprio é quem vendeu para a loja. **Quem distingue é o `tipo_est`, não este
+campo estar vazio.** O rótulo acompanha.
+
+A coluna da lista passa a mostrar o nome também no estoque próprio.
+
+Conferido que os outros leitores de `proprietario_id` não quebram, e dois
+melhoram: `cadastros.html` conta veículos por fornecedor e trava a exclusão de
+quem tem vínculo (passa a proteger mais); `despesas.html` só preenche o
+proprietário quando consignado — guarda explícita, continua correta.
+
+⚠️ **Corrigida incoerência introduzida em 19/09:** o `_despesaDeManutencao` não
+tinha essa guarda. Despesa de manutenção de carro próprio passaria a mostrar o
+**vendedor** como "proprietário". Agora segue a regra do `despesas.html`.
+
+`novoFornecedorRapido` passou a funcionar em `<select>`: num select não adianta
+atribuir o nome, é preciso existir a `<option>`. `_preencherCampoForn` cria
+quando falta e seleciona pelo id; em `<input>` segue preenchendo o nome.
+
+**Validado:** 39 testes novos. **Total do sistema: 164 testes em 9 suítes.**
+
+### Armadilha de teste (aprendida três vezes hoje)
+O shared define `fsave`, `fdel`, `toast`, `fNome`… **e sobrescreve os stubs**.
+Em teste: carregar o shared, depois a página, e **só então** religar os stubs.
+E se o ambiente neutraliza `renderX` para evitar redesenho, guardar a referência
+real antes — senão o teste chama a função vazia e "falha" sem defeito nenhum.
+
+⚠️ O scratchpad é limpo entre sessões: `ext.js` e `payload.txt` sumiram e o
+`node --check` passou a validar um arquivo **velho**, dando OK falso. Conferir
+que os utilitários existem antes de confiar na verificação.
