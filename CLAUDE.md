@@ -1249,3 +1249,46 @@ vir preenchido seria preciso, ao gravar uma multa **nova**, chamar também
 `/consultas/v1/infracoes/codigoOrgao/{}/numeroAit/{}/codigoInfracao/{}`.
 Custo: 1 consulta extra por multa nova (não por multa existente).
 **Em aberto** — não implementar sem o Rogel pedir.
+
+## 💡 Emissor de nota fiscal — levantamento de 26/09/2026 (em avaliação)
+
+Rogel perguntou se dá para emitir nota fiscal pelo sistema. **Levantado, nada
+construído** — ele vai decidir com calma.
+
+### Estado atual
+Não existe **nada** de nota fiscal nos dois sistemas. A única menção é um item
+de checklist ("Nota fiscal / Recibo assinado") no `vendas.html` da Auto Mais.
+O `fatura.html` da LOKÁ emite **fatura de cobrança**, que não é documento fiscal.
+
+### Recomendação: integrar com API de emissão, NÃO construir o emissor
+Emitir nota é gerar XML no layout oficial, **assinar digitalmente**, transmitir
+ao webservice, tratar centenas de códigos de rejeição, contingência quando a
+SEFAZ cai, DANFE, cancelamento, carta de correção e inutilização de numeração.
+E o layout **muda** — sem acompanhar, o sistema para de emitir.
+
+Do zero: meses + manutenção eterna. Via API de terceiros (o sistema manda os
+dados e recebe XML + PDF): dias.
+
+### Dois bloqueios de arquitetura
+1. **O certificado NÃO pode ir para o navegador.** O site é GitHub Pages —
+   estático e público. O `.pfx` no JS seria entregar o e-CNPJ da empresa.
+   Precisa de servidor → Cloud Functions. E aí:
+   - **LOKÁ**: a Org Policy **barra criar função nova** (por isso o diagnóstico
+     virou um *modo* da `dispararConsultaMultas`). Contornável, mas é degrau.
+   - **Auto Mais**: projeto no **plano Spark** — não tem Cloud Functions.
+     Precisaria subir para Blaze.
+2. ✅ **Metade do caminho já existe:** o `efrotas-client.js` faz exatamente o
+   tipo de conexão que a SEFAZ exige — **mTLS com o e-CNPJ A1**, convertendo o
+   `.pfx` via node-forge. Mesmo certificado, válido até jan/2027.
+
+### ⚠️ O que NÃO é decisão minha
+Qual documento fiscal cada empresa deve emitir é **pergunta para o contador**:
+- **Auto Mais** (venda de usado) → NF-e de mercadoria, estadual (SEFAZ-BA)
+- **LOKÁ** (locação de bem móvel) → tem particularidades; varia por município e
+  regime da empresa
+
+Errar aí não é bug, é problema com o fisco. Construir só depois que o contador
+determinar.
+
+### Para retomar, falta saber
+1. qual empresa começa · 2. o que o contador determinou · 3. volume mensal
