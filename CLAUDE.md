@@ -1370,3 +1370,90 @@ real antes — senão o teste chama a função vazia e "falha" sem defeito nenhu
 ⚠️ O scratchpad é limpo entre sessões: `ext.js` e `payload.txt` sumiram e o
 `node --check` passou a validar um arquivo **velho**, dando OK falso. Conferir
 que os utilitários existem antes de confiar na verificação.
+
+---
+
+## ✅ Busca passa a ignorar acento — 28/09/2026 (LOKÁ `c80e9b7` · Auto Mais `58915de`)
+
+Pedido: "a busca por nome difere os nomes que tem acento dos nomes que nao tem".
+Quem procurava `joao` não achava **João**, e quem procurava `José` não achava
+**Jose**. Como os dois jeitos de escrever convivem no banco (ver a normalização
+de 15/09), o campo de busca escondia metade dos cadastros.
+
+### A regra: normalizar os DOIS lados
+Entrou `semAcento()`:
+
+```js
+function semAcento(s) {
+  s = String(s === null || s === undefined ? '' : s);
+  return (s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g, '') : s).toLowerCase();
+}
+```
+
+`NFD` separa a letra do acento; o intervalo `̀-ͯ` apaga **só** o acento,
+sem tocar na letra. Pega til, cedilha, trema, agudo, grave e circunflexo.
+
+⚠️ **Normalizar um lado só não resolve nada** — a comparação continua desigual.
+Onde havia `.toLowerCase()` nos dois lados, passou a haver `semAcento()` nos dois.
+
+| Onde | Buscas trocadas |
+|---|---|
+| `loka/sistema/gestao.html` (v97) | **43** |
+| `loka/sistema/fatura.html` (v76) | 7 |
+| `automaiscar/sistema/*` (7 páginas) | 44 |
+
+LOKÁ: busca global, clientes, seletor de veículos, ativos, reservas, usuários,
+clientes associados, frota, veículos, faturas, manutenções (2 telas),
+fornecedores, bens, contas a receber (2), a pagar, histórico e multas; na
+`fatura.html`, cliente e veículo.
+Auto Mais: clientes, fornecedores, contratos, leads, despesas, manutenções,
+veículos e a busca do Painel (que varre 6 coleções).
+
+No Auto Mais a função entrou no **`firebase-shared.js`** — as 7 páginas que
+buscam já o carregam. Na LOKÁ cada página é avulsa, então está declarada em
+`gestao.html` e em `fatura.html`.
+
+### 🔴 O que ficou de fora, de propósito
+Não é toda comparação de texto que pode ignorar acento. **Ali onde o texto é
+identidade, ignorar acento faria dois cadastros distintos virarem um:**
+
+| Ficou intacto | Por quê |
+|---|---|
+| `uLogin` / `login.html` / `gestao.html` do Auto Mais | é login — `josé` e `jose` têm de ser gente diferente |
+| `var meu = (sess.usuario||'')` | identifica quem está logado |
+| `perfChave`, `chave` de perfil | chave de permissão, já restrita a `[a-z0-9_]` |
+| set de **oficinas associadas** (`_assocCache.oficinas`) | é escopo de permissão, não busca — mexer ali muda o que o perfil vê |
+| `mltDetectarGravidade(txt)` | parser do PDF de multa; já trata `gravíssim`/`gravissim` à mão |
+| categoria de despesa (Auto Mais) | vocabulário fixo, comparação de igualdade |
+| `_efAtivo` | compara com `'inativo'`, texto do sistema |
+
+⚠️ **Padrão a seguir:** campo de busca → `semAcento` nos dois lados.
+Login, chave, perfil ou escopo de permissão → **`toLowerCase()` puro**.
+
+### Como foi feito (e por que não na mão)
+94 trocas em 10 arquivos. Um `sed` cego teria pegado as linhas de login.
+O script (`scratchpad/acento.py`, não versionado) caminha **para trás** a partir
+de cada `.toLowerCase()` balanceando parênteses e colchetes, para descobrir onde
+começa a expressão e envolvê-la: `(a+' '+b).toLowerCase()` → `semAcento((a+' '+b))`,
+`vNome(x).toLowerCase()` → `semAcento(vNome(x))`. Ele só age nas **linhas
+listadas à mão**, uma a uma, depois de classificar as 62 ocorrências do
+`gestao.html`.
+
+⚠️ Duas armadilhas de ferramenta, custaram tempo:
+- **Heredoc do Bash comeu os escapes** (`\t` virou tabulação de verdade dentro do
+  fonte Python). Para arquivo com escape, usar a ferramenta de escrita, não heredoc.
+- **`̀` escrito pela ferramenta de escrita virou o caractere combinante de
+  verdade** no arquivo. Funciona igual, mas caractere combinante solto no fonte é
+  frágil (cola visualmente no `[` anterior). Trocado pela forma escapada — conferir
+  com `grep 'u0300-'` se aparecer 2 (comentário + regex).
+
+### Validado
+- `node --check` nos 10 arquivos, com base limpa **antes e depois**
+- **59 testes de runtime** usando o código real dos arquivos: 12 pares com/sem
+  acento, minúscula, nulo, `undefined`, número, placa e CPF intactos,
+  "Ana" ≠ "Anna", e os filtros de clientes e de multas de ponta a ponta
+- **No motor do navegador, contra o que está publicado** (Claude in Chrome estava
+  fora do ar; usei a aba interna e busquei os arquivos na própria origem, que
+  dispensa login): os 10 pares batem na `gestao.html` no ar, e a linha real de
+  filtro do `cadastros.html` publicado acha `José` e `Jose` nos dois sentidos,
+  sem perder busca por CPF nem por telefone
