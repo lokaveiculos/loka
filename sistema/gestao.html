@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v96-20260925-1035 -->
+<!-- LOKA deploy: v97-20260928-1753 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1193,7 +1193,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v96-20260925-1035';
+var LOKA_BUILD = 'v97-20260928-1753';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1220,6 +1220,17 @@ var _isSaving = false;       // Evita loop: nosso próprio save não re-renderiz
 var _syncTimeout = null;     // Timer para mostrar indicador
 
 // ── Limpa nulls/undefined/objetos vazios de arrays do Firebase ──
+// ── BUSCA SEM ACENTO ──────────────────────────────────────────
+// "João" e "Joao" têm de se encontrar. NFD separa a letra do acento, e o
+// intervalo \u0300-\u036f apaga só os acentos, sem tocar nas letras.
+// Precisa valer nos DOIS lados da comparação: no que foi digitado e no que
+// está gravado. Não usar em login, perfil nem chave — ali o texto é
+// identidade, e ignorar acento faria dois cadastros distintos virarem um.
+function semAcento(s) {
+  s = String(s === null || s === undefined ? '' : s);
+  return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase();
+}
+
 function cleanArr(arr) {
   if (!Array.isArray(arr)) return [];
   return arr.filter(function(x) { return x !== null && x !== undefined && typeof x === 'object'; });
@@ -2621,10 +2632,10 @@ function renderPag(containerId, pg, pages, total, setter) {
 function globalSearch(q) {
   var res = document.getElementById('gsResults');
   if (!res || !db) return;
-  q = (q||'').trim().toLowerCase();
+  q = semAcento((q||'').trim());
   if (q.length < 2) { res.classList.remove('open'); return; }
   var h = '';
-  var clis = db.clients.filter(function(c){return (c.nome+' '+(c.cpf||'')+' '+(c.telefone||'')).toLowerCase().indexOf(q)>=0;}).slice(0,4);
+  var clis = db.clients.filter(function(c){return semAcento((c.nome+' '+(c.cpf||'')+' '+(c.telefone||''))).indexOf(q)>=0;}).slice(0,4);
   if (clis.length) {
     h += '<div class="gsr-sec">👤 Clientes</div>';
     clis.forEach(function(c){
@@ -2632,7 +2643,7 @@ function globalSearch(q) {
       h += '<div class="gsr-item" onclick="showPanel(\'clientes\');setTimeout(function(){openCliente('+i+')},200)"><div><div class="gsr-item-title">'+c.nome+'</div><div class="gsr-item-sub">'+(c.cpf||'')+'</div></div></div>';
     });
   }
-  var vcs = db.veiculos.filter(function(v){return (v.marca+' '+v.modelo+' '+v.placa).toLowerCase().indexOf(q)>=0;}).slice(0,4);
+  var vcs = db.veiculos.filter(function(v){return semAcento((v.marca+' '+v.modelo+' '+v.placa)).indexOf(q)>=0;}).slice(0,4);
   if (vcs.length) {
     h += '<div class="gsr-sec">🚗 Veículos</div>';
     vcs.forEach(function(v){
@@ -2850,10 +2861,10 @@ function contarLocacoesCliente(cl) {
 function renderClientes() {
   if (!db) return;
   db.clients   = cleanArr(db.clients);
-  var q = (document.getElementById('qClientes').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qClientes').value||''));
   var f = document.getElementById('fClientes').value;
   var list = db.clients.filter(function(c) {
-    if (q && (c.nome+' '+(c.cpf||'')+' '+(c.telefone||'')).toLowerCase().indexOf(q)<0) return false;
+    if (q && semAcento((c.nome+' '+(c.cpf||'')+' '+(c.telefone||''))).indexOf(q)<0) return false;
     if (f==='freq' && (c.alugueis||0)<3) return false;
     if (f==='bloq' && c.status!=='bloqueado') return false;
     return true;
@@ -2962,13 +2973,13 @@ async function buscaCep() {
 var _ctVeicsSelecionados = new Set();
 
 function renderVeicsModal(q) {
-  q = (q||'').toLowerCase().trim();
+  q = semAcento((q||'')).trim();
   var lista = document.getElementById('ctVeiculosLista');
   if (!lista || !db) return;
   var veics = (db.veiculos||[]).filter(function(v,i) {
     if (!v || v.status !== 'disponivel') return false;
     if (!q) return true;
-    return (v.marca+' '+v.modelo+' '+v.placa).toLowerCase().indexOf(q) >= 0;
+    return semAcento((v.marca+' '+v.modelo+' '+v.placa)).indexOf(q) >= 0;
   });
   var counter = document.getElementById('ctVeicCount');
   if (counter) counter.textContent = _ctVeicsSelecionados.size > 0
@@ -3209,11 +3220,11 @@ function renderAtivos() {
   if (!db) return;
   db.ativos   = cleanArr(db.ativos);
   db.veiculos = cleanVeics(db.veiculos);
-  var q = (document.getElementById('qAtivos').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qAtivos').value||''));
   var list = db.ativos.filter(function(a){
     if (!a) return false;
     if (_filtroAtivos && a.tipo !== _filtroAtivos) return false;
-    return !q || (a.clienteNome+' '+a.veiculoNome+' '+(a.placa||'')).toLowerCase().indexOf(q)>=0;
+    return !q || semAcento((a.clienteNome+' '+a.veiculoNome+' '+(a.placa||''))).indexOf(q)>=0;
   });
 
   // Ordena por data de devolução: vencidos e mais urgentes primeiro; sem data vai ao fim
@@ -3842,10 +3853,10 @@ function fmtRes(v) {
 }
 
 function renderReservas() {
-  var q  = (document.getElementById('qReservas') && document.getElementById('qReservas').value || '').toLowerCase();
+  var q  = semAcento((document.getElementById('qReservas') && document.getElementById('qReservas').value || ''));
   var f  = document.getElementById('fReservas') && document.getElementById('fReservas').value || '';
   var list = _reservasCache.filter(function(r) {
-    if (q && (r.nome + ' ' + (r.veiculo||'')).toLowerCase().indexOf(q) < 0) return false;
+    if (q && semAcento((r.nome + ' ' + (r.veiculo||''))).indexOf(q) < 0) return false;
     if (f && (r.status||'pendente') !== f) return false;
     return true;
   });
@@ -4330,10 +4341,10 @@ function renderUsuarios() {
 
   // Consulta/filtro
   var _bq = (document.getElementById('uBusca')||{}).value || '';
-  _bq = _bq.trim().toLowerCase();
+  _bq = semAcento(_bq.trim());
   var _totalGeral = todos.length;
   if (_bq) todos = todos.filter(function(u){
-    return ((u.usuario||'')+' '+(u.nome||'')+' '+(u.perfil||'')).toLowerCase().indexOf(_bq) >= 0;
+    return semAcento(((u.usuario||'')+' '+(u.nome||'')+' '+(u.perfil||''))).indexOf(_bq) >= 0;
   });
   if (!todos.length) { el.innerHTML = '<p style="font-size:12px;color:var(--muted);margin-bottom:8px">Nenhum usuário encontrado para “'+_bq+'”.</p>'; return; }
 
@@ -4479,7 +4490,7 @@ function _preencherAssocFields() {
     var clis = (db && db.clients||[]).slice().filter(Boolean).sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
     contC.innerHTML = _htmlTodos('assoc-cliente','Todos os clientes')
       + (clis.length ? clis.map(function(c){
-      return '<label class="cli-assoc-item" data-nome="'+(c.nome||'').toLowerCase().replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
+      return '<label class="cli-assoc-item" data-nome="'+semAcento((c.nome||'')).replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dark)">'
         + '<input type="checkbox" class="assoc-cliente" value="'+c.id+'"> <span>'+(c.nome||'(sem nome)')+'</span></label>';
     }).join('') : '<span style="font-size:11px;color:var(--muted)">Nenhum cliente cadastrado.</span>');
   }
@@ -4487,7 +4498,7 @@ function _preencherAssocFields() {
 
 // Filtra a lista de clientes no cadastro de usuário
 function _filtrarClientesAssoc() {
-  var q = ((document.getElementById('uBuscaClienteAssoc')||{}).value||'').trim().toLowerCase();
+  var q = semAcento(((document.getElementById('uBuscaClienteAssoc')||{}).value||'').trim());
   document.querySelectorAll('#uClientesAssoc .cli-assoc-item').forEach(function(l){
     l.style.display = (!q || (l.getAttribute('data-nome')||'').indexOf(q) >= 0) ? 'flex' : 'none';
   });
@@ -4815,7 +4826,7 @@ function renderFrota() {
   if (!db) return;
   db.ativos    = cleanArr(db.ativos);
   db.veiculos  = cleanVeics(db.veiculos);
-  var q = (document.getElementById('qFrota').value || '').toLowerCase();
+  var q = semAcento((document.getElementById('qFrota').value || ''));
   var fAli = (document.getElementById('fFrotaAlienado')||{}).value || '';
   var fFinal = (document.getElementById('fFrotaFinal')||{}).value || '';
   var f = document.getElementById('fFrota').value;
@@ -4824,7 +4835,7 @@ function renderFrota() {
       var _d = docsDaPlaca(v.placa) || {};
       var _busca = v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')+' '
         + (v.renavam||_d.renavam||'')+' '+(v.chassi||_d.chassi||'');
-      if (_busca.toLowerCase().indexOf(q)<0) return false;
+      if (semAcento(_busca).indexOf(q)<0) return false;
     }
     // Filtro por alienação (cadastro do veículo ou tabela oficial)
     if (fAli) {
@@ -4844,13 +4855,13 @@ function renderFrota() {
       if (['disponivel','alugado','manutencao'].indexOf(v.status) < 0) return false;
     } else if (f && v.status !== f) return false;
     // Filtro por cliente
-    var qfc = (document.getElementById('qFrotaCliente') && document.getElementById('qFrotaCliente').value||'').toLowerCase();
+    var qfc = semAcento((document.getElementById('qFrotaCliente') && document.getElementById('qFrotaCliente').value||''));
     if (qfc) {
       var ativoFc = (db.ativos||[]).find(function(a){
         return a && (a.placa===v.placa || a.veiculoId===v.id ||
           (a.placas && a.placas.indexOf(v.placa)>=0));
       });
-      var nomeFc  = ativoFc ? (ativoFc.clienteNome||'').toLowerCase() : '';
+      var nomeFc  = ativoFc ? semAcento((ativoFc.clienteNome||'')) : '';
       if (nomeFc.indexOf(qfc)<0) return false;
     }
     return true;
@@ -4966,19 +4977,19 @@ function renderFrota() {
 function renderVeiculos() {
   if (!db) return;
   db.veiculos  = cleanVeics(db.veiculos);
-  var q = (document.getElementById('qVeiculos').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qVeiculos').value||''));
   var f = document.getElementById('fVeiculos').value;
   var list = db.veiculos.filter(function(v){
-    if (q && (v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||'')).toLowerCase().indexOf(q)<0) return false;
+    if (q && semAcento((v.marca+' '+v.modelo+' '+v.placa+' '+(v.cor||''))).indexOf(q)<0) return false;
     if (f && v.status!==f) return false;
     // Filtro por cliente
-    var qc = (document.getElementById('qVeiculosCliente') && document.getElementById('qVeiculosCliente').value||'').toLowerCase();
+    var qc = semAcento((document.getElementById('qVeiculosCliente') && document.getElementById('qVeiculosCliente').value||''));
     if (qc) {
       var ativoVc = (db.ativos||[]).find(function(a){
         return a && (a.placa===v.placa || a.veiculoId===v.id ||
           (a.placas && a.placas.indexOf(v.placa)>=0));
       });
-      var nomeVc  = ativoVc ? (ativoVc.clienteNome||'').toLowerCase() : '';
+      var nomeVc  = ativoVc ? semAcento((ativoVc.clienteNome||'')) : '';
       if (nomeVc.indexOf(qc)<0) return false;
     }
     return true;
@@ -5117,13 +5128,13 @@ function _statusFaturaReal(fat) {
 function renderFaturas() {
   var grid = document.getElementById('faturasGrid');
   if (!grid) return;
-  var q = (document.getElementById('qFaturas') && document.getElementById('qFaturas').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qFaturas') && document.getElementById('qFaturas').value||''));
 
   var list = _todasFaturas.filter(function(f) {
     if (!f) return false;
     var st = _statusFaturaReal(f);
     if (_filtroFaturas && st !== _filtroFaturas) return false;
-    if (q && (((f.cliente||'')+' '+(f.numero||'')).toLowerCase().indexOf(q)<0)) return false;
+    if (q && (semAcento(((f.cliente||'')+' '+(f.numero||''))).indexOf(q)<0)) return false;
     return true;
   });
 
@@ -5275,7 +5286,7 @@ function parseBRLFat(s) {
 function _manutColetarSaida() {
   garantirArray('manutencoes');
   var modo = _modoManutencao();
-  var q  = ((document.getElementById('qManut')||{}).value||'').toLowerCase();
+  var q  = semAcento(((document.getElementById('qManut')||{}).value||''));
   var fs = ((document.getElementById('fManutStatus')||{}).value)||'';
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
   var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
@@ -5294,7 +5305,7 @@ function _manutColetarSaida() {
     if (dataIni && (!m.data || m.data < dataIni)) return false;
     if (dataFim && (!m.data || m.data > dataFim)) return false;
     if (!q) return true;
-    return ((m.veiculoNome||'')+' '+(m.placa||'')+' '+(m.oficina||'')+' '+(m.descricao||'')).toLowerCase().indexOf(q) >= 0;
+    return semAcento(((m.veiculoNome||'')+' '+(m.placa||'')+' '+(m.oficina||'')+' '+(m.descricao||''))).indexOf(q) >= 0;
   });
 
   var filtros = [];
@@ -5588,7 +5599,7 @@ function renderManutencao() {
   // Perfil de manutenção RESTRITO (oficina / clientes): consulta com escopo
   var _modo = _modoManutencao();
   if (_modo.restrito) { renderManutencaoRestrito(_modo); return; }
-  var q  = (document.getElementById('qManut').value||'').toLowerCase();
+  var q  = semAcento((document.getElementById('qManut').value||''));
   var fs = document.getElementById('fManutStatus').value;
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
   var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
@@ -5600,7 +5611,7 @@ function renderManutencao() {
     if (dataIni && (!m.data || m.data < dataIni)) return false;
     if (dataFim && (!m.data || m.data > dataFim)) return false;
     if (!q) return true;
-    return (m.veiculoNome+' '+m.placa+' '+(m.oficina||'')+' '+(m.descricao||'')).toLowerCase().indexOf(q) >= 0;
+    return semAcento((m.veiculoNome+' '+m.placa+' '+(m.oficina||'')+' '+(m.descricao||''))).indexOf(q) >= 0;
   });
 
   // Stats
@@ -5835,10 +5846,10 @@ var _fornEditId = null;
 function renderFornecedores(){
   if (!db) return;
   garantirArray('fornecedores');
-  var q = (document.getElementById('qFornecedor')&&document.getElementById('qFornecedor').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qFornecedor')&&document.getElementById('qFornecedor').value||''));
   var list = (db.fornecedores||[]).filter(function(f){
     if (!f) return false;
-    return !q || ((f.nome||'')+' '+(f.especialidade||'')+' '+(f.cnpj||'')).toLowerCase().indexOf(q)>=0;
+    return !q || semAcento(((f.nome||'')+' '+(f.especialidade||'')+' '+(f.cnpj||''))).indexOf(q)>=0;
   });
   var el = document.getElementById('fornCount'); if(el) el.textContent = list.length+' fornecedor(es)';
   var tb = document.getElementById('fornTable'); if(!tb) return;
@@ -6344,13 +6355,13 @@ function finRenderBens() {
   var grid = document.getElementById('finGridBens');
   if (!grid) return;
   var rows = db.financeiro.bens;
-  var q = (document.getElementById('qBens')&&document.getElementById('qBens').value||'').toLowerCase().trim();
+  var q = semAcento((document.getElementById('qBens')&&document.getElementById('qBens').value||'')).trim();
 
   // Filtrar por contrato, carro ou placa — preservando o índice real (i) para edição
   var visiveis = rows.map(function(r,i){ return {r:r,i:i}; }).filter(function(o){
     if (!q) return true;
     var r = o.r;
-    return ((r.contrato||'')+' '+(r.carro||'')+' '+(r.placa||'')).toLowerCase().indexOf(q) >= 0;
+    return semAcento(((r.contrato||'')+' '+(r.carro||'')+' '+(r.placa||''))).indexOf(q) >= 0;
   });
 
   var totalFiltrado = visiveis.reduce(function(s,o){ return s+(Number(o.r.valor)||0); },0);
@@ -6826,7 +6837,7 @@ function relatorioReceber(){
   if (!rows.length) { toast('Nenhuma conta a receber cadastrada','#b45309'); return; }
 
   // Reaproveita os MESMOS filtros da tela
-  var q = (document.getElementById('qReceber')&&document.getElementById('qReceber').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qReceber')&&document.getElementById('qReceber').value||''));
   var di = (document.getElementById('recDataIni')||{}).value||'';
   var df = (document.getElementById('recDataFim')||{}).value||'';
   var fst = (document.getElementById('recStatus')||{}).value||'';
@@ -6843,7 +6854,7 @@ function relatorioReceber(){
     if (!r) return false;
     var st = statusReal(r);
     if (fst && st!==fst) return false;
-    if (q && (r.cliente||'').toLowerCase().indexOf(q)<0) return false;
+    if (q && semAcento((r.cliente||'')).indexOf(q)<0) return false;
     if (fTipo && (r.tipo||'Outros')!==fTipo) return false;
     var dref = st==='recebido' ? (r.recebidoEm||r.vencimento) : r.vencimento;
     if (di && (!dref || dref < di)) return false;
@@ -6954,7 +6965,7 @@ function finRenderReceber() {
   if (!grid) return;
   finInit();
   var rows = db.financeiro.receber;
-  var q = (document.getElementById('qReceber')&&document.getElementById('qReceber').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qReceber')&&document.getElementById('qReceber').value||''));
   var di = (document.getElementById('recDataIni')||{}).value||'';
   var df = (document.getElementById('recDataFim')||{}).value||'';
   var fst = (document.getElementById('recStatus')||{}).value||'';
@@ -6975,7 +6986,7 @@ function finRenderReceber() {
     var r=o.r; if(!r) return false;
     var st = statusReal(r);
     if (fst && st!==fst) return false;
-    if (q && (r.cliente||'').toLowerCase().indexOf(q)<0) return false;
+    if (q && semAcento((r.cliente||'')).indexOf(q)<0) return false;
     if (fTipo && (r.tipo||'Outros')!==fTipo) return false;
     var dref = st==='recebido' ? (r.recebidoEm||r.vencimento) : r.vencimento;
     if (di && (!dref || dref < di)) return false;
@@ -7364,7 +7375,7 @@ function finRenderPagar() {
   finInit();
   var rows = db.financeiro.pagar;
   var ymRef = pagMesRef();
-  var q = (document.getElementById('qPagar')&&document.getElementById('qPagar').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qPagar')&&document.getElementById('qPagar').value||''));
   var fst = (document.getElementById('pagStatus')||{}).value||'';
   var fDia = (document.getElementById('pagDia')||{}).value||'';
   var ordem = (document.getElementById('pagOrdenar')||{}).value||'';
@@ -7381,7 +7392,7 @@ function finRenderPagar() {
       if (fst==='pago' && st!=='pago') return;
       if (fst==='pendente' && st==='pago') return;
     }
-    if (q && ((r.fornecedor||'')+' '+(r.descricao||'')).toLowerCase().indexOf(q)<0) return;
+    if (q && semAcento(((r.fornecedor||'')+' '+(r.descricao||''))).indexOf(q)<0) return;
     if (fDia) {
       var _diaConta = r.diaVenc || parseInt((r.vencimento||'').slice(8,10)) || 0;
       if (String(_diaConta) !== fDia) return;
@@ -7859,14 +7870,14 @@ function renderHistorico() {
   if (!db) return;
   garantirArray('historico');
   histPreencherPlacas();
-  var q = (document.getElementById('qHistorico').value||'').toLowerCase();
+  var q = semAcento((document.getElementById('qHistorico').value||''));
   var fPlaca = (document.getElementById('histPlaca')||{}).value||'';
   var di = (document.getElementById('histDataIni')||{}).value||'';
   var df = (document.getElementById('histDataFim')||{}).value||'';
 
   var list = (db.historico||[]).filter(function(h){
     if (!h) return false;
-    if (q && ((h.clienteNome||'')+' '+(h.veiculoNome||'')+' '+(h.placa||'')).toLowerCase().indexOf(q)<0) return false;
+    if (q && semAcento(((h.clienteNome||'')+' '+(h.veiculoNome||'')+' '+(h.placa||''))).indexOf(q)<0) return false;
     if (fPlaca && String(h.placa||'').toUpperCase()!==fPlaca) return false;
     if (di || df) {
       var dd = histDataDev(h);
@@ -8988,7 +8999,7 @@ function mltLimparFiltro(){
 
 function mltFiltradas(){
   var f = _mltFiltro;
-  var q = f.q.toLowerCase().trim();
+  var q = semAcento(f.q).trim();
   // Escopo por cliente (perfis restritos, ex.: Clientes): só as multas dos clientes associados
   var escSet = null;
   // Curinga "Todos os clientes": não monta o conjunto, então nada é filtrado
@@ -9020,8 +9031,8 @@ function mltFiltradas(){
       if (f.orgaos.indexOf(alvo) < 0) return false;
     }
     if (q) {
-      var alvo = [m.ait, m.placa, m.clienteNome, m.descricao, m.orgao, m.local]
-        .join(' ').toLowerCase();
+      var alvo = semAcento([m.ait, m.placa, m.clienteNome, m.descricao, m.orgao, m.local]
+        .join(' '));
       if (alvo.indexOf(q) < 0) return false;
     }
     return true;

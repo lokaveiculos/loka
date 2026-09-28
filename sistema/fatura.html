@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v75-20260812-1700 -->
+<!-- LOKA deploy: v76-20260928-1753 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -866,6 +866,17 @@ function preencherFaturaParaEdicao(fat, editId) {
 }
 
 // ── UTILS ─────────────────────────────────────────────────────
+// ── BUSCA SEM ACENTO ──────────────────────────────────────────
+// "João" e "Joao" têm de se encontrar. NFD separa a letra do acento, e o
+// intervalo \u0300-\u036f apaga só os acentos, sem tocar nas letras.
+// Precisa valer nos DOIS lados da comparação: no que foi digitado e no que
+// está gravado. Não usar em login, perfil nem chave — ali o texto é
+// identidade, e ignorar acento faria dois cadastros distintos virarem um.
+function semAcento(s) {
+  s = String(s === null || s === undefined ? '' : s);
+  return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase();
+}
+
 function fmtDate(v) {
   if (!v) return '';
   var d = new Date(v + 'T00:00');
@@ -891,11 +902,11 @@ function maskFin(el) {
 
 // ── CLIENTE ───────────────────────────────────────────────────
 function buscarCliente(q) {
-  q = (q||'').trim().toLowerCase();
+  q = semAcento((q||'').trim());
   const dd = document.getElementById('cliDropdown');
   if (!q || q.length < 2) { dd.classList.remove('open'); return; }
   const results = _clients.filter(function(c) {
-    return (c.nome+' '+(c.cpf||'')+' '+(c.telefone||'')).toLowerCase().includes(q);
+    return semAcento((c.nome+' '+(c.cpf||'')+' '+(c.telefone||''))).includes(q);
   }).slice(0,8);
   if (!results.length) {
     dd.innerHTML = '<div class="cli-item" style="color:var(--muted)">Nenhum cliente encontrado</div>';
@@ -1045,17 +1056,17 @@ function renderVeiculosArea(lista) {
 
 // ── FILTRO E SELEÇÃO DE VEÍCULOS ────────────────────────────────────────────
 function filtrarVeiculos(q) {
-  q = (q||'').toLowerCase().trim();
+  q = semAcento((q||'')).trim();
   var total = 0, visiveis = 0;
   _veiculos.forEach(function(v, i) {
     var row = document.getElementById('vrow-'+i);
     if (!row) return;
     total++;
     var match = !q
-      || (v.placa||'').toLowerCase().includes(q)
-      || (v.marca||'').toLowerCase().includes(q)
-      || (v.modelo||'').toLowerCase().includes(q)
-      || (v.cor||'').toLowerCase().includes(q);
+      || semAcento((v.placa||'')).includes(q)
+      || semAcento((v.marca||'')).includes(q)
+      || semAcento((v.modelo||'')).includes(q)
+      || semAcento((v.cor||'')).includes(q);
     row.style.display = match ? '' : 'none';
     if (match) visiveis++;
   });
