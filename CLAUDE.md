@@ -1518,3 +1518,102 @@ sequência: **shared → página → religar os stubs**, e alimentar o DB pelo
 `localStorage`, nunca pelo stub de `loadDB`.
 
 **Total do sistema: 194 testes em 10 suítes.**
+
+---
+
+## ✅ Aba Ocorrências / Sinistros — 28/09/2026 (`33b6601`, `f0e8bcf`) · gestao v99
+
+Pedido: "preciso criar uma aba para registro de ocorrencias/sinistros" — LOKÁ.
+**Não existia nada disso nos dois sistemas.** A única menção a sinistro era a
+Cláusula 11ª do contrato. O `fatura.html` emite cobrança, não registra ocorrência.
+
+### Decisões do Rogel (28/09)
+- **Escopo:** sinistro **com veículo**. Veículo obrigatório; o locatário do
+  momento é vinculado sozinho.
+- **Franquia:** vira lançamento em Contas a Receber **só quando marcado** —
+  não automaticamente por haver valor. Evita cobrar o locatário em caso que
+  talvez seja da locadora ou de terceiro.
+
+### Os tipos vêm do contrato, não da minha cabeça
+A Cláusula 11ª define as franquias: danos ao carro/PT, perda total ou roubo,
+para-brisa, e faróis/lanternas por unidade. Os tipos da aba espelham isso
+(`colisao`, `perda_total`, `roubo_furto`, `parabrisa`, `farol_lanterna`,
+`outro`). ⚠️ **Inventar tipo aqui faria o registro não conversar com a cobrança.**
+
+### Franquia → Contas a Receber
+O lançamento carrega **`sinistroId`**, e é por ele que o reencontramos. Sem essa
+marca, cada salvamento criaria um lançamento novo.
+
+| Ação | O que acontece |
+|---|---|
+| Marcar e salvar | cria o lançamento, no nome do locatário, status pendente |
+| Editar | atualiza **o mesmo** lançamento — nunca duplica |
+| Desmarcar | remove o lançamento |
+| Excluir a ocorrência | remove o lançamento junto (avisa antes, no `confirm`) |
+
+🔴 **Proteção que não pode sair:** lançamento que **já tem recebimento** (status
+`recebido` ou `recebido > 0`) **não é reescrito nem apagado** — seria perder
+dinheiro já registrado. Nesse caso o sistema mantém o lançamento e **avisa** o
+que fazer. Vale nos três caminhos: editar valor, desmarcar e excluir.
+
+Validação: franquia marcada exige **dígito** no valor e valor > 0. `mltNum('abc')`
+devolve **0**, e 0 é valor legítimo — sem isso, erro de digitação lançaria
+cobrança de R$ 0,00 calado. É a mesma lição da baixa em lote de multas (v94).
+
+### Onde a aba foi registrada (a lição do `multasefrotas`)
+`PANELS`, `TITLES`, `_TODOS_PAINEIS`, `_PAINEL_LABEL`, `showPanel` e o perfil
+**Operador**. Master e Admin herdam por usarem `_TODOS_PAINEIS.slice()`.
+Oficina e Clientes ficam de fora de propósito.
+
+🔴 **E em `normalizarDB`** — essa é fácil de esquecer: sem `'sinistros'` naquela
+lista, depois da **primeira exclusão** o Firebase devolve o array como objeto e
+a aba quebra. É a armadilha 1, e ela só aparece dias depois de publicar.
+
+### O que NÃO entrou, de propósito
+- **Fotos e anexos.** O sistema **desativou** comprovantes em manutenção
+  ("evita inflar o banco de dados") e **não usa Firebase Storage**. Guardamos o
+  **número** do BO e do aviso de sinistro, não a imagem.
+- Ocorrência sem veículo (reclamação, atraso) — o Rogel escolheu o escopo menor.
+
+### 🔴 Armadilha 6 confirmada na prática (correção `f0e8bcf`)
+Copiei dos outros painéis `<th style="color:#fff">` sobre `<tr style="background:var(--dark)">`.
+**Não funciona, e eu só descobri olhando no navegador:** o CSS global do `th`
+tem fundo claro **e `color:#111827 !important`**, que vence cor inline. O
+cabeçalho ficava legível **por causa do `!important`**, não do meu código.
+
+⚠️ No dia em que aquele `!important` sair, todo `th` com `color:#fff` vira
+**texto branco sobre fundo claro — invisível**. Tirei a cor do meu; o
+`background:var(--dark)` no `tr` fica, porque é o padrão das 6 tabelas e é
+inofensivo (o fundo do `th` cobre).
+
+⚠️ **As outras tabelas do sistema têm o mesmo `color:#fff` inerte.** Não mexi —
+regra de não alterar o que não foi pedido. Fica registrado para quando alguém
+encostar no CSS global.
+
+### Outros cuidados
+- Busca com `semAcento` nos dois lados (padrão de 28/09)
+- Sem data, a ocorrência sai do resultado quando há período — não dá para
+  afirmar que cai no intervalo pedido
+- "Nenhuma ocorrência **registrada**" ≠ "Nenhuma **encontrada com esses filtros**"
+- Relatório PDF imprime **o que está na tela**, não a lista inteira
+- Ao editar depois que o aluguel terminou, o locatário já registrado é
+  **preservado** — senão o sinistro perderia de quem era o carro
+- Digitar a placa seleciona o veículo ignorando hífen e maiúscula
+
+### Validado
+- `node --check` (base limpa) e `<div>` balanceadas (1059/1059, como no HEAD)
+- **72 testes de runtime** com o código real extraído do arquivo: validação,
+  gravação, vínculo de locatário, os dois caminhos da franquia, a proteção do
+  valor já recebido (nos três caminhos), exclusão, 12 casos de filtro, render,
+  e array voltando como objeto do Firebase
+- **No navegador, contra o arquivo publicado** (Claude in Chrome fora do ar;
+  usei a aba interna e montei o painel na própria origem, que dispensa login):
+  tabela desenhada, 4 cartões de resumo com a soma certa, os 5 filtros, busca
+  sem acento, modal abrindo com a data de hoje, franquia revelando os campos,
+  locatário aparecendo sozinho, e um salvamento de ponta a ponta que criou a
+  ocorrência **e** o lançamento no Financeiro com cliente e valor corretos
+
+### ⏳ Não verificado
+Não consegui exercitar **logado, com dados reais** — o Chrome está fora do ar
+nesta sessão. Vale o Rogel registrar uma ocorrência de verdade e conferir se ela
+aparece em Contas a Receber com o nome certo.
