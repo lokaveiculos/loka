@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v97-20260928-1753 -->
+<!-- LOKA deploy: v98-20260928-2034 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -251,6 +251,7 @@ tr:hover td{background:#f8f9fe;}
      <div data-label="Fornecedores" class="nav-item" id="ni-fornecedores" onclick="showPanel('fornecedores')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9"/><path d="M9 22V12h6v10"/></svg>Fornecedores</div>
     <div data-label="Multas" class="nav-item" id="ni-multas" onclick="showPanel('multas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas</div>
     <div data-label="Multas e-Frotas" class="nav-item" id="ni-multasefrotas" onclick="showPanel('multasefrotas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas e-Frotas</div>
+    <div data-label="Ocorrências / Sinistros" class="nav-item" id="ni-sinistros" onclick="showPanel('sinistros')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Ocorrências / Sinistros</div>
     <div data-label="Financeiro" class="nav-item" id="ni-financeiro" onclick="showPanel('financeiro')" style="display:none"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro</div>
     <div data-label="Formulários" class="nav-item" id="ni-formularios" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
     <div data-label="Contratos Gerados" class="nav-item" id="ni-contratos" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
@@ -636,6 +637,48 @@ tr:hover td{background:#f8f9fe;}
         <div id="efSeletor"></div>
         <div id="efLog"></div>
       </div>
+    </div>
+
+    <!-- ══ OCORRÊNCIAS / SINISTROS ══ -->
+    <div class="panel" id="panel-sinistros" style="display:none;width:100%">
+      <div class="toolbar" id="sinToolbar" style="flex-wrap:wrap;gap:8px">
+        <div class="search-box" style="flex:1;min-width:200px">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="filter-input" id="qSin" type="text" placeholder="Buscar placa, locatário, condutor, BO..." oninput="renderSinistros()">
+        </div>
+        <select class="filter-sel" id="fSinTipo" onchange="renderSinistros()">
+          <option value="">Todos os tipos</option>
+          <option value="colisao">💥 Colisão / danos</option>
+          <option value="perda_total">🚨 Perda total</option>
+          <option value="roubo_furto">🔓 Roubo ou furto</option>
+          <option value="parabrisa">🪟 Para-brisa</option>
+          <option value="farol_lanterna">💡 Farol / lanterna</option>
+          <option value="outro">📄 Outro</option>
+        </select>
+        <select class="filter-sel" id="fSinStatus" onchange="renderSinistros()">
+          <option value="">Todos os status</option>
+          <option value="aberto">🔴 Aberto</option>
+          <option value="em_analise">🔎 Em análise</option>
+          <option value="reparo">🔧 Em reparo</option>
+          <option value="concluido">✅ Concluído</option>
+          <option value="sem_cobertura">⚠️ Sem cobertura</option>
+        </select>
+        <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">📅 De</span>
+          <input class="filter-input" id="fSinDataIni" type="date" onchange="renderSinistros()" style="width:140px;padding:5px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">até</span>
+          <input class="filter-input" id="fSinDataFim" type="date" onchange="renderSinistros()" style="width:140px;padding:5px">
+          <button onclick="limparFiltroDataSin()" title="Limpar datas" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
+        </div>
+        <button class="btn btn-blue" id="btnNovoSin" onclick="openSinistro(null)">+ Nova Ocorrência</button>
+        <button class="btn" id="btnRelSin" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioSinistros()" title="Gerar relatório do que está na tela para imprimir ou salvar em PDF">📄 Relatório PDF</button>
+      </div>
+
+      <!-- Resumo -->
+      <div class="stats" id="sinStats" style="margin-bottom:12px"></div>
+
+      <!-- Tabela -->
+      <div id="sinGrid"></div>
     </div>
 
     <div class="panel" id="panel-financeiro" style="display:none;width:100%">
@@ -1193,7 +1236,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v97-20260928-1753';
+var LOKA_BUILD = 'v98-20260928-2034';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1243,12 +1286,13 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
     fornecedores: 'Fornecedores',
   multas: 'Multas',
   efrotas: 'e-Frotas (SENATRAN)',
   multasefrotas: 'Multas e-Frotas',
+  sinistros: 'Ocorrências / Sinistros',
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
   historico:'Histórico de Locações', faturas:'Faturas', manutencao:'Manutenção', financeiro:'Financeiro', reserva:'Reservas', cadastro:'Pré-Cadastro'
@@ -1284,9 +1328,9 @@ function _perfilAtual() {
 }
 
 // Todos os painéis controláveis por permissão
-var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
-var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
   editarPrecos:'Editar preços dos veículos',
   gerenciarUsuarios:'Gerenciar usuários',
@@ -1326,7 +1370,7 @@ var _PERFIS_BUILTIN = {
   admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
               acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true, indicarCondutor:true } },
   operador: { nome:'Operador', builtin:true,
-              paineis:['dashboard','clientes','ativos','veiculos','faturas','manutencao','fornecedores','multas','formularios','contratos','historico','reserva','cadastro'],
+              paineis:['dashboard','clientes','ativos','veiculos','faturas','manutencao','fornecedores','multas','sinistros','formularios','contratos','historico','reserva','cadastro'],
               acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true } },
   // Oficina: inclui novas manutenções E consulta o histórico das placas da sua oficina
   oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
@@ -1565,6 +1609,7 @@ function showPanel(name) {
     if (name === 'faturas')     { setFiltroFaturas(''); carregarFaturas(); }
     if (name === 'financeiro')  { finInit(); finMostrarAba('acertos'); }
     if (name === 'multas')      { mltInit(); mltMostrarAba('lista'); }
+    if (name === 'sinistros')   renderSinistros();
   } catch(e) {
     console.error('showPanel[' + name + ']:', e);
     // Exibir erro visual para debug
@@ -1939,7 +1984,7 @@ var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // quando há chaves não sequenciais, após exclusões). Chamado ao carregar/sincronizar.
 function normalizarDB(){
   if (!db) return;
-  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores'].forEach(function(nome){
+  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros'].forEach(function(nome){
     if (db[nome] === undefined || db[nome] === null) { db[nome] = []; return; }
     if (!Array.isArray(db[nome])) {
       if (typeof db[nome] === 'object') {
@@ -6075,6 +6120,440 @@ function excluirManutencao() {
 }
 
 // Abrir histórico de manutenção filtrando por veículo (botão 🔧)
+// ══════════════════════════════════════════════════════════════
+// OCORRÊNCIAS / SINISTROS
+// ══════════════════════════════════════════════════════════════
+// Os tipos espelham a Cláusula 11ª do contrato, que é onde as franquias estão
+// definidas (danos/PT, perda total ou roubo, para-brisa, faróis e lanternas).
+// Inventar tipo aqui faria o registro não conversar com a cobrança.
+var SIN_TIPO_LBL = {
+  colisao:'💥 Colisão / danos', perda_total:'🚨 Perda total',
+  roubo_furto:'🔓 Roubo ou furto', parabrisa:'🪟 Para-brisa',
+  farol_lanterna:'💡 Farol / lanterna', outro:'📄 Outro'
+};
+var SIN_ST_LBL = {aberto:'🔴 Aberto', em_analise:'🔎 Em análise', reparo:'🔧 Em reparo',
+                  concluido:'✅ Concluído', sem_cobertura:'⚠️ Sem cobertura'};
+var SIN_ST_COR = {aberto:'#c0392b', em_analise:'#b45309', reparo:'#7c3aed',
+                  concluido:'#0d7a3e', sem_cobertura:'#8a5a00'};
+var SIN_ST_BG  = {aberto:'#fdecea', em_analise:'#fef3cd', reparo:'#ede9fe',
+                  concluido:'#e8f5ef', sem_cobertura:'#fff8e6'};
+var _sinEditId = null;
+
+function _sinLista(){ return garantirArray('sinistros'); }
+
+// ── FILTRO E TABELA ───────────────────────────────────────────
+function sinFiltrados(){
+  var q  = semAcento(((document.getElementById('qSin')||{}).value||''));
+  var ft = (document.getElementById('fSinTipo')||{}).value || '';
+  var fs = (document.getElementById('fSinStatus')||{}).value || '';
+  var di = (document.getElementById('fSinDataIni')||{}).value || '';
+  var df = (document.getElementById('fSinDataFim')||{}).value || '';
+  return _sinLista().filter(function(s){
+    if (!s) return false;
+    if (ft && s.tipo !== ft) return false;
+    if (fs && (s.status||'aberto') !== fs) return false;
+    // Sem data não se pode afirmar que cai no período pedido — fica de fora.
+    if (di && (!s.data || s.data < di)) return false;
+    if (df && (!s.data || s.data > df)) return false;
+    if (!q) return true;
+    return semAcento([s.placa, s.veiculoNome, s.clienteNome, s.condutor,
+                      s.local, s.descricao, s.bo, s.seguradora, s.aviso,
+                      s.terceiros].join(' ')).indexOf(q) >= 0;
+  });
+}
+
+function limparFiltroDataSin(){
+  var i = document.getElementById('fSinDataIni'); if (i) i.value = '';
+  var f = document.getElementById('fSinDataFim'); if (f) f.value = '';
+  renderSinistros();
+}
+
+function renderSinistros(){
+  if (!db) return;
+  var todos = _sinLista();
+  var list  = sinFiltrados();
+
+  // Resumo — conta sobre o TOTAL, não sobre o filtrado, para o cartão não
+  // mudar de significado conforme o filtro.
+  var st = document.getElementById('sinStats');
+  if (st) {
+    var nAb = todos.filter(function(s){ return s && (s.status||'aberto')==='aberto'; }).length;
+    var nAn = todos.filter(function(s){ return s && s.status==='em_analise'; }).length;
+    var nRe = todos.filter(function(s){ return s && s.status==='reparo'; }).length;
+    var aReceber = todos.reduce(function(acc,s){
+      if (!s || !s.franquiaDevida) return acc;
+      return acc + mltNum(s.franquiaValor);
+    }, 0);
+    st.innerHTML =
+      '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value">'+nAb+'</div><div class="stat-label">Abertos</div></div>'+
+      '<div class="stat" style="border-left-color:#b45309"><div class="stat-value">'+nAn+'</div><div class="stat-label">Em análise</div></div>'+
+      '<div class="stat" style="border-left-color:#7c3aed"><div class="stat-value">'+nRe+'</div><div class="stat-label">Em reparo</div></div>'+
+      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:16px">'+fmtBRL(aReceber)+'</div><div class="stat-label">Franquia a cobrar</div></div>';
+  }
+
+  var grid = document.getElementById('sinGrid');
+  if (!grid) return;
+  if (!list.length) {
+    // "Nada registrado" e "nada encontrado" são coisas diferentes — dizer o
+    // mesmo nos dois casos deixa a dúvida de "sumiu tudo?".
+    grid.innerHTML = todos.length
+      ? '<div class="empty"><p>Nenhuma ocorrência encontrada com esses filtros</p><small>Ajuste a busca, o tipo, o status ou o período.</small></div>'
+      : '<div class="empty"><p>Nenhuma ocorrência registrada</p><small>Clique em "+ Nova Ocorrência" para registrar um sinistro.</small></div>';
+    return;
+  }
+
+  function th(txt, extra){
+    return '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;'+(extra||'')+'">'+txt+'</th>';
+  }
+
+  grid.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px">'
+    + '<thead><tr style="background:var(--dark)">'
+      + th('Veículo') + th('Data', 'text-align:center') + th('Tipo')
+      + th('Ocorrência') + th('Condutor') + th('Franquia', 'text-align:right')
+      + th('Status') + th('Ações', 'text-align:center')
+    + '</tr></thead><tbody>'
+    + list.slice().sort(function(a,b){
+        return String(b.data||'').localeCompare(String(a.data||''));
+      }).map(function(s){
+      var stt = s.status || 'aberto';
+      var fr  = s.franquiaDevida
+        ? '<strong style="color:#8a5a00">'+fmtBRL(s.franquiaValor)+'</strong>'
+          + (s.receberId ? '<br><span style="font-size:9px;color:#0d7a3e;font-weight:700">✓ lançada</span>' : '')
+        : '—';
+      return '<tr style="border-bottom:1px solid #f0f2f8">'
+        + '<td style="padding:9px 12px"><strong>'+(s.veiculoNome||'—')+'</strong>'
+          + '<br><span style="font-family:monospace;font-size:10px;background:#f0f2f9;padding:1px 5px;border-radius:3px">'+(s.placa||'')+'</span>'
+          + (s.clienteNome ? '<br><span style="font-size:9px;color:#2B4BF2;font-weight:700">🏢 '+s.clienteNome+'</span>' : '')
+        + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(s.data)+(s.hora?'<br><span style="font-size:10px;color:var(--muted)">'+s.hora+'</span>':'')+'</td>'
+        + '<td style="padding:9px 12px"><span style="background:#f0f2f9;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700">'+(SIN_TIPO_LBL[s.tipo]||s.tipo||'—')+'</span></td>'
+        + '<td style="padding:9px 12px;font-size:11px;color:var(--muted)">'+String(s.descricao||'').substring(0,48)+(String(s.descricao||'').length>48?'…':'')
+          + (s.bo ? '<br><span style="font-size:9px;font-weight:700;color:var(--dark)">BO '+s.bo+'</span>' : '')
+        + '</td>'
+        + '<td style="padding:9px 12px;font-size:11px">'+(s.condutor||'—')+'</td>'
+        + '<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:11px">'+fr+'</td>'
+        + '<td style="padding:9px 12px"><span style="background:'+(SIN_ST_BG[stt]||'#f0f2f9')+';color:'+(SIN_ST_COR[stt]||'#555')+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap">'+(SIN_ST_LBL[stt]||stt)+'</span></td>'
+        + '<td style="padding:9px 12px;text-align:center">'
+          + '<button class="icon-btn sin-edit-btn" data-sid="'+s.id+'" title="Abrir / editar" style="color:#2B4BF2;border-color:#2B4BF2">✏️</button>'
+        + '</td>'
+      + '</tr>';
+    }).join('')
+    + '</tbody></table></div>'
+    + '<p style="font-size:11px;color:var(--muted);margin:8px 0 0">'+list.length+' de '+todos.length+' ocorrência(s)</p>';
+
+  _wireSinGrid(grid);
+}
+
+// Delegação de evento ligada uma única vez — o grid é redesenhado a cada
+// digitação, e religar em cada render empilharia handlers.
+function _wireSinGrid(grid){
+  if (!grid || grid._sinWired) return;
+  grid._sinWired = true;
+  grid.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest && ev.target.closest('.sin-edit-btn');
+    if (b) openSinistro(b.getAttribute('data-sid'));
+  });
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function _snSet(id, val){ var e = document.getElementById(id); if (e) e.value = (val==null?'':val); }
+function _snGet(id){ var e = document.getElementById(id); return e ? (e.value||'') : ''; }
+
+function snPreencherVeiculos(){
+  var sel = document.getElementById('snVeiculo');
+  var dl  = document.getElementById('snListaPlacas');
+  if (!sel) return;
+  var vs = (db.veiculos||[]).filter(Boolean).slice().sort(function(a,b){
+    return String(a.placa||'').localeCompare(String(b.placa||''));
+  });
+  sel.innerHTML = '<option value="">— Selecione —</option>'
+    + vs.map(function(v){
+        return '<option value="'+v.id+'">'+(v.placa||'—')+' · '+(v.marca||'')+' '+(v.modelo||'')+'</option>';
+      }).join('');
+  if (dl) dl.innerHTML = vs.map(function(v){ return '<option value="'+(v.placa||'')+'">'; }).join('');
+}
+
+// Digitar a placa seleciona o veículo. Casa ignorando hífen e maiúscula,
+// porque a placa é digitada de vários jeitos.
+function snSelecionarPorPlaca(txt){
+  var alvo = String(txt||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if (!alvo) return;
+  var v = (db.veiculos||[]).filter(Boolean).find(function(x){
+    return String(x.placa||'').toUpperCase().replace(/[^A-Z0-9]/g,'') === alvo;
+  });
+  if (v) { _snSet('snVeiculo', v.id); snAoTrocarVeiculo(); }
+}
+
+function snAoTrocarVeiculo(){
+  var box  = document.getElementById('snLocatariaBox');
+  var nome = document.getElementById('snLocatariaNome');
+  if (!box || !nome) return;
+  var vid = _snGet('snVeiculo');
+  var v = (db.veiculos||[]).filter(Boolean).find(function(x){ return x.id===vid; });
+  if (!vid || !v) { box.style.display = 'none'; return; }
+  _snSet('snBuscaPlaca', v.placa||'');
+  var loc = _locatariaAtual(v.placa, v.id);
+  box.style.display = 'block';
+  if (loc && loc.clienteNome) {
+    nome.textContent = loc.clienteNome;
+    nome.style.color = 'var(--dark)';
+  } else {
+    nome.textContent = 'sem aluguel ativo — o veículo estava com a locadora';
+    nome.style.color = 'var(--muted)';
+  }
+}
+
+function snAlternarFranquia(){
+  var ck = document.getElementById('snFranquiaDevida');
+  var bx = document.getElementById('snFranquiaCampos');
+  if (bx) bx.style.display = (ck && ck.checked) ? 'block' : 'none';
+}
+
+function openSinistro(id){
+  if (!db) return;
+  _sinEditId = id || null;
+  snPreencherVeiculos();
+
+  var s = id ? _sinLista().find(function(x){ return x && x.id===id; }) : null;
+
+  document.getElementById('mSinTitulo').textContent = s ? 'Ocorrência · '+(s.placa||'') : 'Nova Ocorrência';
+  var bx = document.getElementById('btnExcluirSin');
+  if (bx) bx.style.display = s ? 'inline-flex' : 'none';
+
+  _snSet('snBuscaPlaca', s ? (s.placa||'') : '');
+  _snSet('snVeiculo',    s ? (s.veiculoId||'') : '');
+  _snSet('snData',       s ? (s.data||'') : new Date().toISOString().slice(0,10));
+  _snSet('snHora',       s ? (s.hora||'') : '');
+  _snSet('snTipo',       s ? (s.tipo||'colisao') : 'colisao');
+  _snSet('snStatus',     s ? (s.status||'aberto') : 'aberto');
+  _snSet('snLocal',      s ? (s.local||'') : '');
+  _snSet('snCondutor',   s ? (s.condutor||'') : '');
+  _snSet('snVitimas',    s ? (s.vitimas==null?'nao':s.vitimas) : 'nao');
+  _snSet('snDescricao',  s ? (s.descricao||'') : '');
+  _snSet('snTerceiros',  s ? (s.terceiros||'') : '');
+  _snSet('snBO',         s ? (s.bo||'') : '');
+  _snSet('snSeguradora', s ? (s.seguradora||'') : '');
+  _snSet('snAviso',      s ? (s.aviso||'') : '');
+  _snSet('snCustoReparo',s ? (s.custoReparo||'') : '');
+  _snSet('snFranquiaValor', s ? (s.franquiaValor||'') : '');
+  _snSet('snFranquiaVenc',  s ? (s.franquiaVencimento||'') : '');
+  var ck = document.getElementById('snFranquiaDevida');
+  if (ck) ck.checked = !!(s && s.franquiaDevida);
+  snAlternarFranquia();
+  _snSet('snObs', s ? (s.obs||'') : '');
+
+  snAoTrocarVeiculo();
+  openM('mSinistro');
+}
+
+// ── FRANQUIA → CONTAS A RECEBER ───────────────────────────────
+// O lançamento carrega sinistroId, e é por ele que o encontramos de novo.
+// Sem essa marca, editar criaria um segundo lançamento a cada salvamento.
+function _sinReceberLista(){
+  if (!db.financeiro || typeof db.financeiro !== 'object') db.financeiro = {};
+  if (!Array.isArray(db.financeiro.receber)) db.financeiro.receber = [];
+  return db.financeiro.receber;
+}
+function _sinAcharReceber(sinId){
+  var L = _sinReceberLista();
+  for (var i=0;i<L.length;i++) if (L[i] && L[i].sinistroId === sinId) return i;
+  return -1;
+}
+// Um lançamento já recebido (total ou parcial) não pode ser apagado nem
+// reescrito por aqui: seria perder dinheiro já registrado. Devolve true.
+function _sinRecebido(r){
+  return !!(r && (r.status === 'recebido' || mltNum(r.recebido) > 0));
+}
+
+function _sinSincronizarFranquia(reg){
+  var L   = _sinReceberLista();
+  var idx = _sinAcharReceber(reg.id);
+  var tem = idx >= 0;
+
+  if (!reg.franquiaDevida) {
+    if (tem && _sinRecebido(L[idx])) {
+      return { aviso: 'A franquia já tinha recebimento lançado, então o lançamento foi mantido no Financeiro. Ajuste por lá se for o caso.' };
+    }
+    if (tem) { L.splice(idx,1); reg.receberId = ''; }
+    return {};
+  }
+
+  var hist = 'Franquia de sinistro · ' + (reg.placa||'') + ' · '
+           + (SIN_TIPO_LBL[reg.tipo]||reg.tipo||'').replace(/^\S+\s/, '')
+           + ' · ' + fmt(reg.data);
+
+  if (tem) {
+    if (_sinRecebido(L[idx])) {
+      reg.receberId = reg.id;
+      return { aviso: 'O lançamento desta franquia já tem recebimento, por isso o valor no Financeiro não foi alterado.' };
+    }
+    L[idx].cliente    = reg.clienteNome || L[idx].cliente || '';
+    L[idx].valor      = mltNum(reg.franquiaValor);
+    L[idx].vencimento = reg.franquiaVencimento || L[idx].vencimento || '';
+    L[idx].historico  = hist;
+  } else {
+    L.push({
+      cliente: reg.clienteNome || '',
+      valor: mltNum(reg.franquiaValor),
+      recebido: 0,
+      vencimento: reg.franquiaVencimento || '',
+      historico: hist,
+      status: 'pendente',
+      recebidoEm: '',
+      sinistroId: reg.id
+    });
+  }
+  reg.receberId = reg.id;
+  return {};
+}
+
+// ── SALVAR ────────────────────────────────────────────────────
+function salvarSinistro(){
+  if (!db) return;
+  garantirArray('sinistros');
+
+  var vid  = _snGet('snVeiculo');
+  var data = _snGet('snData');
+  var tipo = _snGet('snTipo');
+  var desc = _snGet('snDescricao').trim();
+
+  if (!vid)  { toast('⚠️ Selecione o veículo','#b45309'); return; }
+  if (!data) { toast('⚠️ Informe a data da ocorrência','#b45309'); return; }
+  if (!tipo) { toast('⚠️ Informe o tipo da ocorrência','#b45309'); return; }
+  if (!desc) { toast('⚠️ Descreva o que aconteceu','#b45309'); return; }
+
+  var franq = !!(document.getElementById('snFranquiaDevida')||{}).checked;
+  var fvTxt = _snGet('snFranquiaValor');
+  if (franq) {
+    // mltNum('abc') devolve 0, e 0 é valor legítimo. Sem exigir dígito, um
+    // erro de digitação lançaria cobrança de R$ 0,00 calado.
+    if (!/\d/.test(fvTxt)) { toast('⚠️ Informe o valor da franquia','#b45309'); return; }
+    if (mltNum(fvTxt) <= 0) { toast('⚠️ O valor da franquia deve ser maior que zero','#b45309'); return; }
+  }
+
+  var v = (db.veiculos||[]).filter(Boolean).find(function(x){ return x.id===vid; }) || {};
+  var loc = _locatariaAtual(v.placa, v.id);
+  var antigo = _sinEditId ? _sinLista().find(function(x){ return x && x.id===_sinEditId; }) : null;
+
+  var reg = {
+    id:          _sinEditId || 'sin_'+Date.now(),
+    veiculoId:   vid,
+    veiculoNome: ((v.marca||'')+' '+(v.modelo||'')).trim(),
+    placa:       v.placa || '',
+    // Locatário do momento. Ao editar, preserva o que já estava registrado se
+    // o aluguel já terminou — senão o sinistro perderia de quem era o carro.
+    clienteId:   loc ? (loc.clienteId||'')   : (antigo ? (antigo.clienteId||'')   : ''),
+    clienteNome: loc ? (loc.clienteNome||'') : (antigo ? (antigo.clienteNome||'') : ''),
+    data:        data,
+    hora:        _snGet('snHora'),
+    tipo:        tipo,
+    status:      _snGet('snStatus') || 'aberto',
+    local:       _snGet('snLocal'),
+    condutor:    _snGet('snCondutor'),
+    vitimas:     _snGet('snVitimas'),
+    descricao:   desc,
+    terceiros:   _snGet('snTerceiros'),
+    bo:          _snGet('snBO'),
+    seguradora:  _snGet('snSeguradora'),
+    aviso:       _snGet('snAviso'),
+    custoReparo: _snGet('snCustoReparo'),
+    franquiaDevida:     franq,
+    franquiaValor:      franq ? fvTxt : '',
+    franquiaVencimento: franq ? _snGet('snFranquiaVenc') : '',
+    receberId:   antigo ? (antigo.receberId||'') : '',
+    obs:         _snGet('snObs'),
+    criadoEm:    antigo ? (antigo.criadoEm || new Date().toISOString()) : new Date().toISOString(),
+    atualizadoEm:new Date().toISOString()
+  };
+
+  var r = _sinSincronizarFranquia(reg);
+
+  var L = _sinLista();
+  if (_sinEditId) {
+    var i = L.findIndex(function(x){ return x && x.id===_sinEditId; });
+    if (i >= 0) L[i] = reg; else L.push(reg);
+  } else {
+    L.push(reg);
+  }
+
+  saveDB();
+  closeM('mSinistro');
+  renderSinistros();
+  if (typeof finRenderReceber === 'function') { try { finRenderReceber(); } catch(e){} }
+  toast(_sinEditId ? '✅ Ocorrência atualizada!' : '✅ Ocorrência registrada!','#c0392b');
+  if (r.aviso) setTimeout(function(){ toast('⚠️ '+r.aviso,'#b45309'); }, 2600);
+  _sinEditId = null;
+}
+
+function excluirSinistro(){
+  if (!_sinEditId) return;
+  var s = _sinLista().find(function(x){ return x && x.id===_sinEditId; });
+  var idx = _sinAcharReceber(_sinEditId);
+  var recebido = idx >= 0 && _sinRecebido(_sinReceberLista()[idx]);
+
+  var msg = 'Excluir esta ocorrência?';
+  if (idx >= 0) {
+    msg += recebido
+      ? '\n\nA cobrança da franquia JÁ TEM RECEBIMENTO lançado, então ela será MANTIDA no Financeiro.'
+      : '\n\nA cobrança da franquia em Contas a Receber será removida junto.';
+  }
+  if (!confirm(msg)) return;
+
+  if (idx >= 0 && !recebido) _sinReceberLista().splice(idx,1);
+  db.sinistros = _sinLista().filter(function(x){ return x && x.id!==_sinEditId; });
+
+  saveDB();
+  closeM('mSinistro');
+  renderSinistros();
+  if (typeof finRenderReceber === 'function') { try { finRenderReceber(); } catch(e){} }
+  toast('🗑 Ocorrência excluída.','#c0392b');
+  if (recebido) setTimeout(function(){ toast('⚠️ A cobrança da franquia ficou no Financeiro porque já tinha recebimento.','#b45309'); }, 2600);
+  _sinEditId = null;
+}
+
+// ── RELATÓRIO ─────────────────────────────────────────────────
+// Imprime o que está na tela. Mandar a lista inteira surpreenderia quem
+// acabou de recortar um período.
+function relatorioSinistros(){
+  var list = sinFiltrados();
+  if (!list.length) { toast('⚠️ Nada para imprimir com esses filtros','#b45309'); return; }
+  var total = list.reduce(function(a,s){ return a + (s.franquiaDevida ? mltNum(s.franquiaValor) : 0); }, 0);
+  var di = (document.getElementById('fSinDataIni')||{}).value || '';
+  var df = (document.getElementById('fSinDataFim')||{}).value || '';
+  var per = (di||df) ? ('Período: '+(di?fmt(di):'início')+' até '+(df?fmt(df):'hoje')) : 'Todas as datas';
+
+  var h = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Ocorrências e Sinistros — LOKÁ</title><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111827}'
+    + 'h1{font-size:17px;margin:0 0 4px}p.sub{font-size:11px;color:#555;margin:0 0 14px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:10px}'
+    + 'th{background:#e5e7eb;color:#111827!important;font-weight:700;padding:6px;border:1px solid #cbd5e1;text-align:left}'
+    + 'td{padding:6px;border:1px solid #e2e8f0;vertical-align:top}'
+    + 'tfoot td{font-weight:700;background:#f8fafc}'
+    + '@media print{@page{size:A4 landscape;margin:12mm}}'
+    + '</style></head><body>'
+    + '<h1>Ocorrências e Sinistros</h1>'
+    + '<p class="sub">LOKÁ Aluguel de Veículos · '+per+' · '+list.length+' ocorrência(s) · emitido em '+new Date().toLocaleString('pt-BR')+'</p>'
+    + '<table><thead><tr><th>Data</th><th>Placa</th><th>Veículo</th><th>Locatário</th>'
+    + '<th>Tipo</th><th>Condutor</th><th>Local</th><th>BO</th><th>Status</th><th>Franquia</th></tr></thead><tbody>'
+    + list.slice().sort(function(a,b){ return String(a.data||'').localeCompare(String(b.data||'')); })
+        .map(function(s){
+      function c(x){ return '<td>'+String(x==null||x===''?'—':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td>'; }
+      return '<tr>'+c(fmt(s.data))+c(s.placa)+c(s.veiculoNome)+c(s.clienteNome)
+        + c((SIN_TIPO_LBL[s.tipo]||s.tipo||'').replace(/^\S+\s/,''))
+        + c(s.condutor)+c(s.local)+c(s.bo)
+        + c((SIN_ST_LBL[s.status||'aberto']||'').replace(/^\S+\s/,''))
+        + c(s.franquiaDevida ? fmtBRL(s.franquiaValor) : '')+'</tr>';
+    }).join('')
+    + '</tbody><tfoot><tr><td colspan="9">Total de franquia a cobrar</td><td>'+fmtBRL(total)+'</td></tr></tfoot></table>'
+    + '<script>window.onload=function(){window.print();}<\/script></body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { toast('⚠️ O navegador bloqueou a janela de impressão','#b45309'); return; }
+  w.document.write(h); w.document.close();
+}
+
 // ── IMPORTAR MANUTENÇÃO (código da oficina) ─────────────────
 // ── COPIAR LINK DO CHECKLIST COMPARTILHÁVEL ─────────────────
 function copiarLinkChecklist() {
@@ -10890,6 +11369,108 @@ function _efDiagFuncao(add){
 </div></div>
 
 <!-- MODAL: MANUTENÇÃO -->
+<!-- ══ MODAL: OCORRÊNCIA / SINISTRO ══ -->
+<div class="modal-bg" id="mSinistro"><div class="modal" style="max-width:620px">
+  <div class="modal-head" style="background:#c0392b">
+    <h3 id="mSinTitulo">Nova Ocorrência</h3>
+    <button class="modal-close" onclick="closeM('mSinistro')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="g2">
+
+      <div class="fg" style="grid-column:1/-1">
+        <label class="fl">Veículo * <span style="font-weight:400;color:var(--muted);font-size:10px">(digite a placa ou selecione)</span></label>
+        <input class="fi" id="snBuscaPlaca" list="snListaPlacas" placeholder="🔍 Digite a placa..." style="text-transform:uppercase;margin-bottom:6px" oninput="snSelecionarPorPlaca(this.value)">
+        <datalist id="snListaPlacas"></datalist>
+        <select class="fs" id="snVeiculo" onchange="snAoTrocarVeiculo()">
+          <option value="">— Selecione —</option>
+        </select>
+        <div id="snLocatariaBox" style="margin-top:8px;font-size:12px;padding:8px 12px;border-radius:8px;background:#f0f2f9;color:var(--muted);display:none">
+          🏢 Locatário no momento: <strong id="snLocatariaNome" style="color:var(--dark)">—</strong>
+        </div>
+      </div>
+
+      <div class="fg"><label class="fl">Data da ocorrência *</label><input class="fi" id="snData" type="date"></div>
+      <div class="fg"><label class="fl">Hora</label><input class="fi" id="snHora" type="time"></div>
+
+      <div class="fg"><label class="fl">Tipo *</label>
+        <select class="fs" id="snTipo">
+          <option value="colisao">💥 Colisão / danos ao veículo</option>
+          <option value="perda_total">🚨 Perda total</option>
+          <option value="roubo_furto">🔓 Roubo ou furto</option>
+          <option value="parabrisa">🪟 Para-brisa</option>
+          <option value="farol_lanterna">💡 Farol / lanterna</option>
+          <option value="outro">📄 Outro</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fs" id="snStatus">
+          <option value="aberto">🔴 Aberto</option>
+          <option value="em_analise">🔎 Em análise (seguradora)</option>
+          <option value="reparo">🔧 Em reparo</option>
+          <option value="concluido">✅ Concluído</option>
+          <option value="sem_cobertura">⚠️ Sem cobertura</option>
+        </select>
+      </div>
+
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Onde aconteceu</label>
+        <input class="fi" id="snLocal" placeholder="Ex: BR-324, km 12, Feira de Santana/BA">
+      </div>
+
+      <div class="fg"><label class="fl">Quem estava dirigindo</label><input class="fi" id="snCondutor" placeholder="Nome do condutor"></div>
+      <div class="fg"><label class="fl">Houve vítimas?</label>
+        <select class="fs" id="snVitimas">
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+          <option value="">Não informado</option>
+        </select>
+      </div>
+
+      <div class="fg" style="grid-column:1/-1"><label class="fl">O que aconteceu *</label>
+        <textarea class="fi" id="snDescricao" rows="3" placeholder="Descreva a ocorrência" style="resize:vertical"></textarea>
+      </div>
+
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Terceiros envolvidos</label>
+        <input class="fi" id="snTerceiros" placeholder="Nome, placa e contato do terceiro, se houver">
+      </div>
+
+      <div class="fg"><label class="fl">Boletim de Ocorrência (nº)</label><input class="fi" id="snBO" placeholder="Nº do BO"></div>
+      <div class="fg"><label class="fl">Seguradora</label><input class="fi" id="snSeguradora" placeholder="Nome da seguradora"></div>
+      <div class="fg"><label class="fl">Aviso de sinistro (nº)</label><input class="fi" id="snAviso" placeholder="Nº do aviso"></div>
+      <div class="fg"><label class="fl">Custo do reparo (R$)</label><input class="fi" id="snCustoReparo" placeholder="0,00"></div>
+
+      <!-- Franquia devida pelo locatário -->
+      <div class="fg" style="grid-column:1/-1;background:#fff8e6;border:1px solid #f5d98a;border-radius:10px;padding:12px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#8a5a00;cursor:pointer">
+          <input type="checkbox" id="snFranquiaDevida" onchange="snAlternarFranquia()">
+          Franquia devida pelo locatário — lançar em Contas a Receber
+        </label>
+        <div id="snFranquiaCampos" style="display:none;margin-top:10px">
+          <div class="g2">
+            <div class="fg"><label class="fl">Valor da franquia (R$) *</label><input class="fi" id="snFranquiaValor" placeholder="0,00"></div>
+            <div class="fg"><label class="fl">Vencimento</label><input class="fi" id="snFranquiaVenc" type="date"></div>
+          </div>
+          <p style="font-size:11px;color:#8a5a00;margin:4px 0 0">
+            O lançamento fica ligado a esta ocorrência: editar atualiza o mesmo,
+            excluir remove. Se a franquia já tiver sido recebida, o lançamento
+            não é mexido — o aviso explica o que fazer.
+          </p>
+        </div>
+      </div>
+
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label>
+        <textarea class="fi" id="snObs" rows="2" placeholder="Anotações internas" style="resize:vertical"></textarea>
+      </div>
+
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" id="btnExcluirSin" onclick="excluirSinistro()" style="color:#c0392b;border-color:#c0392b;display:none">🗑 Excluir</button>
+    <button class="btn btn-outline" onclick="closeM('mSinistro')">Cancelar</button>
+    <button class="btn btn-blue" id="btnSalvarSin" onclick="salvarSinistro()">Salvar</button>
+  </div>
+</div></div>
+
 <div class="modal-bg" id="mManutRegistro"><div class="modal" style="max-width:560px">
   <div class="modal-head" style="background:#7c3aed">
     <h3 id="mManutTitulo">Nova Manutenção</h3>
