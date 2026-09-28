@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v98-20260928-2034 -->
+<!-- LOKA deploy: v99-20260928-2039 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1236,7 +1236,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v98-20260928-2034';
+var LOKA_BUILD = 'v99-20260928-2039';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -6202,8 +6202,11 @@ function renderSinistros(){
     return;
   }
 
+  // O CSS global do `th` traz fundo claro e `color:#111827 !important`, que
+  // vence cor inline. Por isso nao declaramos cor aqui: seria codigo morto
+  // hoje e texto branco invisivel no dia em que aquele !important sair.
   function th(txt, extra){
-    return '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;'+(extra||'')+'">'+txt+'</th>';
+    return '<th style="padding:9px 12px;font-size:9px;font-weight:700;text-transform:uppercase;'+(extra||'')+'">'+txt+'</th>';
   }
 
   grid.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
