@@ -1457,3 +1457,64 @@ listadas à mão**, uma a uma, depois de classificar as 62 ocorrências do
   dispensa login): os 10 pares batem na `gestao.html` no ar, e a linha real de
   filtro do `cadastros.html` publicado acha `José` e `Jose` nos dois sentidos,
   sem perder busca por CPF nem por telefone
+
+## 🔴 A busca continuava travando — 28/09/2026 (`708f9f8`)
+
+O conserto de 26/09 **não alcançava 4 dos 11 campos**. O Rogel estava certo ao
+reportar de novo.
+
+### A causa: `comFoco` desiste quando o campo não tem `id`
+```js
+var id = ativo && ativo.id;
+...
+if(!id) return;     // sem id não há como reencontrar o campo após o render
+```
+Quatro campos não tinham `id`, então `comFoco` era chamado e **desistia na
+primeira linha**:
+
+| Arquivo | Campo |
+|---|---|
+| `cadastros.html` | busca de clientes (**nome**) |
+| `cadastros.html` | busca de fornecedores (**nome**) |
+| `veiculos.html` | busca de veículos (**placa**) |
+| `contratos.html` | busca de contratos |
+
+Exatamente "placa/veículo/nome". Ganharam `busca-veiculos`, `busca-clientes`,
+`busca-fornecedores`, `busca-contratos`.
+
+### ⚠️ NÃO era a LOKÁ — verificado antes de mexer
+Lá o campo de busca fica no **HTML estático**, fora do que o render substitui:
+`renderVeiculos` troca só o `#veiculosGrid`, não o `#panel-veiculos` que contém
+o campo. Aquela causa não existe na LOKÁ. (São 12 `oninput` com render lá, mas
+nenhum destrói o próprio campo.)
+
+### A lição, que é o mais importante
+O teste de 26/09 verificava que `comFoco` estava **ligado** nos campos, e
+exercitava `comFoco` com elementos que **eu** criava — sempre com id.
+**Verifiquei a fiação, não o resultado.** Um teste verde e um bug vivo.
+
+Entrou `teste-foco-real.js`: faz o ciclo de verdade em 7 telas — chama o render
+real, deixa o campo focado, dispara `comFoco`, e exige que o foco volte para um
+elemento **novo** com o mesmo id. Mais duas regras estruturais: todo campo com
+`comFoco` tem de ter `id`; todo `oninput` que dispare render passa por `comFoco`.
+
+**Provado que pega o defeito:** removendo o id de propósito, 3 dos 10 testes
+falham; restaurando, os 10 passam.
+
+⚠️ Na primeira versão o teste de ciclo **passava mesmo com o defeito** — o DOM
+falso devolvia um elemento genérico para id desconhecido. Teste que passa errado
+é pior que teste nenhum. Agora ele exige que o campo tenha nascido do HTML
+redesenhado.
+
+### Outra sessão mexeu no mesmo dia
+O commit `58915de` (28/09 17:54, de outra sessão) tornou a busca **insensível a
+acento** (`semAcento` no shared). Convivem sem conflito: aquele mexeu na
+**lógica** do filtro, este no **campo**. Conferido que os 4 campos têm `id` e
+`semAcento` ao mesmo tempo.
+
+⚠️ Isso quebrou 1 suíte de teste minha (`teste-etapa` não carregava o shared, e
+`semAcento` mora lá). Ao mexer em teste que usa stubs, lembrar sempre da
+sequência: **shared → página → religar os stubs**, e alimentar o DB pelo
+`localStorage`, nunca pelo stub de `loadDB`.
+
+**Total do sistema: 194 testes em 10 suítes.**
