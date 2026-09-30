@@ -1841,3 +1841,117 @@ mas isso é decisão do Rogel (e o risco é deixar de ver multa de carro alugado
 ⚠️ **A trava de inativos resolve metade do desperdício, não ele todo.** Não
 confundir os dois problemas: inativo é cadastro interno; 403 em ativo é contrato
 com o Serpro.
+
+---
+
+## 💬 WhatsApp — mensagem pronta no CRM (30/09/2026, `cc3be56`) · Auto Mais
+
+Pedido: "integracao do whatsapp para personalizar o atendimento aos clientes".
+Dos tres objetivos que o Rogel marcou, **este e o unico que nao depende de
+servidor, conta na Meta nem dinheiro** — por isso saiu primeiro, inteiro.
+
+### O que estava errado
+O sistema **ja abria o WhatsApp em 5 pontos** nos dois sistemas, mas so **um**
+levava texto (e era o numero fixo da propria loja). Nos outros a conversa abria
+**em branco**: a pessoa tinha na tela o nome, o telefone e o carro de interesse,
+e digitava tudo de novo do lado de fora.
+
+### A mensagem acompanha a ETAPA do lead
+Nao e um texto unico. `waMsgLead(l)` escolhe por `etapaIdDoLead(l)`:
+
+| Etapa | A conversa abre com |
+|---|---|
+| `ganho` | agradece a compra — **nao oferece nada** |
+| `negociacao` / `proposta` | retoma a conversa sobre aquele carro |
+| qualquer outra (inclui **sem etapa**) | aborda pelo veiculo de interesse |
+
+⚠️ **Quem envia continua sendo a pessoa.** O `wa.me/?text=` so **abre** o
+WhatsApp com o texto escrito — nada e enviado sozinho, e ela confere (e edita)
+antes de mandar. Nao ha automacao de envio aqui, nem poderia haver sem a API
+oficial.
+
+### Helpers no `firebase-shared.js` (para as outras telas reusarem)
+| Funcao | Cuidado embutido |
+|---|---|
+| `waNumero` | nao repete o `55` de quem digitou `+55`; aceita fixo de 10 digitos; **recusa numero sem DDD** — melhor nao abrir do que discar errado |
+| `waLink` | devolve `''` quando o numero nao serve, para quem chama **esconder o botao** em vez de abrir link quebrado |
+| `waTexto` | linha vazia e **separador de paragrafo**, nao buraco |
+| `waEmpresa` | respeita `nome_curto`; sem ele encurta a razao social ("AUTO MAIS COMERCIO E CORRETORA DE VEICULOS LTDA" → "Auto Mais") |
+| `waPrimeiroNome` | "JOAO CARLOS DA SILVA" → "Joao" |
+
+🔴 **A guarda era `if(l.telefone)` e estava errada.** Telefone invalido (`123`)
+passava, `waLink` devolvia `''`, e o card ganhava um `<a href="">` — link
+quebrado que **recarrega a pagina** em vez de abrir conversa. Agora a guarda e
+o proprio `waLink`: nao serve, nao aparece botao.
+
+### 🔴 Defeito meu que o teste fraco deixou passar
+O `waTexto` filtrava toda linha vazia. Isso protegia do buraco (campo em branco
+no cadastro virando linha solta), **mas apagava tambem a linha em branco que o
+`waMsgLead` pede de proposito** entre a saudacao e o assunto — a mensagem saia
+num bloco unico e o `''` no meio do array era **codigo morto**.
+
+Linha vazia tem **dois papeis** e o codigo tratava os dois igual. Agora corrida
+de vazios vira **uma** linha em branco, e as das pontas caem fora.
+
+⚠️ **Como eu descobri:** injetando o defeito de proposito. O teste original
+(27 casos, todos verdes) **nao acusou** — ele procurava tres `\n` seguidos e o
+defeito produzia dois. E a mesma licao de 28/09: **teste verde nao prova nada
+se ele nao pega o defeito.** O teste passou a exigir o formato exato da
+mensagem (contagem de linhas e conteudo de cada uma).
+
+### Validado
+- `node --check` no shared e nas 10 paginas
+- **30 testes de runtime**: numero com/sem DDI, fixo, curto, longo, lixo;
+  acento, quebra de linha e `&` sobrevivendo ao link; a mensagem de cada etapa;
+  lead sem nome, sem carro e sem etapa; o botao presente e **ausente**
+- **Provado que os testes pegam o defeito:** 3 versoes defeituosas injetadas
+  (guarda antiga, filtro cego, join cru) — **todas acusadas**
+- **Regressao: 224 testes em 11 suites**, nenhuma falha
+- **No navegador, contra o arquivo publicado** (mesma origem dispensa login):
+  os 5 leads de teste geram a mensagem certa, o telefone `123` **esconde** o
+  botao, e um nome com aspa e apostrofo (`Jose D'Avila "Zeca"`) **nao quebra o
+  atributo HTML** — o navegador le o `href` e devolve a mensagem intacta
+
+### ⏳ Nao verificado
+Falta exercitar **logado, com lead de verdade** — eu nao autentico. Vale o
+Rogel abrir o CRM e clicar no botao verde de um lead real.
+
+### Onde ainda NAO foi aplicado
+Os outros 4 pontos que abrem WhatsApp continuam com a conversa em branco
+(faturas e multas na LOKA, vendas e manutencao na Auto Mais). Os helpers ja
+estao prontos para isso — **nao fiz porque nao foi pedido** (regra 3).
+
+## 🔴 Os outros dois objetivos do WhatsApp exigem servidor e dinheiro
+
+O Rogel tambem marcou **"historico da conversa no sistema"** e **"atendimento
+automatico / chatbot"**. Os dois compartilham a mesma base, e **nenhum dos dois
+e possivel pelo `wa.me`** — aquele endereco so *abre* o aplicativo; nao devolve
+nada ao sistema, nao sabe se a mensagem foi enviada e nao recebe resposta.
+
+Para ler e responder mensagem e preciso a **WhatsApp Business Cloud API** (Meta):
+
+| Exigencia | O que significa na pratica |
+|---|---|
+| Conta Meta Business + WhatsApp Business verificados | CNPJ, documento, aprovacao da Meta |
+| **Numero dedicado** | o numero entra na API e **sai do WhatsApp comum** — quem usa o celular da loja hoje perde o app naquele numero |
+| **Webhook HTTPS** respondendo em segundos | e por ele que a mensagem do cliente chega ao sistema |
+| **Modelos aprovados** pela Meta | fora da janela de 24h so se manda texto pre-aprovado; nao da para escrever livremente |
+| **Custo por conversa** | a Meta cobra por janela de conversa, nao por mensagem |
+
+### Os bloqueios tecnicos que ja conhecemos
+1. **GitHub Pages e estatico — nao recebe POST.** O webhook precisa de servidor.
+2. **Auto Mais esta no plano Spark** — nao tem Cloud Functions. Precisaria subir
+   para Blaze (cartao, como foi na LOKA).
+3. **LOKA: a Org Policy barra criar funcao nova.** Contornavel como foi com o
+   diagnostico (virou um *modo* da `dispararConsultaMultas`), mas e degrau.
+4. **O token da API nao pode ir para o navegador** — o site e publico. Mesmo
+   problema do `.pfx` do e-CNPJ.
+
+### O que da para fazer sem nada disso
+Registrar **a mao** no sistema que houve contato (data, canal, resumo) — um
+historico digitado, nao capturado. Resolve "saber o que foi conversado", **nao**
+resolve "ler a conversa do WhatsApp dentro do sistema".
+
+⚠️ **Nao construir nada disso sem decisao do Rogel** — envolve numero dedicado,
+conta na Meta e custo mensal. O item A (mensagem pronta) ja entrega a parte de
+"personalizar o atendimento" que nao custa nada.
