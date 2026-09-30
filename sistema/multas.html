@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v12-20260925-1035 -->
+<!-- LOKA deploy: v13-20260930-1530 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -212,7 +212,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v12-20260925-1035';
+var LOKA_BUILD = 'v13-20260930-1530';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -564,10 +564,16 @@ var EF_TAMANHO_LOTE = 25;
 var _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:0, restantes:0 };
 
 function efConsultarFrota(){
-  var n = _efVeiculosLista().length;
+  var lista = _efVeiculosLista();
+  var n = lista.length;
   if (!n){ toast('Nenhum veículo cadastrado'); return; }
   if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.' + (_efInativosCount() ? '\n\n(' + _efInativosCount() + ' veículo(s) inativo(s) ficam de fora — o Serpro recusaria e cobraria)' : ''))) return;
-  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:n, restantes:n };
+  // Manda a lista de placas ATIVAS em vez de deixar o backend decidir: sem
+  // isso, "toda a frota" nao envia placa nenhuma e a versao publicada do
+  // backend varre tudo, inativos inclusive — cada um cobrado e recusado.
+  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:n, restantes:n,
+              placas: lista.map(function(v){ return v.placa; }),
+              quando: new Date().toISOString() };
   _efRodarLote();
 }
 
@@ -607,7 +613,8 @@ function _efRodarLote(){
         + (_efLote.erros ? ' · ⚠️ ' + _efLote.erros + ' com erro' : '')
         // Ao concluir, mostra TODAS as placas que falharam, com o motivo —
         // acumuladas ao longo de todos os lotes, não só do último.
-        + (_efLote.errosLista.length ? _efTabelaErros(_efLote.errosLista) : ''), '#e8f5ef');
+        + (_efLote.errosLista.length ? _efTabelaErros(_efLote.errosLista) : '')
+        + '<button class="btn btn-blue" style="font-size:11px;padding:6px 12px;margin-top:8px" onclick="efGerarRelatorio()">&#128196; Gerar Relat&oacute;rio</button>', '#e8f5ef');
       status('✓ Concluído · ' + _efLote.novas + ' nova(s)', '#9f9');
       setBtns(false);
       return;
@@ -631,6 +638,119 @@ function _efRodarLote(){
     status('⚠ ' + traduzErro(e), '#fbb');
     setBtns(false);
   });
+}
+
+// ── RELATÓRIO DA VARREDURA e-Frotas ────────────────────────────
+// O backend devolve só a CONTAGEM de novas, não a lista. Para saber QUAIS
+// multas entraram, o relatório usa o carimbo de início da varredura e pega as
+// de origem 'efrotas' criadas dali para cá. Por isso _efLote guarda `quando`.
+function _efRelMultasDaVarredura(){
+  var desde = _efLote && _efLote.quando;
+  if (!desde) return [];
+  return _arr(DB && DB.multas).filter(function(m){
+    return m && m.origem === 'efrotas' && String(m.criadoEm || '') >= desde;
+  }).sort(function(a,b){
+    return String(a.placa||'').localeCompare(String(b.placa||''))
+        || String(a.dataInfracao||'').localeCompare(String(b.dataInfracao||''));
+  });
+}
+
+function efGerarRelatorio(){
+  var novas = _efRelMultasDaVarredura();
+  var L = _efLote || {};
+  var ini = L.quando ? new Date(L.quando) : new Date();
+  var esc = function(s){
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  };
+  // Numero ja vem pronto: no banco o valor e 195.23, e ali o ponto e DECIMAL.
+  // Tratar tudo como texto no formato BR (ponto = milhar) transformava
+  // 195.23 em 19523 — o relatorio mostraria R$ 19.523,00.
+  var money = function(v){
+    var n = (typeof v === 'number') ? v
+          : Number(String(v == null ? 0 : v).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+    return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  };
+  var dataBR = function(s){
+    if (!s) return '—';
+    s = String(s).slice(0,10);
+    var p = s.split('-');
+    return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+  };
+  var _v = function(x){
+    return (typeof x === 'number') ? x
+         : Number(String(x == null ? 0 : x).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+  };
+  var total = novas.reduce(function(a,m){ return a + _v(m.valor); }, 0);
+
+  var cards = [
+    ['Placas consultadas', L.total || 0, '#0E1B4D'],
+    ['Multas novas',       L.novas || 0, '#c0392b'],
+    ['Atualizadas',        L.atualizadas || 0, '#b45309'],
+    ['Baixadas como pagas',L.baixadas || 0, '#0d7a3e'],
+    ['Placas com erro',    L.erros || 0, (L.erros ? '#c0392b' : '#5a607a')]
+  ].map(function(c){
+    return '<div class="card"><div class="cv" style="color:'+c[2]+'">'+c[1]+'</div><div class="cl">'+c[0]+'</div></div>';
+  }).join('');
+
+  var linhas = novas.length
+    ? novas.map(function(m){
+        return '<tr><td>'+esc(m.placa||'—')+'</td><td>'+esc(m.veiculoNome||'—')+'</td>'
+          + '<td>'+esc(m.ait||'—')+'</td><td>'+dataBR(m.dataInfracao)
+          + (m.horaInfracao ? ' '+esc(m.horaInfracao) : '')+'</td>'
+          + '<td>'+esc(m.descricao||'—')+'</td>'
+          + '<td>'+esc(m.orgao||'—')+'</td>'
+          + '<td>'+esc(m.clienteNome||'não identificado')+'</td>'
+          + '<td class="r">'+money(m.valor)+'</td></tr>';
+      }).join('')
+    : '<tr><td colspan="8" class="vazio">Nenhuma multa nova nesta varredura.</td></tr>';
+
+  // As placas que falharam entram no relatório: sem elas o documento daria a
+  // entender que a frota inteira foi consultada com sucesso.
+  var errosHtml = '';
+  var lista = L.errosLista || [];
+  if (lista.length) {
+    errosHtml = '<h2>Placas com erro — ' + lista.length + '</h2>'
+      + '<table><thead><tr><th>Placa</th><th>Motivo</th></tr></thead><tbody>'
+      + lista.map(function(e){
+          return '<tr><td>'+esc(e.placa || e.Placa || '—')+'</td><td>'+esc(e.erro || e.motivo || e.msg || '—')+'</td></tr>';
+        }).join('')
+      + '</tbody></table>'
+      + '<p class="obs">Estas placas não foram consultadas com sucesso — as multas delas podem não estar no total acima.</p>';
+  }
+
+  var h = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Relatório da consulta e-Frotas</title><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#111827}'
+    + 'h1{font-size:18px;margin:0 0 3px}h2{font-size:14px;margin:20px 0 6px}'
+    + 'p.sub{font-size:11px;color:#555;margin:0 0 14px}'
+    + '.cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}'
+    + '.card{border:1px solid #e2e8f0;border-radius:8px;padding:9px 14px;min-width:120px}'
+    + '.cv{font-size:20px;font-weight:800}.cl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.5px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:8px}'
+    + 'th{background:#e5e7eb;color:#111827!important;font-weight:700;padding:6px;border:1px solid #cbd5e1;text-align:left}'
+    + 'td{padding:6px;border:1px solid #e2e8f0;vertical-align:top}'
+    + 'td.r{text-align:right;white-space:nowrap;font-weight:700}'
+    + 'td.vazio{text-align:center;color:#555;padding:14px}'
+    + 'tfoot td{font-weight:700;background:#f8fafc}'
+    + 'p.obs{font-size:10px;color:#555;margin:4px 0 0}'
+    + '@media print{@page{size:A4 landscape;margin:11mm}}'
+    + '</style></head><body>'
+    + '<h1>Consulta e-Frotas — relatório da varredura</h1>'
+    + '<p class="sub">LOKÁ Aluguel de Veículos · varredura iniciada em '
+      + ini.toLocaleString('pt-BR') + ' · relatório emitido em ' + new Date().toLocaleString('pt-BR') + '</p>'
+    + '<div class="cards">' + cards + '</div>'
+    + '<h2>Multas novas — ' + novas.length + '</h2>'
+    + '<table><thead><tr><th>Placa</th><th>Veículo</th><th>AIT</th><th>Data</th>'
+    + '<th>Infração</th><th>Órgão</th><th>Locatário</th><th class="r">Valor</th></tr></thead>'
+    + '<tbody>' + linhas + '</tbody>'
+    + (novas.length ? '<tfoot><tr><td colspan="7">Total das multas novas</td><td class="r">' + money(total) + '</td></tr></tfoot>' : '')
+    + '</table>'
+    + errosHtml
+    + '<script>window.onload=function(){window.print();}<\/script></body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { toast('O navegador bloqueou a janela de impressão', '#b45309'); return; }
+  w.document.write(h); w.document.close();
 }
 
 // ── Seletor de placas ─────────────────────────────────────────
@@ -867,7 +987,7 @@ function efConsultarSelecionadas(){
   if (!placas.length){ toast('⚠️ Selecione ao menos uma placa'); return; }
   if (!confirm('Consultar ' + placas.length + ' placa(s) no e-Frotas?\n\n💰 São ' + placas.length + ' consulta(s) COBRADA(S) pelo Serpro.')) return;
   efFecharSeletor();
-  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:placas.length, restantes:placas.length, placas:placas };
+  _efLote = { quando: new Date().toISOString(), inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, errosLista:[], total:placas.length, restantes:placas.length, placas:placas };
   _efRodarLote();
 }
 

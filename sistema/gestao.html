@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v100-20260930-1439 -->
+<!-- LOKA deploy: v101-20260930-1530 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1248,7 +1248,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v100-20260930-1439';
+var LOKA_BUILD = 'v101-20260930-1530';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8598,10 +8598,16 @@ var EF_TAMANHO_LOTE = 5;
 var _efLote = { inicio:0, novas:0, atualizadas:0, erros:0, total:0, restantes:0 };
 
 function efConsultarFrota() {
-  var n = (db && db.veiculos || []).filter(function(v){ return v && v.placa; }).length;
+  // Contava TODOS os veiculos com placa, inativos inclusive: o aviso de
+  // custo saia errado e a varredura consultava quem ja saiu da frota.
+  var lista = _efVeiculosLista();
+  var n = lista.length;
   if (!n) { toast('Nenhum veículo cadastrado', '#b45309'); return; }
   if (!confirm('Consultar TODA a frota (' + n + ' placas) no e-Frotas?\n\n💰 São ' + n + ' consultas COBRADAS pelo Serpro.\n\nA consulta roda em lotes de ' + EF_TAMANHO_LOTE + ' — você pode parar a qualquer momento.' + (_efInativosCount() ? '\n\n(' + _efInativosCount() + ' veículo(s) inativo(s) ficam de fora — o Serpro recusaria e cobraria)' : ''))) return;
-  _efLote = { inicio:0, novas:0, atualizadas:0, erros:0, total:n, restantes:n };
+  // Manda a lista de placas ATIVAS em vez de deixar o backend decidir.
+  _efLote = { inicio:0, novas:0, atualizadas:0, erros:0, total:n, restantes:n,
+              placas: lista.map(function(v){ return v.placa; }),
+              quando: new Date().toISOString() };
   _efRodarLote();
 }
 
@@ -11306,7 +11312,7 @@ function efConsultarSelecionadas(){
   if (!placas.length){ toast('⚠️ Selecione ao menos uma placa', '#b45309'); return; }
   if (!confirm('Consultar ' + placas.length + ' placa(s) no e-Frotas?\n\n💰 São ' + placas.length + ' consulta(s) COBRADA(S) pelo Serpro.')) return;
   efFecharSeletor();
-  _efLote = { inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:placas.length, restantes:placas.length, placas:placas };
+  _efLote = { quando: new Date().toISOString(), inicio:0, novas:0, atualizadas:0, baixadas:0, erros:0, total:placas.length, restantes:placas.length, placas:placas };
   _efRodarLote();
 }
 
