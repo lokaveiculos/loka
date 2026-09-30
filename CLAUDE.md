@@ -1705,3 +1705,87 @@ tem `<div>` dentro de strings. Conferir só o HTML, removendo `<script>` e
 ### ⏳ Não verificado
 Falta exercitar **logado**. O Chrome voltou a funcionar nesta sessão, mas eu não
 autentico — o Rogel entra e eu sigo dali.
+
+---
+
+## 🔴 e-Frotas ainda consultava inativo — 30/09/2026 (`d9de80e`) · multas v13 · gestao v101
+
+Relato: "o sistema continua buscando os veículos inativos no e-Frotas".
+Estava certo. Eram **duas** falhas somadas, e eu só tinha visto uma.
+
+### Falha 1 — o backend nunca foi publicado
+O filtro existe em `deploy/functions/index.js` desde 28/09 (commit **`f4bf8d0`**),
+mas **nunca saiu do computador**. E o ponto que fecha o buraco: *"consultar toda
+a frota"* **não mandava lista de placas** — quem escolhia era o backend, ou seja,
+a versão velha, que varre tudo.
+
+### Falha 2 — a contagem do `gestao.html` ignorava o filtro
+```js
+var n = (db && db.veiculos || []).filter(function(v){ return v && v.placa; }).length;
+```
+Contava **todos** os veículos com placa, inativos inclusive. O aviso de custo
+dizia "119 placas" e a varredura ia inteira. O `multas.html` já usava
+`_efVeiculosLista()`; o `gestao.html` não.
+
+### A correção não depende do deploy
+A tela passou a **mandar a lista de placas ativas** em `opts.placas`. O backend
+publicado **já respeita esse parâmetro** (validado em produção em 18/08, lote de
+25 placas). Então a trava passa a existir em **duas camadas**: a tela escolhe, e
+o backend novo — quando for publicado — filtra de novo.
+
+⚠️ **Lição:** quando a correção mora só no backend e o frontend manda "faça
+tudo", basta o deploy não acontecer para o defeito continuar vivo — e ninguém
+percebe, porque o código-fonte *parece* certo. Prefira que a tela diga
+explicitamente o que quer.
+
+### ⏳ Deploy do backend — PENDENTE, é com o Rogel
+A credencial do `firebase-tools` expirou nesta máquina:
+`Authentication Error: Your credentials are no longer valid`.
+Login do Google é dele, não meu. Para publicar:
+
+```
+cd "$env:USERPROFILE\OneDrive\Desktop\Github\deploy"
+firebase login --reauth
+firebase deploy --only functions
+```
+Se a CLI perguntar sobre apagar funções que existem na nuvem e não no fonte:
+responder **No**.
+
+## ✅ Botão "Gerar Relatório" da varredura — 30/09/2026 · multas v13
+
+Aparece ao **concluir** a varredura, na `multas.html`.
+
+⚠️ **O backend devolve só a CONTAGEM de novas, não a lista.** Para saber *quais*
+multas entraram, o relatório guarda o carimbo de início da varredura
+(`_efLote.quando`) e pega as de `origem === 'efrotas'` com `criadoEm >= quando`.
+É por isso que `_efLote` ganhou o campo `quando` em todos os pontos de partida.
+
+Traz: placas consultadas, novas, atualizadas, baixadas, placas com erro, a
+tabela das multas novas (placa, veículo, AIT, data, infração, órgão, locatário,
+valor) e o total.
+
+🔴 **As placas com ERRO entram no documento de propósito** — sem elas o
+relatório daria a entender que a frota inteira foi consultada com sucesso.
+
+### ⚠️ Defeito que os testes pegaram antes de publicar
+A formatação de valor tratava tudo como texto no formato brasileiro (ponto =
+milhar). **No banco o valor é NÚMERO** (`195.23`, ponto decimal), então
+`195.23` virava `19523` e o relatório mostraria **R$ 19.523,00** no lugar de
+R$ 195,23. Vale a regra do `mltNum` do sistema: **se já é número, use direto.**
+
+### Painel e-Frotas do `gestao.html` é código morto
+`ni-efrotas` não existe no menu e ninguém chama `showPanel('efrotas')`.
+Recebeu só a trava de custo; **sem** o botão de relatório — não há por que
+pendurar tela em painel inalcançável. (Ficou lá um `_efLote.quando` sem uso,
+inofensivo.)
+
+### Validado
+- `node --check` nos dois arquivos; `<div>` do HTML balanceadas
+- **48 testes de runtime** com o código real: quem entra na consulta, o que é
+  enviado ao backend, a confirmação recusada, frota inteira inativa, quais
+  multas entram no relatório, o documento com e sem novidade, as placas com
+  erro e o popup bloqueado
+- ⏳ **Não exercitado logado.** E aqui a regra manda mais que o costume:
+  **não se testa e-Frotas no navegador** — cada placa é cobrada pelo Serpro.
+  A verificação logada tem de interceptar `_efRodarLote` e conferir *o que
+  seria enviado*, sem disparar.
