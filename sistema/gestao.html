@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v99-20260928-2039 -->
+<!-- LOKA deploy: v100-20260930-1439 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -513,7 +513,19 @@ tr:hover td{background:#f8f9fe;}
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button id="mltTabLista"    class="btn btn-blue"    onclick="mltMostrarAba('lista')"    style="font-size:11px;padding:8px 14px">&#128220; Multas</button>
         <button id="mltTabImportar" class="btn btn-outline" onclick="mltMostrarAba('importar')" style="font-size:11px;padding:8px 14px">&#128228; Importar PDF</button>
+        <button id="mltTabAuditoria" class="btn btn-outline" onclick="mltMostrarAba('auditoria')" style="font-size:11px;padding:8px 14px">&#128269; Auditoria</button>
         <button id="mltTabIndicacao" class="btn btn-outline" onclick="mltMostrarAba('indicacao')" style="font-size:11px;padding:8px 14px">&#128100; Indica&ccedil;&atilde;o de Condutor</button>
+      </div>
+
+      <!-- ABA AUDITORIA -->
+      <div id="mltAbaAuditoria" style="display:none">
+        <div class="table-card" style="padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <h3 style="margin:0;font-size:14px">Auditoria de multas</h3>
+            <button class="btn btn-outline" style="font-size:11px;padding:6px 12px" onclick="mltAudRender()">&#8635; Reanalisar</button>
+          </div>
+          <div id="mltAudGrid"></div>
+        </div>
       </div>
 
       <!-- ABA LISTA -->
@@ -1236,7 +1248,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v99-20260928-2039';
+var LOKA_BUILD = 'v100-20260930-1439';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9020,7 +9032,7 @@ function mltIndSelecionadas(){
 }
 
 function mltMostrarAba(aba){
-  ['lista','importar','indicacao'].forEach(function(a){
+  ['lista','importar','indicacao','auditoria'].forEach(function(a){
     var el = document.getElementById('mltAba' + a.charAt(0).toUpperCase() + a.slice(1));
     if (el) el.style.display = (a === aba) ? 'block' : 'none';
     var bt = document.getElementById('mltTab' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -9029,6 +9041,7 @@ function mltMostrarAba(aba){
   if (aba === 'lista') mltRender();
   if (aba === 'importar') mltPreencherClientePadrao();
   if (aba === 'indicacao') mltIndRender();
+  if (aba === 'auditoria') mltAudRender();
 }
 
 // ── Formulário de Identificação do Condutor ────────────────────
@@ -9572,6 +9585,281 @@ function mltRenderAlertas(){
     + '</div>';
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AUDITORIA DE MULTAS — duplicadas e inconsistentes
+// ═══════════════════════════════════════════════════════════════
+// O AIT é o número do Auto de Infração: é ele que identifica a multa perante o
+// órgão. Dois registros com AITs DIFERENTES são, formalmente, duas multas —
+// por isso só o nível 1 é exclusão segura. Nos outros, quem decide é quem olha.
+//
+// ⚠️ Nunca excluir por "parece igual": uma multa apagada por engano some da
+// cobrança, do repasse ao locatário e do prazo de indicação.
+
+var _mltAudSel = {};   // {id: true} marcadas para excluir
+
+function _audNum(v){ return Math.round((mltNum(v) || 0) * 100) / 100; }
+function _audAit(m){ return String((m && m.ait) || '').trim().toUpperCase(); }
+
+// Autos emitidos em sequência (AIT vizinho) quase sempre são autuações REAIS
+// distintas — o mesmo agente autuando duas vezes. É o sinal mais forte contra
+// tratar o par como duplicata.
+function _audDistanciaAit(lista){
+  var ns = lista.map(function(m){
+    var r = /^([A-Z]*)(\d+)$/.exec(_audAit(m));
+    return r ? { pre: r[1], n: Number(r[2]) } : null;
+  });
+  if (ns.indexOf(null) >= 0) return null;
+  var pres = {}; ns.forEach(function(x){ pres[x.pre] = 1; });
+  if (Object.keys(pres).length > 1) return null;      // prefixos diferentes
+  var nums = ns.map(function(x){ return x.n; }).sort(function(a,b){ return a-b; });
+  return nums[nums.length-1] - nums[0];
+}
+
+function _audAgrupar(chaveFn){
+  var g = {}, out = [];
+  mltMultas().forEach(function(m){
+    if (!m) return;
+    var k = chaveFn(m);
+    if (!k) return;
+    (g[k] = g[k] || []).push(m);
+  });
+  Object.keys(g).forEach(function(k){ if (g[k].length > 1) out.push({ chave:k, itens:g[k] }); });
+  return out;
+}
+
+function mltAudAnalisar(){
+  var usados = {};   // uma multa aparece num nível só, do mais grave para o menos
+  function livre(grupo){
+    for (var i=0;i<grupo.itens.length;i++) if (usados[grupo.itens[i].id]) return false;
+    grupo.itens.forEach(function(m){ usados[m.id] = 1; });
+    return true;
+  }
+
+  // N1 — MESMO AIT. Duplicata de verdade: o mesmo auto lançado duas vezes.
+  var n1 = _audAgrupar(function(m){ return _audAit(m) || null; }).filter(livre);
+
+  // N2 — placa + data + HORA + código + valor, com AITs diferentes.
+  var n2 = _audAgrupar(function(m){
+    if (!m.dataInfracao || !m.horaInfracao) return null;
+    return [mltNormPlaca(m.placa), mltISO(m.dataInfracao), m.horaInfracao,
+            String(m.codigoInfracao||''), _audNum(m.valor)].join('|');
+  }).filter(livre);
+
+  // N3 — placa + data + código + valor, horas diferentes. Aqui mora a dúvida.
+  var n3 = _audAgrupar(function(m){
+    if (!m.dataInfracao) return null;
+    return [mltNormPlaca(m.placa), mltISO(m.dataInfracao),
+            String(m.codigoInfracao||''), _audNum(m.valor)].join('|');
+  }).filter(livre);
+
+  // Inconsistências — não se excluem, se corrigem.
+  var inc = { semOrgao:[], semLocatario:[], semData:[], semAit:[], valorZero:[],
+              pagaSemData:[], pagaSemValor:[], naoPagaComValor:[], pagouMais:[] };
+  mltMultas().forEach(function(m){
+    if (!m) return;
+    var st = String(m.status||''), v = _audNum(m.valor), vp = _audNum(m.valorPago);
+    if (!mltOrgaoChave(m))                    inc.semOrgao.push(m);
+    if (!m.clienteNome)                       inc.semLocatario.push(m);
+    if (!m.dataInfracao)                      inc.semData.push(m);
+    if (!_audAit(m))                          inc.semAit.push(m);
+    if (!v)                                   inc.valorZero.push(m);
+    if (st === 'paga' && !m.dataPagamento)    inc.pagaSemData.push(m);
+    if (st === 'paga' && !vp)                 inc.pagaSemValor.push(m);
+    if (st !== 'paga' && vp > 0)              inc.naoPagaComValor.push(m);
+    if (v > 0 && vp > v + 0.005)              inc.pagouMais.push(m);
+  });
+
+  return { n1:n1, n2:n2, n3:n3, inc:inc };
+}
+
+// Sugestão de qual registro do grupo SAI. Nunca descarta pagamento: se uma
+// está paga e a outra não, sai a que não está. Depois, sai a menos completa;
+// empatando, a mais recente.
+function _audPontos(m){
+  var p = 0;
+  if (m.status === 'paga' || m.dataPagamento) p += 1000;
+  ['ait','dataInfracao','horaInfracao','codigoInfracao','codigoOrgao','orgao',
+   'clienteNome','descricao','vencimento','gravidade','valorPago'].forEach(function(c){
+    if (m[c] !== undefined && m[c] !== null && m[c] !== '') p += 1;
+  });
+  return p;
+}
+function _audSugeridoParaExcluir(itens){
+  var ord = itens.slice().sort(function(a,b){
+    var d = _audPontos(b) - _audPontos(a);
+    if (d) return d;
+    return String(a.criadoEm||'').localeCompare(String(b.criadoEm||''));
+  });
+  return ord.slice(1);   // fica o primeiro; os demais são os candidatos a sair
+}
+
+// ── TELA ───────────────────────────────────────────────────────
+function mltAudToggle(id, on){
+  if (on) _mltAudSel[id] = true; else delete _mltAudSel[id];
+  mltAudAtualizarBarra();
+}
+function mltAudSelecionadas(){
+  return mltMultas().filter(function(m){ return m && _mltAudSel[m.id]; });
+}
+function mltAudAtualizarBarra(){
+  var el = document.getElementById('mltAudBarra');
+  if (!el) return;
+  var sel = mltAudSelecionadas();
+  if (!sel.length) { el.innerHTML = ''; return; }
+  var total = sel.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
+  el.innerHTML = '<div style="background:#fdecea;border-left:4px solid var(--red);border-radius:10px;'
+    + 'padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    + '<strong style="font-size:12px;color:var(--red)">'+sel.length+' multa(s) marcada(s) para excluir · '+brl(total)+'</strong>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="mltAudBaixarBackup()">💾 Baixar cópia antes</button>'
+    + '<button class="btn" style="background:var(--red);color:#fff;font-size:11px;padding:5px 10px" onclick="mltAudExcluir()">🗑 Excluir as marcadas</button>'
+    + '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="_mltAudSel={};mltAudRender()">Limpar seleção</button>'
+    + '</div>';
+}
+
+function mltAudRender(){
+  var el = document.getElementById('mltAudGrid');
+  if (!el) return;
+  var r = mltAudAnalisar();
+  var nomes = mltOrgaoNomes();
+
+  function linhaMulta(m, sugerido){
+    var pago = m.dataPagamento ? ' · pago '+mltBR(m.dataPagamento) : '';
+    return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-top:1px solid #f0f2f8">'
+      + '<input type="checkbox" '+(_mltAudSel[m.id]?'checked':'')
+        + ' onchange="mltAudToggle(\''+m.id+'\', this.checked)" style="margin-top:3px">'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:11px;font-weight:700">'+(m.ait||'(sem AIT)')
+          + '<span style="font-weight:400;color:var(--muted)"> · '+mltFmtPlaca(m.placa)+' · '+mltBR(m.dataInfracao)
+          + (m.horaInfracao ? ' '+m.horaInfracao : '')+'</span></div>'
+        + '<div style="font-size:10px;color:var(--muted)">'
+          + brl(mltNum(m.valor)) + ' · cód. ' + (m.codigoInfracao||'—')
+          + ' · ' + (mltOrgaoRotulo(mltOrgaoChave(m), nomes) || 'sem órgão')
+          + ' · <b>' + (m.origem === 'efrotas' ? 'e-Frotas' : 'PDF') + '</b>'
+          + ' · ' + (MLT_STATUS[m.status]||MLT_STATUS.pendente).rot + pago
+        + '</div>'
+      + '</div>'
+      + (sugerido ? '<span style="font-size:9px;background:#fff4e5;color:#b45309;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">candidata a sair</span>' : '')
+      + '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px" onclick="mltMostrarAba(\'lista\');setTimeout(function(){mltAbrir(\''+m.id+'\')},120)">Abrir</button>'
+      + '</div>';
+  }
+
+  function bloco(titulo, explica, grupos, cor, bg, preMarcar){
+    var h = '<div style="background:'+bg+';border-left:4px solid '+cor+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+      + '<div style="font-size:13px;font-weight:800;color:'+cor+'">'+titulo+' — '+grupos.length+' caso(s)</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin:4px 0 8px">'+explica+'</div>';
+    if (!grupos.length) return h + '<div style="font-size:11px;color:var(--muted)">Nada encontrado. ✅</div></div>';
+    grupos.forEach(function(g){
+      var sair = _audSugeridoParaExcluir(g.itens);
+      var sairIds = {}; sair.forEach(function(m){ sairIds[m.id] = 1; });
+      if (preMarcar) sair.forEach(function(m){ _mltAudSel[m.id] = true; });
+      var dist = _audDistanciaAit(g.itens);
+      var aviso = '';
+      if (dist === 1) aviso = '<div style="font-size:10px;color:#0d7a3e;font-weight:700;margin-top:4px">⚠️ Os AITs são CONSECUTIVOS — provavelmente são duas autuações de verdade, não duplicata.</div>';
+      else if (dist !== null && dist <= 200) aviso = '<div style="font-size:10px;color:#b45309;font-weight:700;margin-top:4px">AITs próximos (diferença de '+dist+') — pode ser sequência real de autuações.</div>';
+      h += '<div style="background:#fff;border-radius:8px;padding:8px 12px;margin-bottom:8px">'
+        + linhaMulta(g.itens[0], false)
+        + g.itens.slice(1).map(function(m){ return linhaMulta(m, !!sairIds[m.id]); }).join('')
+        + aviso
+        + '</div>';
+    });
+    return h + '</div>';
+  }
+
+  function blocoInc(titulo, lista, comoCorrigir){
+    if (!lista.length) return '';
+    var amostra = lista.slice(0, 8).map(function(m){
+      return '<span style="display:inline-block;font-size:10px;background:#f0f2f9;border-radius:4px;padding:2px 6px;margin:2px 3px 0 0;cursor:pointer" '
+        + 'onclick="mltMostrarAba(\'lista\');setTimeout(function(){mltAbrir(\''+m.id+'\')},120)">'
+        + (m.ait || mltFmtPlaca(m.placa)) + '</span>';
+    }).join('');
+    return '<div style="padding:8px 0;border-top:1px solid #f0f2f8">'
+      + '<div style="font-size:12px;font-weight:700">'+titulo+' — <span style="color:var(--amber)">'+lista.length+'</span></div>'
+      + '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">'+comoCorrigir+'</div>'
+      + amostra + (lista.length > 8 ? '<span style="font-size:10px;color:var(--muted)"> + '+(lista.length-8)+' outras</span>' : '')
+      + '</div>';
+  }
+
+  var i = r.inc;
+  var totalInc = i.semOrgao.length + i.semLocatario.length + i.semData.length + i.semAit.length
+               + i.valorZero.length + i.pagaSemData.length + i.pagaSemValor.length
+               + i.naoPagaComValor.length + i.pagouMais.length;
+
+  el.innerHTML =
+      '<div id="mltAudBarra"></div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'
+      + 'Analisadas <b>'+mltMultas().length+'</b> multas. O <b>AIT</b> é o número do Auto de Infração — '
+      + 'é ele que identifica a multa perante o órgão. Registros com AITs diferentes são, formalmente, '
+      + 'duas multas, então só o nível 1 é exclusão segura.'
+    + '</div>'
+    + bloco('🔴 Nível 1 · Mesmo AIT',
+            'O mesmo auto lançado duas vezes. É duplicata de verdade — a cópia já vem marcada.',
+            r.n1, '#c0392b', '#fdecea', true)
+    + bloco('🟠 Nível 2 · Mesma placa, data, hora, infração e valor',
+            'AITs diferentes, mas tudo o mais idêntico, inclusive a hora. Muito provavelmente o mesmo fato entrou pelas duas portas (PDF e e-Frotas). Confira antes de marcar.',
+            r.n2, '#b45309', '#fff4e5', false)
+    + bloco('🟡 Nível 3 · Mesma placa, data, infração e valor — horas diferentes',
+            'Pode ser a mesma multa com hora divergente entre as fontes, ou duas autuações reais no mesmo dia. Nada vem marcado: é preciso olhar.',
+            r.n3, '#8a6d00', '#fffbe6', false)
+    + '<div style="background:#f8f9fe;border-left:4px solid var(--blue);border-radius:10px;padding:12px 14px">'
+      + '<div style="font-size:13px;font-weight:800;color:var(--blue)">🔎 Inconsistências — '+totalInc+' apontamento(s)</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin:4px 0 4px">Estas não se excluem: se corrigem. Clique num código para abrir a multa.</div>'
+      + (totalInc ? '' : '<div style="font-size:11px;color:var(--muted)">Nada encontrado. ✅</div>')
+      + blocoInc('Paga sem data de pagamento', i.pagaSemData, 'Informe a data no cadastro da multa.')
+      + blocoInc('Paga com valor pago zerado', i.pagaSemValor, 'Informe quanto foi pago.')
+      + blocoInc('Não está paga, mas tem valor pago', i.naoPagaComValor, 'Ou o status está errado, ou o valor não devia estar ali.')
+      + blocoInc('Valor pago maior que o valor da multa', i.pagouMais, 'Confira: pode ser erro de digitação na baixa.')
+      + blocoInc('Sem AIT', i.semAit, 'Sem o número do auto não dá para indicar condutor nem recorrer.')
+      + blocoInc('Sem data da infração', i.semData, 'Sem data o sistema não identifica o locatário nem calcula prazo.')
+      + blocoInc('Sem órgão autuador', i.semOrgao, 'Sem o órgão não dá para saber onde pagar nem onde indicar.')
+      + blocoInc('Sem locatário identificado', i.semLocatario, 'Sem locatário a multa não é repassada a ninguém.')
+      + blocoInc('Valor zerado', i.valorZero, 'Confira o valor no auto.')
+    + '</div>';
+
+  mltAudAtualizarBarra();
+}
+
+// Cópia do que vai sair, antes de sair. O banco não tem lixeira.
+function mltAudBaixarBackup(){
+  var sel = mltAudSelecionadas();
+  if (!sel.length) { toast('Nada marcado','#b45309'); return; }
+  var txt = JSON.stringify(sel, null, 2);
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], {type:'application/json'}));
+  a.download = 'multas-excluidas-' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'') + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  toast('Cópia baixada — guarde fora do repositório','#0d7a3e');
+}
+
+function mltAudExcluir(){
+  var sel = mltAudSelecionadas();
+  if (!sel.length) { toast('Marque o que deve sair','#b45309'); return; }
+
+  var pagas = sel.filter(function(m){ return m.status === 'paga' || m.dataPagamento; });
+  var total = sel.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
+
+  var msg = 'Excluir ' + sel.length + ' multa(s)?\n\n'
+    + sel.slice(0,12).map(function(m){
+        return '  • ' + (m.ait||'sem AIT') + '  ' + mltFmtPlaca(m.placa) + '  '
+             + mltBR(m.dataInfracao) + '  ' + brl(mltNum(m.valor));
+      }).join('\n')
+    + (sel.length > 12 ? '\n  • ... e mais ' + (sel.length-12) : '')
+    + '\n\nTotal: ' + brl(total);
+  if (pagas.length) {
+    msg += '\n\n⚠️ ATENÇÃO: ' + pagas.length + ' dessas já está(ão) PAGA(S).'
+         + '\nExcluir apaga o registro do pagamento.';
+  }
+  msg += '\n\nIsto não tem desfazer. Baixou a cópia?';
+  if (!confirm(msg)) return;
+
+  var fora = {}; sel.forEach(function(m){ fora[m.id] = 1; });
+  db.multas = mltMultas().filter(function(m){ return m && !fora[m.id]; });
+  _mltAudSel = {};
+  saveDB();
+  mltAudRender();
+  toast('🗑 ' + sel.length + ' multa(s) excluída(s)', '#c0392b');
+}
+
 // ── RENDER PRINCIPAL ───────────────────────────────────────────
 function mltRender(){
   mltRenderAlertas();
@@ -9609,11 +9897,13 @@ function mltRender(){
   var visiveis = {}; lista.forEach(function(m){ visiveis[m.id] = 1; });
   Object.keys(_mltBaixaSel).forEach(function(id){ if (!visiveis[id]) delete _mltBaixaSel[id]; });
 
+  var _orgNomes = mltOrgaoNomes();
   var h = mltBarraBaixa(lista)
     + '<div class="table-card"><div class="table-scroll"><table>'
     + '<thead><tr>'
     + '<th style="width:32px"><input type="checkbox" id="mltChkTodas" onchange="mltBaixaTodasVisiveis(this.checked)" title="Selecionar todas as filtradas"></th>'
     + '<th>Veículo</th><th>AIT / Infração</th><th>Data</th>'
+    + '<th>Órgão autuador</th>'
     + '<th>Locatário</th><th>Valor</th><th>Pagamento</th><th>Prazos</th><th>Status</th><th></th>'
     + '</tr></thead><tbody>';
 
@@ -9652,6 +9942,14 @@ function mltRender(){
     var grav = m.gravidade && MLT_GRAV[m.gravidade]
       ? '<span style="font-size:9px;color:var(--muted)"> · '+MLT_GRAV[m.gravidade].rot+' ('+(m.pontos||MLT_GRAV[m.gravidade].pts)+' pts)</span>' : '';
 
+    // Órgão autuador: agrupa pelo CÓDIGO, porque o mesmo órgão chega escrito
+    // de várias formas ("238490-BA" e "238490 - PREF. DE BA SALVADOR").
+    var _ok = mltOrgaoChave(m);
+    var orgaoCel = _ok
+      ? '<div style="font-weight:600">' + (_orgNomes[_ok] || ('Órgão ' + _ok)) + '</div>'
+        + '<div style="font-size:9px;color:var(--muted);font-family:monospace">' + _ok + '</div>'
+      : '<span style="font-size:10px;color:var(--amber);font-weight:600">⚠ sem órgão</span>';
+
     // Já paga ou cancelada não entra em baixa — evita "pagar" duas vezes.
     var podeBaixar = (m.status !== 'paga' && m.status !== 'cancelada');
     h += '<tr'+(_mltBaixaSel[m.id]?' style="background:#f2f5ff"':'')+'>'
@@ -9663,9 +9961,10 @@ function mltRender(){
         + '<div style="font-size:10px;color:var(--muted)">'+(m.veiculoNome||'—')+'</div></td>'
       + '<td><div style="font-size:11px;font-weight:600">'+(m.ait||'—')+'</div>'
         + '<div style="font-size:10px;color:var(--muted)">'+(m.descricao||'—')+grav+'</div>'
-        + (m.orgao?'<div style="font-size:9px;color:var(--muted)">'+m.orgao+'</div>':'')+'</td>'
+        + '</td>'
       + '<td style="font-size:11px;white-space:nowrap">'+mltBR(m.dataInfracao)
         + (m.horaInfracao?'<div style="font-size:10px;color:var(--muted)">'+m.horaInfracao+'</div>':'')+'</td>'
+      + '<td style="font-size:11px">'+orgaoCel+'</td>'
       + '<td>'+loc+'</td>'
       + '<td style="font-size:11px;font-weight:700;white-space:nowrap">'+brl(mltNum(m.valor))+'</td>'
       + '<td style="white-space:nowrap">'+pgto+'</td>'
