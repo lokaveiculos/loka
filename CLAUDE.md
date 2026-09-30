@@ -1617,3 +1617,91 @@ encostar no CSS global.
 Não consegui exercitar **logado, com dados reais** — o Chrome está fora do ar
 nesta sessão. Vale o Rogel registrar uma ocorrência de verdade e conferir se ela
 aparece em Contas a Receber com o nome certo.
+
+---
+
+## ✅ Coluna do órgão + Auditoria de multas — 30/09/2026 (`724b667`) · gestao v100
+
+Pedido: coluna com o órgão autuador, e auditoria que verifique e exclua as
+multas duplicadas — depois da baixa das placas de final 5 e 6, o Rogel viu
+"vários lançamentos inconsistentes e duplicados".
+
+### 🔴 O achado que muda o pedido: NÃO HÁ DUPLICATA no banco
+
+Auditado o backup de produção (595 multas, `backups-loka/multas-ANTES-auditoria-20260930-142932.json`):
+
+| Critério | Resultado |
+|---|---|
+| `id` repetido | **0** |
+| **AIT repetido** | **0** |
+| AIT + órgão repetido | **0** |
+| AITs com os mesmos dígitos (formato diferente) | **0** |
+
+**Todos os 595 AITs são únicos.** O AIT é o número do Auto de Infração — é ele
+que identifica a multa perante o órgão. ⚠️ **Não dá para excluir "as duplicadas"
+porque, formalmente, não existem.**
+
+O que existe são **19 pares parecidos**: mesma placa, mesmo dia, mesmo código de
+infração e mesmo valor — **com AITs diferentes**. Podem ser a mesma multa vinda
+pelas duas portas (PDF e e-Frotas) com hora divergente, **ou duas autuações
+reais no mesmo dia** — o que é comum em frota.
+
+🔴 **O sinal que decide:** vários desses pares têm **AITs consecutivos**
+(`C000335748` / `C000335749` na RDK5G66, `R004000046` / `R004000045` na FLR6J14).
+Auto emitido em sequência é o mesmo agente autuando duas vezes — **é autuação de
+verdade, não duplicata**. Excluir teria apagado multa real.
+
+Por isso **não excluí nada**. Entreguei a ferramenta para o Rogel decidir olhando.
+
+### Coluna do órgão autuador
+O órgão aparecia como texto cru em letra miúda dentro de "AIT / Infração"
+(`105300-BA`). Agora é coluna própria: **nome por extenso** em cima, código
+embaixo. O nome vem do `mltOrgaoNomes` (v91), que aprende dos próprios dados —
+basta uma multa trazer "238490 - PREF. DE BA SALVADOR" para todas as
+"238490-BA" passarem a mostrar o nome. Sem tabela fixa para manter.
+
+### Aba Auditoria — três níveis, porque nem todo par é duplicata
+| Nível | Critério | Vem marcado? |
+|---|---|---|
+| 🔴 N1 | **mesmo AIT** | **sim** — é duplicata de verdade |
+| 🟠 N2 | placa + data + **hora** + código + valor | não |
+| 🟡 N3 | placa + data + código + valor (horas diferentes) | não |
+
+Uma multa entra num nível só, do mais grave para o menos. Nos grupos, o sistema
+mede a distância entre os AITs e **avisa em verde quando são consecutivos**.
+
+🔴 **A sugestão de qual sai nunca descarta pagamento:** se uma está paga e a
+outra não, sai a que não está. Depois desempata pela mais completa, e por fim
+pela mais recente.
+
+Antes de excluir: botão que **baixa uma cópia em JSON** do que vai sair (o banco
+não tem lixeira), e um `confirm` que lista os AITs, soma o valor e **avisa em
+destaque quando alguma já está paga**.
+
+### Inconsistências (essas não se excluem — se corrigem)
+| Achado | Quantas |
+|---|---|
+| sem órgão autuador | **82** |
+| sem locatário identificado | **72** |
+| sem data da infração | **21** |
+| paga sem data / sem valor / pagou a mais / valor zerado / sem AIT | **0** |
+
+⚠️ **82, não 91.** Nove multas têm o órgão no **texto** (`238490 - PREF. DE BA
+SALVADOR`) com o campo `codigoOrgao` vazio; o `mltOrgaoChave` lê o texto, então
+a tela mostra e agrupa essas nove normalmente. Contar `codigoOrgao` dá 91 e
+**superestima o problema** — o número que vale é o que a tela enxerga.
+
+### Validado
+- `node --check` (base limpa); `<div>` do HTML balanceadas (639/639)
+- **51 testes de runtime** com o código real **e os dados reais de produção**:
+  os três níveis, a proteção do pagamento, o aviso de AIT consecutivo, os dois
+  caminhos da exclusão, o `confirm` recusado, banco vazio e array voltando como
+  objeto do Firebase
+
+⚠️ **Contar `<div>` com grep no arquivo todo não serve** para este arquivo: o JS
+tem `<div>` dentro de strings. Conferir só o HTML, removendo `<script>` e
+`<style>` antes (`scratchpad/divs.js`).
+
+### ⏳ Não verificado
+Falta exercitar **logado**. O Chrome voltou a funcionar nesta sessão, mas eu não
+autentico — o Rogel entra e eu sigo dali.
