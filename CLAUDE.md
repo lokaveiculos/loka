@@ -1789,3 +1789,55 @@ inofensivo.)
   **não se testa e-Frotas no navegador** — cada placa é cobrada pelo Serpro.
   A verificação logada tem de interceptar `_efRodarLote` e conferir *o que
   seria enviado*, sem disparar.
+
+### ✅ Trava de inativos conferida no ar — 30/09/2026, 16h15
+
+A consulta que o Rogel rodou às **15:05** foi **25 min antes** do deploy das
+15:30, então ela ainda era a versão antiga — e o `efrotas_status` prova:
+`totalFrota: 119` (a frota inteira, não os 109 ativos).
+
+Verificado depois, com o `multas.html` **publicado** e a **frota real**, com o
+disparo interceptado (nenhuma consulta ao Serpro):
+
+| | |
+|---|---|
+| frota com placa | 119 |
+| inativos | 10 |
+| **placas que a varredura enviaria** | **109** |
+| **inativas que vazaram** | **nenhuma** |
+| aviso ao operador | "109 placas · 10 veículo(s) inativo(s) ficam de fora" |
+
+⚠️ **Como conferir e-Frotas sem gastar:** trocar `window._efRodarLote` por uma
+função que só guarda o `_efLote` e responder o `confirm` por código. Dá para ver
+exatamente o que seria enviado sem chamar o Serpro. **Nunca dispare de verdade
+para testar.**
+
+## 🔴 ACHADO: 6 placas ATIVAS que o Serpro recusa (30/09/2026)
+
+Dos 12 erros da última varredura, só **6 eram de veículo inativo** — os outros
+**6 são de veículos ATIVOS e ALUGADOS**:
+
+| Placa | Veículo |
+|---|---|
+| SKT3B92 | FIAT Fastback |
+| TKQ7I29 | VW Saveiro |
+| SUJ8F15 | VW Saveiro Baú |
+| EXI0G91 | VW Saveiro Baú |
+| TMX5C27 | Jeep Renegade Altitude |
+| FIJ1F24 | VW Saveiro Baú |
+
+Todas dão `HTTP 403 — Consulta não autorizada / Nenhum registro encontrado`, e
+**nenhuma delas tem uma única multa no sistema** (nem do e-Frotas, nem do PDF).
+
+⚠️ **Isso não é bug do sistema.** O 403 com "nenhum registro encontrado" é o
+Serpro dizendo que a placa não está no **contrato e-Frotas da empresa**. Elas
+estão na frota da LOKÁ, mas não foram incluídas na frota junto ao SENATRAN.
+
+**Custo:** 6 consultas cobradas em toda varredura da frota, sempre com erro, e
+que nunca trouxeram nada. **Consertar é fora do sistema** — incluir as placas no
+contrato e-Frotas. Enquanto não for, dá para poupá-las por uma lista de exceção,
+mas isso é decisão do Rogel (e o risco é deixar de ver multa de carro alugado).
+
+⚠️ **A trava de inativos resolve metade do desperdício, não ele todo.** Não
+confundir os dois problemas: inativo é cadastro interno; 403 em ativo é contrato
+com o Serpro.
