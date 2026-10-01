@@ -1955,3 +1955,72 @@ resolve "ler a conversa do WhatsApp dentro do sistema".
 ⚠️ **Nao construir nada disso sem decisao do Rogel** — envolve numero dedicado,
 conta na Meta e custo mensal. O item A (mensagem pronta) ja entrega a parte de
 "personalizar o atendimento" que nao custa nada.
+
+---
+
+## ✅ Relatórios da Auto Mais — 01/10/2026 (`a6e2664`)
+
+Dois pedidos do Rogel: o relatório de veículos disponíveis exibir **ano de
+fabricação e ano do modelo** e dizer se o carro é **próprio ou consignado**; e o
+relatório de despesas parar de mostrar **a placa no lugar do nome do veículo**.
+
+### Relatório de estoque (`veiculos.html` · `exportEstoque`)
+O campo `ano_modelo` **já existia** no cadastro e a lista da tela já mostrava
+`ano/ano_modelo` (linha 273). Só o relatório ficou para trás, com
+`{label:'Ano',key:'ano'}` — o ano de fabricação sozinho.
+
+| | Antes | Agora |
+|---|---|---|
+| PDF | `Ano` | `Ano` (fab/modelo) + **`Estoque`** |
+| CSV | `Ano`, `Tipo Estoque` | `Ano Fab.`, `Ano Modelo`, **`Estoque`** |
+
+Quando fabricação e modelo são iguais, mostra **um ano só** — repetir
+"2017/2017" em toda linha só polui. E `tipo_est` (que no banco é `proprio` /
+`consignado`, minúsculo) vira **Próprio / Consignado** por extenso.
+
+### 🔴 Despesas: não era o relatório, era a GRAVAÇÃO
+O `<option>` do seletor de veículo tem **`value=placa`**, e o `svDesp` copiava
+esse value direto:
+
+```js
+veiculo: document.getElementById('dveic').value   // = a PLACA
+placa:   document.getElementById('dplaca').value  // = a PLACA
+```
+
+Por isso as colunas "Veiculo" e "Placa" saíam **idênticas**. Vale para
+`despesas.html` **e** `despesa_form.html`.
+
+⚠️ As despesas geradas por **manutenção** (`gestao.html`, 19/09) sempre gravaram
+`marca + modelo` — por isso 13 estavam certas e 32 não. Dado misto no mesmo
+campo, vindo de portas diferentes.
+
+Conferido no Firestore: **45 despesas com o campo preenchido, 32 com a placa
+dentro.**
+
+**Corrigido nos dois lados:**
+1. a gravação passa a guardar `marca + modelo` do cadastro;
+2. **`nomeVeicDesp()`** resolve o nome pelo cadastro **na hora de exibir** — as
+   32 já gravadas aparecem certas **sem migrar o banco**. Casa a placa ignorando
+   hífen e caixa.
+
+Se o carro não estiver mais cadastrado e o campo só tiver a placa, mostra
+**vazio** em vez de repetir a placa numa coluna que promete o nome. Nome digitado
+à mão é preservado. Entrou também no **resumo por placa** da própria tela de
+Despesas, que tinha o mesmo sintoma.
+
+⚠️ **Padrão a levar adiante:** consertar na exibição **e** na gravação. Só a
+gravação deixaria o histórico torto; só a exibição deixaria o banco torto.
+
+### Verificado no ar, com os dados reais
+| | |
+|---|---|
+| Estoque: disponíveis | 18 |
+| Ano saindo | `2016/2017`, `2018/2019`, `2022` (iguais → um só) |
+| Estoque | Próprio / Consignado (4 consignados na frota) |
+| Despesas que saíam como placa | **32 → 0** |
+| Exemplo | `PKJ2749` → **CHEVROLET PRISMA 1.0 JOY** |
+
+Validado: `node --check` nas 3 páginas alteradas **e nas outras 6** (sem
+regressão) + **39 testes de runtime** com o código real e os dados reais do
+Firestore — rodando `exportEstoque` de verdade, com stub capturando as colunas,
+nos dois caminhos (PDF e CSV).
