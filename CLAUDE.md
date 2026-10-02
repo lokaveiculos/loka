@@ -2264,3 +2264,96 @@ problema de dado como se fosse defeito da ordenação.
 ⚠️ O auto-teste de injeção do `t-layout` dependia do texto exato de uma linha do
 `renderAtivos` e quebrou quando a tela mudou. Agora ele localiza **a primeira
 tabela larga** e remove o `overflow-x` dela — injeção robusta a mudanças.
+
+---
+
+## 🔴 Fatura gravava registro duplicado — 02/10/2026 (`b60ac57`, `f57d859`, `8905431`) · fatura v81
+
+Relato: "quando editamos uma fatura e salvamos o sistema grava dois registros".
+Reproduzido no navegador. Eram **três** defeitos somados.
+
+### Causa A — salvar de novo criava OUTRA fatura
+```js
+id: _editandoFaturaId || ('fat_' + Date.now())
+```
+🔴 **`_editandoFaturaId` nunca era atualizado depois de gravar.** Numa fatura
+nova, cada clique em Salvar sorteava um id novo → outra fatura. Dois cliques
+(ou salvar, ajustar, salvar) = dois registros. O botão também não travava.
+
+Agora a tela **lembra o id** depois de gravar, e o botão trava durante a
+gravação (destravando no sucesso, na falha e no erro geral).
+
+### Causa B — editar número ou período duplicava no Contas a Receber
+A `faturaKey` é `cliente + número + período` — **os três editáveis**. Mudando
+qualquer um, o upsert não reconhecia o lançamento antigo e criava um segundo.
+
+Medido na fatura real `fat_1788891273306` (ISS TRANSPORTES), sem gravar:
+
+| | chave | acha? |
+|---|---|---|
+| sem mexer | `c1780917221151_001_2026-09` | sim |
+| mudando o período | `..._001_2026-10` | **não** |
+| mudando o número | `..._002_2026-09` | **não** |
+
+Quem identifica passou a ser o **id da fatura**, que não muda ao editar.
+
+### 🔴 Causa C — a janela de transição (só apareceu testando NO AR)
+Os **17 lançamentos já gravados não têm `faturaId`**. Para uma fatura anterior
+à v79: busca por id não acha (campo não existe), busca pela chave nova não acha
+(acabou de mudar) → **duplicaria uma última vez**.
+
+A tela passou a guardar a **chave de quando a fatura foi aberta**
+(`_faturaKeyOriginal`) como terceiro caminho de busca.
+
+Ordem final: **`faturaId` → chave atual → chave de abertura.**
+
+⚠️ **Os testes de unidade da v79 passavam** porque eu simulava registros que já
+tinham `faturaId`. Foi o teste contra os **dados reais, no ar**, que mostrou o
+buraco. É a lição de 28/09 de novo: *teste verde não prova nada se ele não pega
+o defeito.*
+
+### 🔴 Causa D — Limpar não saía do modo edição (v81)
+`limparFatura()` não zerava `_editandoFaturaId`. Abrir uma fatura → **Limpar** →
+preencher outra → salvar **sobrescrevia a primeira**. Não é duplicação: é
+**perda** do registro anterior.
+
+Defeito anterior a esta sessão, mas a v79 o tornou mais provável — agora o id
+também fica preenchido depois de salvar uma fatura nova. Limpar passou a zerar
+os dois marcadores e a tirar o `?edit=` da URL (senão um F5 voltaria à edição).
+
+### O que estava certo
+A gravação da fatura em si: mesmo caminho (`faturas/{clienteId}/{id}`), `set()`
+que sobrescreve, cliente e veículos restaurados na edição. E a `faturaKey`
+continua sendo gravada — **a renegociação casa por ela**.
+
+⚠️ As "faturas duplicadas" que aparecem por cliente+número **não são defeito**:
+são faturas de **meses diferentes**, todas numeradas `001` (o número não é
+incrementado). Ex.: um cliente tem 4 faturas "001" — julho, agosto, setembro e
+outubro. Vale decidir se a numeração deve ser sequencial.
+
+### Validado
+- `node --check`; **41 testes**, incluindo os que **reproduzem** cada defeito
+  (dois cliques com e sem lembrar o id; upsert ao mudar período, número e
+  cliente; a transição sem o terceiro caminho; abrir → limpar → nova fatura)
+- **No ar, na fatura real**: sem mexer, mudando o período e mudando o número →
+  **os três atualizam o mesmo lançamento**
+
+## ⏳ Id duplicado dos aluguéis — comando pronto, falta o Rogel rodar
+
+Dois aluguéis ativos dividem o id `a17861061258471131`:
+**TRANSSOUZA/RUZ9J78** e **RSC/RUE5F30**.
+
+🔴 **Quem fica com o id: a RSC.** As **17 multas** com esse `locacaoId` são
+todas da placa **RUE5F30**. Trocar o id da RSC quebraria o vínculo das multas;
+trocar o da TRANSSOUZA não afeta nada — nada aponta para ele.
+
+Gravar direto foi **bloqueado** nesta sessão (`Modify Shared Resources`).
+Comando em **uma linha** para colar no console, logado:
+`backups-loka\CORRIGIR-ID-DUPLICADO.txt` — pede `allow pasting` antes.
+
+Ele confere tudo antes (dois registros com o id, distinção pela placa, id novo
+sem colisão), pede confirmação mostrando quem muda e quem fica, usa o `saveDB()`
+do próprio sistema e **confere no console se sobrou algum id repetido**.
+Simulado contra o banco real: 2 → 1 com o id duplicado, **0 repetidos no fim**.
+
+Backup: `backups-loka\loka_db-ANTES-id-duplicado-20261002-141331.json`
