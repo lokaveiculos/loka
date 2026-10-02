@@ -2117,3 +2117,71 @@ justamente porque aquele código morto a chama.
 ⚠️ A `fatura.html` **não exige login** — dá para testar à vontade. Mas com 119
 veículos o `Page.captureScreenshot` do Chrome dá timeout: esconder as linhas
 não selecionadas antes de capturar, ou usar a aba interna.
+
+---
+
+## 🔴 Tabelas largas não tinham barra de rolagem — 02/10/2026 (`a2462b7`) · gestao v102
+
+Relato: "diversas telas não cabem na página e também não tem barra horizontal
+para arrastarmos a visualização", citando **Contas a Receber**.
+
+### A causa — uma só, para todas as telas
+```css
+.shell{display:grid;grid-template-columns:220px 1fr;}
+```
+🔴 **Em CSS Grid, uma coluna `1fr` tem `min-width:auto`** — ela **nunca encolhe
+abaixo do conteúdo**. Então a tabela larga não rolava: ela **esticava a coluna
+inteira**, o layout transbordava a janela, e o **`body{overflow-x:hidden}`**
+(linha 29) cortava o excesso.
+
+Resultado exato do relato: **conteúdo cortado e barra nenhuma**.
+
+⚠️ **Os wrappers `overflow-x:auto` de cada tabela já existiam e estavam certos.**
+Eles nunca chegavam a agir, porque o pai crescia junto. Procurar o defeito na
+tabela não levaria a lugar nenhum — ele estava três níveis acima.
+
+### Medido na estrutura real, com o CSS publicado
+| Janela | Tabela | Antes | Depois |
+|---|---|---|---|
+| 900px | Contas a Receber (980px) | cortada, sem barra | **rola** |
+| 1024px | Contas a Receber (980px) | cortada, sem barra | **rola** |
+| 1024px | a de 1700px | cortada, sem barra | **rola** |
+| 1280px | a de 1700px | cortada, sem barra | **rola** |
+| 1360px | a de 1700px | `content` esticava para **1734px** | **rola** (wrap 1091) |
+
+Em 1360px o Contas a Receber **cabe** (1091px) — por isso o problema não aparece
+em monitor largo. Ele mora na faixa entre o corte do mobile (768px) e ~1250px:
+**nem vira layout mobile, nem cabe**.
+
+### A correção — 3 linhas de CSS, zero JS
+```css
+.shell                    220px 1fr  →  220px minmax(0,1fr)
+.shell.sidebar-collapsed   64px 1fr  →   64px minmax(0,1fr)
+.main                     ganhou min-width:0        (defesa extra)
+```
+`minmax(0,1fr)` permite a coluna encolher; aí o wrapper de cada tabela
+finalmente cria a própria barra.
+
+Vale para as **12 tabelas largas** do sistema — 1700, 1050, 980, 900, 820, 820,
+760, 700, 700, 680, 640, 560 — não só Contas a Receber.
+
+### Conferido antes de mexer
+- **Todas** as tabelas com `min-width ≥ 300px` já têm wrapper com rolagem
+- As duas sem wrapper (`overflow:hidden`) **não têm `min-width`** — se adaptam
+- `multas.html` e `fatura.html` **não** têm esse `.shell` em grid; o defeito é só
+  do `gestao.html`
+
+Mantidos de propósito: `body{overflow-x:hidden}` (com o grid certo nada mais
+transborda, e ele segue útil contra rolagem acidental) e as regras de `@media`
+mobile.
+
+⚠️ **Padrão a lembrar:** `1fr` e flex item **não encolhem abaixo do conteúdo** —
+precisam de `minmax(0,1fr)` ou `min-width:0`. Quando um `overflow:auto` "não
+funciona", o culpado costuma ser um ancestral que cresceu, não o elemento.
+
+### Validado
+- `node --check`; **16 testes**, sendo **3 que injetam o defeito de volta** e
+  exigem que o teste o acuse — inclusive o caso de alguém adicionar tabela larga
+  **sem** wrapper
+- **No ar, no arquivo publicado**, medido em 900 / 1024 / 1280 / 1360px: em toda
+  largura a tabela **ou cabe, ou rola**, e a página nunca transborda
