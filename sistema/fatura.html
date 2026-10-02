@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v79-20261002-1421 -->
+<!-- LOKA deploy: v80-20261002-1424 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -773,6 +773,7 @@ function carregarDados() {
 
 // ── MODO EDIÇÃO: carregar fatura existente ──────────────────
 var _editandoFaturaId = null;
+var _faturaKeyOriginal = '';   // chave da fatura como ela estava ao abrir
 var _modoConsulta = false;
 function verificarModoEdicao() {
   var params = new URLSearchParams(window.location.search);
@@ -813,6 +814,11 @@ function aplicarModoConsulta(fat) {
 
 function preencherFaturaParaEdicao(fat, editId) {
   _editandoFaturaId = editId;
+  // Chave como ela estava ao ABRIR. Os lançamentos gravados antes da v79 não
+  // têm faturaId; se o número ou o período mudarem nesta edição, é por ela que
+  // o lançamento antigo ainda será encontrado.
+  var _sanitO = function(x){ return String(x||'').replace(/[.#$\[\]\/]/g,'-'); };
+  _faturaKeyOriginal = _sanitO(fat.clienteId||'sc')+'_'+_sanitO(fat.numero)+'_'+_sanitO(fat.periodo||'sp');
 
   // Campos de identificação
   function set(id, val){ var el=document.getElementById(id); if(el && val!=null) el.value = val; }
@@ -1713,11 +1719,17 @@ function _sincronizarReceber(silent) {
       if (faturaId) {
         for (var i=0;i<arr.length;i++){ if(arr[i] && arr[i].faturaId===faturaId){ idx=i; break; } }
       }
-      // 2º pela chave antiga: os lançamentos gravados antes desta correção não
-      // têm faturaId. Achando por aqui, eles são atualizados (e ganham o id)
-      // em vez de virar duplicata.
+      // 2º pela chave atual: lançamentos gravados antes desta correção não têm
+      // faturaId. Achando por aqui, eles são atualizados (e ganham o id) em vez
+      // de virar duplicata.
       if (idx<0) {
         for (var j=0;j<arr.length;j++){ if(arr[j] && arr[j].faturaKey===faturaKey){ idx=j; break; } }
+      }
+      // 3º pela chave de quando a fatura foi ABERTA: cobre o caso de editar o
+      // número ou o período de uma fatura anterior à v79, em que a chave atual
+      // já mudou e o lançamento ainda não tem faturaId.
+      if (idx<0 && _faturaKeyOriginal && _faturaKeyOriginal!==faturaKey) {
+        for (var k=0;k<arr.length;k++){ if(arr[k] && arr[k].faturaKey===_faturaKeyOriginal){ idx=k; break; } }
       }
       if (idx<0) { arr.push(linha); return {arr:arr, novo:true}; }
       var atual = arr[idx];
