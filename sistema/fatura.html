@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v78-20261002-1106 -->
+<!-- LOKA deploy: v79-20261002-1421 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -441,7 +441,7 @@ textarea.input {
   <span id="statusMsg" style="font-size:11px;color:var(--muted);font-weight:600"></span>
   <button class="btn btn-outline" onclick="limparFatura()">🗑 Limpar</button>
   <button class="btn btn-outline" onclick="window.print()">🖨 Imprimir</button>
-  <button class="btn btn-primary" onclick="salvarFatura()">💾 Salvar Fatura</button>
+  <button class="btn btn-primary" id="btnSalvarFatura" onclick="salvarFatura()">💾 Salvar Fatura</button>
   <button class="btn btn-green" onclick="salvarContaReceber()">📥 Salvar no Contas a Receber</button>
 </div>
 
@@ -1599,11 +1599,22 @@ function salvarFatura() {
     criadoEm: new Date().toISOString()
   };
 
+  // Trava o botão durante a gravação: dois cliques criavam duas faturas,
+  // porque o id só era sorteado na hora de montar o objeto.
+  var _btnSalvar = document.getElementById('btnSalvarFatura');
+  function _destravar(){ if (_btnSalvar) { _btnSalvar.disabled = false; _btnSalvar.style.opacity = ''; } }
+  if (_btnSalvar) { _btnSalvar.disabled = true; _btnSalvar.style.opacity = '.6'; }
+
   try {
     // Salva vinculada ao cliente: faturas/{clienteId}/{faturaId}
     var path = 'faturas/' + (fatura.clienteId || 'sem_cliente') + '/' + fatura.id;
     if (db) {
       db.ref(path).set(fatura).then(function() {
+        // 🔴 Sem isto, salvar de novo sem recarregar criava OUTRA fatura: o id
+        // era sorteado a cada chamada. A partir daqui a tela está editando ESTA
+        // fatura, e o próximo salvamento sobrescreve em vez de duplicar.
+        _editandoFaturaId = fatura.id;
+        _destravar();
         carregarFaturasCliente(fatura.clienteId);
         // Lança/atualiza automaticamente no Contas a Receber (mesma chave = sem duplicar)
         _sincronizarReceber(true).then(function(){
@@ -1611,15 +1622,17 @@ function salvarFatura() {
         }).catch(function(){
           status((_editandoFaturaId ? '✅ Fatura atualizada' : '✅ Fatura salva') + ' — ⚠️ falha ao lançar no Contas a Receber', '#b45309');
         });
-      }).catch(function(e) { status('❌ Erro Firebase: '+e.message, '#c0392b'); });
+      }).catch(function(e) { _destravar(); status('❌ Erro Firebase: '+e.message, '#c0392b'); });
     } else {
       var list = JSON.parse(localStorage.getItem('loka_faturas')||'[]');
       list.unshift(fatura);
       localStorage.setItem('loka_faturas', JSON.stringify(list));
+      _editandoFaturaId = fatura.id;
+      _destravar();
       _sincronizarReceber(true);
       status('✅ Fatura salva e lançada no Contas a Receber (offline)!', '#0d7a3e');
     }
-  } catch(e) { status('❌ Erro: '+e.message, '#c0392b'); }
+  } catch(e) { _destravar(); status('❌ Erro: '+e.message, '#c0392b'); }
 }
 
 // ── SALVAR NO CONTAS A RECEBER ────────────────────────────────
@@ -1648,7 +1661,12 @@ function _construirLinhaReceber() {
   // 'vencido' e 'pendente' -> 'pendente' (o gestão calcula o vencido pela data)
 
   var sanit = function(s){ return String(s||'').replace(/[.#$\[\]\/]/g,'-'); };
+  // ⚠️ A faturaKey é montada com cliente + número + período — os TRÊS são
+  // editáveis. Mudar qualquer um fazia o upsert não reconhecer o lançamento
+  // antigo e criar um segundo. Ela continua sendo gravada (a renegociação a
+  // usa), mas quem IDENTIFICA agora é o id da fatura, que não muda.
   var faturaKey = sanit(cli.id||'sc')+'_'+sanit(num)+'_'+sanit(periodo||'sp');
+  var faturaId = _editandoFaturaId || '';
 
   var hist = 'Fatura #'+num+(nomeMes?' — '+nomeMes:'')+' · '+veics.length+' veículo(s)';
   var obs = (document.getElementById('fatObs')||{}).value || '';
@@ -1656,6 +1674,7 @@ function _construirLinhaReceber() {
 
   return {
     faturaKey: faturaKey,
+    faturaId: faturaId,
     linha: {
       cliente:   cli.nome,
       tipo:      'Fatura',
@@ -1665,7 +1684,8 @@ function _construirLinhaReceber() {
       historico: hist,
       status:    status,
       recebidoEm: recebidoEm,
-      faturaKey: faturaKey,   // marcador anti-duplicação
+      faturaKey: faturaKey,   // mantido: a renegociação casa por ele
+      faturaId:  faturaId,    // marcador anti-duplicação (não muda ao editar)
       origem:    'fatura'
     }
   };
@@ -1677,7 +1697,7 @@ function _sincronizarReceber(silent) {
   return new Promise(function(resolve, reject){
     var built = _construirLinhaReceber();
     if (!built) { resolve({ok:false, reason:'invalido'}); return; }
-    var linha = built.linha, faturaKey = built.faturaKey;
+    var linha = built.linha, faturaKey = built.faturaKey, faturaId = built.faturaId;
 
     // Normaliza array vindo do Firebase (pode vir como objeto {0:..,1:..})
     function normArr(val){
@@ -1689,14 +1709,23 @@ function _sincronizarReceber(silent) {
     // Insere ou atualiza pela faturaKey (preserva recebimentos já lançados no gestão)
     function upsert(arr){
       var idx=-1;
-      for (var j=0;j<arr.length;j++){ if(arr[j] && arr[j].faturaKey===faturaKey){ idx=j; break; } }
+      // 1º pelo ID da fatura — estável, sobrevive a editar número e período.
+      if (faturaId) {
+        for (var i=0;i<arr.length;i++){ if(arr[i] && arr[i].faturaId===faturaId){ idx=i; break; } }
+      }
+      // 2º pela chave antiga: os lançamentos gravados antes desta correção não
+      // têm faturaId. Achando por aqui, eles são atualizados (e ganham o id)
+      // em vez de virar duplicata.
+      if (idx<0) {
+        for (var j=0;j<arr.length;j++){ if(arr[j] && arr[j].faturaKey===faturaKey){ idx=j; break; } }
+      }
       if (idx<0) { arr.push(linha); return {arr:arr, novo:true}; }
       var atual = arr[idx];
       var jaRecebeu = Number(atual.recebido)>0 || atual.status==='renegociado';
       arr[idx] = Object.assign({}, atual, {
         cliente: linha.cliente, tipo:'Fatura', valor: linha.valor,
         vencimento: linha.vencimento, historico: linha.historico,
-        faturaKey: faturaKey, origem:'fatura'
+        faturaKey: faturaKey, faturaId: faturaId, origem:'fatura'
       });
       // Só mexe em status/recebido se o gestão ainda NÃO registrou recebimento
       if (!jaRecebeu) { arr[idx].status=linha.status; arr[idx].recebido=linha.recebido; arr[idx].recebidoEm=linha.recebidoEm; }
