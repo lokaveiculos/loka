@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v76-20260928-1753 -->
+<!-- LOKA deploy: v77-20261002-1059 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -144,13 +144,32 @@ body {
 
 /* ── PLANILHA DE VEÍCULOS ── */
 .veic-table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
-.veic-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+/* A planilha cabe na largura util (~746px) com as MESMAS proporcoes de coluna
+   da impressao — quem preenche ve na tela o alinhamento que sai no A4, sem
+   rolar de lado. Antes a tabela pedia 979px e rolava. */
+.veic-table { width: 100%; border-collapse: collapse; font-size: 10.5px; table-layout: fixed; }
 .veic-table thead th {
-  background: var(--azul); color: #fff; padding: 10px 12px;
-  text-align: left; font-size: 9px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .7px; white-space: nowrap;
+  background: var(--azul); color: #fff; padding: 5px 4px;
+  text-align: left; font-size: 8px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .2px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
-.veic-table thead th:first-child { width: 36px; text-align: center; border-radius: 10px 0 0 0; }
+.veic-table thead th:first-child { width: 4%; text-align: center; border-radius: 10px 0 0 0; padding: 5px 2px; }
+
+/* Larguras em % — espelham a tabela impressa, somando 100% */
+.veic-table th:nth-child(2),  .veic-table td:nth-child(2)  { width: 15%; }  /* Veiculo  */
+.veic-table th:nth-child(3),  .veic-table td:nth-child(3)  { width: 10%; }  /* Placa    */
+.veic-table th:nth-child(4),  .veic-table td:nth-child(4)  { width:  8%; }  /* Status   */
+.veic-table th:nth-child(5),  .veic-table td:nth-child(5)  { width:  6%; }  /* Qtd      */
+.veic-table th:nth-child(6),  .veic-table td:nth-child(6)  { width: 12%; }  /* Valor un */
+.veic-table th:nth-child(7),  .veic-table td:nth-child(7)  { width: 11%; }  /* Seguro   */
+.veic-table th:nth-child(8),  .veic-table td:nth-child(8)  { width: 11%; }  /* Desconto */
+.veic-table th:nth-child(9),  .veic-table td:nth-child(9)  { width:  6%; }  /* Dias par */
+.veic-table th:nth-child(10), .veic-table td:nth-child(10) { width: 17%; }  /* Subtotal */
+
+/* Nome do veiculo nao empurra a tabela: corta com reticencias, e o titulo
+   completo fica no "title" da celula. */
+.veic-table tbody td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .veic-table thead th:last-child  { border-radius: 0 10px 0 0; }
 .veic-table tbody tr { transition: background .1s; cursor: pointer; }
 .veic-table tbody tr:hover { background: #f8f9ff; }
@@ -158,12 +177,12 @@ body {
 .veic-table tbody tr:not(.vsel) td.num-cell { color: #c5cce0; }
 .veic-table tbody tr.vsel td.num-cell { color: var(--blue); font-weight: 700; }
 .veic-table tbody td {
-  padding: 9px 12px; border-bottom: 1px solid #f0f2f8;
-  vertical-align: middle;
+  padding: 4px 4px; border-bottom: 1px solid #f0f2f8;
+  vertical-align: middle; overflow: hidden;
 }
 .veic-table tbody tr:last-child td { border-bottom: none; }
 .veic-table tfoot td {
-  padding: 10px 12px; background: #f4f6fc;
+  padding: 6px 5px; background: #f4f6fc;
   font-size: 11px; font-weight: 700; border-top: 2px solid var(--border);
 }
 .veic-table tfoot td.total-lbl { color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-size: 9px; }
@@ -185,8 +204,8 @@ body {
 .st-disponivel{ background: #e8f5ef; color: #0d7a3e; }
 .st-manutencao{ background: #ede9fe; color: #7c3aed; }
 .veic-fin {
-  border: 1.5px solid var(--border); border-radius: 6px;
-  padding: 5px 8px; font-family: Montserrat, sans-serif; font-size: 12px;
+  border: 1.5px solid var(--border); border-radius: 5px;
+  padding: 3px 4px; font-family: Montserrat, sans-serif; font-size: 10.5px;
   color: var(--text); outline: none; background: #fff; width: 100%;
   text-align: right; transition: border-color .2s; min-width: 80px;
 }
@@ -1018,12 +1037,11 @@ function renderVeiculosArea(lista) {
       + '<td><span class="placa-badge">'+v.placa+'</span></td>'
       + '<td>'+stBadge(v.status||'disponivel')+'</td>'
       + '<td class="num-cell"><input class="veic-fin" id="vqtd-'+i+'" type="text" value="1" placeholder="1" oninput="calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="max-width:50px;text-align:center"></td>'
-      + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
+      + '<td class="num-cell"><input class="veic-fin" id="vfin-'+i+'" type="text" value="'+valMensal+'" placeholder="0,00" oninput="maskFin(this);recalcDescontoParado('+i+');calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
       + '<td class="num-cell"><input class="veic-fin" id="vseg-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()"></td>'
-      + '<td class="num-cell"><input class="veic-fin" id="vdesc-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="color:var(--red)"></td>'
+      + '<td class="num-cell"><input class="veic-fin" id="vdesc-'+i+'" type="text" placeholder="0,00" oninput="maskFin(this);descontoEditadoAMao('+i+')" onclick="event.stopPropagation()" style="color:var(--red)"></td>'
       + '<td class="num-cell" style="text-align:center;white-space:nowrap">'
-        + '<input class="veic-fin" id="vparado-'+i+'" type="number" min="0" placeholder="0" oninput="calcTotalVeic();calcTotal()" onclick="event.stopPropagation()" style="max-width:44px;text-align:center;display:inline-block">'
-        + '<button type="button" onclick="event.stopPropagation();aplicarDescontoParado('+i+')" title="Deduzir os dias parados do valor" style="margin-left:3px;font-size:9px;background:#2B4BF2;color:#fff;border:none;border-radius:4px;padding:3px 5px;cursor:pointer">↓</button>'
+        + '<input class="veic-fin" id="vparado-'+i+'" type="number" min="0" placeholder="0" title="Dias parado na oficina — o desconto sai sozinho" oninput="recalcDescontoParado('+i+')" onclick="event.stopPropagation()" style="text-align:center">'
         + '</td>'
       + '<td class="num-cell" id="vsub-'+i+'" style="font-family:monospace;font-size:11px;font-weight:700">—</td>'
     + '</tr>';
@@ -1038,11 +1056,11 @@ function renderVeiculosArea(lista) {
     + '<th>Veículo</th>'
     + '<th>Placa</th>'
     + '<th>Status</th>'
-    + '<th>Qtd dias/meses</th>'
-    + '<th>Valor Unit. (R$)</th>'
-    + '<th>Seguro (R$)</th>'
-    + '<th>Desconto (R$)</th>'
-    + '<th title="Dias parado na oficina (digite e clique ↓ para deduzir)">Dias parado</th>'
+    + '<th title="Quantidade de dias ou meses">Qtd</th>'
+    + '<th title="Valor unitário (R$)">Valor un.</th>'
+    + '<th title="Seguro (R$)">Seguro</th>'
+    + '<th title="Desconto (R$) — os dias parados entram aqui sozinhos">Desconto</th>'
+    + '<th title="Dias parado na oficina — digite e o desconto sai sozinho">Dias par.</th>'
     + '<th>Subtotal</th>'
     + '</tr></thead>'
     + '<tbody>'+rows+'</tbody>'
@@ -1172,25 +1190,63 @@ function atualizarDiasParados(){
   });
 }
 
-// Aplica o desconto: (aluguel mensal ÷ 30) × dias parados (digitados manualmente)
-function aplicarDescontoParado(i){
-  var finEl = document.getElementById('vfin-'+i);
-  var descEl = document.getElementById('vdesc-'+i);
-  var parEl = document.getElementById('vparado-'+i);
-  if (!finEl || !descEl || !parEl) return;
-  var dias = parseInt(parEl.value) || 0;
-  if (dias <= 0) { alert('Digite quantos dias o veículo ficou parado na oficina.'); return; }
-  var mensal = parseBRL(finEl.value);
-  if (!mensal) { alert('Preencha o valor do aluguel deste veículo primeiro.'); return; }
-  var valorDesconto = (mensal / 30) * dias;
-  var atual = parseBRL(descEl.value) || 0;
-  var novo = atual + valorDesconto;
-  descEl.value = novo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-  calcTotalVeic(); calcTotal();
-  // feedback visual
-  descEl.style.transition='background .3s'; descEl.style.background='#fff3cd';
-  setTimeout(function(){ descEl.style.background=''; }, 600);
+// ══ DESCONTO POR DIAS PARADOS — automatico ═══════════════════════
+// Formula: (valor unitario / 30) x dias parados.
+// Antes era preciso clicar num botao "↓" de 9px, e cada clique SOMAVA de novo
+// ao desconto — clicar duas vezes dobrava. Agora sai sozinho ao digitar os
+// dias, e recalcula quando o valor unitario muda.
+//
+// _descParado guarda QUANTO do campo Desconto veio desta conta, para que um
+// desconto digitado a mao (negociacao, avaria) seja preservado em vez de
+// sobrescrito.
+var _descParado = {};
+
+function _fmtBR(n){
+  return n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
+
+function recalcDescontoParado(i){
+  var finEl  = document.getElementById('vfin-'+i);
+  var descEl = document.getElementById('vdesc-'+i);
+  var parEl  = document.getElementById('vparado-'+i);
+  if (!finEl || !descEl || !parEl) return;
+
+  var dias = parseInt(parEl.value, 10) || 0;
+  if (dias < 0) dias = 0;
+  var unit = parseBRL(finEl.value) || 0;
+
+  // O que estava no campo menos a parcela automatica anterior = parte manual.
+  var totalAtual = parseBRL(descEl.value) || 0;
+  var antes      = _descParado[i] || 0;
+  var manual     = totalAtual - antes;
+  if (manual < 0) manual = 0;          // a pessoa reduziu o campo a mao
+
+  var automatico = (unit / 30) * dias;
+  _descParado[i] = automatico;
+
+  var novo = manual + automatico;
+  descEl.value = novo > 0 ? _fmtBR(novo) : '';
+
+  // Deixa a conta a vista: evita a duvida de "de onde veio esse valor?"
+  descEl.title = dias > 0
+    ? dias + ' dia(s) parado(s): ' + _fmtBR(unit) + ' ÷ 30 × ' + dias + ' = ' + _fmtBR(automatico)
+      + (manual > 0 ? '  (+ ' + _fmtBR(manual) + ' lançado à mão)' : '')
+    : '';
+
+  calcTotalVeic(); calcTotal();
+}
+
+// Quem edita o Desconto a mao redefine a base: o que esta ali passa a ser
+// "manual" por inteiro, senao a proxima mudanca de dias subtrairia o que a
+// pessoa acabou de digitar.
+function descontoEditadoAMao(i){
+  _descParado[i] = 0;
+  calcTotalVeic(); calcTotal();
+}
+
+// Mantido porque `atualizarDiasParados` ainda o chama. Hoje o calculo e
+// automatico, entao so reaplica.
+function aplicarDescontoParado(i){ recalcDescontoParado(i); }
 
 // Obtém o mês de referência da fatura (do campo periodoRef ou emissão)
 function obterMesReferencia(){
