@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v102-20261002-1337 -->
+<!-- LOKA deploy: v103-20261002-1347 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -357,6 +357,28 @@ tr:hover td{background:#f8f9fe;}
           <button id="fAtDiaria" class="btn btn-outline" onclick="setFiltroAtivos('diaria')"  style="font-size:11px;padding:7px 14px">🚗 Diária</button>
           <button id="fAtMensal" class="btn btn-outline" onclick="setFiltroAtivos('mensal')"  style="font-size:11px;padding:7px 14px">📅 Mensal</button>
         </div>
+        <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)" title="Data de devolução prevista">⏰ Vence de</span>
+          <input class="filter-input" id="atVencIni" type="date" onchange="renderAtivos()" style="width:135px;padding:5px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">até</span>
+          <input class="filter-input" id="atVencFim" type="date" onchange="renderAtivos()" style="width:135px;padding:5px">
+          <button onclick="limparFiltroVencAtivos()" title="Limpar datas de vencimento" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)" title="Data de retirada — início do contrato">📄 Contrato de</span>
+          <input class="filter-input" id="atContIni" type="date" onchange="renderAtivos()" style="width:135px;padding:5px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">até</span>
+          <input class="filter-input" id="atContFim" type="date" onchange="renderAtivos()" style="width:135px;padding:5px">
+          <button onclick="limparFiltroContAtivos()" title="Limpar datas de contrato" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
+        </div>
+        <select class="filter-sel" id="atOrdenar" onchange="renderAtivos()" title="Como classificar a lista">
+          <option value="venc">⏰ Próximos vencimentos</option>
+          <option value="venc_desc">⏰ Vencimento mais distante</option>
+          <option value="cont_novo">📄 Contrato mais recente</option>
+          <option value="cont_antigo">📄 Contrato mais antigo</option>
+          <option value="cliente">🔤 Cliente (A–Z)</option>
+          <option value="valor">💰 Maior valor</option>
+        </select>
         
       </div>
       <div id="ativosGrid"></div>
@@ -1248,7 +1270,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v102-20261002-1337';
+var LOKA_BUILD = 'v103-20261002-1347';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -3273,29 +3295,115 @@ function setFiltroAtivos(tipo) {
 }
 
 
+// ── FILTROS DE DATA E ORDENAÇÃO DOS ALUGUÉIS ATIVOS ──────────
+// "Data do contrato" é a RETIRADA (todos os 107 aluguéis têm).
+// "Data de vencimento" é a DEVOLUÇÃO prevista — e aqui mora o cuidado:
+// só 34 dos 107 têm. Os 99 mensais em contrato contínuo não têm data de fim.
+// Por isso, quando há filtro de vencimento, a tela DIZ quantos saíram por não
+// ter a data, em vez de deixar o operador achar que sumiram.
+function _atVal(id){ var e = document.getElementById(id); return e ? (e.value || '') : ''; }
+function _atData(v){ return v ? String(v).slice(0, 10) : ''; }
+
+function limparFiltroVencAtivos(){
+  var a = document.getElementById('atVencIni'); if (a) a.value = '';
+  var b = document.getElementById('atVencFim'); if (b) b.value = '';
+  renderAtivos();
+}
+function limparFiltroContAtivos(){
+  var a = document.getElementById('atContIni'); if (a) a.value = '';
+  var b = document.getElementById('atContFim'); if (b) b.value = '';
+  renderAtivos();
+}
+
+// Devolve a lista filtrada e quantos ficaram de fora só por não ter vencimento.
+function _atFiltrar(lista){
+  var vi = _atVal('atVencIni'), vf = _atVal('atVencFim');
+  var ci = _atVal('atContIni'), cf = _atVal('atContFim');
+  var semVenc = 0;
+
+  var out = lista.filter(function(a){
+    if (!a) return false;
+    // Contrato (retirada) — as duas pontas inclusivas
+    if (ci || cf){
+      var r = _atData(a.retirada);
+      if (!r) return false;
+      if (ci && r < ci) return false;
+      if (cf && r > cf) return false;
+    }
+    // Vencimento (devolução)
+    if (vi || vf){
+      var d = _atData(a.devolucao);
+      // Sem data não dá para afirmar que cai no período pedido. Sai do
+      // resultado, mas é CONTADO para o aviso.
+      if (!d) { semVenc++; return false; }
+      if (vi && d < vi) return false;
+      if (vf && d > vf) return false;
+    }
+    return true;
+  });
+  out._semVenc = semVenc;
+  return out;
+}
+
+function _atOrdenar(lista){
+  var modo = _atVal('atOrdenar') || 'venc';
+  var LONGE = '9999-12-31', ANTIGO = '0000-01-01';
+  function venc(a){ return _atData(a.devolucao) || LONGE; }   // sem data vai ao fim
+  function cont(a){ return _atData(a.retirada)  || ANTIGO; }
+  function num(v){
+    if (typeof v === 'number') return v;
+    return Number(String(v == null ? 0 : v).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+  }
+  var mapa = {
+    venc:        function(a,b){ return venc(a).localeCompare(venc(b)); },
+    venc_desc:   function(a,b){ return venc(b).localeCompare(venc(a)); },
+    cont_novo:   function(a,b){ return cont(b).localeCompare(cont(a)); },
+    cont_antigo: function(a,b){ return cont(a).localeCompare(cont(b)); },
+    cliente:     function(a,b){ return String(a.clienteNome||'').localeCompare(String(b.clienteNome||''), 'pt-BR'); },
+    valor:       function(a,b){ return num(b.valor) - num(a.valor); }
+  };
+  // Modo desconhecido cai no padrão de sempre: próximos vencimentos primeiro.
+  return lista.slice().sort(mapa[modo] || mapa.venc);
+}
+
+// Resumo acima da tabela: quantos de quantos, e o aviso dos sem vencimento.
+function _atResumo(mostrados, total, semVenc){
+  var h = '<p style="font-size:11px;color:var(--muted);margin:0 0 8px">'
+        + '<strong>' + mostrados + '</strong> de ' + total + ' aluguel(is) ativo(s)';
+  if (semVenc > 0){
+    h += ' · <span style="color:var(--amber);font-weight:700" '
+       + 'title="Contrato mensal contínuo não tem data de devolução prevista">'
+       + '⚠ ' + semVenc + ' sem data de vencimento ficaram de fora do filtro</span>';
+  }
+  return h + '</p>';
+}
+
 function renderAtivos() {
   if (!db) return;
   db.ativos   = cleanArr(db.ativos);
   db.veiculos = cleanVeics(db.veiculos);
   var q = semAcento((document.getElementById('qAtivos').value||''));
-  var list = db.ativos.filter(function(a){
+  var _todos = db.ativos.filter(function(a){
     if (!a) return false;
     if (_filtroAtivos && a.tipo !== _filtroAtivos) return false;
     return !q || semAcento((a.clienteNome+' '+a.veiculoNome+' '+(a.placa||''))).indexOf(q)>=0;
   });
+  var list = _atFiltrar(_todos);
+  var _semVenc = list._semVenc || 0;
 
-  // Ordena por data de devolução: vencidos e mais urgentes primeiro; sem data vai ao fim
-  list.sort(function(a,b){
-    var da = a.devolucao ? String(a.devolucao).slice(0,10) : '9999-12-31';
-    var db_ = b.devolucao ? String(b.devolucao).slice(0,10) : '9999-12-31';
-    return da < db_ ? -1 : da > db_ ? 1 : 0;
-  });
+  // Classificação escolhida no seletor. O padrão continua sendo "próximos
+  // vencimentos" — vencidos e mais urgentes primeiro, sem data ao fim.
+  list = _atOrdenar(list);
 
   var grid = document.getElementById('ativosGrid');
   if (!grid) return;
 
   if (!list.length) {
-    grid.innerHTML = '<div class="empty"><p>Nenhum aluguel ativo</p><small>Gere um contrato para registrar um aluguel.</small></div>';
+    grid.innerHTML = _todos.length || _semVenc
+      ? '<div class="empty"><p>Nenhum aluguel encontrado com esses filtros</p><small>'
+        + (_semVenc ? _semVenc + ' aluguel(is) sem data de vencimento ficaram de fora. ' : '')
+        + 'Ajuste a busca, o tipo ou as datas.</small></div>'
+      : '<div class="empty"><p>Nenhum aluguel ativo</p><small>Gere um contrato para registrar um aluguel.</small></div>';
     return;
   }
 
@@ -3335,7 +3443,8 @@ function renderAtivos() {
     '</tr>';
   }).join('');
 
-  grid.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
+  grid.innerHTML = _atResumo(list.length, db.ativos.length, _semVenc)
+    + '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px">'
     + '<thead><tr style="background:var(--dark)">'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px">Cliente</th>'
