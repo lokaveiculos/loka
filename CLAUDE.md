@@ -2185,3 +2185,82 @@ funciona", o culpado costuma ser um ancestral que cresceu, não o elemento.
   **sem** wrapper
 - **No ar, no arquivo publicado**, medido em 900 / 1024 / 1280 / 1360px: em toda
   largura a tabela **ou cabe, ou rola**, e a página nunca transborda
+
+---
+
+## ✅ Aluguéis Ativos: filtro por data e classificação — 02/10/2026 (`79cd3da`) · gestao v103
+
+Pedido: filtro por **data de vencimento** e **data do contrato**, e botão para
+**classificar próximos vencimentos**.
+
+### 🔴 Quais datas existem de verdade (conferido nos 107 aluguéis)
+| Campo | Significado | Quantos têm |
+|---|---|---|
+| `retirada` | data do contrato | **107 de 107** |
+| `devolucao` | vencimento (devolução prevista) | **34 de 107** |
+| `vigencia` | texto livre | 11 |
+
+Os **73 restantes são mensais em contrato CONTÍNUO** — não têm data de fim.
+Por tipo: diária 8/8 com devolução; mensal apenas 26 de 99.
+
+⚠️ **Um filtro por vencimento esconderia 73 aluguéis.** Por isso, quando há
+filtro de vencimento, a tela **diz quantos saíram por não ter a data**
+("⚠ 73 sem data de vencimento ficaram de fora do filtro") em vez de deixar o
+operador achar que sumiram. O filtro por **contrato não exclui ninguém**.
+
+⚠️ **Não inventei vencimento a partir de `vigencia`**: é texto livre
+(`"360"`, `"30 DIAS"`, `"120 DIAS"`) em 11 registros. Mesma regra do prazo de
+indicação das multas — **data chutada dá falsa segurança**.
+
+### Classificação
+A ordenação por próximos vencimentos **já era o comportamento fixo** da tela —
+só não dava para mudar. Virou um seletor, e **"⏰ Próximos vencimentos" continua
+sendo o padrão**: quem não mexer não vê diferença.
+
+`venc` (padrão) · `venc_desc` · `cont_novo` · `cont_antigo` · `cliente` · `valor`
+
+Sem data de vencimento continua indo para o **fim** da lista, como antes.
+Modo desconhecido cai no padrão. `sort` é destrutivo, então ordena sobre cópia.
+
+Entrou também o resumo **"X de Y aluguéis"** acima da tabela, e "nenhum
+encontrado **com esses filtros**" deixou de se confundir com "nenhum aluguel
+ativo".
+
+### 🔴 ACHADO não corrigido: dois aluguéis ativos com o MESMO id
+`a17861061258471131` pertence a **dois registros diferentes**:
+
+| Cliente | Placa | Retirada |
+|---|---|---|
+| TRANSSOUZA TRANSPORTE E TURISMO | RUZ9J78 | 2026-05-10 |
+| RSC TRANSPORTE 2016 LTDA | RUE5F30 | 2025-09-20 |
+
+Clientes, placas e datas **distintos** — são dois contratos reais com id colidido.
+
+⚠️ **Oito funções** do sistema fazem `find(x => x.id === id)`, que devolve
+**sempre o primeiro**: encerrar, prorrogar, gerenciar veículos, editar. Agir
+sobre o segundo agiria no primeiro.
+
+`renderAtivos` usa `db.ativos.indexOf(a)` para o índice real, então **a lista em
+si está segura** — o risco está nas ações por id.
+
+**Não corrigido:** é dado de produção e não foi pedido. Trocar o id de um deles
+resolve, mas é decisão do Rogel (e convém conferir se algo mais referencia
+aquele id).
+
+⚠️ O teste pegou isso porque a invariante era "não perde nem duplica" contando
+**ids**. A invariante certa é sobre os **registros** — contar ids acusaria um
+problema de dado como se fosse defeito da ordenação.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (641/641)
+- **51 testes** com o código real e os **107 aluguéis reais**: cada filtro
+  isolado e combinados, pontas inclusivas, data com hora (ISO), as 6
+  classificações, modo desconhecido, `sort` não destrutivo, botões de limpar,
+  resumo e o aviso dos sem vencimento
+- **No ar**: 4º trimestre → 11 aluguéis (73 avisados como fora); junho/2026 →
+  16 contratos, nenhum excluído; as 3 ordenações conferidas na amostra
+- Regressão: **6 suítes, 287 testes**, nenhuma falha
+
+⚠️ O auto-teste de injeção do `t-layout` dependia do texto exato de uma linha do
+`renderAtivos` e quebrou quando a tela mudou. Agora ele localiza **a primeira
+tabela larga** e remove o `overflow-x` dela — injeção robusta a mudanças.
