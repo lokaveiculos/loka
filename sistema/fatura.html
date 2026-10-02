@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v80-20261002-1424 -->
+<!-- LOKA deploy: v81-20261002-1426 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -1796,6 +1796,14 @@ function status(msg, color) {
 // ── LIMPAR ────────────────────────────────────────────────────
 function limparFatura() {
   if (!confirm('Limpar todos os campos?')) return;
+  // 🔴 Limpar tem de SAIR do modo edição. Sem isto, abrir uma fatura, clicar
+  // em Limpar e preencher outra SOBRESCREVIA a primeira — o id continuava
+  // apontando para ela. Vale para o lançamento no Contas a Receber também.
+  _editandoFaturaId = null;
+  _faturaKeyOriginal = '';
+  if (window.history && history.replaceState && /[?&](edit|view|cli)=/.test(location.search)) {
+    history.replaceState(null, '', location.pathname);
+  }
   limparCliente();
   _veicSelecionados.clear();
   document.querySelectorAll('.veic-card').forEach(function(c){c.classList.remove('selected');});
