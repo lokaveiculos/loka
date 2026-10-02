@@ -2024,3 +2024,96 @@ Validado: `node --check` nas 3 páginas alteradas **e nas outras 6** (sem
 regressão) + **39 testes de runtime** com o código real e os dados reais do
 Firestore — rodando `exportEstoque` de verdade, com stub capturando as colunas,
 nos dois caminhos (PDF e CSV).
+
+---
+
+## ✅ Fatura: desconto de dias parados automático + planilha alinhada ao A4 — 02/10/2026 (`716cd69`, `c36ef98`) · fatura v78
+
+### A fórmula já existia — o problema era chegar nela
+`(valor unitário ÷ 30) × dias parados` **já estava no código** desde antes, em
+`aplicarDescontoParado`. Só que rodava ao clicar num **botão "↓" de 9px** dentro
+da coluna "Dias parado" — fácil de nunca ver.
+
+🔴 **E cada clique SOMAVA de novo** (`atual + valorDesconto`): clicar duas vezes
+dobrava o desconto, sem avisar.
+
+Agora o desconto **sai sozinho** ao digitar os dias, e **refaz** quando o valor
+unitário muda. O botão saiu — virou desnecessário, e a coluna ficou mais estreita.
+
+| Situação | Antes | Agora |
+|---|---|---|
+| digitar 10 dias | nada até clicar ↓ | desconto na hora |
+| clicar/recalcular 2× | **dobrava** | mesmo valor |
+| corrigir 10 → 5 dias | somava por cima | refaz: 500,00 |
+| mudar o valor unitário | desconto ficava velho | acompanha |
+| zerar os dias | desconto continuava lá | limpa |
+
+### 🔴 O desconto lançado à mão é preservado
+`_descParado[i]` guarda **quanto do campo veio desta conta**. O resto é tratado
+como manual (negociação, avaria) e **sobrevive** a qualquer recálculo:
+200,00 à mão + 6 dias de um carro de 1.500 → 500,00; mudando para 3 dias → 350,00.
+
+⚠️ Quem **edita o campo Desconto** chama `descontoEditadoAMao(i)`, que zera a
+base. Sem isso, a próxima mudança de dias subtrairia o que a pessoa acabou de
+digitar.
+
+O campo mostra a conta no `title`:
+`3.000,00 ÷ 30 × 10 = 1.000,00  (+ 200,00 lançado à mão)` — para não restar
+dúvida de onde veio o valor.
+
+### Planilha alinhada ao A4
+Na tela a tabela pedia **979px** e havia **746px** úteis: rolava de lado, e as
+colunas não batiam com o impresso.
+
+| | Antes | Agora |
+|---|---|---|
+| fonte | 12px | 10.5px |
+| células | 9px 12px | 4px 4px |
+| cabeçalho | 10px 12px | 5px 4px |
+| inputs | 12px, 5px 8px | 10.5px, 3px 4px |
+| layout | `min-width:700px` | `table-layout: fixed` |
+
+As larguras em % são as **mesmas da impressão**, escaladas para os 96% que
+sobram depois do checkbox: papel `16/10/8/6/13/12/12/6/17` → tela
+`15/10/8/6/12/11/11/6/17`. Quem preenche vê o alinhamento que sai no papel.
+
+⚠️ Rótulos encurtados ("Qtd dias/meses" → "Qtd"), com o texto completo no
+`title`: **com `table-layout: fixed` um título longo alargaria a coluna**.
+
+### 🔴 Defeito que a mudança revelou (corrigido na v78)
+O rodapé tinha **9 células** (`colspan="8"` + 1) para uma tabela de **10
+colunas**. Sem `table-layout: fixed` o navegador acomodava; com ele, o total
+caiu na coluna "Dias par." (44px) e **quebrou em duas linhas**.
+
+A **célula vazia do checkbox** resolve os dois casos com a mesma estrutura: na
+tela são 10 colunas; na impressão a `.chk-cell` já é ocultada, voltando a 9 —
+que é por que o papel nunca mostrou o problema.
+
+⚠️ **Lição:** `table-layout: fixed` transforma desalinhamento tolerado em
+desalinhamento visível. Ao adotá-lo, conferir `colspan` de rodapés e cabeçalhos.
+
+### ⚠️ Achado NÃO corrigido (não foi pedido)
+`atualizarDiasParados()` preenche os dias parados a partir das **manutenções**
+(`diasParadoNoMes`), mas **nunca é chamada** — `grep` acha só a definição. A
+integração nunca funcionou: hoje os dias são digitados à mão.
+
+Ela também faria `cel.innerHTML = ...`, **destruindo o input** `vparado-i`, e
+chama `aplicarDescontoParado(i, dias)` com 2 argumentos para uma função de 1.
+`aplicarDescontoParado` foi **mantida** como atalho para a função nova
+justamente porque aquele código morto a chama.
+
+### Validado
+- `node --check`; **38 testes de runtime** com o código real: a fórmula em 5
+  valores, recálculo que não dobra, mudança de dias e de valor unitário,
+  desconto manual preservado nos três caminhos, bordas (sem valor, zero dia,
+  dias negativo, texto, linha inexistente), larguras de tela e papel conferidas
+  **separadamente** (a regex pegava os 18 valores dos dois blocos juntos)
+- **No navegador, no arquivo publicado**, 8 passos como o operador faria:
+  3.000 + 10 dias → 1.000,00; redigitar não dobra; 5 dias → 500,00; dobrar o
+  unitário → 1.000,00; zerar → limpa; e a linha com 200,00 à mão somando certo
+- **Na largura real (746px): não rola, nenhum valor corta** (testado com
+  12.500,00) e o total de R$ 14.200,00 cabe sem quebrar
+
+⚠️ A `fatura.html` **não exige login** — dá para testar à vontade. Mas com 119
+veículos o `Page.captureScreenshot` do Chrome dá timeout: esconder as linhas
+não selecionadas antes de capturar, ou usar a aba interna.
