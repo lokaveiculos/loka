@@ -2357,3 +2357,102 @@ do próprio sistema e **confere no console se sobrou algum id repetido**.
 Simulado contra o banco real: 2 → 1 com o id duplicado, **0 repetidos no fim**.
 
 Backup: `backups-loka\loka_db-ANTES-id-duplicado-20261002-141331.json`
+
+---
+
+## ✅ Recibo de pagamento de multa — 08/10/2026 (`5499a3c`, `e5ad102`, `59a4133`) · gestao v106
+
+Pedido em três partes, ao longo da sessão: botão de recibo por multa com
+multi-seleção para frota · filtro por data/placa/cliente · **registrar o
+recebimento para consultar**. O "Baixar como pagas" ficou intocado.
+
+### 🔴 Só multa PAGA gera recibo
+Um "recibo de pagamento" de multa não paga seria um documento afirmando o que
+não aconteceu. O botão 🧾 só aparece quando a multa está **paga e com locatário**;
+abrir por uma pendente avisa e não abre.
+
+Nos dados reais: 621 multas, **184 pagas**, e **17 dessas sem locatário** — essas
+não geram recibo nominal.
+
+### 🔴 Por que a seleção é separada da baixa
+Os dois têm **públicos opostos**:
+
+| | aceita | para quê |
+|---|---|---|
+| `_mltBaixaSel` | só **não** pagas | dar baixa (pagamento no banco) |
+| `_mltRecSel` | só **pagas** | documentar o que já foi pago |
+
+⚠️ Reusar a mesma seleção era impossível: a da baixa recusa paga **de propósito**.
+
+### Filtro dentro do modal
+A tela já filtra, mas quem monta um recibo não deveria ter de fechar a janela
+para recortar o lote. Entraram busca livre (placa, AIT, cliente, infração, órgão)
+e período, com Limpar.
+
+Dois cuidados herdados da baixa em lote:
+- **o que sai do filtro sai da seleção** — recibo de multa invisível na tela
+  seria o mesmo erro;
+- "Marcar todas" vale sobre o **filtrado**.
+
+E abrir pelo 🧾 de uma multa **limpa o filtro**: um filtro deixado de antes
+esconderia justamente a multa que o operador acabou de clicar.
+
+### 🔴 O registro (v106) — `loka_db/recibos`
+Guarda número, cliente (nome, documento e **endereço**), data, forma, observação,
+valor, quantidade, **quem emitiu**, quando, e a lista das multas.
+
+🔴 **A lista das multas é uma CÓPIA CONGELADA.** Se a multa for editada depois,
+o recibo já entregue **não pode mudar** — documento emitido é documento emitido.
+O endereço também é congelado, senão a 2ª via sairia com o cadastro de hoje.
+
+Cada multa coberta recebe `reciboId` / `reciboNum` / `reciboEm`, e a linha da
+tela exibe um selo verde com o número.
+
+### Aba Recibos
+Número, data, cliente, quantidade, valor, forma e quem emitiu. Busca por número,
+cliente, placa ou AIT; filtro por período; resumo com o total recebido.
+**2ª via** reimprime da cópia congelada, com carimbo. **Excluir** remove o
+registro e **solta as multas** — o `confirm` diz isso e lembra que o papel já
+entregue continua existindo.
+
+🔴 **Registra ANTES de abrir o documento**: não se entrega ao cliente um recibo
+que o sistema não conhece. Popup bloqueado → o registro já ficou gravado.
+Multa que já consta em recibo **avisa** antes de entrar em outro (não bloqueia —
+reemitir é legítimo).
+
+⚠️ `'recibos'` entrou em **`normalizarDB`** — a armadilha 1 de novo.
+
+### ⚠️ Descrição suja da importação (achado do próprio recibo)
+Gerando o documento com dados reais, a coluna Infração saiu com sobra da página
+do portal (`Exibir: 1-6 de 6 itens Página`) e caracteres de ícone de fonte
+privada.
+
+**44 multas no banco, 34 delas pagas.** Tirando o ícone, **36 voltam a ficar
+legíveis**; as outras **8** são lixo puro e saem como "Infração não descrita no
+registro" — mais honesto do que imprimir o lixo, e mais seguro do que inventar
+a infração.
+
+⚠️ **Só a exibição foi tratada.** O banco continua com as 44 como estão —
+corrigir dado de produção não foi pedido.
+
+⚠️ Minha primeira medição disse "10" porque só procurou os quadradinhos Unicode
+comuns, e não a **área de uso privado** (`U+E000–U+F8FF`), que é onde moram os
+ícones de fonte. Ao caçar lixo de OCR, procurar os dois.
+
+### ⚠️ O heredoc destruiu escapes DUAS vezes nesta entrega
+`[-]` virou os caracteres literais (funciona, mas é frágil e
+impossível de casar depois com Edit) e **`\b` virou um BACKSPACE literal**, o que
+**quebrava** a detecção do "Exibir". Reescrito pela ferramenta de escrita, com
+verificação de que os escapes estão como **texto** no arquivo.
+
+### Validado
+- `node --check`; `<div>` balanceadas (660/660)
+- **164 testes** nas duas suítes do recibo, com as **621 multas reais**: quem
+  pode gerar, 11 casos de valor por extenso, o filtro do modal, a trava de dois
+  clientes, o documento inteiro (total conferido contra soma por fora), a cópia
+  congelada (**editar a multa depois não muda o recibo**), as marcas, o aviso de
+  reemissão, a consulta, a 2ª via, a exclusão soltando as multas, nó vindo como
+  objeto do Firebase e popup bloqueado
+- **No ar**: emissão → registro → consulta → 2ª via, com `saveDB` neutralizado
+  (nada foi gravado em produção)
+- Regressão: **9 suítes, 492 testes**, nenhuma falha
