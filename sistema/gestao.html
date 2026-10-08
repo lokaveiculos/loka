@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v104-20261008-1746 -->
+<!-- LOKA deploy: v105-20261008-1755 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1035,8 +1035,18 @@ tr:hover td{background:#f8f9fe;}
         <input class="fi" id="mltRecObs" placeholder="Ex.: refere-se &agrave; compet&ecirc;ncia de agosto/2026"></div>
     </div>
 
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;background:#f0f2f9;border-radius:8px;padding:7px 9px;margin-top:10px">
+      <input class="fi" id="mltRecBusca" placeholder="&#128269; Placa, AIT, cliente ou infra&ccedil;&atilde;o..."
+             oninput="mltRecRender()" style="flex:1;min-width:150px;font-size:11px;padding:5px 8px">
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">De</span>
+      <input class="fi" id="mltRecDe" type="date" onchange="mltRecRender()" style="width:132px;font-size:11px;padding:4px 6px">
+      <span style="font-size:10px;font-weight:700;color:var(--muted)">at&eacute;</span>
+      <input class="fi" id="mltRecAte" type="date" onchange="mltRecRender()" style="width:132px;font-size:11px;padding:4px 6px">
+      <button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="mltRecLimparFiltro()">Limpar</button>
+    </div>
     <div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px">
-      <strong style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Multas pagas no filtro</strong>
+      <strong style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Multas pagas</strong>
       <button class="btn btn-outline" style="font-size:10px;padding:3px 8px;margin-left:auto" onclick="mltRecTodas(true)">Marcar todas</button>
       <button class="btn btn-outline" style="font-size:10px;padding:3px 8px" onclick="mltRecTodas(false)">Desmarcar</button>
     </div>
@@ -1316,7 +1326,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v104-20261008-1746';
+var LOKA_BUILD = 'v105-20261008-1755';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -10082,6 +10092,21 @@ function _mltExtenso(n){
   return txt;
 }
 
+// A descricao vinda da importacao de PDF carrega sobra da pagina do portal
+// ("Exibir: 1-6 de 6 itens Pagina") e caracteres de icone de fonte privada.
+// Sao 44 multas no banco, 34 delas pagas. Tirando o icone, 36 voltam a ficar
+// legiveis; as outras 8 sao lixo puro e viram "nao descrita" -- num documento
+// que vai para o cliente, isso e mais honesto do que imprimir o lixo, e mais
+// seguro do que inventar a infracao.
+function _mltDescLimpa(m){
+  var t = String((m && m.descricao) || '')
+    // Area de uso privado do Unicode: e icone de fonte, nunca texto real.
+    .replace(/[\uE000-\uF8FF]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  if (/^exibir\b/i.test(t) || /\d+\s*-\s*\d+\s+de\s+\d+\s+itens/i.test(t)) return '';
+  return t;
+}
+
 // ── SELEÇÃO ───────────────────────────────────────────────────
 function mltRecToggle(id, on){
   if (on) _mltRecSel[id] = true; else delete _mltRecSel[id];
@@ -10108,8 +10133,38 @@ function mltRecTodas(marcar){
 // Candidatas: as pagas do filtro atual da tela. O painel já filtra por data,
 // placa, locatário e órgão — o recibo aproveita esse recorte em vez de inventar
 // filtro novo.
+// Filtro do proprio modal: a tela ja filtra, mas quem esta montando um recibo
+// nao deveria ter de fechar a janela e voltar so para recortar o lote.
+// Busca e periodo agem SOBRE as candidatas (pagas com locatario) -- nunca
+// trazem multa nao paga para dentro do recibo.
+function _mltRecF(id){ var e = document.getElementById(id); return e ? (e.value || '') : ''; }
+
+function mltRecLimparFiltro(){
+  ['mltRecBusca','mltRecDe','mltRecAte'].forEach(function(id){
+    var e = document.getElementById(id); if (e) e.value = '';
+  });
+  mltRecRender();
+}
+
+function mltRecAplicarFiltro(lista){
+  var q  = semAcento(_mltRecF('mltRecBusca'));
+  var de = _mltRecF('mltRecDe'), ate = _mltRecF('mltRecAte');
+  if (!q && !de && !ate) return lista;
+  return lista.filter(function(m){
+    if (de || ate){
+      var d = mltISO(m.dataInfracao) || '';
+      // Sem data nao da para afirmar que cai no periodo pedido.
+      if (!d) return false;
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+    }
+    if (!q) return true;
+    return semAcento([m.placa, m.ait, m.clienteNome, m.descricao, m.orgao].join(' ')).indexOf(q) >= 0;
+  });
+}
+
 function mltRecCandidatas(){
-  return mltFiltradas().filter(mltRecPagavel);
+  return mltRecAplicarFiltro(mltFiltradas().filter(mltRecPagavel));
 }
 
 // ── MODAL ─────────────────────────────────────────────────────
@@ -10124,7 +10179,12 @@ function mltRecAbrir(id){
       return;
     }
     // Abrindo por uma multa, começa só com ela — evita herdar seleção antiga.
+    // E limpa o filtro do modal: um filtro deixado de antes poderia esconder
+    // justamente a multa que o operador acabou de clicar.
     _mltRecSel = {}; _mltRecSel[id] = true;
+    ['mltRecBusca','mltRecDe','mltRecAte'].forEach(function(f){
+      var e = document.getElementById(f); if (e) e.value = '';
+    });
   }
   var hoje = new Date().toISOString().slice(0,10);
   var d = document.getElementById('mltRecData'); if (d && !d.value) d.value = hoje;
@@ -10136,6 +10196,10 @@ function mltRecRender(){
   var el = document.getElementById('mltRecLista');
   if (!el) return;
   var cand = mltRecCandidatas();
+  // Multa que saiu do filtro sai da selecao: emitir recibo de algo que nao
+  // esta na tela seria o mesmo erro que a baixa em lote evita.
+  var visivel = {}; cand.forEach(function(m){ visivel[m.id] = 1; });
+  Object.keys(_mltRecSel).forEach(function(id){ if (!visivel[id]) delete _mltRecSel[id]; });
   var sel  = mltRecSelecionadas();
   var cli  = mltRecClientes();
   var nCli = Object.keys(cli).length;
@@ -10156,10 +10220,16 @@ function mltRecRender(){
   if (btn) btn.disabled = (sel.length === 0 || nCli !== 1);
 
   if (!cand.length) {
+    var temFiltro = !!(_mltRecF('mltRecBusca') || _mltRecF('mltRecDe') || _mltRecF('mltRecAte'));
+    var haPagas = mltFiltradas().filter(mltRecPagavel).length > 0;
     el.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">'
-      + 'Nenhuma multa <strong>paga</strong> no filtro atual da tela.<br>'
-      + '<span style="font-size:11px">O recibo comprova pagamento — só multa já quitada entra. '
-      + 'Ajuste o filtro de status para "Paga".</span></div>';
+      + (temFiltro && haPagas
+          ? 'Nenhuma multa paga <strong>com esses filtros</strong>.<br>'
+            + '<span style="font-size:11px">Ajuste a busca ou o período, ou clique em Limpar.</span>'
+          : 'Nenhuma multa <strong>paga</strong> no filtro atual da tela.<br>'
+            + '<span style="font-size:11px">O recibo comprova pagamento — só multa já quitada entra. '
+            + 'Ajuste o filtro de status para "Paga".</span>')
+      + '</div>';
     return;
   }
 
@@ -10216,7 +10286,7 @@ function mltRecGerar(){
       + '<td>' + esc(mltFmtPlaca(m.placa)) + '</td>'
       + '<td>' + esc(m.ait || '—') + '</td>'
       + '<td>' + esc(mltBR(m.dataInfracao)) + '</td>'
-      + '<td>' + esc(m.descricao || '—') + '</td>'
+      + '<td>' + esc(_mltDescLimpa(m) || 'Infração não descrita no registro') + '</td>'
       + '<td>' + esc(m.orgao || '—') + '</td>'
       + '<td class="r">' + brl(v) + '</td>'
       + '</tr>';
