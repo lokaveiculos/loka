@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v103-20261002-1347 -->
+<!-- LOKA deploy: v104-20261008-1746 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -584,6 +584,7 @@ tr:hover td{background:#f8f9fe;}
           <input class="filter-input" id="mltFDe"  type="date" onchange="mltAplicarFiltro()" title="Infra&ccedil;&atilde;o de" style="max-width:140px">
           <input class="filter-input" id="mltFAte" type="date" onchange="mltAplicarFiltro()" title="Infra&ccedil;&atilde;o at&eacute;" style="max-width:140px">
           <button class="btn btn-outline" onclick="mltLimparFiltro()" style="font-size:11px">Limpar</button>
+          <button class="btn btn-outline" onclick="mltRecAbrir()" style="font-size:11px" title="Recibo de pagamento para o locat&aacute;rio (multas j&aacute; pagas)">&#129534; Recibo</button>
           <button class="btn btn-outline" onclick="mltRelatorio()" style="font-size:11px">&#128203; Relat&oacute;rio PDF</button>
           <button class="btn btn-outline" id="mltBtnExcel" onclick="mltRelatorioCSV()" style="font-size:11px">&#128202; Excel</button>
           <button class="btn btn-green" id="mltBtnNova" onclick="mltAbrir(null)">+ Nova Multa</button>
@@ -1003,6 +1004,51 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <!-- MODAL: ALUGUEL -->
+<!-- ══ MODAL: RECIBO DE PAGAMENTO DE MULTA ══ -->
+<div class="modal-bg" id="mReciboMulta"><div class="modal" style="max-width:640px">
+  <div class="modal-head" style="background:#0d7a3e">
+    <h3>&#129534; Recibo de pagamento</h3>
+    <button class="modal-close" onclick="closeM('mReciboMulta')">&#10005;</button>
+  </div>
+  <div class="modal-body">
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px">
+      Documenta para o locat&aacute;rio as multas <strong>j&aacute; pagas</strong>. A lista segue o
+      filtro da tela &mdash; use os filtros de locat&aacute;rio e per&iacute;odo para recortar o lote.
+      <br>&#9888; Isto n&atilde;o altera multa nenhuma: quem d&aacute; baixa &eacute; o bot&atilde;o
+      &quot;Baixar como pagas&quot;.
+    </p>
+
+    <div class="g2">
+      <div class="fg"><label class="fl">Data do recibo</label>
+        <input class="fi" id="mltRecData" type="date"></div>
+      <div class="fg"><label class="fl">Forma de pagamento</label>
+        <select class="fs" id="mltRecForma">
+          <option value="">— n&atilde;o informar —</option>
+          <option value="PIX">PIX</option>
+          <option value="transfer&ecirc;ncia banc&aacute;ria">Transfer&ecirc;ncia banc&aacute;ria</option>
+          <option value="boleto">Boleto</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="cart&atilde;o">Cart&atilde;o</option>
+          <option value="desconto em fatura">Desconto em fatura</option>
+        </select></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Observa&ccedil;&atilde;o (opcional)</label>
+        <input class="fi" id="mltRecObs" placeholder="Ex.: refere-se &agrave; compet&ecirc;ncia de agosto/2026"></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin:12px 0 6px">
+      <strong style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Multas pagas no filtro</strong>
+      <button class="btn btn-outline" style="font-size:10px;padding:3px 8px;margin-left:auto" onclick="mltRecTodas(true)">Marcar todas</button>
+      <button class="btn btn-outline" style="font-size:10px;padding:3px 8px" onclick="mltRecTodas(false)">Desmarcar</button>
+    </div>
+    <div id="mltRecResumo" style="font-size:12px;background:#f4f6fc;border-radius:8px;padding:8px 12px;margin-bottom:8px"></div>
+    <div id="mltRecLista" style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mReciboMulta')">Cancelar</button>
+    <button class="btn btn-green" id="mltRecBtnGerar" onclick="mltRecGerar()">&#129534; Gerar recibo (PDF)</button>
+  </div>
+</div></div>
+
 <div class="modal-bg" id="mBaixaMultas"><div class="modal" style="max-width:460px">
   <div class="modal-head"><h3>Baixar multas como pagas</h3><button class="modal-close" onclick="closeM('mBaixaMultas')">&#10005;</button></div>
   <div class="modal-body">
@@ -1270,7 +1316,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v103-20261002-1347';
+var LOKA_BUILD = 'v104-20261008-1746';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9975,6 +10021,272 @@ function mltAudExcluir(){
   toast('🗑 ' + sel.length + ' multa(s) excluída(s)', '#c0392b');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// RECIBO DE PAGAMENTO DE MULTA
+// ═══════════════════════════════════════════════════════════════
+// Só multa PAGA gera recibo. Um "recibo de pagamento" de algo não pago seria
+// um documento afirmando o que não aconteceu — por isso o botão só aparece nas
+// pagas, e o lote ignora o resto.
+//
+// ⚠️ Isto NÃO se mistura com "Baixar como pagas": aquele marca a multa como
+// quitada (e por isso só aceita as NÃO pagas); este documenta para o locatário
+// o que já foi pago. Públicos opostos, seleções separadas.
+var _mltRecSel = {};        // { idDaMulta: true }
+
+function mltRecPagavel(m){
+  return !!(m && m.status === 'paga' && m.clienteId && m.clienteNome);
+}
+
+// Valor por extenso — recibo sem extenso não é recibo.
+function _mltExtenso(n){
+  n = Math.round((Number(n) || 0) * 100) / 100;
+  var U = ['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez',
+           'onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  var D = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  var C = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  function ate999(v){
+    if (v === 0)   return '';
+    if (v === 100) return 'cem';
+    var t = '', c = Math.floor(v/100), r = v % 100;
+    if (c) t = C[c];
+    if (r) {
+      var meio = r < 20 ? U[r] : D[Math.floor(r/10)] + (r%10 ? ' e ' + U[r%10] : '');
+      t = t ? t + ' e ' + meio : meio;
+    }
+    return t;
+  }
+  function inteiro(v){
+    if (v === 0) return 'zero';
+    var partes = [], escala = [['bilhão','bilhões',1e9],['milhão','milhões',1e6],['mil','mil',1e3]];
+    for (var i = 0; i < escala.length; i++){
+      var div = escala[i][2], q = Math.floor(v / div);
+      if (q) {
+        // "mil" não leva "um" na frente: 1000 = "mil", não "um mil".
+        var pref = (div === 1e3 && q === 1) ? '' : ate999(q) + ' ';
+        partes.push(pref + (q === 1 ? escala[i][0] : escala[i][1]));
+        v -= q * div;
+      }
+    }
+    if (v) partes.push(ate999(v));
+    // Antes da última parte entra "e" quando o resto é menor que cem ou redondo.
+    if (partes.length > 1) {
+      var ult = partes.pop();
+      var resto = Math.round(n) % 1000;
+      return partes.join(', ') + ((resto && (resto < 100 || resto % 100 === 0)) ? ' e ' : ' ') + ult;
+    }
+    return partes[0] || 'zero';
+  }
+  var reais = Math.floor(n), cent = Math.round((n - reais) * 100);
+  var txt = inteiro(reais) + (reais === 1 ? ' real' : ' reais');
+  if (cent) txt += ' e ' + inteiro(cent) + (cent === 1 ? ' centavo' : ' centavos');
+  return txt;
+}
+
+// ── SELEÇÃO ───────────────────────────────────────────────────
+function mltRecToggle(id, on){
+  if (on) _mltRecSel[id] = true; else delete _mltRecSel[id];
+  mltRecRender();
+}
+function mltRecSelecionadas(){
+  return mltMultas().filter(function(m){ return m && _mltRecSel[m.id] && mltRecPagavel(m); });
+}
+// Um recibo = UM cliente. Com dois locatários marcados não dá para emitir um
+// documento só, então o modal exige resolver antes.
+function mltRecClientes(){
+  var ids = {};
+  mltRecSelecionadas().forEach(function(m){ ids[m.clienteId] = m.clienteNome; });
+  return ids;
+}
+
+function mltRecTodas(marcar){
+  mltRecCandidatas().forEach(function(m){
+    if (marcar) _mltRecSel[m.id] = true; else delete _mltRecSel[m.id];
+  });
+  mltRecRender();
+}
+
+// Candidatas: as pagas do filtro atual da tela. O painel já filtra por data,
+// placa, locatário e órgão — o recibo aproveita esse recorte em vez de inventar
+// filtro novo.
+function mltRecCandidatas(){
+  return mltFiltradas().filter(mltRecPagavel);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function mltRecAbrir(id){
+  if (!db) return;
+  if (id) {
+    var m = mltMultas().find(function(x){ return x && x.id === id; });
+    if (!m) return;
+    if (!mltRecPagavel(m)) {
+      toast(m.status === 'paga' ? '⚠️ Esta multa não tem locatário identificado'
+                                : '⚠️ Só multa paga gera recibo de pagamento', '#b45309');
+      return;
+    }
+    // Abrindo por uma multa, começa só com ela — evita herdar seleção antiga.
+    _mltRecSel = {}; _mltRecSel[id] = true;
+  }
+  var hoje = new Date().toISOString().slice(0,10);
+  var d = document.getElementById('mltRecData'); if (d && !d.value) d.value = hoje;
+  mltRecRender();
+  openM('mReciboMulta');
+}
+
+function mltRecRender(){
+  var el = document.getElementById('mltRecLista');
+  if (!el) return;
+  var cand = mltRecCandidatas();
+  var sel  = mltRecSelecionadas();
+  var cli  = mltRecClientes();
+  var nCli = Object.keys(cli).length;
+
+  // Resumo + aviso quando há mais de um locatário marcado
+  var resumo = document.getElementById('mltRecResumo');
+  if (resumo) {
+    var soma = sel.reduce(function(s,m){ return s + (mltNum(m.valorPago) || mltNum(m.valor)); }, 0);
+    var h = '<strong>' + sel.length + '</strong> de ' + cand.length + ' multa(s) paga(s) · total <strong>' + brl(soma) + '</strong>';
+    if (nCli > 1) {
+      h += '<div style="color:var(--red);font-weight:700;margin-top:6px;font-size:11px">'
+         + '⚠️ ' + nCli + ' locatários marcados. Um recibo é de UM cliente — '
+         + 'desmarque até sobrar um só, ou filtre a tela por locatário.</div>';
+    }
+    resumo.innerHTML = h;
+  }
+  var btn = document.getElementById('mltRecBtnGerar');
+  if (btn) btn.disabled = (sel.length === 0 || nCli !== 1);
+
+  if (!cand.length) {
+    el.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:12px">'
+      + 'Nenhuma multa <strong>paga</strong> no filtro atual da tela.<br>'
+      + '<span style="font-size:11px">O recibo comprova pagamento — só multa já quitada entra. '
+      + 'Ajuste o filtro de status para "Paga".</span></div>';
+    return;
+  }
+
+  // Agrupado por locatário, para o caso de frota ficar legível
+  var porCli = {};
+  cand.forEach(function(m){ (porCli[m.clienteNome] = porCli[m.clienteNome] || []).push(m); });
+
+  el.innerHTML = Object.keys(porCli).sort().map(function(nome){
+    var ms = porCli[nome];
+    var sub = ms.reduce(function(s,m){ return s + (mltNum(m.valorPago) || mltNum(m.valor)); }, 0);
+    return '<div style="margin-bottom:10px">'
+      + '<div style="background:#EEF1FD;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;color:var(--dark)">'
+        + nome + ' — ' + ms.length + ' multa(s) · ' + brl(sub) + '</div>'
+      + ms.map(function(m){
+          var v = mltNum(m.valorPago) || mltNum(m.valor);
+          return '<label style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid #f0f2f8;font-size:11px;cursor:pointer">'
+            + '<input type="checkbox" ' + (_mltRecSel[m.id] ? 'checked' : '')
+              + ' onchange="mltRecToggle(\'' + m.id + '\', this.checked)">'
+            + '<span style="font-family:monospace;font-weight:700">' + mltFmtPlaca(m.placa) + '</span>'
+            + '<span style="color:var(--muted)">' + (m.ait || 's/ AIT') + '</span>'
+            + '<span style="color:var(--muted)">' + mltBR(m.dataInfracao) + '</span>'
+            + '<span style="margin-left:auto;font-weight:700">' + brl(v) + '</span>'
+            + '</label>';
+        }).join('')
+      + '</div>';
+  }).join('');
+}
+
+// ── O DOCUMENTO ───────────────────────────────────────────────
+function mltRecGerar(){
+  var sel = mltRecSelecionadas();
+  if (!sel.length) { toast('Marque ao menos uma multa','#b45309'); return; }
+  var cli = mltRecClientes(), ids = Object.keys(cli);
+  if (ids.length !== 1) { toast('Um recibo é de um cliente só — deixe apenas um locatário marcado','#b45309'); return; }
+
+  var c = (db.clients || []).find(function(x){ return x && x.id === ids[0]; }) || { nome: cli[ids[0]] };
+  var total = sel.reduce(function(s,m){ return s + (mltNum(m.valorPago) || mltNum(m.valor)); }, 0);
+  var dataRec = (document.getElementById('mltRecData') || {}).value || new Date().toISOString().slice(0,10);
+  var forma   = (document.getElementById('mltRecForma') || {}).value || '';
+  var obs     = (document.getElementById('mltRecObs')   || {}).value || '';
+
+  var esc = function(s){
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  };
+  var endereco = [c.endereco, c.bairro].filter(Boolean).join(', ')
+    + ((c.cidade || c.uf) ? ' — ' + [c.cidade, c.uf].filter(Boolean).join('/') : '')
+    + (c.cep ? ' · CEP ' + c.cep : '');
+
+  var linhas = sel.slice().sort(function(a,b){
+    return String(a.dataInfracao||'').localeCompare(String(b.dataInfracao||''));
+  }).map(function(m){
+    var v = mltNum(m.valorPago) || mltNum(m.valor);
+    return '<tr>'
+      + '<td>' + esc(mltFmtPlaca(m.placa)) + '</td>'
+      + '<td>' + esc(m.ait || '—') + '</td>'
+      + '<td>' + esc(mltBR(m.dataInfracao)) + '</td>'
+      + '<td>' + esc(m.descricao || '—') + '</td>'
+      + '<td>' + esc(m.orgao || '—') + '</td>'
+      + '<td class="r">' + brl(v) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  // Nº do recibo derivado da data + quantidade: dois recibos do mesmo lote no
+  // mesmo dia saem com o mesmo número, o que é desejável (é o mesmo documento).
+  var numero = 'REC-' + String(dataRec).replace(/-/g,'') + '-' + String(sel.length).padStart(3,'0');
+
+  var h = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Recibo ' + numero + ' — ' + esc(c.nome) + '</title><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:26px 30px;color:#111827;font-size:12px}'
+    + '.cab{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0E1B4D;padding-bottom:10px;margin-bottom:16px}'
+    + '.emp{font-size:16px;font-weight:800;color:#0E1B4D}'
+    + '.emp small{display:block;font-size:10px;font-weight:400;color:#555;margin-top:2px}'
+    + '.num{text-align:right;font-size:11px;color:#555}'
+    + '.num strong{display:block;font-size:19px;color:#0E1B4D}'
+    + 'h1{font-size:15px;text-align:center;letter-spacing:2px;margin:14px 0 4px;color:#0E1B4D}'
+    + '.valor{text-align:center;font-size:22px;font-weight:800;margin-bottom:14px}'
+    + '.corpo{line-height:1.7;text-align:justify;margin-bottom:14px}'
+    + '.corpo strong{color:#0E1B4D}'
+    + 'table{width:100%;border-collapse:collapse;font-size:10px;margin:10px 0}'
+    + 'th{background:#e5e7eb;color:#111827!important;font-weight:700;padding:6px;border:1px solid #cbd5e1;text-align:left}'
+    + 'td{padding:5px 6px;border:1px solid #e2e8f0}'
+    + 'td.r,th.r{text-align:right;white-space:nowrap}'
+    + 'tfoot td{font-weight:800;background:#f8fafc}'
+    + '.obs{font-size:10px;color:#555;border-left:3px solid #cbd5e1;padding-left:8px;margin:10px 0}'
+    + '.ass{margin-top:46px;text-align:center}'
+    + '.ass .linha{border-top:1px solid #111827;width:300px;margin:0 auto 4px}'
+    + '.rod{margin-top:18px;font-size:9px;color:#777;text-align:center;border-top:1px solid #e2e8f0;padding-top:8px}'
+    + '@media print{@page{size:A4;margin:12mm}body{padding:0}}'
+    + '</style></head><body>'
+    + '<div class="cab">'
+      + '<div class="emp">LOKÁ Aluguel de Veículos'
+        + '<small>CNPJ 39.911.638/0001-10 · Feira de Santana — BA</small></div>'
+      + '<div class="num">RECIBO Nº<strong>' + numero + '</strong></div>'
+    + '</div>'
+    + '<h1>RECIBO DE PAGAMENTO</h1>'
+    + '<div class="valor">' + brl(total) + '</div>'
+    + '<div class="corpo">'
+      + 'Recebemos de <strong>' + esc(c.nome) + '</strong>'
+      + (c.cpf ? ', inscrito(a) no CPF/CNPJ sob o nº <strong>' + esc(c.cpf) + '</strong>' : '')
+      + (endereco.trim().replace(/^,\s*/,'') ? ', estabelecido(a) em ' + esc(endereco.replace(/^,\s*/,'')) : '')
+      + ', a importância de <strong>' + brl(total) + '</strong> '
+      + '(' + esc(_mltExtenso(total)) + '), '
+      + 'referente ao pagamento de <strong>' + sel.length + '</strong> multa(s) de trânsito '
+      + 'incidente(s) sobre veículo(s) locado(s), conforme discriminado abaixo'
+      + (forma ? ', quitada(s) por <strong>' + esc(forma) + '</strong>' : '')
+      + '.'
+    + '</div>'
+    + '<table><thead><tr>'
+      + '<th>Placa</th><th>AIT</th><th>Data da infração</th><th>Infração</th><th>Órgão</th><th class="r">Valor</th>'
+    + '</tr></thead><tbody>' + linhas + '</tbody>'
+    + '<tfoot><tr><td colspan="5">TOTAL</td><td class="r">' + brl(total) + '</td></tr></tfoot></table>'
+    + (obs ? '<div class="obs">' + esc(obs) + '</div>' : '')
+    + '<div class="corpo" style="margin-top:12px">Para clareza, firmamos o presente recibo.</div>'
+    + '<div style="text-align:right;font-size:11px">Feira de Santana — BA, ' + mltBR(dataRec) + '.</div>'
+    + '<div class="ass"><div class="linha"></div>'
+      + '<div style="font-size:11px;font-weight:700">LOKÁ Aluguel de Veículos</div>'
+      + '<div style="font-size:10px;color:#555">CNPJ 39.911.638/0001-10</div></div>'
+    + '<div class="rod">Documento emitido pelo sistema LOKÁ em ' + new Date().toLocaleString('pt-BR')
+      + ' · as multas listadas constam como pagas no sistema</div>'
+    + '<script>window.onload=function(){window.print();}<\/script></body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { toast('O navegador bloqueou a janela de impressão','#b45309'); return; }
+  w.document.write(h); w.document.close();
+  closeM('mReciboMulta');
+}
+
 // ── RENDER PRINCIPAL ───────────────────────────────────────────
 function mltRender(){
   mltRenderAlertas();
@@ -10088,7 +10400,10 @@ function mltRender(){
       + '<td class="td-actions">'
         + (_multasRestrito()
             ? '<span style="color:var(--muted);font-size:10px">—</span>'
-            : '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="mltAbrir(\''+m.id+'\')">Editar</button>'
+            : (mltRecPagavel(m)
+                ? '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:#0d7a3e;border-color:#0d7a3e" title="Recibo de pagamento para o locatário" onclick="mltRecAbrir(\''+m.id+'\')">🧾</button>'
+                : '')
+              + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="mltAbrir(\''+m.id+'\')">Editar</button>'
               + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:var(--red)" onclick="mltExcluir(\''+m.id+'\')">✕</button>')
       + '</td></tr>';
   });
