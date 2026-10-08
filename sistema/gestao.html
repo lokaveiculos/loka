@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v105-20261008-1755 -->
+<!-- LOKA deploy: v106-20261008-1802 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -535,8 +535,28 @@ tr:hover td{background:#f8f9fe;}
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button id="mltTabLista"    class="btn btn-blue"    onclick="mltMostrarAba('lista')"    style="font-size:11px;padding:8px 14px">&#128220; Multas</button>
         <button id="mltTabImportar" class="btn btn-outline" onclick="mltMostrarAba('importar')" style="font-size:11px;padding:8px 14px">&#128228; Importar PDF</button>
+        <button id="mltTabRecibos" class="btn btn-outline" onclick="mltMostrarAba('recibos')" style="font-size:11px;padding:8px 14px">&#129534; Recibos</button>
         <button id="mltTabAuditoria" class="btn btn-outline" onclick="mltMostrarAba('auditoria')" style="font-size:11px;padding:8px 14px">&#128269; Auditoria</button>
         <button id="mltTabIndicacao" class="btn btn-outline" onclick="mltMostrarAba('indicacao')" style="font-size:11px;padding:8px 14px">&#128100; Indica&ccedil;&atilde;o de Condutor</button>
+      </div>
+
+      <!-- ABA RECIBOS -->
+      <div id="mltAbaRecibos" style="display:none">
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <div class="search-box" style="flex:1;min-width:200px">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="filter-input" id="mltRecHistBusca" type="text" placeholder="Buscar n&ordm;, cliente, placa ou AIT..." oninput="mltRecHistRender()">
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+            <span style="font-size:10px;font-weight:700;color:var(--muted)">&#128197; De</span>
+            <input class="filter-input" id="mltRecHistDe" type="date" onchange="mltRecHistRender()" style="width:140px;padding:5px">
+            <span style="font-size:10px;font-weight:700;color:var(--muted)">at&eacute;</span>
+            <input class="filter-input" id="mltRecHistAte" type="date" onchange="mltRecHistRender()" style="width:140px;padding:5px">
+            <button onclick="mltRecHistLimpar()" title="Limpar" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">&#10005;</button>
+          </div>
+        </div>
+        <div class="stats" id="mltRecHistStats" style="margin-bottom:12px"></div>
+        <div id="mltRecHistGrid"></div>
       </div>
 
       <!-- ABA AUDITORIA -->
@@ -1326,7 +1346,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v105-20261008-1755';
+var LOKA_BUILD = 'v106-20261008-1802';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -2074,7 +2094,7 @@ var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // quando há chaves não sequenciais, após exclusões). Chamado ao carregar/sincronizar.
 function normalizarDB(){
   if (!db) return;
-  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros'].forEach(function(nome){
+  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros','recibos'].forEach(function(nome){
     if (db[nome] === undefined || db[nome] === null) { db[nome] = []; return; }
     if (!Array.isArray(db[nome])) {
       if (typeof db[nome] === 'object') {
@@ -9203,7 +9223,7 @@ function mltIndSelecionadas(){
 }
 
 function mltMostrarAba(aba){
-  ['lista','importar','indicacao','auditoria'].forEach(function(a){
+  ['lista','importar','indicacao','auditoria','recibos'].forEach(function(a){
     var el = document.getElementById('mltAba' + a.charAt(0).toUpperCase() + a.slice(1));
     if (el) el.style.display = (a === aba) ? 'block' : 'none';
     var bt = document.getElementById('mltTab' + a.charAt(0).toUpperCase() + a.slice(1));
@@ -9213,6 +9233,7 @@ function mltMostrarAba(aba){
   if (aba === 'importar') mltPreencherClientePadrao();
   if (aba === 'indicacao') mltIndRender();
   if (aba === 'auditoria') mltAudRender();
+  if (aba === 'recibos')   mltRecHistRender();
 }
 
 // ── Formulário de Identificação do Condutor ────────────────────
@@ -10259,51 +10280,40 @@ function mltRecRender(){
 }
 
 // ── O DOCUMENTO ───────────────────────────────────────────────
-function mltRecGerar(){
-  var sel = mltRecSelecionadas();
-  if (!sel.length) { toast('Marque ao menos uma multa','#b45309'); return; }
-  var cli = mltRecClientes(), ids = Object.keys(cli);
-  if (ids.length !== 1) { toast('Um recibo é de um cliente só — deixe apenas um locatário marcado','#b45309'); return; }
-
-  var c = (db.clients || []).find(function(x){ return x && x.id === ids[0]; }) || { nome: cli[ids[0]] };
-  var total = sel.reduce(function(s,m){ return s + (mltNum(m.valorPago) || mltNum(m.valor)); }, 0);
-  var dataRec = (document.getElementById('mltRecData') || {}).value || new Date().toISOString().slice(0,10);
-  var forma   = (document.getElementById('mltRecForma') || {}).value || '';
-  var obs     = (document.getElementById('mltRecObs')   || {}).value || '';
-
+// Monta e abre o documento. Separado do mltRecGerar porque a 2ª via usa a
+// cópia CONGELADA do registro, não as multas atuais.
+function _mltRecDoc(d){
   var esc = function(s){
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   };
+  var c = d.cliente || {};
   var endereco = [c.endereco, c.bairro].filter(Boolean).join(', ')
     + ((c.cidade || c.uf) ? ' — ' + [c.cidade, c.uf].filter(Boolean).join('/') : '')
     + (c.cep ? ' · CEP ' + c.cep : '');
+  endereco = endereco.replace(/^[,\s—]+/, '').trim();
 
-  var linhas = sel.slice().sort(function(a,b){
+  var linhas = (d.linhas || []).slice().sort(function(a,b){
     return String(a.dataInfracao||'').localeCompare(String(b.dataInfracao||''));
   }).map(function(m){
-    var v = mltNum(m.valorPago) || mltNum(m.valor);
     return '<tr>'
       + '<td>' + esc(mltFmtPlaca(m.placa)) + '</td>'
       + '<td>' + esc(m.ait || '—') + '</td>'
       + '<td>' + esc(mltBR(m.dataInfracao)) + '</td>'
-      + '<td>' + esc(_mltDescLimpa(m) || 'Infração não descrita no registro') + '</td>'
+      + '<td>' + esc(m.descricao || 'Infração não descrita no registro') + '</td>'
       + '<td>' + esc(m.orgao || '—') + '</td>'
-      + '<td class="r">' + brl(v) + '</td>'
+      + '<td class="r">' + brl(m.valor) + '</td>'
       + '</tr>';
   }).join('');
 
-  // Nº do recibo derivado da data + quantidade: dois recibos do mesmo lote no
-  // mesmo dia saem com o mesmo número, o que é desejável (é o mesmo documento).
-  var numero = 'REC-' + String(dataRec).replace(/-/g,'') + '-' + String(sel.length).padStart(3,'0');
-
   var h = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
-    + '<title>Recibo ' + numero + ' — ' + esc(c.nome) + '</title><style>'
+    + '<title>Recibo ' + d.numero + ' — ' + esc(c.nome) + '</title><style>'
     + 'body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:26px 30px;color:#111827;font-size:12px}'
     + '.cab{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0E1B4D;padding-bottom:10px;margin-bottom:16px}'
     + '.emp{font-size:16px;font-weight:800;color:#0E1B4D}'
     + '.emp small{display:block;font-size:10px;font-weight:400;color:#555;margin-top:2px}'
     + '.num{text-align:right;font-size:11px;color:#555}'
     + '.num strong{display:block;font-size:19px;color:#0E1B4D}'
+    + '.via{display:inline-block;background:#fff4e5;color:#b45309;border:1px solid #f5d98a;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;margin-top:4px}'
     + 'h1{font-size:15px;text-align:center;letter-spacing:2px;margin:14px 0 4px;color:#0E1B4D}'
     + '.valor{text-align:center;font-size:22px;font-weight:800;margin-bottom:14px}'
     + '.corpo{line-height:1.7;text-align:justify;margin-bottom:14px}'
@@ -10322,28 +10332,29 @@ function mltRecGerar(){
     + '<div class="cab">'
       + '<div class="emp">LOKÁ Aluguel de Veículos'
         + '<small>CNPJ 39.911.638/0001-10 · Feira de Santana — BA</small></div>'
-      + '<div class="num">RECIBO Nº<strong>' + numero + '</strong></div>'
+      + '<div class="num">RECIBO Nº<strong>' + d.numero + '</strong>'
+        + (d.segundaVia ? '<div class="via">2ª VIA</div>' : '') + '</div>'
     + '</div>'
     + '<h1>RECIBO DE PAGAMENTO</h1>'
-    + '<div class="valor">' + brl(total) + '</div>'
+    + '<div class="valor">' + brl(d.total) + '</div>'
     + '<div class="corpo">'
       + 'Recebemos de <strong>' + esc(c.nome) + '</strong>'
       + (c.cpf ? ', inscrito(a) no CPF/CNPJ sob o nº <strong>' + esc(c.cpf) + '</strong>' : '')
-      + (endereco.trim().replace(/^,\s*/,'') ? ', estabelecido(a) em ' + esc(endereco.replace(/^,\s*/,'')) : '')
-      + ', a importância de <strong>' + brl(total) + '</strong> '
-      + '(' + esc(_mltExtenso(total)) + '), '
-      + 'referente ao pagamento de <strong>' + sel.length + '</strong> multa(s) de trânsito '
+      + (endereco ? ', estabelecido(a) em ' + esc(endereco) : '')
+      + ', a importância de <strong>' + brl(d.total) + '</strong> '
+      + '(' + esc(_mltExtenso(d.total)) + '), '
+      + 'referente ao pagamento de <strong>' + (d.linhas||[]).length + '</strong> multa(s) de trânsito '
       + 'incidente(s) sobre veículo(s) locado(s), conforme discriminado abaixo'
-      + (forma ? ', quitada(s) por <strong>' + esc(forma) + '</strong>' : '')
+      + (d.forma ? ', quitada(s) por <strong>' + esc(d.forma) + '</strong>' : '')
       + '.'
     + '</div>'
     + '<table><thead><tr>'
       + '<th>Placa</th><th>AIT</th><th>Data da infração</th><th>Infração</th><th>Órgão</th><th class="r">Valor</th>'
     + '</tr></thead><tbody>' + linhas + '</tbody>'
-    + '<tfoot><tr><td colspan="5">TOTAL</td><td class="r">' + brl(total) + '</td></tr></tfoot></table>'
-    + (obs ? '<div class="obs">' + esc(obs) + '</div>' : '')
+    + '<tfoot><tr><td colspan="5">TOTAL</td><td class="r">' + brl(d.total) + '</td></tr></tfoot></table>'
+    + (d.obs ? '<div class="obs">' + esc(d.obs) + '</div>' : '')
     + '<div class="corpo" style="margin-top:12px">Para clareza, firmamos o presente recibo.</div>'
-    + '<div style="text-align:right;font-size:11px">Feira de Santana — BA, ' + mltBR(dataRec) + '.</div>'
+    + '<div style="text-align:right;font-size:11px">Feira de Santana — BA, ' + mltBR(d.data) + '.</div>'
     + '<div class="ass"><div class="linha"></div>'
       + '<div style="font-size:11px;font-weight:700">LOKÁ Aluguel de Veículos</div>'
       + '<div style="font-size:10px;color:#555">CNPJ 39.911.638/0001-10</div></div>'
@@ -10352,10 +10363,238 @@ function mltRecGerar(){
     + '<script>window.onload=function(){window.print();}<\/script></body></html>';
 
   var w = window.open('', '_blank');
-  if (!w) { toast('O navegador bloqueou a janela de impressão','#b45309'); return; }
+  if (!w) { toast('O navegador bloqueou a janela de impressão','#b45309'); return false; }
   w.document.write(h); w.document.close();
-  closeM('mReciboMulta');
+  return true;
 }
+
+// ── REGISTRO DO RECEBIMENTO ───────────────────────────────────
+// O recibo deixou de ser só um papel: cada emissão vira um registro em
+// loka_db/recibos, e cada multa recebe a marca do recibo que a cobriu.
+//
+// 🔴 Os dados das multas são CONGELADOS no registro. Se amanhã a multa for
+// editada (valor corrigido, descrição ajustada), o recibo já entregue ao
+// cliente não pode mudar — documento emitido é documento emitido.
+function mltRecibos(){
+  if (!db) return [];
+  if (!Array.isArray(db.recibos)) {
+    db.recibos = (db.recibos && typeof db.recibos === 'object')
+      ? Object.keys(db.recibos).sort(function(a,b){ return Number(a)-Number(b); })
+          .map(function(k){ return db.recibos[k]; }).filter(function(x){ return x != null; })
+      : [];
+  }
+  return db.recibos;
+}
+
+function _mltQuemEmitiu(){
+  try { return JSON.parse(sessionStorage.getItem('loka_user') || '{}').usuario || ''; }
+  catch(e){ return ''; }
+}
+
+// Registra a emissão e marca as multas. Devolve o registro gravado.
+function mltRecRegistrar(numero, cliente, sel, dados){
+  mltRecibos();
+  var agora = new Date().toISOString();
+  var reg = {
+    id: 'rec_' + Date.now(),
+    numero: numero,
+    clienteId: cliente.id || '',
+    clienteNome: cliente.nome || '',
+    clienteDoc: cliente.cpf || '',
+    // Endereço congelado junto: na 2ª via o cadastro pode já ter mudado, e o
+    // documento tem de sair igual ao que o cliente recebeu.
+    clienteEnd: {
+      endereco: cliente.endereco || '', bairro: cliente.bairro || '',
+      cidade: cliente.cidade || '', uf: cliente.uf || '', cep: cliente.cep || ''
+    },
+    data: dados.data,
+    forma: dados.forma || '',
+    obs: dados.obs || '',
+    valor: Math.round(dados.total * 100) / 100,
+    qtd: sel.length,
+    emitidoEm: agora,
+    emitidoPor: _mltQuemEmitiu(),
+    // Cópia congelada: é o que o cliente recebeu.
+    multas: sel.map(function(m){
+      return {
+        id: m.id, ait: m.ait || '', placa: m.placa || '',
+        dataInfracao: m.dataInfracao || '', descricao: _mltDescLimpa(m),
+        orgao: m.orgao || '', valor: mltNum(m.valorPago) || mltNum(m.valor)
+      };
+    })
+  };
+  db.recibos.push(reg);
+
+  // A marca na multa é o que faz a tela saber que ela já foi recebida.
+  sel.forEach(function(m){
+    m.reciboId = reg.id; m.reciboNum = numero; m.reciboEm = dados.data;
+  });
+
+  saveDB();
+  return reg;
+}
+
+function mltRecExcluir(id){
+  var r = mltRecibos().find(function(x){ return x && x.id === id; });
+  if (!r) return;
+  if (!confirm('Excluir o registro do recibo ' + r.numero + '?\n\n'
+    + r.clienteNome + ' · ' + brl(r.valor) + ' · ' + r.qtd + ' multa(s)\n\n'
+    + 'As multas voltam a aparecer como "sem recibo". O documento que já foi '
+    + 'entregue ao cliente não deixa de existir — isto apaga só o registro.')) return;
+
+  db.recibos = mltRecibos().filter(function(x){ return x && x.id !== id; });
+  // Solta as multas que este recibo tinha marcado
+  mltMultas().forEach(function(m){
+    if (m && m.reciboId === id) { delete m.reciboId; delete m.reciboNum; delete m.reciboEm; }
+  });
+  saveDB();
+  mltRecHistRender();
+  mltRender();
+  toast('🗑 Registro de recibo excluído','#c0392b');
+}
+
+// ── ABA RECIBOS: consulta ─────────────────────────────────────
+function mltRecHistFiltrados(){
+  var q  = semAcento((document.getElementById('mltRecHistBusca')||{}).value || '');
+  var de = (document.getElementById('mltRecHistDe') ||{}).value || '';
+  var ate= (document.getElementById('mltRecHistAte')||{}).value || '';
+  return mltRecibos().filter(function(r){
+    if (!r) return false;
+    if (de || ate){
+      var d = String(r.data || '').slice(0,10);
+      if (!d) return false;
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+    }
+    if (!q) return true;
+    var alvo = [r.numero, r.clienteNome, r.forma, r.obs, r.emitidoPor]
+      .concat((r.multas||[]).map(function(m){ return m.placa + ' ' + m.ait; }));
+    return semAcento(alvo.join(' ')).indexOf(q) >= 0;
+  }).sort(function(a,b){
+    return String(b.emitidoEm||'').localeCompare(String(a.emitidoEm||''));
+  });
+}
+
+function mltRecHistLimpar(){
+  ['mltRecHistBusca','mltRecHistDe','mltRecHistAte'].forEach(function(id){
+    var e = document.getElementById(id); if (e) e.value = '';
+  });
+  mltRecHistRender();
+}
+
+function mltRecHistRender(){
+  var el = document.getElementById('mltRecHistGrid');
+  if (!el) return;
+  var todos = mltRecibos();
+  var lista = mltRecHistFiltrados();
+
+  var st = document.getElementById('mltRecHistStats');
+  if (st) {
+    var soma = lista.reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+    var mult = lista.reduce(function(s,r){ return s + (Number(r.qtd)||0); }, 0);
+    st.innerHTML =
+      '<div class="stat"><div class="stat-value">'+lista.length+'</div><div class="stat-label">Recibos</div></div>'
+    + '<div class="stat"><div class="stat-value">'+mult+'</div><div class="stat-label">Multas cobertas</div></div>'
+    + '<div class="stat"><div class="stat-value" style="color:var(--green)">'+brl(soma)+'</div><div class="stat-label">Valor recebido</div></div>';
+  }
+
+  if (!lista.length) {
+    el.innerHTML = todos.length
+      ? '<div class="empty"><p>Nenhum recibo com esses filtros</p><small>Ajuste a busca ou o período.</small></div>'
+      : '<div class="empty"><p>Nenhum recibo emitido ainda</p><small>Use o botão 🧾 Recibo na aba Multas para emitir o primeiro.</small></div>';
+    return;
+  }
+
+  function th(txt, extra){
+    return '<th style="padding:9px 12px;font-size:9px;font-weight:700;text-transform:uppercase;'+(extra||'')+'">'+txt+'</th>';
+  }
+  el.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px">'
+    + '<thead><tr style="background:var(--dark)">'
+      + th('Recibo') + th('Data', 'text-align:center') + th('Cliente')
+      + th('Multas', 'text-align:center') + th('Valor', 'text-align:right')
+      + th('Forma') + th('Emitido por') + th('Ações', 'text-align:center')
+    + '</tr></thead><tbody>'
+    + lista.map(function(r){
+      return '<tr style="border-bottom:1px solid #f0f2f8">'
+        + '<td style="padding:8px 12px;font-family:monospace;font-weight:700;font-size:11px">'+(r.numero||'—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:center;font-size:11px">'+mltBR(r.data)+'</td>'
+        + '<td style="padding:8px 12px"><strong style="font-size:11px">'+(r.clienteNome||'—')+'</strong>'
+          + (r.clienteDoc ? '<div style="font-size:9px;color:var(--muted)">'+r.clienteDoc+'</div>' : '')+'</td>'
+        + '<td style="padding:8px 12px;text-align:center;font-size:11px">'+(r.qtd||0)+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-weight:700;font-size:11px">'+brl(r.valor)+'</td>'
+        + '<td style="padding:8px 12px;font-size:11px">'+(r.forma||'—')+'</td>'
+        + '<td style="padding:8px 12px;font-size:10px;color:var(--muted)">'+(r.emitidoPor||'—')
+          + '<div style="font-size:9px">'+String(r.emitidoEm||'').slice(0,10).split('-').reverse().join('/')+'</div></td>'
+        + '<td style="padding:8px 12px;text-align:center;white-space:nowrap">'
+          + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:#0d7a3e;border-color:#0d7a3e" '
+            + 'title="Reimprimir este recibo" onclick="mltRecReimprimir(\''+r.id+'\')">🧾 2ª via</button>'
+          + (_multasRestrito() ? ''
+             : '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:var(--red);border-color:var(--red)" '
+               + 'title="Excluir o registro" onclick="mltRecExcluir(\''+r.id+'\')">✕</button>')
+        + '</td></tr>';
+    }).join('')
+    + '</tbody></table></div>'
+    + '<p style="font-size:11px;color:var(--muted);margin:8px 0 0">'+lista.length+' de '+todos.length+' recibo(s)</p>';
+}
+
+// 2ª via: usa a cópia CONGELADA, não relê as multas. É o mesmo documento.
+function mltRecReimprimir(id){
+  var r = mltRecibos().find(function(x){ return x && x.id === id; });
+  if (!r) { toast('Recibo não encontrado','#b45309'); return; }
+  var e = r.clienteEnd || {};
+  _mltRecDoc({
+    numero: r.numero,
+    cliente: { nome: r.clienteNome, cpf: r.clienteDoc, endereco: e.endereco,
+               bairro: e.bairro, cidade: e.cidade, uf: e.uf, cep: e.cep },
+    linhas: r.multas || [], total: Number(r.valor)||0,
+    data: r.data, forma: r.forma, obs: r.obs, segundaVia: true
+  });
+}
+
+function mltRecGerar(){
+  var sel = mltRecSelecionadas();
+  if (!sel.length) { toast('Marque ao menos uma multa','#b45309'); return; }
+  var cli = mltRecClientes(), ids = Object.keys(cli);
+  if (ids.length !== 1) { toast('Um recibo é de um cliente só — deixe apenas um locatário marcado','#b45309'); return; }
+
+  var c = (db.clients || []).find(function(x){ return x && x.id === ids[0]; }) || { id: ids[0], nome: cli[ids[0]] };
+  var total   = sel.reduce(function(s,m){ return s + (mltNum(m.valorPago) || mltNum(m.valor)); }, 0);
+  var dataRec = (document.getElementById('mltRecData') || {}).value || new Date().toISOString().slice(0,10);
+  var forma   = (document.getElementById('mltRecForma') || {}).value || '';
+  var obs     = (document.getElementById('mltRecObs')   || {}).value || '';
+
+  // Multa que já tem recibo: avisa antes de emitir outro por cima.
+  var jaTem = sel.filter(function(m){ return m.reciboNum; });
+  if (jaTem.length && !confirm(
+      jaTem.length + ' das ' + sel.length + ' multa(s) já constam em recibo emitido:\n\n'
+      + jaTem.slice(0,8).map(function(m){ return '  • ' + (m.ait||m.placa) + ' — ' + m.reciboNum; }).join('\n')
+      + (jaTem.length > 8 ? '\n  • ... e mais ' + (jaTem.length-8) : '')
+      + '\n\nEmitir um recibo novo cobrindo essas multas de novo?')) return;
+
+  var numero = 'REC-' + String(dataRec).replace(/-/g,'') + '-' + String(sel.length).padStart(3,'0');
+
+  // 🔴 Registra ANTES de abrir o documento. Se a gravação falhar, não se
+  // entrega ao cliente um recibo que o sistema não conhece.
+  var reg;
+  try {
+    reg = mltRecRegistrar(numero, c, sel, { data: dataRec, forma: forma, obs: obs, total: total });
+  } catch(e) {
+    toast('❌ Não foi possível registrar o recibo: ' + e.message, '#c0392b');
+    return;
+  }
+
+  var ok = _mltRecDoc({
+    numero: numero, cliente: c, linhas: reg.multas, total: total,
+    data: dataRec, forma: forma, obs: obs
+  });
+  if (!ok) return;   // popup bloqueado — o registro já ficou gravado
+
+  closeM('mReciboMulta');
+  mltRender();
+  toast('🧾 Recibo ' + numero + ' emitido e registrado', '#0d7a3e');
+}
+
 
 // ── RENDER PRINCIPAL ───────────────────────────────────────────
 function mltRender(){
@@ -10470,9 +10709,12 @@ function mltRender(){
       + '<td class="td-actions">'
         + (_multasRestrito()
             ? '<span style="color:var(--muted);font-size:10px">—</span>'
-            : (mltRecPagavel(m)
+            : ((m.reciboNum
+                  ? '<span title="Recibo ' + m.reciboNum + ' de ' + mltBR(m.reciboEm) + '" style="font-size:9px;background:#e6f5ec;color:#0d7a3e;font-weight:700;padding:2px 5px;border-radius:4px;margin-right:3px;white-space:nowrap">🧾 ' + m.reciboNum.replace(/^REC-/,'') + '</span>'
+                  : '')
+               + (mltRecPagavel(m)
                 ? '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:#0d7a3e;border-color:#0d7a3e" title="Recibo de pagamento para o locatário" onclick="mltRecAbrir(\''+m.id+'\')">🧾</button>'
-                : '')
+                : ''))
               + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="mltAbrir(\''+m.id+'\')">Editar</button>'
               + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px;color:var(--red)" onclick="mltExcluir(\''+m.id+'\')">✕</button>')
       + '</td></tr>';
