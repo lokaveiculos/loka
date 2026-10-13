@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v107-20261013-0910 -->
+<!-- LOKA deploy: v108-20261013-1030 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1357,7 +1357,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v107-20261013-0910';
+var LOKA_BUILD = 'v108-20261013-1030';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7473,7 +7473,16 @@ function finEdit(aba, idx, campo, valor) {
   finInit();
   var numericos = ['valor','recebido','principal','amortizado','receita','totParcelas','cet','valorParcela','pago'];
   if (numericos.indexOf(campo)>=0) valor = finParse(valor);
+  var _antes = db.financeiro[aba][idx][campo];
   db.financeiro[aba][idx][campo] = valor;
+  if (aba === 'receber' && campo === 'recebido') {
+    var _dif = (Number(valor)||0) - (Number(_antes)||0);
+    if (Math.abs(_dif) >= 0.005) {
+      _finRegistrarBaixa(db.financeiro[aba][idx], _dif,
+        db.financeiro[aba][idx].recebidoEm || new Date().toISOString().split('T')[0],
+        _dif > 0 ? 'ajuste na tabela' : 'estorno na tabela');
+    }
+  }
   saveDB();
   finRender(aba);
   // Mexer no recebido/valor/status na propria tabela tambem e dar baixa.
@@ -7971,7 +7980,13 @@ function finRenderReceber() {
       + '<td style="padding:4px 6px">'+inp('cliente','120px')+'</td>'
       + '<td style="padding:4px 6px">'+tipoSelect(r,i)+'</td>'
       + '<td style="padding:4px 6px">'+inp('valor','95px','text-align:right;font-weight:700')+'</td>'
-      + '<td style="padding:4px 6px">'+inp('recebido','95px','text-align:right;color:#0d7a3e;font-weight:700')+'</td>'
+      + '<td style="padding:4px 6px">'+inp('recebido','95px','text-align:right;color:#0d7a3e;font-weight:700')
+        + (rec>0 || _finBaixas(r).length
+            ? '<div style="margin-top:3px"><button onclick="finVerBaixas('+i+')" title="Ver o hist\u00f3rico de baixas desta conta" '
+              + 'style="background:#eef7ff;color:#0e7490;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-weight:700;font-size:9px;white-space:nowrap">'
+              + '\u{1F4CB} ' + (_finBaixas(r).length ? _finBaixas(r).length + ' baixa(s)' : 'sem detalhe') + '</button></div>'
+            : '')
+        + '</td>'
       + '<td style="padding:4px 6px;text-align:right;font-family:monospace;font-weight:700;color:'+(saldo<=0?'#0d7a3e':'#c0392b')+'">'+brl(saldo)+'</td>'
       + '<td style="padding:4px 6px"><input type="date" value="'+(r.vencimento||'')+'" onchange="finEdit(\'receber\','+i+',\'vencimento\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0E1B4D"></td>'
       + '<td style="padding:4px 6px">'+inp('historico','260px')+'</td>'
@@ -8137,20 +8152,195 @@ function finReceberToggle(idx, receber) {
   var r = db.financeiro.receber[idx];
   if (!r) return;
   if (receber) {
+    // Quitar de uma vez tambem e um recebimento: entra no historico pela
+    // diferenca, para nao contar duas vezes o que ja havia sido baixado.
+    _finRegistrarBaixa(r, (Number(r.valor)||0) - (Number(r.recebido)||0),
+                       new Date().toISOString().split('T')[0], 'quitação');
     r.status = 'recebido';
     r.recebido = Number(r.valor)||0;
     r.recebidoEm = new Date().toISOString().split('T')[0];
   } else {
-    if (!confirm('Reverter para pendente? Isso zera o valor recebido.'
+    if (!confirm('Reverter para pendente? Isso zera o valor recebido'
+      + (_finBaixas(r).length ? ' e apaga o histórico de ' + _finBaixas(r).length + ' baixa(s)' : '') + '.'
       + ((r.faturaId || r.faturaKey) ? '\n\nA fatura ligada a este lançamento também volta para pendente.' : ''))) return;
     r.status = 'pendente';
     r.recebido = 0;
     r.recebidoEm = '';
+    r.recebimentos = [];
   }
   saveDB();
   finRenderReceber();
   toast(receber ? '✅ '+(r.cliente||'')+' quitado' : '↩ Revertido para pendente', receber?'#0d7a3e':'#b45309');
   _sincFaturaDoRecebimento(idx);
+}
+
+// ══════════════════════════════════════════════════════════════
+// HISTÓRICO DE BAIXAS PARCIAIS
+// ══════════════════════════════════════════════════════════════
+// O Contas a Receber guardava só o ACUMULADO (`recebido`) e a data da ÚLTIMA
+// entrada (`recebidoEm`). Recebendo uma fatura em três vezes, as duas
+// primeiras desapareciam: não dava para saber quando nem quanto entrou.
+//
+// Agora cada recebimento vira uma linha em `r.recebimentos[]`.
+//
+// 🔴 O campo se chama `recebimentos`, e não `baixas`, de propósito: `baixas`
+// já existe nos contratos ativos, com outro significado (devolução de veículo).
+function _finBaixas(r){
+  if (!r) return [];
+  // Armadilha 1: array do Firebase pode voltar como objeto {0:…,1:…}.
+  if (!Array.isArray(r.recebimentos)) {
+    r.recebimentos = (r.recebimentos && typeof r.recebimentos === 'object')
+      ? Object.keys(r.recebimentos).sort(function(a,b){ return Number(a)-Number(b); })
+          .map(function(k){ return r.recebimentos[k]; }).filter(function(x){ return x != null; })
+      : [];
+  }
+  return r.recebimentos;
+}
+
+function _finQuem(){
+  try { return JSON.parse(sessionStorage.getItem('loka_user') || '{}').usuario || ''; }
+  catch(e){ return ''; }
+}
+
+function _finRegistrarBaixa(r, valor, data, obs){
+  valor = Math.round((Number(valor) || 0) * 100) / 100;
+  if (!valor) return null;                  // baixa de zero não é recebimento
+  var b = {
+    id: 'bx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    valor: valor,
+    data: data || new Date().toISOString().split('T')[0],
+    por: _finQuem(),
+    quando: new Date().toISOString(),
+    obs: obs || ''
+  };
+  _finBaixas(r).push(b);
+  return b;
+}
+
+function _finSomaBaixas(r){
+  return _finBaixas(r).reduce(function(s,b){ return s + (Number(b.valor)||0); }, 0);
+}
+
+// Quanto do `recebido` entrou ANTES de o histórico existir. Mostrar isso como
+// uma baixa inventada seria afirmar que houve um pagamento só, naquela data —
+// e não se sabe. Então ele aparece separado, dizendo o que é.
+function _finAnteriorAoHistorico(r){
+  var d = (Number(r && r.recebido) || 0) - _finSomaBaixas(r);
+  return Math.abs(d) < 0.005 ? 0 : Math.round(d * 100) / 100;
+}
+
+// ── Janela do histórico ───────────────────────────────────────
+function finVerBaixas(idx){
+  finInit();
+  var r = db.financeiro.receber[idx];
+  if (!r) return;
+  var val = Number(r.valor)||0, rec = Number(r.recebido)||0;
+  var lista = _finBaixas(r).slice().sort(function(a,b){
+    return String(a.data||'').localeCompare(String(b.data||''))
+        || String(a.quando||'').localeCompare(String(b.quando||''));
+  });
+  var antigo = _finAnteriorAoHistorico(r);
+
+  var existing = document.getElementById('mFinBaixas');
+  if (existing) existing.remove();
+  var p = document.createElement('div');
+  p.id = 'mFinBaixas';
+  p.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  var corrido = 0;
+  var linhas = '';
+  if (antigo) {
+    corrido += antigo;
+    linhas += '<tr style="border-bottom:1px solid #f0f2f8;background:#fafbff">'
+      + '<td style="padding:7px 10px;font-size:11px;color:var(--muted)">'
+        + (r.recebidoEm ? mltBR(r.recebidoEm) : '—') + '</td>'
+      + '<td style="padding:7px 10px;text-align:right;font-weight:700;font-size:11px">'+brl(antigo)+'</td>'
+      + '<td style="padding:7px 10px;font-size:10px;color:var(--muted)">registro anterior ao hist&oacute;rico<br>'
+        + '<span style="font-size:9px">sem detalhamento das parcelas</span></td>'
+      + '<td style="padding:7px 10px;text-align:right;font-size:11px;color:var(--muted)">'+brl(corrido)+'</td>'
+      + '<td></td></tr>';
+  }
+  linhas += lista.map(function(b){
+    corrido += Number(b.valor)||0;
+    return '<tr style="border-bottom:1px solid #f0f2f8">'
+      + '<td style="padding:7px 10px;font-size:11px">'+mltBR(b.data)+'</td>'
+      + '<td style="padding:7px 10px;text-align:right;font-weight:700;font-size:11px;color:#0d7a3e">'+brl(b.valor)+'</td>'
+      + '<td style="padding:7px 10px;font-size:10px;color:var(--muted)">'+(b.obs||'')
+        + (b.por ? '<br><span style="font-size:9px">por '+b.por+'</span>' : '')+'</td>'
+      + '<td style="padding:7px 10px;text-align:right;font-size:11px;color:var(--muted)">'+brl(corrido)+'</td>'
+      + '<td style="padding:7px 10px;text-align:center">'
+        + '<button title="Excluir esta baixa" onclick="finExcluirBaixa('+idx+',\''+b.id+'\')" '
+        + 'style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;font-weight:700;font-size:10px">&#10005;</button>'
+      + '</td></tr>';
+  }).join('');
+
+  var vazio = !lista.length && !antigo;
+  p.innerHTML = '<div style="background:#fff;border-radius:12px;width:640px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);max-height:90vh;overflow:auto">'
+    + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">'
+      + '<span>&#128203; Hist&oacute;rico de baixas &mdash; '+(r.cliente||'')+'</span>'
+      + '<span style="font-size:11px;font-weight:600;opacity:.8">'+(r.historico||'')+'</span></div>'
+    + '<div style="padding:16px 18px">'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+      + '<div style="flex:1;min-width:120px;background:#f0f2f9;border-radius:8px;padding:8px 12px">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted)">Valor da conta</div>'
+        + '<div style="font-size:14px;font-weight:800">'+brl(val)+'</div></div>'
+      + '<div style="flex:1;min-width:120px;background:#e8f5ef;border-radius:8px;padding:8px 12px">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#0d7a3e">J&aacute; recebido</div>'
+        + '<div style="font-size:14px;font-weight:800;color:#0d7a3e">'+brl(rec)+'</div></div>'
+      + '<div style="flex:1;min-width:120px;background:'+(val-rec>0.005?'#fef3cd':'#e8f5ef')+';border-radius:8px;padding:8px 12px">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:'+(val-rec>0.005?'#b45309':'#0d7a3e')+'">Em aberto</div>'
+        + '<div style="font-size:14px;font-weight:800;color:'+(val-rec>0.005?'#c0392b':'#0d7a3e')+'">'+brl(val-rec)+'</div></div>'
+    + '</div>'
+    + (vazio
+        ? '<div style="padding:22px;text-align:center;color:var(--muted);font-size:12px">Nenhum recebimento registrado nesta conta.</div>'
+        : '<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">'
+          + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+          + '<thead><tr style="background:var(--dark)">'
+            + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:left">Data</th>'
+            + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Valor</th>'
+            + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:left">Observa&ccedil;&atilde;o</th>'
+            + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Acumulado</th>'
+            + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">&nbsp;</th>'
+          + '</tr></thead><tbody>'+linhas+'</tbody></table></div>')
+    + (antigo ? '<p style="font-size:10px;color:#b45309;margin:8px 0 0">&#9888; '+brl(antigo)
+        + ' entrou antes de o hist&oacute;rico existir &mdash; o sistema sabe o total, '
+        + 'mas n&atilde;o em quantas vezes foi pago.</p>' : '')
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+      + '<button id="fbFechar" style="padding:9px 16px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Fechar</button>'
+    + '</div></div></div>';
+  document.body.appendChild(p);
+  p.querySelector('#fbFechar').onclick = function(){ p.remove(); };
+  p.addEventListener('click', function(e){ if (e.target === p) p.remove(); });
+}
+
+// Excluir uma baixa lançada por engano. O `recebido` é recalculado a partir do
+// histórico — não se apaga a linha deixando o total antigo de pé.
+function finExcluirBaixa(idx, id){
+  finInit();
+  var r = db.financeiro.receber[idx];
+  if (!r) return;
+  var lista = _finBaixas(r);
+  var b = lista.filter(function(x){ return x && x.id === id; })[0];
+  if (!b) return;
+  if (!confirm('Excluir a baixa de ' + brl(b.valor) + ' de ' + mltBR(b.data) + '?\n\n'
+    + 'O valor recebido da conta volta para ' + brl((Number(r.recebido)||0) - (Number(b.valor)||0)) + '.')) return;
+
+  r.recebimentos = lista.filter(function(x){ return x && x.id !== id; });
+  var val = Number(r.valor)||0;
+  r.recebido = Math.round(((Number(r.recebido)||0) - (Number(b.valor)||0)) * 100) / 100;
+  if (r.recebido < 0) r.recebido = 0;
+  if (r.recebido <= 0)      { r.status = 'pendente'; r.recebidoEm = ''; }
+  else if (r.recebido >= val && val > 0) r.status = 'recebido';
+  else r.status = 'parcial';
+  // A data que a tela mostra passa a ser a da última baixa que sobrou.
+  var resto = _finBaixas(r);
+  if (resto.length) r.recebidoEm = resto[resto.length-1].data || r.recebidoEm;
+
+  saveDB();
+  finRenderReceber();
+  finVerBaixas(idx);
+  _sincFaturaDoRecebimento(idx);
+  toast('🗑 Baixa de '+brl(b.valor)+' excluída','#c0392b');
 }
 
 // ── RECEBIMENTO PARCIAL ──────────────────────────────────────
@@ -8191,6 +8381,7 @@ function finReceberParcial(idx) {
     var add = finParse(document.getElementById('rpValor').value);
     var data = document.getElementById('rpData').value;
     if (add<=0) { toast('⚠️ Informe um valor válido','#b45309'); return; }
+    _finRegistrarBaixa(r, add, data);
     r.recebido = jaRec + add;
     r.recebidoEm = data || new Date().toISOString().split('T')[0];
     if (r.recebido >= val) { r.recebido = val; r.status = 'recebido'; }
