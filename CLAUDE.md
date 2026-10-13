@@ -51,8 +51,8 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v94-20260924-1115** |
-| `fatura.html` | v75-20260812-1700 |
+| `gestao.html` | **v107-20261013-0910** |
+| `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v11-20260915-1050** |
 
 ## Modelo de dados — `loka_db`
@@ -2456,3 +2456,145 @@ verificação de que os escapes estão como **texto** no arquivo.
 - **No ar**: emissão → registro → consulta → 2ª via, com `saveDB` neutralizado
   (nada foi gravado em produção)
 - Regressão: **9 suítes, 492 testes**, nenhuma falha
+
+---
+
+## ✅ Baixa recíproca fatura ⇄ Contas a Receber — 13/10/2026 (`095494c`) · gestao v107 · fatura v82
+
+Pedido: "quando recebermos um pagamento pelo contas a receber gentileza baixar
+também na fatura e vice-versa" — e, no meio, "incluir um filtro por data em
+faturas".
+
+### O problema: um pagamento, dois registros independentes
+O dinheiro entra **uma vez**, mas o sistema anotava isso em dois lugares que não
+se falavam:
+
+| Onde | Nó | Quem baixava |
+|---|---|---|
+| Fatura | `faturas/{clienteId}/{id}` | botão **Dar Baixa** do painel Faturas |
+| Lançamento | `loka_db/financeiro/receber` | **💵 Receber** do Contas a Receber |
+
+Nenhum dos dois tocava o outro. Dar baixa num lado deixava o outro em aberto —
+e era assim que a mesma dívida continuava aparecendo como cobrança.
+
+🔴 **Divergência viva encontrada nos dados reais:** a fatura **001 da G7 COMPANY**
+está `pago` e o lançamento está **parcial** (R$ 25.863 de R$ 38.460,09).
+Uma só, mas é exatamente o sintoma. **Não foi corrigida** — é dado de produção e
+não foi pedido; ela se acerta sozinha no próximo toque em qualquer dos lados.
+
+### O vínculo: `faturaId` primeiro, `faturaKey` depois
+Conferido nos dados reais: **21 lançamentos** vêm de fatura, e **todos** acham a
+sua — **5 pelo `faturaId`** e **16 pela `faturaKey`** (cliente+número+período),
+porque nasceram antes do id existir. Zero órfãos.
+
+⚠️ `_fatChave()` tem de reproduzir **exatamente** a fórmula da `fatura.html`
+(inclusive trocar `/` por `-`, por causa de números como `002/JUNHO`), senão o
+vínculo não é achado. Achando pela chave, o sistema **grava o `faturaId`** no
+lançamento — o vínculo deixa de depender de número e período, que são editáveis.
+
+### Direção A — recebeu no Contas a Receber, baixa na fatura
+São **três portas**, e deixar uma de fora manteria o defeito vivo por aquele
+caminho: `finReceberToggle` (quitar/reverter), `finReceberParcial` (modal) e
+`finEdit` quando se edita **recebido / valor / status** direto na tabela.
+
+| Lançamento | Fatura vira |
+|---|---|
+| quitado | `pago` + `pagoEm` |
+| parcial | `parcial` |
+| revertido | `pendente`, e o `pagoEm` é **removido** |
+
+### 🔴 A armadilha que quase passou: o cache do painel Faturas
+`_todasFaturas` só é preenchido quando o painel **Faturas é aberto**
+(`showPanel` → `carregarFaturas`). Quem dá baixa pelo Contas a Receber pode nunca
+ter entrado lá na sessão — com o cache vazio, a busca pela fatura **falharia em
+silêncio** e ninguém notaria. Por isso `_fatComCache()` carrega o nó sob demanda.
+
+### Direção B — baixou a fatura, baixa o lançamento
+O `confirm` do **Dar Baixa** passou a dizer **antes** o que acontece nos dois
+lados: o lançamento e o valor; quando **não há lançamento** ligado (são **10 das
+33 faturas**); quando ele está **renegociado**; e quando os valores **divergem**
+(a fatura pode ser de um valor e o lançamento de outro — juros, multa, acerto).
+
+A baixa usa o valor do **lançamento**, não o total da fatura: é o lançamento que
+diz quanto está em aberto no Contas a Receber.
+
+### O que nunca pode ser sobrescrito
+- **Fatura `renegociada`** e **lançamento `renegociado`**: o saldo migrou para as
+  parcelas do acordo; sobrescrever perderia esse estado. Os dois avisam e param.
+  (São **19 lançamentos renegociados** hoje.)
+- **Lançamento já quitado** não é rebaixado.
+- 🔴 **Falha de gravação não pode ser silenciosa:** a fatura mora **fora** do
+  `loka_db`, então `saveDB()` não a grava — é um `update()` separado, que pode
+  falhar sozinho. Falhando, o aviso é `⚠️ A FATURA NÃO FOI BAIXADA: …`.
+  Silêncio aqui faria o operador acreditar que os dois lados estão quitados.
+
+### `fatura.html` v82 — a guarda que travava a baixa
+O upsert tinha `var jaRecebeu = Number(atual.recebido)>0 …` e **não mexia em
+status/recebido** quando havia qualquer recebimento. A intenção era certa (não
+apagar dinheiro já lançado no gestão), mas o efeito era travar justamente o
+"vice-versa": marcar a fatura como **paga** sobre um parcial não dava baixa.
+
+A regra passou a ser **nunca DIMINUIR o que já entrou**:
+`if (atual.status !== 'renegociado' && Number(linha.recebido||0) >= recAtual)`.
+Fatura pendente continua **não** zerando um parcial; fatura paga agora **completa**.
+
+⚠️ A `fatura.html` **não tinha** a constante `LOKA_BUILD` — só o carimbo da
+linha 4. Entrou agora, com `console.log`, para a regra dos dois carimbos valer
+nela também.
+
+### Filtro por data no painel Faturas
+A tela tem **três datas** (período, emissão, vencimento), então o filtro traz um
+seletor de qual delas, mais De/Até e Limpar. Padrão: **vencimento** — é a data
+que se persegue na cobrança.
+
+⚠️ **Período é mês (`2026-07`), não dia.** A comparação corta os **dois** lados no
+mesmo tamanho (7 ou 10 caracteres); comparando com 10, `'2026-07' < '2026-07-01'`
+e o mês escolhido ficaria de fora do próprio intervalo.
+
+Os cartões de resumo passaram a somar **o filtrado** (antes somavam sempre o
+total, mesmo com a busca ativa — a tela mentia sobre a lista recortada), entrou o
+rodapé "X de Y fatura(s)", e "nenhuma encontrada **com estes filtros**" deixou de
+se confundir com "nenhuma fatura registrada".
+
+Fatura **sem** a data escolhida sai do resultado quando há período, e a tela
+**diz quantas saíram** — mesma regra dos Aluguéis Ativos. (Hoje as 33 têm as três
+datas, então o aviso não aparece; a guarda é para o futuro.)
+
+### Marca de parcial/renegociada sem sumir dos filtros
+`_statusFaturaReal` continua devolvendo só **pago / vencido / pendente** — se eu
+tivesse acrescentado `parcial`, a fatura parcial cairia fora de
+*Vencidas / A Vencer / Pagas* e ficaria **invisível em qualquer filtro**. É a
+armadilha do "lead sem etapa" do CRM. A informação entra como **marca extra** na
+coluna Status, sem mexer no que o filtro enxerga.
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (gestao 661/661, fatura 73/73)
+- **117 testes novos** (`t-sincfat` 101 + `t-fat-baixa` 16) com o código real e
+  os dados reais (103 lançamentos, 33 faturas): o vínculo pelos dois caminhos,
+  os quatro status, as duas direções, renegociado nos dois lados, cache vazio,
+  banco fora do ar, falha de gravação, `confirm` recusado, as três portas, o
+  filtro nas três datas com pontas inclusivas, e o render
+- **10 defeitos injetados de propósito — todos acusados** (voltar a guarda
+  antiga, confiar no cache, falhar calado, pisar na renegociada, comparar
+  período com 10 caracteres, deixar entrar fatura sem data, rebaixar lançamento
+  quitado, desligar a porta do toggle, tirar a guarda inteira, esquecer o
+  renegociado)
+- **No ar, no arquivo publicado**, com as 33 faturas e os 103 lançamentos reais e
+  o `firebase` substituído (**nada foi gravado em produção**): quitar → fatura
+  paga; parcial → fatura parcial; reverter → fatura pendente e `pagoEm` removido;
+  cache vazio → carrega 33 faturas e baixa assim mesmo; Dar Baixa → lançamento
+  quitado com a data da fatura. O par usado foi real (fatura 002 da ISS, R$
+  3.300) e **não tinha `faturaId`** — ganhou o vínculo no caminho.
+- Barra do painel medida a 1024px: os três controles visíveis, sem estouro
+- Regressão: **11 suítes, 609 testes**, nenhuma falha
+
+### ⏳ Não verificado
+Falta exercitar **logado, com um recebimento de verdade** — eu não autentico.
+
+### ⚠️ Achados não corrigidos (não foram pedidos)
+- A **renegociação do `gestao.html`** marca os lançamentos como `renegociado` mas
+  **não** marca a fatura como `renegociada` (a da `fatura.html` marca). A
+  sincronização nova não piora isso: ela ignora renegociado nos dois sentidos.
+- O rodapé do **Contas a Receber** tem 10 células para 11 colunas: o "TOTAL
+  FILTRADO" ocupa a coluna do 🤝 e os três totais saem deslocados uma coluna à
+  esquerda.
