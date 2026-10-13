@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v106-20261008-1802 -->
+<!-- LOKA deploy: v107-20261013-0910 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -468,6 +468,17 @@ tr:hover td{background:#f8f9fe;}
           <button id="fFatVencidas" class="btn btn-outline" onclick="setFiltroFaturas('vencido')"  style="font-size:11px;padding:7px 12px">❌ Vencidas</button>
           <button id="fFatAvencer"  class="btn btn-outline" onclick="setFiltroFaturas('pendente')" style="font-size:11px;padding:7px 12px">⏳ A Vencer</button>
           <button id="fFatPagas"    class="btn btn-outline" onclick="setFiltroFaturas('pago')"      style="font-size:11px;padding:7px 12px">✅ Pagas</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+          <select class="filter-sel" id="fFatCampo" onchange="renderFaturas()" style="font-size:10px;padding:5px">
+            <option value="vencimento">&#128197; Vencimento</option>
+            <option value="emissao">&#128196; Emiss&atilde;o</option>
+            <option value="periodo">&#128198; Per&iacute;odo</option>
+          </select>
+          <input class="filter-input" id="fFatDe" type="date" onchange="renderFaturas()" style="width:135px;padding:5px" title="Data inicial">
+          <span style="font-size:10px;color:var(--muted)">at&eacute;</span>
+          <input class="filter-input" id="fFatAte" type="date" onchange="renderFaturas()" style="width:135px;padding:5px" title="Data final">
+          <button onclick="limparFiltroDataFaturas()" title="Limpar o per&iacute;odo" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">&#10005;</button>
         </div>
         <button class="btn btn-blue" onclick="window.open('fatura.html?v='+Date.now(),'_blank')" style="white-space:nowrap">+ Nova Fatura</button>
       </div>
@@ -1346,7 +1357,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v106-20261008-1802';
+var LOKA_BUILD = 'v107-20261013-0910';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -5367,38 +5378,85 @@ function _statusFaturaReal(fat) {
   return 'pendente';
 }
 
-function renderFaturas() {
-  var grid = document.getElementById('faturasGrid');
-  if (!grid) return;
-  var q = semAcento((document.getElementById('qFaturas') && document.getElementById('qFaturas').value||''));
+function limparFiltroDataFaturas(){
+  ['fFatDe','fFatAte'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  renderFaturas();
+}
 
-  var list = _todasFaturas.filter(function(f) {
+// Período é mês (`2026-07`); emissão e vencimento são dia (`2026-07-15`).
+// Comparar texto ISO funciona nos dois casos, desde que os DOIS lados sejam
+// cortados no mesmo tamanho — senão '2026-07' < '2026-07-01' e o mês escolhido
+// ficaria de fora do próprio intervalo.
+function _fatNaData(f, campo, de, ate){
+  var n = (campo === 'periodo') ? 7 : 10;
+  var v = String((f && f[campo]) || '').slice(0, n);
+  if (!v) return false;
+  if (de  && v < de.slice(0, n))  return false;
+  if (ate && v > ate.slice(0, n)) return false;
+  return true;
+}
+
+var _FAT_CAMPO_LBL = { vencimento:'vencimento', emissao:'emissão', periodo:'período' };
+
+function _fatFiltradas(){
+  var todas = _todasFaturas || [];
+  var q     = semAcento((document.getElementById('qFaturas') && document.getElementById('qFaturas').value||''));
+  var campo = (document.getElementById('fFatCampo')||{}).value || 'vencimento';
+  var de    = (document.getElementById('fFatDe') ||{}).value || '';
+  var ate   = (document.getElementById('fFatAte')||{}).value || '';
+  var temData = !!(de || ate);
+  var semData = 0;
+
+  var lista = todas.filter(function(f) {
     if (!f) return false;
     var st = _statusFaturaReal(f);
     if (_filtroFaturas && st !== _filtroFaturas) return false;
     if (q && (semAcento(((f.cliente||'')+' '+(f.numero||''))).indexOf(q)<0)) return false;
+    if (temData) {
+      // Sem a data escolhida não dá para afirmar que a fatura cai no intervalo
+      // pedido. Ela sai do resultado, mas a tela DIZ quantas saíram.
+      if (!String(f[campo]||'')) { semData++; return false; }
+      if (!_fatNaData(f, campo, de, ate)) return false;
+    }
     return true;
   });
+
+  return {
+    lista: lista, total: todas.length, campo: campo, semData: semData,
+    filtrando: !!(_filtroFaturas || q || temData)
+  };
+}
+
+function renderFaturas() {
+  var grid = document.getElementById('faturasGrid');
+  if (!grid) return;
+  var filtro = _fatFiltradas();
+  var list = filtro.lista;
 
   // Stats
   var stats = document.getElementById('faturasStats');
   if (stats) {
-    var nVenc = _todasFaturas.filter(function(f){ return f && _statusFaturaReal(f)==='vencido'; }).length;
-    var nPend = _todasFaturas.filter(function(f){ return f && _statusFaturaReal(f)==='pendente'; }).length;
-    var nPago = _todasFaturas.filter(function(f){ return f && _statusFaturaReal(f)==='pago'; }).length;
+    // Os cartões somam o que está FILTRADO: mostrar o total geral embaixo de
+    // uma lista recortada faria a tela mentir.
+    function dos(st){ return list.filter(function(f){ return _statusFaturaReal(f)===st; }); }
     function somaT(arr){ return arr.reduce(function(s,f){ return s + (parseBRLFat(f.total)||0); },0); }
-    var totVenc = somaT(_todasFaturas.filter(function(f){return f&&_statusFaturaReal(f)==='vencido';}));
-    var totPend = somaT(_todasFaturas.filter(function(f){return f&&_statusFaturaReal(f)==='pendente';}));
-    var totPago = somaT(_todasFaturas.filter(function(f){return f&&_statusFaturaReal(f)==='pago';}));
+    var lVenc = dos('vencido'), lPend = dos('pendente'), lPago = dos('pago');
     stats.innerHTML =
-      '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value">'+nVenc+'</div><div class="stat-label">Vencidas · R$ '+totVenc.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div></div>'+
-      '<div class="stat" style="border-left-color:#f59e0b"><div class="stat-value">'+nPend+'</div><div class="stat-label">A Vencer · R$ '+totPend.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div></div>'+
-      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value">'+nPago+'</div><div class="stat-label">Pagas · R$ '+totPago.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div></div>'+
-      '<div class="stat"><div class="stat-value">'+_todasFaturas.length+'</div><div class="stat-label">Total de faturas</div></div>';
+      '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value">'+lVenc.length+'</div><div class="stat-label">Vencidas · R$ '+somaT(lVenc).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div></div>'+
+      '<div class="stat" style="border-left-color:#f59e0b"><div class="stat-value">'+lPend.length+'</div><div class="stat-label">A Vencer · R$ '+somaT(lPend).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div></div>'+
+      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value">'+lPago.length+'</div><div class="stat-label">Pagas · R$ '+somaT(lPago).toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div></div>'+
+      '<div class="stat"><div class="stat-value">'+list.length+'</div><div class="stat-label">'+(filtro.filtrando ? 'Filtradas (de '+filtro.total+')' : 'Total de faturas')+'</div></div>';
   }
 
+  var aviso = filtro.semData
+    ? '<p style="font-size:11px;color:#b45309;margin:8px 0 0;font-weight:600">⚠ '+filtro.semData+' fatura(s) sem data de '+(_FAT_CAMPO_LBL[filtro.campo]||filtro.campo)+' ficaram de fora do filtro</p>'
+    : '';
+
   if (!list.length) {
-    grid.innerHTML = '<div class="empty"><p>Nenhuma fatura encontrada</p><small>Clique em "+ Nova Fatura" para criar.</small></div>';
+    // "Nenhuma registrada" e "nenhuma com estes filtros" são coisas diferentes.
+    grid.innerHTML = filtro.total
+      ? '<div class="empty"><p>Nenhuma fatura encontrada com estes filtros</p><small>Ajuste a busca, o status ou o período.</small></div>' + aviso
+      : '<div class="empty"><p>Nenhuma fatura encontrada</p><small>Clique em "+ Nova Fatura" para criar.</small></div>';
     return;
   }
 
@@ -5421,13 +5479,20 @@ function renderFaturas() {
     + '</tr></thead><tbody>'
     + list.sort(function(a,b){ return new Date(b.emissao||0)-new Date(a.emissao||0); }).map(function(f) {
       var st = _statusFaturaReal(f);
+      // O status gravado pode ser mais específico do que os três que os filtros
+      // conhecem. Mostramos a marca extra sem mexer no status do filtro —
+      // senão a fatura cairia fora de Vencidas/A Vencer/Pagas e ficaria
+      // invisível em qualquer filtro.
+      var extra = f.status === 'parcial'     ? '<div style="font-size:9px;color:#1e40af;font-weight:700;margin-top:3px">◑ pago parcialmente</div>'
+                : f.status === 'renegociada' ? '<div style="font-size:9px;color:#9d174d;font-weight:700;margin-top:3px">🤝 renegociada</div>'
+                : '';
       return '<tr style="border-bottom:1px solid #f0f2f8">'
         + '<td style="padding:9px 12px"><strong>'+(f.numero||'—')+'</strong><br><span style="font-size:10px;color:var(--muted)">'+(f.cliente||'')+'</span></td>'
         + '<td style="padding:9px 12px;font-size:11px">'+(f.periodo||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmtD(f.emissao)+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmtD(f.vencimento)+'</td>'
         + '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace">'+(f.total||'—')+'</td>'
-        + '<td style="padding:9px 12px"><span style="background:'+stBg[st]+';color:'+stCor[st]+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+stLbl[st]+'</span></td>'
+        + '<td style="padding:9px 12px"><span style="background:'+stBg[st]+';color:'+stCor[st]+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+stLbl[st]+'</span>'+extra+'</td>'
         + '<td style="padding:9px 12px;text-align:center"><div style="display:flex;gap:4px;justify-content:center">'
           + '<button class="fatura-view-btn" data-fatid="'+(f.id||'')+'" data-cliid="'+(f.clienteId||'')+'" title="Consultar / imprimir fatura" style="padding:5px 9px;background:#eef7ff;color:#0e7490;border:1.5px solid #0e7490;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">👁 Consultar</button>'
           + '<button class="fatura-edit-btn" data-fatid="'+(f.id||'')+'" data-cliid="'+(f.clienteId||'')+'" title="Editar fatura" style="padding:5px 9px;background:#EEF1FD;color:#2B4BF2;border:1.5px solid #2B4BF2;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">✏️ Editar</button>'
@@ -5436,7 +5501,9 @@ function renderFaturas() {
         + '</div></td>'
       + '</tr>';
     }).join('')
-    + '</tbody></table></div>';
+    + '</tbody></table></div>'
+    + '<p style="font-size:11px;color:var(--muted);margin:8px 0 0">'+list.length+' de '+filtro.total+' fatura(s)</p>'
+    + aviso;
 
   // Event delegation: dar baixa e excluir
   grid.querySelector('table').addEventListener('click', function(e) {
@@ -5451,29 +5518,211 @@ function renderFaturas() {
   });
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// SINCRONIZAÇÃO FATURA ⇄ CONTAS A RECEBER
+// ══════════════════════════════════════════════════════════════
+// Um pagamento acontece UMA vez, mas o sistema o anotava em dois lugares
+// independentes: a fatura (nó `faturas`) e o lançamento do Contas a Receber
+// (`loka_db/financeiro/receber`). Dar baixa num lado deixava o outro em
+// aberto — e era assim que a mesma dívida continuava sendo cobrada.
+//
+// 🔴 Quem liga os dois é o `faturaId`, que não muda ao editar a fatura. Os
+// lançamentos antigos nasceram antes dele e só têm a `faturaKey`
+// (cliente+número+período), então ela é o segundo caminho. A chave tem de ser
+// montada EXATAMENTE como a fatura.html monta, senão o vínculo não é achado.
+function _fatChave(f){
+  if (!f) return '';
+  var s = function(x){ return String(x||'').replace(/[.#$\[\]\/]/g,'-'); };
+  return s(f.clienteId||'sc')+'_'+s(f.numero)+'_'+s(f.periodo||'sp');
+}
+
+// Status que a fatura deveria ter, olhando só o lançamento.
+function _fatStatusDoLanc(r){
+  if (!r) return 'pendente';
+  if (r.status === 'renegociado') return 'renegociada';
+  var val = Number(r.valor)||0, rec = Number(r.recebido)||0;
+  if (r.status === 'recebido') return 'pago';
+  if (val > 0 && rec >= val) return 'pago';
+  if (rec > 0) return 'parcial';
+  return 'pendente';
+}
+
+function _fatDoLanc(r, lista){
+  if (!r || (!r.faturaId && !r.faturaKey)) return null;
+  lista = lista || _todasFaturas || [];
+  var f = null;
+  if (r.faturaId) {
+    f = lista.filter(function(x){ return x && x.id === r.faturaId; })[0] || null;
+  }
+  if (!f && r.faturaKey) {
+    f = lista.filter(function(x){ return x && _fatChave(x) === r.faturaKey; })[0] || null;
+  }
+  return f;
+}
+
+// Índice do lançamento que corresponde a uma fatura (-1 se não houver).
+function _lancDaFat(fat){
+  if (!fat) return -1;
+  finInit();
+  var arr = db.financeiro.receber || [];
+  var i;
+  if (fat.id) {
+    for (i=0;i<arr.length;i++) if (arr[i] && arr[i].faturaId === fat.id) return i;
+  }
+  var chave = _fatChave(fat);
+  for (i=0;i<arr.length;i++) if (arr[i] && arr[i].faturaKey === chave) return i;
+  return -1;
+}
+
+// 🔴 O painel Faturas carrega o nó `faturas` só quando é ABERTO. Quem dá baixa
+// pelo Contas a Receber pode nunca ter entrado lá nesta sessão — com o cache
+// vazio, a busca pela fatura falharia em silêncio e a baixa recíproca não
+// aconteceria sem ninguém perceber. Por isso carregamos sob demanda.
+function _fatComCache(cb){
+  if (_todasFaturas && _todasFaturas.length) { cb(_todasFaturas); return; }
+  if (typeof firebase==='undefined' || !firebase.apps || !firebase.apps.length) { cb(_todasFaturas||[]); return; }
+  firebase.database().ref('faturas').once('value').then(function(snap){
+    var data = snap.val() || {};
+    _todasFaturas = [];
+    Object.keys(data).forEach(function(cli){
+      var m = data[cli]; if (!m) return;
+      Object.keys(m).forEach(function(fid){
+        var f = m[fid]; if (f && typeof f==='object') _todasFaturas.push(f);
+      });
+    });
+    cb(_todasFaturas);
+  }).catch(function(e){ console.error('_fatComCache:', e); cb(null); });
+}
+
+// Grava a alteração no nó `faturas` e atualiza o que está na tela.
+// `null` num campo o REMOVE (é como o Realtime Database apaga uma chave).
+function _fatAplicar(fat, up, cb){
+  Object.keys(up).forEach(function(k){
+    if (up[k] === null) delete fat[k]; else fat[k] = up[k];
+  });
+  var painel = document.getElementById('panel-faturas');
+  if (painel && painel.style.display !== 'none' && typeof renderFaturas === 'function') renderFaturas();
+
+  if (typeof firebase==='undefined' || !firebase.apps || !firebase.apps.length) { cb(true,''); return; }
+  var path = 'faturas/' + (fat.clienteId||'sem_cliente') + '/' + fat.id;
+  firebase.database().ref(path).update(up)
+    .then(function(){ cb(true,''); })
+    .catch(function(e){ cb(false, (e && e.message) || 'erro ao gravar'); });
+}
+
+// Lançamento antigo não tem `faturaId`. Achando a fatura pela chave, gravamos o
+// id — assim o vínculo deixa de depender de número e período, que são editáveis.
+function _fatGravarVinculo(r, fat){
+  if (!r || !fat || !fat.id || r.faturaId === fat.id) return;
+  r.faturaId = fat.id;
+  saveDB();
+}
+
+// ── DIREÇÃO A: recebimento no Contas a Receber → baixa na fatura ──
+function _sincFaturaDoRecebimento(idx){
+  finInit();
+  var r = db.financeiro.receber[idx];
+  if (!r || (!r.faturaId && !r.faturaKey)) return;   // conta que não veio de fatura
+  var alvo = _fatStatusDoLanc(r);
+  if (alvo === 'renegociada') return;   // renegociar não é receber — não propaga
+
+  _fatComCache(function(lista){
+    if (lista === null) {
+      toast('⚠️ Recebimento salvo, mas NÃO deu para abrir as faturas — a fatura continua em aberto','#c0392b');
+      return;
+    }
+    var fat = _fatDoLanc(r, lista);
+    if (!fat) {
+      toast('ℹ️ Recebimento salvo. Não achei a fatura deste lançamento — baixe pelo painel Faturas.','#b45309');
+      return;
+    }
+    // 🔴 Fatura renegociada não se mexe: o saldo dela migrou para as parcelas
+    // do acordo, e sobrescrever perderia esse estado.
+    if (fat.status === 'renegociada') {
+      toast('ℹ️ A fatura '+(fat.numero||'')+' está renegociada — baixa não aplicada nela.','#b45309');
+      return;
+    }
+    if (fat.status === alvo) { _fatGravarVinculo(r, fat); return; }   // já está assim
+
+    var up = { status: alvo };
+    up.pagoEm = (alvo === 'pago') ? new Date().toISOString() : null;
+
+    _fatAplicar(fat, up, function(ok, msg){
+      if (!ok) { toast('⚠️ A FATURA NÃO FOI BAIXADA: '+msg,'#c0392b'); return; }
+      _fatGravarVinculo(r, fat);
+      toast(alvo==='pago'    ? '✅ Fatura '+(fat.numero||'')+' também marcada como paga'
+          : alvo==='parcial' ? '◑ Fatura '+(fat.numero||'')+' marcada como paga parcialmente'
+          :                    '↩ Fatura '+(fat.numero||'')+' voltou para pendente',
+          alvo==='pendente' ? '#b45309' : '#0d7a3e');
+    });
+  });
+}
+
+// ── DIREÇÃO B: baixa na fatura → recebimento no Contas a Receber ──
+function _sincRecebimentoDaFatura(fat, idx){
+  finInit();
+  if (idx === null || idx === undefined) idx = _lancDaFat(fat);
+  if (idx < 0) return;                      // avisado no confirm da baixa
+  var r = db.financeiro.receber[idx];
+  if (!r) return;
+  if (r.status === 'renegociado') return;   // avisado no confirm da baixa
+  var val = Number(r.valor)||0;
+  if (r.status === 'recebido' || (val > 0 && (Number(r.recebido)||0) >= val)) return;  // já quitado
+
+  r.recebido = val;
+  r.status = 'recebido';
+  r.recebidoEm = String(fat.pagoEm||'').slice(0,10) || new Date().toISOString().split('T')[0];
+  if (fat.id && r.faturaId !== fat.id) r.faturaId = fat.id;
+  saveDB();
+
+  var aba = document.getElementById('finAbaReceber');
+  if (aba && aba.style.display !== 'none' && typeof finRenderReceber === 'function') finRenderReceber();
+  toast('💵 Contas a Receber: '+(r.cliente||'')+' baixado em '+brl(val),'#0d7a3e');
+}
+
 // ── DAR BAIXA NA FATURA (marcar como paga) ──────────────────
 function darBaixaFatura(fatId, cliId) {
-  var fat = _todasFaturas.find(function(f){ return f && f.id===fatId; });
+  var fat = (_todasFaturas||[]).filter(function(f){ return f && f.id===fatId; })[0];
   if (!fat) return;
-  if (!confirm('Dar baixa na fatura '+(fat.numero||'')+' de '+(fat.cliente||'')+'?\n\nEla será marcada como PAGA.')) return;
 
-  fat.status = 'pago';
-  fat.pagoEm = new Date().toISOString();
-
-  // Atualizar no Firebase
-  if (typeof firebase!=='undefined' && firebase.apps && firebase.apps.length) {
-    var path = 'faturas/' + (cliId||fat.clienteId||'sem_cliente') + '/' + fatId;
-    firebase.database().ref(path).update({ status:'pago', pagoEm:fat.pagoEm }).then(function() {
-      renderFaturas();
-      toast('✅ Fatura '+(fat.numero||'')+' marcada como paga','#0d7a3e');
-    }).catch(function(e) {
-      toast('❌ Erro: '+e.message,'#c0392b');
-    });
+  // O aviso diz o que vai acontecer nos DOIS lados antes de confirmar.
+  finInit();
+  var idx = _lancDaFat(fat);
+  var l   = idx >= 0 ? db.financeiro.receber[idx] : null;
+  var extra;
+  if (!l) {
+    extra = '\n\n⚠️ Não há lançamento no Contas a Receber ligado a esta fatura — só a fatura será baixada.';
+  } else if (l.status === 'renegociado') {
+    extra = '\n\n⚠️ O lançamento desta fatura está RENEGOCIADO: o saldo migrou para as parcelas do acordo. Elas NÃO serão baixadas.';
   } else {
-    renderFaturas();
-    toast('✅ Fatura marcada como paga','#0d7a3e');
+    var val  = Number(l.valor)||0;
+    var jaOk = l.status === 'recebido' || (val > 0 && (Number(l.recebido)||0) >= val);
+    if (jaOk) {
+      extra = '\n\nO Contas a Receber desta fatura já está quitado.';
+    } else {
+      extra = '\n\nO Contas a Receber também será baixado: ' + (l.cliente||'') + ' · ' + brl(val);
+      // O lançamento pode valer diferente do total da fatura (juros, multa,
+      // acerto). Mostrar os dois evita a surpresa de ver outro número.
+      var tFat = parseBRLFat(fat.total);
+      if (tFat && Math.abs(tFat - val) >= 0.01) {
+        extra += '\n⚠️ Atenção: a fatura é de ' + brl(tFat) + ' e o lançamento é de ' + brl(val) + '.';
+      }
+      if ((Number(l.recebido)||0) > 0) {
+        extra += '\n(já havia ' + brl(Number(l.recebido)||0) + ' recebido — será completado)';
+      }
+    }
   }
+
+  if (!confirm('Dar baixa na fatura '+(fat.numero||'')+' de '+(fat.cliente||'')+'?\n\nEla será marcada como PAGA.'+extra)) return;
+
+  _fatAplicar(fat, { status:'pago', pagoEm: new Date().toISOString() }, function(ok, msg){
+    if (!ok) { toast('❌ Erro: '+msg,'#c0392b'); return; }
+    toast('✅ Fatura '+(fat.numero||'')+' marcada como paga','#0d7a3e');
+    _sincRecebimentoDaFatura(fat, idx);
+  });
 }
+
 
 // ── EXCLUIR FATURA ──────────────────────────────────────────
 // ── EDITAR FATURA ───────────────────────────────────────────
@@ -7227,6 +7476,8 @@ function finEdit(aba, idx, campo, valor) {
   db.financeiro[aba][idx][campo] = valor;
   saveDB();
   finRender(aba);
+  // Mexer no recebido/valor/status na propria tabela tambem e dar baixa.
+  if (aba === 'receber' && ['recebido','valor','status'].indexOf(campo) >= 0) _sincFaturaDoRecebimento(idx);
 }
 
 
@@ -7890,7 +8141,8 @@ function finReceberToggle(idx, receber) {
     r.recebido = Number(r.valor)||0;
     r.recebidoEm = new Date().toISOString().split('T')[0];
   } else {
-    if (!confirm('Reverter para pendente? Isso zera o valor recebido.')) return;
+    if (!confirm('Reverter para pendente? Isso zera o valor recebido.'
+      + ((r.faturaId || r.faturaKey) ? '\n\nA fatura ligada a este lançamento também volta para pendente.' : ''))) return;
     r.status = 'pendente';
     r.recebido = 0;
     r.recebidoEm = '';
@@ -7898,6 +8150,7 @@ function finReceberToggle(idx, receber) {
   saveDB();
   finRenderReceber();
   toast(receber ? '✅ '+(r.cliente||'')+' quitado' : '↩ Revertido para pendente', receber?'#0d7a3e':'#b45309');
+  _sincFaturaDoRecebimento(idx);
 }
 
 // ── RECEBIMENTO PARCIAL ──────────────────────────────────────
@@ -7946,6 +8199,7 @@ function finReceberParcial(idx) {
     fechar();
     finRenderReceber();
     toast(r.status==='recebido' ? '✅ '+(r.cliente||'')+' quitado!' : '◑ Recebimento parcial registrado','#0d7a3e');
+    _sincFaturaDoRecebimento(idx);
   };
 }
 

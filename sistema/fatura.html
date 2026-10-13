@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v81-20261002-1426 -->
+<!-- LOKA deploy: v82-20261013-0910 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -770,6 +770,9 @@ function carregarDados() {
     verificarModoEdicao();
   });
 }
+
+var LOKA_BUILD = 'v82-20261013-0910';
+try { console.log('%cLOKÁ Fatura — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // ── MODO EDIÇÃO: carregar fatura existente ──────────────────
 var _editandoFaturaId = null;
@@ -1733,14 +1736,19 @@ function _sincronizarReceber(silent) {
       }
       if (idx<0) { arr.push(linha); return {arr:arr, novo:true}; }
       var atual = arr[idx];
-      var jaRecebeu = Number(atual.recebido)>0 || atual.status==='renegociado';
       arr[idx] = Object.assign({}, atual, {
         cliente: linha.cliente, tipo:'Fatura', valor: linha.valor,
         vencimento: linha.vencimento, historico: linha.historico,
         faturaKey: faturaKey, faturaId: faturaId, origem:'fatura'
       });
-      // Só mexe em status/recebido se o gestão ainda NÃO registrou recebimento
-      if (!jaRecebeu) { arr[idx].status=linha.status; arr[idx].recebido=linha.recebido; arr[idx].recebidoEm=linha.recebidoEm; }
+      // 🔴 O gestão pode ter registrado recebimento que a fatura não conhece:
+      // sobrescrever com o status da fatura apagaria dinheiro já recebido. Mas
+      // marcar a fatura como PAGA tem de dar baixa no Contas a Receber mesmo
+      // havendo um parcial. A regra, então, é nunca DIMINUIR o que já entrou.
+      var recAtual = Number(atual.recebido)||0;
+      if (atual.status !== 'renegociado' && Number(linha.recebido||0) >= recAtual) {
+        arr[idx].status=linha.status; arr[idx].recebido=linha.recebido; arr[idx].recebidoEm=linha.recebidoEm;
+      }
       return {arr:arr, novo:false};
     }
 
