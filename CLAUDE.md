@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v107-20261013-0910** |
+| `gestao.html` | **v108-20261013-1030** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v11-20260915-1050** |
 
@@ -2598,3 +2598,134 @@ Falta exercitar **logado, com um recebimento de verdade** — eu não autentico.
 - O rodapé do **Contas a Receber** tem 10 células para 11 colunas: o "TOTAL
   FILTRADO" ocupa a coluna do 🤝 e os três totais saem deslocados uma coluna à
   esquerda.
+
+---
+
+## 🔴 "Criar os lançamentos faltantes" — 9 das 10 JÁ EXISTIAM (13/10/2026)
+
+Pedido: criar os lançamentos das 10 faturas que apareciam sem conta no Contas a
+Receber. **Criar os 10 teria duplicado R$ 321.878,75.**
+
+### A medição estava certa, a conclusão não
+Aquelas 10 foram medidas **pela chave da fatura** (`faturaId`/`faturaKey`). Mas
+lançamento **digitado à mão não tem chave nenhuma** — e é exatamente a mesma
+dívida. Cruzando por **valor + vencimento**, 9 das 10 já estavam lá:
+
+| Fatura | Valor | Lançamento que já existia |
+|---|---|---|
+| 001 BRJ | 20.100,00 | recebido |
+| **001 G7** | **46.150,00** | **parcial (R$ 30.000 recebidos)** |
+| 1ª Quinzena ISS | 4.889,75 | recebido |
+| 002/JUNHO ISS | 3.300,00 | recebido |
+| 001 ISS 2026-07 | 3.000,00 | pendente |
+| 001 NOVO COMEÇO | 3.700,00 | recebido |
+| 1ª Quinzena RSC | 76.580,52 | recebido |
+| **002/JUNHO RSC** | **83.948,48** | **renegociado** |
+| **001 RSC 2026-07** | **80.210,00** | **renegociado** |
+
+🔴 **Os dois da RSC estão dentro do acordo de 6 parcelas** (`ren_1786564266313`,
+R$ 325.134,77 em 19 contas). Criar lançamento novo para eles cobraria **duas
+vezes** o que já está sendo pago parcelado.
+
+### ⚠️ O erro que quase passou: nome de cliente com 2 letras
+O cruzamento casa o cliente por prefixo, porque no lançamento o nome costuma ser
+apelido (**"RSC"**, **"G7"**, **"ISS"**, **"BRJ"**) e na fatura é a razão social
+inteira. Minha primeira versão exigia **3 caracteres** — e com isso **"G7" não
+casava**, escondendo o lançamento `G7 | 46.150 | parcial`. Eu teria criado uma
+dívida duplicada de R$ 46.150 sem perceber. A trava passou para **2**.
+
+### A única que falta mesmo, e a dúvida que ela trouxe
+Sobra a **ISS 02/maio, período 2026-06, R$ 3.200, já paga**. Mas existe o
+lançamento **"Fatura 2ª quinzena maio" · R$ 3.300 · mesmo vencimento (11/06) ·
+recebido** — R$ 100 de diferença. É provavelmente a mesma coisa.
+
+Por isso o script **não cria sozinho** nesse caso: ele separa três situações.
+
+| Situação | Critério | O que faz |
+|---|---|---|
+| **LIGA** | mesmo valor **e** mesmo vencimento | grava `faturaId`+`faturaKey` no lançamento que já existe. Não cria dívida |
+| **DÚVIDA** | mesmo vencimento, valor **até 10% diferente** | mostra os dois números e **pergunta** |
+| **CRIA** | nenhum sinal | cria o lançamento |
+
+⚠️ O limite de 10% é necessário: sem ele, uma avaria de R$ 1.400 no mesmo
+vencimento viraria "suspeita" de uma fatura de R$ 46.150, e o script pararia de
+perguntar o que importa.
+
+Dívida em aberto tem **confirmação própria**, separada — é a única coisa que
+aumenta o saldo a receber.
+
+**Script:** `backups-loka\LIGAR-FATURAS-AO-RECEBER.txt` (uma linha, console da
+tela de Gestão, logado, após `allow pasting`). O legível fica ao lado.
+Simulado contra o banco real: **9 ligados, 0 criados sem perguntar, saldo a
+receber inalterado, idempotente**. 26 testes.
+
+### Correção de dado incluída
+O lançamento da ISS de R$ 3.000 tem `vencimento: "0025-07-25"` — ano digitado
+errado. Ao ligar, ele passa a ser `2026-07-25`, o da fatura. Com o ano 0025 ele
+nunca apareceria num filtro por data.
+
+### Backups
+`backups-loka/loka_db-ANTES-lancamentos-faltantes-20261013-091136.json` e
+`faturas-ANTES-...json`.
+
+---
+
+## ✅ Histórico de baixas parciais — 13/10/2026 (`6413171`) · gestao v108
+
+Pedido: "muitas vezes recebemos parcialmente as faturas e damos baixa parcial.
+preciso que o sistema nos mostre o histórico de baixas parciais".
+
+### O que se perdia
+O Contas a Receber guardava só o **acumulado** (`recebido`) e a data da **última**
+entrada (`recebidoEm`). Recebendo uma fatura em três vezes, as duas primeiras
+sumiam: não dava para saber quando nem quanto entrou.
+
+Agora cada recebimento vira uma linha em **`r.recebimentos[]`** — valor, data,
+quem lançou e quando.
+
+⚠️ **O campo se chama `recebimentos`, não `baixas`, de propósito:** `baixas` já
+existe nos **contratos ativos**, com outro significado (devolução de veículo).
+Há também `db.baixasHistorico` (histórico global de devoluções) e uma aba
+`'baixas'` do Financeiro que **não existe no HTML** — código morto.
+
+### A janela
+Botão 📋 na coluna Recebido abre o histórico: data, valor, observação, quem
+lançou, **acumulado correndo**, e os três cartões (valor da conta · já recebido ·
+em aberto). Dá para **excluir** uma baixa lançada por engano.
+
+| Caminho | O que registra |
+|---|---|
+| 💵 Receber (parcial ou total) | uma baixa com a data informada |
+| ✅ Quitar de uma vez | uma baixa pela **diferença** — senão contaria duas vezes o que já havia sido baixado |
+| ↩ Reverter | **apaga** o histórico junto (o aviso diz isso) |
+| Editar "Recebido" na tabela | entra como **ajuste** ou **estorno** |
+
+🔴 **A invariante que mantém tudo honesto:** soma das baixas + o que veio antes
+do histórico **=** `recebido`. É por isso que reverter apaga, que quitar entra
+pela diferença e que excluir **recalcula** o `recebido` (e o status, e avisa a
+fatura pela sincronização da v107).
+
+### 🔴 O que NÃO foi inventado
+**31 lançamentos** já têm recebimento e nenhum histórico. Transformar isso numa
+baixa única seria afirmar que houve **um** pagamento, naquela data — e não se
+sabe. Eles aparecem como linha separada, **"registro anterior ao histórico ·
+sem detalhamento das parcelas"**, com o aviso: *o sistema sabe o total, mas não
+em quantas vezes foi pago*. Essa linha não tem botão de excluir.
+
+### Validado
+- `node --check`; `<div>` balanceadas (661/661)
+- **58 testes** com o código real e os 103 lançamentos reais: registro, soma,
+  o que veio de antes, os quatro caminhos, excluir (recalculando status e data),
+  `confirm` recusado, id inexistente, a janela nos três estados, e a invariante
+  conferida nos 103
+- **6 defeitos injetados — todos acusados** (parcial não registra, quitar
+  contando duas vezes, reverter não limpa, excluir não recalcula, array do
+  Firebase não normalizado, edição na tabela não registrada)
+- **No ar, no arquivo publicado**, com DOM de verdade: três recebimentos
+  (300 → 550 → 1.000), a janela desenhada, o acumulado correndo, a linha de
+  "anterior ao histórico" e o aviso
+- Regressão: **13 suítes, 693 testes**, nenhuma falha
+
+⚠️ Um defeito pode **estourar exceção** em vez de devolver resultado errado — a
+suíte passou a envolver tudo em `try/catch` e contar o crash como falha. Sem
+isso, dois dos seis defeitos matavam o teste sem acusar nada.
