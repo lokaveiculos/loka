@@ -3102,6 +3102,52 @@ versões — a legível e a de uma linha que ele cola.
 
 **Backup:** `backups-loka/multas-ANTES-cobrada-rsc-20261014-154930.json`
 
+### Segundo relório: RSC até 22-07-2026
+
+202 multas · R$ 41.110,12 (emitido 27/07/2026). Conferido: a soma das 202 achadas
+no banco bate exatamente com o rodapé.
+
+| | |
+|---|---|
+| a marcar como cobrada | **112** · R$ 19.126,95 |
+| já **pagas** (puladas) | **89** — aqui a exceção pedida valeu de verdade |
+| deixada de fora | **1** |
+
+⚠️ **A multa `R004213897` (placa RUE0E26) ficou de fora.** O relatório da RSC a
+traz, mas o sistema a atribui à **ISS TRANSPORTES** — e o contrato ativo dessa
+placa é da ISS desde **11/06/2026**, dez dias antes da infração (21/06). A página
+mostra a exclusão e o motivo, e diz que incluí-la é decisão do Rogel.
+
+⚠️ **Remontar o AIT a partir dos pedaços do PDF não escala.** Neste relatório a
+quebra cai em pontos diferentes (`R0041`+`78234`, `T00021`+…) e o método achou só
+187 das 202. A busca passou a ser **invertida**: junta-se o texto todo sem
+espaço e pergunta-se, para cada AIT do banco, se ele aparece ali. Aí bateu 202/202.
+
+**Página:** `backups-loka\MARCAR-COBRADAS-RSC-ate-22-07.html`
+
+### A página, em vez do console
+
+O comando de uma linha **não funcionou** para o Rogel ("colei e nao foi").
+Colar 3.000 caracteres no console é frágil. Virou **página HTML** em
+`backups-loka` (fora do repo — nunca publicada), que ele abre com duplo clique.
+
+| Decisão | Por quê |
+|---|---|
+| **REST (`fetch` + GET/PATCH), não o SDK** | funciona abrindo do disco (`file://`) e não depende de CDN. Conferido: o endpoint responde `Access-Control-Allow-Origin: *` e aceita PATCH |
+| grava **só `multas/{i}/status`** | nunca o `loka_db` inteiro (armadilha 3) |
+| **relê o banco** depois de gravar | só diz "Pronto" depois de ver gravado |
+| banco respondendo **vazio** não libera o botão | resposta vazia não pode virar gravação |
+| falha diz **"NÃO foi gravado"** com o motivo | nunca finge sucesso |
+
+Validado: **45 testes** nas duas páginas, com as 634 multas reais e o `fetch`
+substituído — incluindo nenhum outro campo alterado, idempotência, `confirm`
+recusado, sem internet, banco vazio e falha de gravação.
+
+### O botão da v114 funcionou em produção
+O `_writerBuild` do banco ficou `v114-20261014-1705`: o Rogel marcou as 39 do
+primeiro relatório pela tela, em lotes. **Nenhuma multa fora do relatório foi
+tocada.** O primeiro relatório está concluído.
+
 ### Dá para fazer pela tela também
 Com a v114, o botão **🏷 Alterar situação** passou a oferecer "Cobrada do
 locatário". Para um lote pequeno é o caminho natural; para estas 38 específicas,
