@@ -3109,14 +3109,18 @@ no banco bate exatamente com o rodapé.
 
 | | |
 |---|---|
-| a marcar como cobrada | **112** · R$ 19.126,95 |
+| a marcar como cobrada | **113** · R$ 19.257,11 |
 | já **pagas** (puladas) | **89** — aqui a exceção pedida valeu de verdade |
-| deixada de fora | **1** |
+| incluída por decisão do Rogel | **1** (ver abaixo) |
 
-⚠️ **A multa `R004213897` (placa RUE0E26) ficou de fora.** O relatório da RSC a
-traz, mas o sistema a atribui à **ISS TRANSPORTES** — e o contrato ativo dessa
-placa é da ISS desde **11/06/2026**, dez dias antes da infração (21/06). A página
-mostra a exclusão e o motivo, e diz que incluí-la é decisão do Rogel.
+⚠️ **A multa `R004213897` (placa RUE0E26):** o relatório da RSC a traz, mas o
+sistema a atribui à **ISS TRANSPORTES** — e o contrato ativo dessa placa é da ISS
+desde **11/06/2026**, dez dias antes da infração (21/06).
+
+Deixei de fora e perguntei. **O Rogel mandou incluir**, então ela entrou: a página
+passou a 113 multas (R$ 19.257,11) e mostra uma nota dizendo que a multa está ali
+por decisão dele, com o locatário que o sistema registra visível na linha.
+A coluna **Locatário** entrou na tabela por causa disso.
 
 ⚠️ **Remontar o AIT a partir dos pedaços do PDF não escala.** Neste relatório a
 quebra cai em pontos diferentes (`R0041`+`78234`, `T00021`+…) e o método achou só
