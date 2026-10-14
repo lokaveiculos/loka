@@ -3156,3 +3156,125 @@ tocada.** O primeiro relatório está concluído.
 Com a v114, o botão **🏷 Alterar situação** passou a oferecer "Cobrada do
 locatário". Para um lote pequeno é o caminho natural; para estas 38 específicas,
 o comando é mais seguro do que marcar 38 linhas à mão.
+
+---
+
+## 🔴 Extrato do DETRAN-BA — o layout JÁ é reconhecido; o problema é o arquivo (14/10/2026)
+
+Pedido: *"criar um botão 'importar arquivo' para importar as multas dos veículos
+que não estão registradas no nome da locadora, conforme exemplo em anexo"*.
+
+### Nada disso precisava ser construído
+O botão **já existe**: painel Multas → aba **Importar** → "📁 Escolher PDF(s)"
+(`mltImportarArquivo`, `gestao.html:674`), com pdf.js e tela de conferência.
+E o roteador **já conhece este documento**:
+
+```js
+if (/EXTRATO DE MULTAS/i.test(texto))  return mltParseDetranBA(texto);
+```
+
+Provado rodando o código publicado contra o layout: **18 testes, 18 passaram** —
+3 multas, AIT, valor, data e placa corretos, e a soma fechando com o
+"Valor total" do próprio extrato.
+
+### 🔴 O arquivo enviado não tem texto dentro
+Ele saiu pelo **"Microsoft Print To PDF"**, que converte **cada letra em curva
+vetorial**: `Tj`/`TJ`/`BT` = **0**, fontes = **nenhuma**, 5.866 curvas. Para o
+computador é um quadro riscado.
+
+⚠️ **O importador abriria e mostraria ZERO multas, sem erro nenhum.** É o pior
+tipo de falha: parece que não havia multa.
+
+**Conserto na origem:** na janela de impressão, campo *Destino*, escolher
+**"Salvar como PDF"** (do Chrome) e **não** "Microsoft Print to PDF".
+
+Como não havia texto, o layout foi lido **olhando**: renderizei o PDF com pdf.js
+num servidor local e li na tela. A **soma (130,16 + 195,23 + 130,16 = 455,55)
+bate com o "Valor total" do extrato** — é isso que prova que li certo.
+⚠️ A primeira leitura, em baixa resolução, errou 2 dos 3 nº de controle e 1 data.
+Ampliar não é luxo: `zoom` só recorta, quem amplia é renderizar em escala maior.
+
+### O layout
+```
+Placa:          Valor total:     Quantidade de multas:
+SKT3B92         R$455,55         3
+┌─ um cartão por multa ──────────────────────────────────┐
+│ Nº Controle:   Nº AIT:       Valor:      Data Infração:│
+│ 525744300      S051451059    R$130,16    16/09/2026    │
+│ Órgão Autuador:              UF:         Situação:     │
+│ DNIT                         DN          NOTIFICADA    │
+└────────────────────────────────────────────────────────┘
+```
+O parser aproveita placa, AIT, valor e data; **não** aproveita Nº Controle nem
+Situação, e a descrição fica genérica — **este extrato não diz qual foi a
+infração**.
+
+### 🔴 O que o extrato revelou: o sistema está CEGO para 6 placas
+**SKT3B92 é uma das 6 placas ativas que o Serpro recusa** (403, fora do contrato
+e-Frotas — registrado em 30/09). É exatamente o *"não está no nome da locadora"*.
+
+| | |
+|---|---|
+| multas da SKT3B92 **no sistema** | **0** |
+| multas da SKT3B92 **no extrato do DETRAN** | **3 · R$ 455,55** |
+| locatário em 16/09 e 21/09 | **ISS TRANSPORTES & LOGISTICA** (aluguel 13/09→13/10) |
+
+As outras 5 (TKQ7I29, SUJ8F15, EXI0G91, TMX5C27, FIJ1F24) também estão com
+**0 multas**. ⚠️ Por decisão do Rogel, **só esta placa foi tratada** — as outras
+não foram extraídas.
+
+### A página de importação
+`backups-loka\IMPORTAR-MULTAS-SKT3B92.html` (fora do repo — nunca publicada).
+Duplo clique, confere, clica no verde. Mesmo desenho das páginas de cobrada:
+REST, funciona do disco, não depende de CDN.
+
+Os 3 registros **não foram digitados à mão**: saíram do **próprio
+`mltParsePDF` do sistema**, rodado contra o banco real. Por isso já vêm com
+veículo (`vf104`, FIAT Fastback), órgão DNIT, locatário ISS, gravidade
+**Média (4 pts)** e **Grave (5 pts)** — os valores 130,16 e 195,23 são exatamente
+os do CTB.
+
+| Cuidado | Por quê |
+|---|---|
+| grava só `multas/<i>` novos | nunca o `loka_db` inteiro (armadilha 3) |
+| **confere que a posição está vazia** antes de gravar | senão uma gravação feita no meio faria escrever **por cima** de multa existente |
+| AIT que já existe é **pulado** | rodar duas vezes não duplica |
+| banco respondendo vazio **não** destrava o botão | sem saber o que há, não dá para escolher índice livre |
+| relê o banco depois | só diz "Pronto" depois de ver gravado |
+| entram como **pendentes**, sem data/valor de pagamento | importação não é baixa |
+
+⚠️ Elas aparecem no painel **Multas do `gestao.html`**, não na `multas.html` —
+esta só lista `origem === 'efrotas'`, e multa de PDF não tem esse campo (igual às
+336 antigas).
+
+### 🔴 A armadilha do ambiente de teste (custou um resultado errado)
+Para rodar o código real no Node eu carrego o `<script>` inline do `gestao.html`
+num `vm`. **Declarações de função são içadas, mas `var` não**: o script estourou
+em `window.addEventListener` (linha 371) e **todos os `var` depois disso nunca
+existiram** — inclusive `MLT_GRAV`.
+
+Resultado: o conversor rodou, devolveu 3 registros de aparência correta e
+**gravidade vazia**, sem erro nenhum. Eu quase entreguei assim.
+
+⚠️ **Regra:** ao montar ambiente de mentira, **exigir que o script rode até o
+fim** (`try/catch` que *imprime* o erro, não que o engole) e conferir que uma
+constante tardia existe. Engolir o erro faz o teste rodar com meio sistema.
+
+### Validado
+- `node --check`; **39 testes** com as **634 multas reais** e o `fetch`
+  substituído: a prévia, os índices livres, o que é gravado (só as 3 posições +
+  os 2 carimbos), a forma do registro igual à do importador, idempotência,
+  AIT já existente, posição ocupada, `confirm` recusado, falha do banco, banco
+  vazio e array voltando como objeto
+- **8 defeitos injetados — todos acusados**: não conferir a posição, ignorar AIT
+  repetido, gravar o nó inteiro, deixar campo interno vazar, escrever a partir do
+  índice 0, fingir sucesso na recusa, destravar com banco vazio, e id repetido
+- **No navegador, com o banco real** (só leitura, **sem clicar no verde**):
+  634 multas lidas, 3 entram nas posições 634/635/636, R$ 455,55,
+  "Passará a ter 637", tabela com Média/Grave e locatário ISS
+
+**Backup:** `backups-loka/loka_db-ANTES-importar-skt3b92-20261014.json`
+
+### ⏳ Falta o Rogel clicar
+A página está pronta; a gravação é dele. Depois: abrir o painel Multas com
+**Ctrl+Shift+R** e conferir as 3 no nome da ISS.
