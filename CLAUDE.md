@@ -51,9 +51,10 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v110-20261014-1105** |
+| `gestao.html` | **v111-20261014-1150** |
 | `fatura.html` | **v82-20261013-0910** |
-| `multas.html` | **v11-20260915-1050** |
+| `multas.html` | **v13-20260930-1530** |
+| `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 
 ## Modelo de dados — `loka_db`
 
@@ -2841,3 +2842,114 @@ Falta ver **logado**, dentro do menu — eu não autentico. O painel foi registr
 em `PANELS`, `_TODOS_PAINEIS`, `TITLES`, `_PAINEL_LABEL`, `showPanel` e no perfil
 **Operador** (Master e Admin herdam pelo `_TODOS_PAINEIS.slice()`), que é a lição
 do painel `multasefrotas`.
+
+---
+
+## ✅ Formulário de ocorrência do colaborador + importação — 14/10/2026 (`873dde0`) · gestao v111
+
+Pedido: "formulário para registro de sinistros para uso no mobile e computador
+em que os colaboradores possam registrar as informações e possamos importar
+para nosso sistema".
+
+### Já existia metade do caminho
+A aba **Ocorrências / Sinistros** existe desde a v99, e o sistema já tem um
+**padrão de importação por código**: o `manutencao-oficina.html` gera
+`LOKA-MANUT::<base64>`, a oficina manda pelo WhatsApp e o gestão importa.
+O formulário novo é o mesmo desenho, para sinistro.
+
+### 🔴 Por que código, e não uma página que grava direto no banco
+A página é **pública** (GitHub Pages) e as regras do banco estão **abertas**
+(pendência 3). Uma porta de escrita a mais, sem login, aumentaria a exposição de
+dado de cliente — e aqui o dado é pior: nome de condutor, feridos, terceiros.
+
+Além disso o código **funciona sem sinal**: quem está na rua preenche, copia e
+envia quando a conexão voltar.
+
+⚠️ Existe precedente de página pública que grava (`reserva`, `cadastro`), e é
+justamente a pendência 7. Não aumentei esse lado.
+
+### `sistema/sinistro-colaborador.html`
+Uma coluna no celular, duas no computador (medido: `318px 318px` a 1000px,
+coluna única a 375px, sem rolagem lateral em nenhuma das duas).
+
+⚠️ Campos com **`font-size:16px`** de propósito: abaixo disso o iOS dá zoom
+sozinho ao focar o campo, e o formulário "pula" na mão de quem está na rua.
+
+**Os 6 tipos são os MESMOS da Cláusula 11ª** que a aba de Sinistros usa. Tipo
+inventado aqui faria o registro não conversar com a cobrança — é a mesma regra
+registrada quando a aba nasceu.
+
+**Obrigatório só o que o sistema exige para abrir a ocorrência**: placa, tipo,
+data, descrição e quem registrou. O resto (local, condutor, feridos, terceiros,
+BO, seguradora, aviso) fica em branco se a pessoa não souber — travar o
+formulário na rua faria o registro não acontecer.
+
+Topo da página: **havendo feridos, 192 e 190 primeiro**. O formulário é registro,
+não atendimento.
+
+### A importação (aba Sinistros → 📥 Importar)
+Botão **📥 Importar** e botão **🔗 Link do formulário** (copia o endereço e abre
+o WhatsApp para mandar ao colaborador).
+
+🔧 **O decodificador é melhor que o da manutenção.** Tirar os espaços junta o
+base64 que o WhatsApp quebrou em linhas — **mas também cola nele o texto que vier
+depois** ("abraço", "obrigado"), porque essas letras são base64 válido. Aqui o
+`_sinImpLer()` **encurta pela direita até virar JSON válido**. É a melhoria que o
+Auto Mais ganhou em 19/09 e estava anotada como "vale levar para lá".
+
+Aceita: prefixo em minúscula (o teclado do celular corrige), base64 quebrado em
+linhas, texto antes e depois, e vários códigos de uma vez.
+
+O **preview antes de importar** confere a placa na frota, resolve o **locatário
+do momento**, mostra quem registrou e **avisa (sem bloquear)** se já existe
+ocorrência da mesma placa, data e tipo — o mesmo código pode ser colado duas
+vezes sem ninguém perceber.
+
+### 🔴 O que a importação NÃO aceita do código
+O código é um texto que qualquer um pode montar à mão. Então a importação só
+usa o que o formulário foi feito para mandar:
+
+| Campo | De onde vem |
+|---|---|
+| `status` | **sempre `aberto`** — quem está na rua registra o fato, não decide o andamento |
+| `franquiaDevida` / `franquiaValor` | **sempre vazio** — cobrar o locatário é decisão da LOKÁ, caso a caso; pode ser da locadora ou de terceiro |
+| `clienteId` / `clienteNome` | do **sistema**, pela placa — não do código |
+| `veiculoId` | do **cadastro**, pela placa |
+| `receberId` | nunca vem de fora |
+
+⚠️ **Essa trava só foi testada porque dois defeitos injetados passaram.** Meu
+teste só mandava códigos gerados pelo próprio formulário, que nunca trazem
+`status` nem franquia — com entrada honesta o defeito é invisível. Entrou um
+bloco que **monta o código à mão** com `status:'concluido'`,
+`franquiaDevida:true`, `franquiaValor:'5.000,00'` e cliente forjado, e exige que
+a importação ignore tudo isso. É a lição de sempre, por outro ângulo: **o teste
+tem de exercitar a entrada desonesta, não só a esperada.**
+
+### O que NÃO entrou
+- **Fotos.** O sistema não usa Firebase Storage e desativou comprovantes em
+  manutenção para não inflar o banco. Mesma decisão da aba de Sinistros.
+- **Franquia no formulário** — ver acima.
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (gestao 668/668, formulário 38/38)
+- **70 testes** com o código real dos dois arquivos e os 119 veículos reais:
+  geração do código, acento sobrevivendo ao base64, os 5 obrigatórios, placa
+  curta, o ciclo completo formulário → importação, código sujo do WhatsApp
+  (texto antes/depois, quebras de linha, prefixo minúsculo, dois de uma vez,
+  corrompido), placa fora do cadastro, aviso de repetida, código adulterado, o
+  link do formulário, e a estrutura responsiva
+- **6 defeitos injetados — todos acusados**: não encurtar pela direita, prefixo
+  sensível a caixa, não limpar espaços, status vindo do formulário, franquia
+  vindo do formulário, e o formulário gerando código sem obrigatório
+- **No ar, nas duas páginas publicadas**: formulário aberto a **375px**,
+  preenchido como um colaborador faria, botão real clicado → código gerado; esse
+  código, embrulhado numa mensagem de WhatsApp de verdade (texto antes, quebras
+  de linha a cada 45 caracteres, "Abraço" depois), foi lido pelo importador
+  publicado e virou ocorrência: **VW Amarok, locatário RSC, status aberto,
+  franquia false**, acentos intactos. Nada foi gravado em produção.
+- Regressão: **15 suítes, 831 testes**, nenhuma falha
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir a aba Sinistros e usar os dois botões novos.
+E vale ele mandar o link para um colaborador e receber o primeiro código de
+verdade.
