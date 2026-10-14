@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v112-20261014-1240** |
+| `gestao.html` | **v114-20261014-1705** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v13-20260930-1530** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -2974,3 +2974,135 @@ Total: **15 suítes, 841 testes**.
 Falta **logado**: o Rogel abrir a aba Sinistros e usar os dois botões novos.
 E vale ele mandar o link para um colaborador e receber o primeiro código de
 verdade.
+
+---
+
+## ✅ Alterar a situação das multas em lote — 14/10/2026 · gestao v113 → v114
+
+Pedido: "um botão para selecionarmos o status das multas, multi seleção, assim
+como fazemos para baixar as multas pagas".
+
+### Usa a MESMA seleção da baixa
+O botão **🏷 Alterar situação** entra na barra que já aparece quando há multas
+marcadas na tabela, ao lado de **💰 Baixar como pagas**. Nenhuma caixinha nova:
+é a seleção que o operador já conhece, com duas ações diferentes.
+
+### 🔴 A regra de quais situações entram — e o erro que eu cometi na v113
+Na v113 deixei **paga, cobrada e repassada** de fora, tratando as três como
+"situações de pagamento". **Estava errado.** O código diz outra coisa:
+
+```js
+if (m.status !== 'paga' && m.status !== 'cancelada') aberto += v;
+if (m.clienteId && m.status !== 'cobrada' && m.status !== 'cancelada') repassar += v;
+```
+
+**Multa cobrada continua contando como EM ABERTO.** Cobrada e repassada são
+estado de **cobrança** — saem do "a repassar", não do que se tem a receber.
+Só **paga** é dinheiro recebido.
+
+Na **v114** o lote passou a oferecer **6 situações**, e só `paga` ficou de fora:
+ela tira a multa do total em aberto e é o que o recibo exige, então precisa de
+data e valor — que é o que a baixa pergunta.
+
+⚠️ Cobrada e repassada aqui mudam **só a situação**: não gravam
+`dataPagamento` nem `valorPago`. O modal avisa que a multa **continua em aberto**
+até o pagamento.
+
+⚠️ **Fica a incoerência:** a baixa também oferece cobrada/repassada e, por
+aquele caminho, grava data e valor de pagamento. São dois caminhos com
+resultados diferentes para a mesma situação. Não mexi na baixa (não foi pedido),
+mas o certo seria ela só oferecer `paga`.
+
+### Indicar não é só trocar o rótulo
+| Caminho | O que mais acontece |
+|---|---|
+| → **Condutor Indicado** | grava `indicadoEm`, `indicadoPor` e registra em `indicacoes_log` |
+| **saindo** de indicada | limpa os dois campos e registra a **desindicação** |
+| as duas pontas | exigem `_podeAcao('indicarCondutor')`, a mesma permissão da aba de Indicação |
+
+🔴 Sem limpar `indicadoEm` ao sair, a multa ficaria com data de indicação sem
+estar indicada. E o lote não pode ser atalho para contornar permissão.
+
+O `confirm` avisa que **desfazer aqui não cancela no órgão** — mesma redação do
+botão Desindicar.
+
+Quem já está na situação pedida **não é tocado** nem conta no total, e o
+`confirm` diz quantas ficam como estão.
+
+⚠️ Multas **pagas e canceladas continuam fora da seleção da tabela**, como a
+baixa sempre fez. Para mudar uma delas é pelo **Editar**.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **58 testes** com o código real e as **634 multas reais**: as situações
+  oferecidas, abrir/avisar, as 4 operações, indicar e desindicar com log,
+  permissão nas duas pontas, quem já está na situação, cobrada/repassada sem
+  gravar pagamento, e o que não pode ser tocado
+- **7 defeitos injetados — todos acusados**: aceitar `paga`, cobrada gravando
+  pagamento, indicada sem data, sair de indicada sem limpar, não registrar a
+  desindicação, pular a permissão, e mexer em quem já está na situação
+- **No ar**: as 444 selecionáveis reais → indicar (444 com data, 444 no log,
+  as 190 pagas intactas) → voltar para pendente (0 com data velha, 444
+  desindicações no log); `paga` forçada no campo recusada. Nada gravado em
+  produção.
+
+---
+
+## ✅ Multas da RSC marcadas como cobradas — 14/10/2026
+
+Pedido: alterar para **cobradas** as multas de um relatório em anexo, exceto as
+já baixadas como pagas.
+
+### ⚠️ O arquivo citado não existe no disco
+O caminho dado (`Downloads\Relatório de Multas — RSC.pdf`) **não existe**. O
+único relatório de multas da RSC em Downloads é
+**`Relatório de Multas Parcial 09-2026 RSC.pdf`** (30/09/2026 17:01).
+
+**A prova de que é o certo:** o rodapé do relatório diz *39 multas · R$ 9.445,10*
+e as 39 que casei no banco somam **exatamente R$ 9.445,10**.
+
+### Como o relatório foi lido
+O PDF usa fontes **Identity-H**: o texto é índice de glifo, não letra. Sem o
+`ToUnicode` de cada fonte sai lixo — foi o que aconteceu na primeira tentativa.
+O extrator (`scratchpad/pdf-texto.py`) descomprime os streams, lê os CMaps
+`bfchar`/`bfrange` e decodifica.
+
+⚠️ **O PDF quebra linha no meio do AIT.** `S051026113` saiu como `S0510261` +
+`13`, e por isso 1 das 39 "não existia" no banco. O cruzamento passou a tentar
+também a emenda com a linha seguinte. **A soma é o que prova o conjunto certo** —
+sem ela, eu teria entregue 38 achando que era tudo.
+
+### O que o relatório tem
+| | |
+|---|---|
+| multas | 39 · R$ 9.445,10 · todas **RSC TRANSPORTE 2016 LTDA** |
+| situação no relatório | 39 Pendente |
+| situação hoje no banco | 38 pendente · **1 já cobrada** |
+| **já pagas** | **nenhuma** |
+
+⚠️ A exceção pedida ("exceto as já baixadas como pagas") **não exclui nada neste
+relatório** — ele só tem pendentes. O comando pula as pagas assim mesmo, para o
+caso de alguma ser paga entre a análise e a execução.
+
+**A alterar: 38 multas · R$ 9.249,87.**
+
+### O comando
+`backups-loka\MARCAR-COBRADAS-RSC.txt` (uma linha, console da tela de Gestão,
+logado, após `allow pasting`). O legível fica ao lado.
+
+Ele muda **só `status`** — cobrada não é pagamento, então não grava
+`dataPagamento` nem `valorPago`. (As 38 já vêm do banco com `dataPagamento: ""`
+e `valorPago: 0`; o comando não encosta nesses campos.)
+
+Simulado contra o banco real, **22 testes**: as 38 ficam cobradas, nenhuma multa
+fora do relatório muda, nenhum outro campo é alterado, as 190 pagas seguem
+pagas, rodar duas vezes não faz nada, cancelar não muda nada, multa paga é
+pulada com o pagamento intacto, e banco vazio não quebra. Testado nas duas
+versões — a legível e a de uma linha que ele cola.
+
+**Backup:** `backups-loka/multas-ANTES-cobrada-rsc-20261014-154930.json`
+
+### Dá para fazer pela tela também
+Com a v114, o botão **🏷 Alterar situação** passou a oferecer "Cobrada do
+locatário". Para um lote pequeno é o caminho natural; para estas 38 específicas,
+o comando é mais seguro do que marcar 38 linhas à mão.
