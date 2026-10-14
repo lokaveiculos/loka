@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v109-20261014-1040 -->
+<!-- LOKA deploy: v110-20261014-1105 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1385,7 +1385,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v109-20261014-1040';
+var LOKA_BUILD = 'v110-20261014-1105';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -5570,6 +5570,12 @@ function _fvNum(s){
 }
 function _fvPlaca(p){ return String(p == null ? '' : p).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 
+// 🔴 O `_fvBRL()` do sistema não limita as casas decimais: ele só exige um MÍNIMO
+// de 2, e o padrão do toLocaleString deixa chegar a 3. Como aqui há divisão
+// (média por carro), o número saía "R$ 3.324,964". Arredonda antes de formatar.
+// Não mexi no `brl` global — ele é usado em todas as telas.
+function _fvBRL(n){ return brl(Math.round((Number(n) || 0) * 100) / 100); }
+
 // Placa dentro de texto livre: pega o padrão antigo (ABC1234) e o Mercosul
 // (ABC1D23). Só vale se a placa existir na frota — senão qualquer sigla de
 // três letras seguida de números viraria "carro".
@@ -5679,7 +5685,7 @@ function _fvCalcular(periodo){
       coberto += sub;
       c.clientes[f.cliente || ''] = 1;
       c.itens.push({ tipo: 'aluguel', fatura: f.numero || '', cliente: f.cliente || '',
-                     valor: sub, desc: 'Aluguel' + (_fvNum(d.desconto) ? ' (desconto ' + brl(_fvNum(d.desconto)) + ')' : '') });
+                     valor: sub, desc: 'Aluguel' + (_fvNum(d.desconto) ? ' (desconto ' + _fvBRL(_fvNum(d.desconto)) + ')' : '') });
     });
 
     // 2) os "outros" só vão para um carro quando a placa está escrita neles
@@ -5804,10 +5810,10 @@ function fvRender(){
     var nFrota = ((db && db.veiculos) || []).filter(function(v){ return v && v.placa && v.status !== 'inativo'; }).length;
     var media = r.carros.length ? r.somaCarros / r.carros.length : 0;
     st.innerHTML =
-      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+brl(r.somaCarros)+'</div><div class="stat-label">Faturado nos ve&iacute;culos</div></div>'
+      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+_fvBRL(r.somaCarros)+'</div><div class="stat-label">Faturado nos ve&iacute;culos</div></div>'
     + '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value">'+r.carros.length+'</div><div class="stat-label">Carros que faturaram'+(nFrota?' (de '+nFrota+' ativos)':'')+'</div></div>'
-    + '<div class="stat"><div class="stat-value" style="font-size:15px">'+brl(media)+'</div><div class="stat-label">M&eacute;dia por carro</div></div>'
-    + '<div class="stat" style="border-left-color:'+(r.somaNaoAtrib?'#b45309':'var(--border)')+'"><div class="stat-value" style="font-size:15px">'+brl(r.somaNaoAtrib)+'</div><div class="stat-label">Sem veículo identificado</div></div>';
+    + '<div class="stat"><div class="stat-value" style="font-size:15px">'+_fvBRL(media)+'</div><div class="stat-label">M&eacute;dia por carro</div></div>'
+    + '<div class="stat" style="border-left-color:'+(r.somaNaoAtrib?'#b45309':'var(--border)')+'"><div class="stat-value" style="font-size:15px">'+_fvBRL(r.somaNaoAtrib)+'</div><div class="stat-label">Sem veículo identificado</div></div>';
   }
 
   if (!r.nFaturas) {
@@ -5842,9 +5848,9 @@ function fvRender(){
         + '<td style="padding:8px 12px;font-size:11px">'+(c.nome||'—')
           + (c.ano ? '<div style="font-size:9px;color:var(--muted)">'+c.ano+'</div>' : '')+'</td>'
         + '<td style="padding:8px 12px;font-size:11px">'+(c.cliente||'<span style="color:var(--muted)">—</span>')+'</td>'
-        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-size:11px">'+(c.aluguel?brl(c.aluguel):'—')+'</td>'
-        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-size:11px;color:'+(c.extras?'#b45309':'var(--muted)')+'">'+(c.extras?brl(c.extras):'—')+'</td>'
-        + '<td style="padding:8px 12px;text-align:right;font-weight:800;font-family:monospace;font-size:12px;color:'+(zero?'var(--muted)':'#0d7a3e')+'">'+brl(c.total)+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-size:11px">'+(c.aluguel?_fvBRL(c.aluguel):'—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-size:11px;color:'+(c.extras?'#b45309':'var(--muted)')+'">'+(c.extras?_fvBRL(c.extras):'—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-weight:800;font-family:monospace;font-size:12px;color:'+(zero?'var(--muted)':'#0d7a3e')+'">'+_fvBRL(c.total)+'</td>'
         + '<td style="padding:8px 12px;font-size:10px">'+(stLbl[c.status]||c.status||'—')+'</td>'
         + '<td style="padding:8px 12px;text-align:center">'
           + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="fvVerVeiculo(\''+c.chave+'\')">📈 Hist&oacute;rico</button></td>'
@@ -5852,9 +5858,9 @@ function fvRender(){
     }).join('')
     + '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D">'
       + '<td colspan="3" style="padding:9px 12px">TOTAL &mdash; '+lista.length+' ve&iacute;culo(s)</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+brl(lista.reduce(function(s,c){return s+c.aluguel;},0))+'</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+brl(lista.reduce(function(s,c){return s+c.extras;},0))+'</td>'
-      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+brl(lista.reduce(function(s,c){return s+c.total;},0))+'</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+_fvBRL(lista.reduce(function(s,c){return s+c.aluguel;},0))+'</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+_fvBRL(lista.reduce(function(s,c){return s+c.extras;},0))+'</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+_fvBRL(lista.reduce(function(s,c){return s+c.total;},0))+'</td>'
       + '<td colspan="2"></td>'
     + '</tr></tfoot></table></div>'
 
@@ -5865,13 +5871,13 @@ function fvRender(){
       + '<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Confer&ecirc;ncia do m&ecirc;s</div>'
       + '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px">'
         + '<span>Faturas de '+_fvMesLabel(periodo)+': <strong>'+r.nFaturas+'</strong></span>'
-        + '<span>Total das faturas: <strong>'+brl(r.totalFaturas)+'</strong></span>'
-        + '<span>Atribu&iacute;do aos ve&iacute;culos: <strong style="color:#0d7a3e">'+brl(r.somaCarros)+'</strong></span>'
-        + '<span>Sem ve&iacute;culo: <strong style="color:#b45309">'+brl(r.somaNaoAtrib)+'</strong></span>'
+        + '<span>Total das faturas: <strong>'+_fvBRL(r.totalFaturas)+'</strong></span>'
+        + '<span>Atribu&iacute;do aos ve&iacute;culos: <strong style="color:#0d7a3e">'+_fvBRL(r.somaCarros)+'</strong></span>'
+        + '<span>Sem ve&iacute;culo: <strong style="color:#b45309">'+_fvBRL(r.somaNaoAtrib)+'</strong></span>'
       + '</div>'
       + (Math.abs(r.totalFaturas - r.somaCarros - r.somaNaoAtrib) >= 0.01
           ? '<div style="font-size:11px;color:#c0392b;margin-top:6px;font-weight:700">⚠ Diferen&ccedil;a de '
-            + brl(r.totalFaturas - r.somaCarros - r.somaNaoAtrib)
+            + _fvBRL(r.totalFaturas - r.somaCarros - r.somaNaoAtrib)
             + ' entre o total das faturas e a soma das partes &mdash; confira o detalhamento dessas faturas.</div>'
           : '')
       + (r.naoAtrib.length
@@ -5880,7 +5886,7 @@ function fvRender(){
             + '<div style="margin-top:6px;font-size:11px">'
             + r.naoAtrib.map(function(o){
                 return '<div style="padding:4px 0;border-bottom:1px solid #eef0f6">'
-                  + '<strong>'+brl(o.valor)+'</strong> &middot; '+(o.desc||'')
+                  + '<strong>'+_fvBRL(o.valor)+'</strong> &middot; '+(o.desc||'')
                   + (o.ref ? ' <span style="color:var(--muted)">('+o.ref+')</span>' : '')
                   + '<div style="font-size:9px;color:var(--muted)">Fatura '+(o.fatura||'—')+' &middot; '+(o.cliente||'')
                   + ' &middot; '+o.motivo+'</div></div>';
@@ -5925,13 +5931,13 @@ function fvVerVeiculo(chave){
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
       + '<div style="flex:1;min-width:130px;background:#e8f5ef;border-radius:8px;padding:8px 12px">'
         + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#0d7a3e">Total no per&iacute;odo</div>'
-        + '<div style="font-size:15px;font-weight:800;color:#0d7a3e">'+brl(total)+'</div></div>'
+        + '<div style="font-size:15px;font-weight:800;color:#0d7a3e">'+_fvBRL(total)+'</div></div>'
       + '<div style="flex:1;min-width:130px;background:#f0f2f9;border-radius:8px;padding:8px 12px">'
         + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted)">Meses com faturamento</div>'
         + '<div style="font-size:15px;font-weight:800">'+meses+' de '+linhas.length+'</div></div>'
       + '<div style="flex:1;min-width:130px;background:#f0f2f9;border-radius:8px;padding:8px 12px">'
         + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted)">M&eacute;dia por m&ecirc;s faturado</div>'
-        + '<div style="font-size:15px;font-weight:800">'+brl(meses?total/meses:0)+'</div></div>'
+        + '<div style="font-size:15px;font-weight:800">'+_fvBRL(meses?total/meses:0)+'</div></div>'
     + '</div>'
     + '<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">'
     + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
@@ -5948,9 +5954,9 @@ function fvVerVeiculo(chave){
         return '<tr style="border-bottom:1px solid #f0f2f8'+(l.valor?'':';opacity:.6')+'">'
           + '<td style="padding:7px 10px;font-size:11px;font-weight:700">'+_fvMesLabel(l.periodo)+'</td>'
           + '<td style="padding:7px 10px;font-size:10px">'+(l.cliente||'<span style="color:var(--muted)">não faturou</span>')+'</td>'
-          + '<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:11px">'+(l.aluguel?brl(l.aluguel):'—')+'</td>'
-          + '<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:11px;color:'+(l.extras?'#b45309':'var(--muted)')+'">'+(l.extras?brl(l.extras):'—')+'</td>'
-          + '<td style="padding:7px 10px;text-align:right;font-weight:800;font-family:monospace;font-size:11px">'+brl(l.valor)+'</td>'
+          + '<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:11px">'+(l.aluguel?_fvBRL(l.aluguel):'—')+'</td>'
+          + '<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:11px;color:'+(l.extras?'#b45309':'var(--muted)')+'">'+(l.extras?_fvBRL(l.extras):'—')+'</td>'
+          + '<td style="padding:7px 10px;text-align:right;font-weight:800;font-family:monospace;font-size:11px">'+_fvBRL(l.valor)+'</td>'
           + '<td style="padding:7px 10px;width:110px"><div style="background:#eef1fd;border-radius:3px;height:8px"><div style="background:#2B4BF2;height:8px;border-radius:3px;width:'+larg+'%"></div></div></td>'
         + '</tr>';
       }).join('')
