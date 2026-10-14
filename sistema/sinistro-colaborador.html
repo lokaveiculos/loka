@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<!-- LOKA deploy: sinistro-v1-20261014-1150 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LOKÁ — Registro de Ocorrência / Sinistro</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f0f2fc;padding:14px;color:#0E1B4D;-webkit-text-size-adjust:100%}
+.wrap{max-width:680px;margin:0 auto}
+.head{background:#0E1B4D;color:#fff;padding:18px 20px;border-radius:12px 12px 0 0}
+.head h1{font-size:16px;font-weight:800;line-height:1.3}
+.head p{font-size:11px;opacity:.75;margin-top:3px}
+.card{background:#fff;padding:18px 16px 22px;border-radius:0 0 12px 12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.intro{font-size:12px;color:#555;margin-bottom:16px;line-height:1.55;padding:11px 14px;background:#EEF1FD;border-radius:8px}
+.alerta{font-size:12px;margin-bottom:16px;line-height:1.5;padding:11px 14px;background:#fdecea;border-left:4px solid #c0392b;border-radius:8px;color:#8a2a20;font-weight:600}
+.sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#2B4BF2;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #EEF1FD}
+.sec:first-of-type{margin-top:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{margin-bottom:2px}
+.fg.full{grid-column:1/-1}
+label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:5px}
+.req{color:#c0392b}
+input,select,textarea{width:100%;padding:12px;border:1.5px solid #d5dae8;border-radius:8px;font-size:16px;font-family:inherit;outline:none;background:#fff;color:#0E1B4D}
+input:focus,select:focus,textarea:focus{border-color:#2B4BF2;background:#fcfdff}
+textarea{resize:vertical;min-height:90px;line-height:1.5}
+.dica{font-size:10px;color:#8891ab;margin-top:4px;line-height:1.4}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:13px 20px;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-gerar{background:#0d7a3e;color:#fff;width:100%;margin-top:20px;padding:16px;font-size:15px}
+.btn-gerar:active{background:#0a6232}
+.btn-copiar{background:#2B4BF2;color:#fff;flex:1}
+.btn-zap{background:#25D366;color:#fff;flex:1}
+.btn-limpar{background:#fff;color:#666;border:1.5px solid #d5dae8;width:100%;margin-top:10px}
+#codigoArea{display:none;margin-top:18px;padding:16px;background:#f7f8fc;border:2px solid #0d7a3e;border-radius:10px}
+#codigoOutput{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;min-height:110px;word-break:break-all}
+.acoes{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.okmsg{display:none;background:#e8f5ef;color:#0d7a3e;padding:9px 12px;border-radius:7px;font-size:12px;font-weight:700;margin-top:10px;text-align:center}
+.passo{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#555;margin-top:9px;line-height:1.5}
+.passo b{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;background:#0d7a3e;color:#fff;border-radius:50%;font-size:10px;flex-shrink:0;margin-top:1px}
+.rodape{text-align:center;font-size:10px;color:#8891ab;margin-top:16px;line-height:1.6}
+@media(max-width:600px){
+  body{padding:8px}
+  .grid{grid-template-columns:1fr}
+  .head{border-radius:10px 10px 0 0;padding:16px}
+  .card{padding:16px 13px 20px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>Registro de Ocorrência / Sinistro</h1>
+    <p>LOKÁ Aluguel de Veículos · Preenchimento pelo colaborador</p>
+  </div>
+  <div class="card">
+
+    <div class="alerta">
+      Havendo feridos, chame primeiro o socorro (<strong>192</strong>) e a polícia
+      (<strong>190</strong>). Este formulário é para o registro — não substitui o
+      atendimento nem o Boletim de Ocorrência.
+    </div>
+
+    <div class="intro">
+      Preencha o que você <strong>sabe agora</strong>. Campos com
+      <span class="req">*</span> são obrigatórios; o resto pode ficar em branco e
+      ser completado depois no sistema. Ao final, o formulário gera um
+      <strong>código</strong> para você enviar à LOKÁ.
+    </div>
+
+    <div class="sec">O veículo e quando aconteceu</div>
+    <div class="grid">
+      <div class="fg">
+        <label>Placa do veículo <span class="req">*</span></label>
+        <input id="placa" placeholder="ABC1D23" autocapitalize="characters" autocorrect="off" spellcheck="false"
+               style="text-transform:uppercase;font-weight:700;letter-spacing:1px"
+               oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="fg">
+        <label>Tipo da ocorrência <span class="req">*</span></label>
+        <select id="tipo">
+          <option value="">— Selecione —</option>
+          <option value="colisao">Colisão / danos no veículo</option>
+          <option value="parabrisa">Para-brisa</option>
+          <option value="farol_lanterna">Farol / lanterna</option>
+          <option value="roubo_furto">Roubo ou furto</option>
+          <option value="perda_total">Perda total</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Data da ocorrência <span class="req">*</span></label>
+        <input id="data" type="date">
+      </div>
+      <div class="fg">
+        <label>Hora (se souber)</label>
+        <input id="hora" type="time">
+      </div>
+      <div class="fg full">
+        <label>Local</label>
+        <input id="local" placeholder="Rua, avenida, cidade, km da rodovia...">
+      </div>
+    </div>
+
+    <div class="sec">Quem estava envolvido</div>
+    <div class="grid">
+      <div class="fg">
+        <label>Quem dirigia</label>
+        <input id="condutor" placeholder="Nome do condutor">
+      </div>
+      <div class="fg">
+        <label>Houve feridos?</label>
+        <input id="vitimas" placeholder="Não / Sim — descreva">
+      </div>
+      <div class="fg full">
+        <label>Terceiros envolvidos</label>
+        <textarea id="terceiros" placeholder="Outro veículo (placa, modelo), nome e telefone do condutor, seguradora dele, poste, muro..." style="min-height:70px"></textarea>
+      </div>
+    </div>
+
+    <div class="sec">O que aconteceu</div>
+    <div class="fg full">
+      <label>Descrição <span class="req">*</span></label>
+      <textarea id="descricao" placeholder="Conte o que aconteceu: como foi, que parte do carro foi atingida, se o carro ficou rodando..."></textarea>
+      <div class="dica">Quanto mais detalhe aqui, menos ligação depois. Escreva como você contaria por telefone.</div>
+    </div>
+
+    <div class="sec">Registros oficiais <span style="font-weight:600;text-transform:none;letter-spacing:0;color:#8891ab">(se já tiver)</span></div>
+    <div class="grid">
+      <div class="fg">
+        <label>Nº do Boletim de Ocorrência</label>
+        <input id="bo" placeholder="Número do BO">
+      </div>
+      <div class="fg">
+        <label>Seguradora</label>
+        <input id="seguradora" placeholder="Nome da seguradora">
+      </div>
+      <div class="fg full">
+        <label>Nº do aviso de sinistro</label>
+        <input id="aviso" placeholder="Número do aviso aberto na seguradora">
+      </div>
+    </div>
+
+    <div class="sec">Para fecharmos</div>
+    <div class="grid">
+      <div class="fg">
+        <label>Quem está registrando <span class="req">*</span></label>
+        <input id="registrou" placeholder="Seu nome">
+      </div>
+      <div class="fg">
+        <label>Seu telefone</label>
+        <input id="telefone" type="tel" inputmode="tel" placeholder="(75) 99999-9999">
+      </div>
+      <div class="fg full">
+        <label>Observações</label>
+        <textarea id="obs" placeholder="Qualquer outra coisa que a LOKÁ precise saber" style="min-height:60px"></textarea>
+      </div>
+    </div>
+
+    <button class="btn btn-gerar" onclick="gerarCodigo()">Gerar código do registro</button>
+
+    <div id="codigoArea">
+      <div style="font-size:13px;font-weight:800;color:#0d7a3e;margin-bottom:4px">Registro pronto</div>
+      <div class="passo"><b>1</b><span>Toque em <strong>Copiar código</strong>.</span></div>
+      <div class="passo"><b>2</b><span>Envie para a LOKÁ pelo WhatsApp (ou cole num e-mail).</span></div>
+      <div class="passo" style="margin-bottom:12px"><b>3</b><span>Pronto — a LOKÁ importa direto no sistema.</span></div>
+      <textarea id="codigoOutput" readonly onclick="this.select()"></textarea>
+      <div class="acoes">
+        <button class="btn btn-copiar" onclick="copiarCodigo()">Copiar código</button>
+        <button class="btn btn-zap" onclick="enviarZap()">Enviar no WhatsApp</button>
+      </div>
+      <div class="okmsg" id="copyMsg">Código copiado — agora é só colar e enviar.</div>
+      <button class="btn btn-limpar" onclick="limparFormulario()">Registrar outra ocorrência</button>
+    </div>
+
+    <div class="rodape">
+      O código guarda apenas o que você digitou aqui.<br>
+      Nada é enviado automaticamente — quem envia é você.
+    </div>
+  </div>
+</div>
+
+<script>
+function val(id){ var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; }
+
+function gerarCodigo(){
+  var placa = val('placa').toUpperCase().replace(/\s/g, '');
+  var tipo  = val('tipo');
+  var data  = val('data');
+  var desc  = val('descricao');
+  var quem  = val('registrou');
+
+  // Os obrigatórios são os que o sistema exige para abrir a ocorrência.
+  // O resto a LOKÁ completa depois, sem travar quem está na rua.
+  if (!placa)            { alerta('Informe a placa do veículo.', 'placa'); return; }
+  if (placa.length < 7)  { alerta('A placa parece incompleta. Confira.', 'placa'); return; }
+  if (!tipo)             { alerta('Escolha o tipo da ocorrência.', 'tipo'); return; }
+  if (!data)             { alerta('Informe a data da ocorrência.', 'data'); return; }
+  if (!desc)             { alerta('Descreva o que aconteceu.', 'descricao'); return; }
+  if (!quem)             { alerta('Informe quem está registrando.', 'registrou'); return; }
+
+  var dados = {
+    v: 1,
+    placa: placa,
+    tipo: tipo,
+    data: data,
+    hora: val('hora'),
+    local: val('local'),
+    condutor: val('condutor'),
+    vitimas: val('vitimas'),
+    terceiros: val('terceiros'),
+    descricao: desc,
+    bo: val('bo'),
+    seguradora: val('seguradora'),
+    aviso: val('aviso'),
+    obs: val('obs'),
+    registrou: quem,
+    telefone: val('telefone'),
+    enviadoEm: new Date().toISOString()
+  };
+
+  // Mesmo formato do formulário da oficina: prefixo + base64 do JSON.
+  // O unescape(encodeURIComponent(...)) é o que faz acento sobreviver ao btoa.
+  var json = JSON.stringify(dados);
+  var codigo = 'LOKA-SIN::' + btoa(unescape(encodeURIComponent(json)));
+  document.getElementById('codigoOutput').value = codigo;
+  var area = document.getElementById('codigoArea');
+  area.style.display = 'block';
+  document.getElementById('copyMsg').style.display = 'none';
+  area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function alerta(msg, foco){
+  alert('⚠️ ' + msg);
+  var e = document.getElementById(foco);
+  if (e) { e.scrollIntoView({ behavior:'smooth', block:'center' }); setTimeout(function(){ e.focus(); }, 300); }
+}
+
+function copiarCodigo(){
+  var ta = document.getElementById('codigoOutput');
+  ta.select();
+  ta.setSelectionRange(0, 99999);           // iOS só copia com o range explícito
+  function ok(){ document.getElementById('copyMsg').style.display = 'block'; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(ok).catch(function(){
+      try { document.execCommand('copy'); ok(); } catch(e){ alert('Selecione o código e copie na mão.'); }
+    });
+  } else {
+    try { document.execCommand('copy'); ok(); } catch(e){ alert('Selecione o código e copie na mão.'); }
+  }
+}
+
+// Abre o WhatsApp com o texto pronto. Quem escolhe o destinatário e envia é a
+// pessoa — nada sai daqui sozinho.
+function enviarZap(){
+  var d = document.getElementById('codigoOutput').value;
+  if (!d) return;
+  var txt = 'Registro de ocorrência LOKÁ'
+    + '\n\nPlaca: ' + val('placa')
+    + '\nData: ' + (val('data') ? val('data').split('-').reverse().join('/') : '')
+    + (val('hora') ? ' ' + val('hora') : '')
+    + '\nRegistrado por: ' + val('registrou')
+    + '\n\n' + d;
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+}
+
+function limparFormulario(){
+  if (!confirm('Limpar o formulário para registrar outra ocorrência?')) return;
+  ['placa','tipo','hora','local','condutor','vitimas','terceiros','descricao',
+   'bo','seguradora','aviso','obs'].forEach(function(id){
+    var e = document.getElementById(id); if (e) e.value = '';
+  });
+  // Quem está registrando e o telefone ficam: costuma ser a mesma pessoa.
+  document.getElementById('data').value = hoje();
+  document.getElementById('codigoArea').style.display = 'none';
+  document.getElementById('codigoOutput').value = '';
+  document.getElementById('copyMsg').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function hoje(){
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+document.getElementById('data').value = hoje();
+</script>
+</body>
+</html>

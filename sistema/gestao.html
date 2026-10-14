@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v110-20261014-1105 -->
+<!-- LOKA deploy: v111-20261014-1150 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -765,6 +765,8 @@ tr:hover td{background:#f8f9fe;}
           <button onclick="limparFiltroDataSin()" title="Limpar datas" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;font-size:13px;padding:0 4px">✕</button>
         </div>
         <button class="btn btn-blue" id="btnNovoSin" onclick="openSinistro(null)">+ Nova Ocorrência</button>
+        <button class="btn" id="btnImpSin" style="background:#2B4BF2;color:#fff;white-space:nowrap" onclick="sinImportarAbrir()" title="Colar o código que o colaborador enviou pelo formulário">&#128229; Importar</button>
+        <button class="btn btn-outline" id="btnLinkSin" style="white-space:nowrap" onclick="sinLinkFormulario()" title="Copiar o link do formulário para mandar ao colaborador">&#128279; Link do formul&aacute;rio</button>
         <button class="btn" id="btnRelSin" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioSinistros()" title="Gerar relatório do que está na tela para imprimir ou salvar em PDF">📄 Relatório PDF</button>
       </div>
 
@@ -1385,7 +1387,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v110-20261014-1105';
+var LOKA_BUILD = 'v111-20261014-1150';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7310,6 +7312,195 @@ function _sinSincronizarFranquia(reg){
 }
 
 // ── SALVAR ────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// IMPORTAR OCORRÊNCIA DO FORMULÁRIO DO COLABORADOR
+// ══════════════════════════════════════════════════════════════
+// O colaborador preenche `sinistro-colaborador.html` no celular ou no
+// computador, o formulário gera um código `LOKA-SIN::<base64>` e ele manda
+// pelo WhatsApp. Aqui o código vira ocorrência.
+//
+// 🔴 Por que código, e não um formulário que grava direto no banco: a página é
+// pública (GitHub Pages) e as regras do banco estão abertas (pendência 3). Uma
+// porta de escrita a mais, sem login, aumentaria a exposição de dado de cliente.
+// Além disso o código funciona sem sinal: a pessoa copia e envia quando puder.
+var _sinImp = [];
+
+// Decodifica um bloco base64 que pode ter vindo sujo.
+// ⚠️ Tirar os espaços junta o base64 que o WhatsApp quebrou em linhas — mas
+// também COLA nele o texto que vier depois ("abraço", "obrigado"), porque essas
+// letras são base64 válido. Por isso encurta pela direita até virar JSON.
+// (O importador de manutenção da LOKÁ ainda não faz isso e engasga nesse caso.)
+function _sinImpLer(parte){
+  var m = String(parte || '').replace(/[\r\n\t ]/g, '').match(/^[A-Za-z0-9+/=]+/);
+  if (!m) return null;
+  var b64 = m[0];
+  for (var fim = b64.length; fim >= 8; fim--) {
+    var pedaco = b64.slice(0, fim);
+    if (pedaco.length % 4 === 1) continue;        // tamanho impossível para base64
+    try {
+      var json = decodeURIComponent(escape(atob(pedaco)));
+      var d = JSON.parse(json);
+      if (d && typeof d === 'object' && d.placa) return d;
+    } catch(e) { /* encurta mais */ }
+  }
+  return null;
+}
+
+function _sinImpPlaca(p){ return String(p == null ? '' : p).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+function sinImportarAbrir(){
+  if (!db) return;
+  _sinImp = [];
+  var ex = document.getElementById('mSinImport');
+  if (ex) ex.remove();
+  var p = document.createElement('div');
+  p.id = 'mSinImport';
+  p.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  p.innerHTML = '<div style="background:#fff;border-radius:12px;width:620px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);max-height:90vh;overflow:auto">'
+    + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0">&#128229; Importar ocorr&ecirc;ncia do formul&aacute;rio</div>'
+    + '<div style="padding:18px">'
+    + '<p style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.5">Cole o c&oacute;digo enviado pelo colaborador (come&ccedil;a com <strong>LOKA-SIN::</strong>). Pode colar v&aacute;rios, um por linha &mdash; e pode colar a mensagem inteira do WhatsApp, o sistema acha o c&oacute;digo no meio do texto.</p>'
+    + '<textarea id="sinImpCodigo" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="LOKA-SIN::..." style="width:100%;min-height:110px;padding:12px;border:1.5px solid #d5dae8;border-radius:8px;font-family:monospace;font-size:11px;outline:none;resize:vertical"></textarea>'
+    + '<button class="btn btn-outline" style="margin-top:10px;font-size:12px" onclick="sinImportarLer()">&#128269; Conferir o c&oacute;digo</button>'
+    + '<div id="sinImpPreview" style="margin-top:12px"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">'
+      + '<button id="sinImpFechar" style="padding:9px 16px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Fechar</button>'
+      + '<button id="sinImpConfirm" style="display:none;padding:9px 20px;background:#0d7a3e;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer" onclick="sinImportarConfirmar()">&#10004; Importar</button>'
+    + '</div></div></div>';
+  document.body.appendChild(p);
+  p.querySelector('#sinImpFechar').onclick = function(){ p.remove(); };
+  p.addEventListener('click', function(e){ if (e.target === p) p.remove(); });
+}
+
+function sinImportarLer(){
+  var raw = (document.getElementById('sinImpCodigo') || {}).value || '';
+  var prev = document.getElementById('sinImpPreview');
+  var conf = document.getElementById('sinImpConfirm');
+  if (!raw.trim()) { toast('Cole ao menos um código','#b45309'); return; }
+
+  _sinImp = [];
+  var erros = 0;
+  // Case-insensitive: o teclado do celular às vezes "corrige" para minúsculas.
+  var partes = raw.split(/LOKA-SIN::/i);
+  partes.forEach(function(parte, i){
+    if (i === 0) return;                 // o que vier antes do primeiro prefixo
+    var d = _sinImpLer(parte);
+    if (d) _sinImp.push(d); else erros++;
+  });
+
+  if (!_sinImp.length) {
+    prev.innerHTML = '<div style="padding:10px;background:#fdecea;color:#c0392b;border-radius:7px;font-size:12px">'
+      + '&#10060; Nenhum c&oacute;digo v&aacute;lido encontrado' + (erros ? ' (' + erros + ' com erro)' : '')
+      + '<div style="font-size:11px;margin-top:4px;font-weight:400">Confira se o texto colado tem <strong>LOKA-SIN::</strong> e se o c&oacute;digo veio inteiro.</div></div>';
+    if (conf) conf.style.display = 'none';
+    return;
+  }
+
+  var jaTem = _sinLista();
+  prev.innerHTML = '<div style="border:1.5px solid #e2e5f0;border-radius:8px;overflow:hidden">'
+    + _sinImp.map(function(d){
+        var pl = _sinImpPlaca(d.placa);
+        var v = (db.veiculos || []).filter(Boolean).find(function(x){ return x.placa && _sinImpPlaca(x.placa) === pl; });
+        var loc = v ? _locatariaAtual(v.placa, v.id) : null;
+        // Avisa (sem bloquear) se já existe ocorrência igual: o mesmo código
+        // pode ser colado duas vezes sem ninguém perceber.
+        var dup = jaTem.some(function(s){
+          return s && _sinImpPlaca(s.placa) === pl && s.data === d.data && s.tipo === d.tipo;
+        });
+        return '<div style="padding:10px 14px;border-bottom:1px solid #f0f2f8;font-size:12px">'
+          + '<strong>' + (d.placa || '—') + '</strong> '
+          + (v ? '<span style="color:#0d7a3e">&#10003; ' + ((v.marca||'') + ' ' + (v.modelo||'')).trim() + '</span>'
+               : '<span style="color:#b45309">&#9888; placa n&atilde;o cadastrada</span>')
+          + ' &middot; <span style="font-weight:700">' + (SIN_TIPO_LBL[d.tipo] || d.tipo || '—') + '</span>'
+          + '<div style="font-size:11px;color:#666;margin-top:3px">'
+            + mltBR(d.data) + (d.hora ? ' ' + d.hora : '')
+            + (loc && loc.clienteNome ? ' &middot; locat&aacute;rio: ' + loc.clienteNome : ' &middot; <span style="color:#b45309">sem locat&aacute;rio no momento</span>')
+            + (d.registrou ? ' &middot; por ' + d.registrou : '')
+          + '</div>'
+          + '<div style="font-size:11px;color:#444;margin-top:3px">' + String(d.descricao || '').substring(0, 110)
+            + (String(d.descricao || '').length > 110 ? '…' : '') + '</div>'
+          + (dup ? '<div style="font-size:11px;color:#b45309;font-weight:700;margin-top:4px">&#9888; j&aacute; existe ocorr&ecirc;ncia desta placa, nesta data e deste tipo</div>' : '')
+          + '</div>';
+      }).join('')
+    + '</div>'
+    + '<div style="font-size:11px;color:#0d7a3e;font-weight:700;margin-top:8px">'
+      + _sinImp.length + ' ocorr&ecirc;ncia(s) pronta(s) para importar'
+      + (erros ? ' &middot; ' + erros + ' c&oacute;digo(s) com erro' : '') + '</div>';
+  if (conf) conf.style.display = 'inline-block';
+}
+
+function sinImportarConfirmar(){
+  if (!_sinImp.length) return;
+  garantirArray('sinistros');
+  var add = 0;
+  _sinImp.forEach(function(d, i){
+    var pl = _sinImpPlaca(d.placa);
+    var v = (db.veiculos || []).filter(Boolean).find(function(x){ return x.placa && _sinImpPlaca(x.placa) === pl; }) || {};
+    var loc = v.id ? _locatariaAtual(v.placa, v.id) : null;
+    // Observações do formulário + quem registrou, para a origem não se perder.
+    var obs = [];
+    if (d.obs) obs.push(d.obs);
+    if (d.registrou) obs.push('Registrado por ' + d.registrou + (d.telefone ? ' (' + d.telefone + ')' : ''));
+    db.sinistros.push({
+      id:          'sin_imp_' + Date.now() + '_' + i,
+      veiculoId:   v.id || '',
+      veiculoNome: ((v.marca||'') + ' ' + (v.modelo||'')).trim(),
+      placa:       v.placa || d.placa || '',
+      clienteId:   loc ? (loc.clienteId||'')   : '',
+      clienteNome: loc ? (loc.clienteNome||'') : '',
+      data:        d.data || new Date().toISOString().split('T')[0],
+      hora:        d.hora || '',
+      tipo:        d.tipo || 'outro',
+      // 🔴 Entra sempre como ABERTO: quem está na rua registra o fato, não
+      // decide o andamento do caso.
+      status:      'aberto',
+      local:       d.local || '',
+      condutor:    d.condutor || '',
+      vitimas:     d.vitimas || '',
+      descricao:   d.descricao || '',
+      terceiros:   d.terceiros || '',
+      bo:          d.bo || '',
+      seguradora:  d.seguradora || '',
+      aviso:       d.aviso || '',
+      custoReparo: '',
+      // 🔴 A franquia NÃO vem do formulário. Cobrar o locatário é decisão da
+      // LOKÁ, caso a caso — pode ser da locadora ou de terceiro.
+      franquiaDevida:     false,
+      franquiaValor:      '',
+      franquiaVencimento: '',
+      receberId:   '',
+      obs:         obs.join(' · '),
+      criadoEm:    new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+      importadoForm: true,
+      registradoPor: d.registrou || '',
+      enviadoEm:   d.enviadoEm || ''
+    });
+    add++;
+  });
+  saveDB();
+  var m = document.getElementById('mSinImport');
+  if (m) m.remove();
+  renderSinistros();
+  toast('✅ ' + add + ' ocorrência(s) importada(s) — confira e complete o que faltar','#0d7a3e');
+}
+
+// Link do formulário, para o Rogel mandar aos colaboradores.
+function sinLinkFormulario(){
+  var url = location.href.replace(/[^/]*$/, '') + 'sinistro-colaborador.html';
+  var txt = 'Formulário de registro de ocorrência da LOKÁ:\n' + url
+    + '\n\nAbra no celular ou no computador, preencha e me envie o código que ele gerar.';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){
+      toast('🔗 Link copiado — cole no WhatsApp do colaborador','#0d7a3e');
+    }).catch(function(){ prompt('Copie o link do formulário:', url); });
+  } else {
+    prompt('Copie o link do formulário:', url);
+  }
+  try { window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); } catch(e){}
+}
+
+
 function salvarSinistro(){
   if (!db) return;
   garantirArray('sinistros');
