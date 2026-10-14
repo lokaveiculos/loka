@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v113-20261014-1520 -->
+<!-- LOKA deploy: v114-20261014-1705 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1130,12 +1130,16 @@ tr:hover td{background:#f8f9fe;}
         <option value="pendente">Pendente</option>
         <option value="indicada">Condutor Indicado</option>
         <option value="recurso">Em Recurso</option>
+        <option value="cobrada">Cobrada do locat&aacute;rio</option>
+        <option value="repassada">Repassada</option>
         <option value="cancelada">Cancelada</option>
       </select></div>
     <div id="mltStAviso" style="display:none;background:#fff8e6;border-left:3px solid #b45309;border-radius:6px;padding:9px 12px;font-size:11px;color:#7c5010;line-height:1.5;margin-top:10px"></div>
     <div style="font-size:10px;color:var(--muted);margin-top:12px;line-height:1.5">
-      Para <strong>Paga</strong>, <strong>Cobrada</strong> ou <strong>Repassada</strong>, use
-      <strong>&#128176; Baixar como pagas</strong> &mdash; essas pedem a data e o valor do pagamento.<br>
+      Para <strong>Paga</strong>, use <strong>&#128176; Baixar como pagas</strong> &mdash;
+      ela pede a data e o valor do pagamento.<br>
+      <strong>Cobrada</strong> e <strong>Repassada</strong> mudam s&oacute; a situa&ccedil;&atilde;o: a multa
+      continua contando como <strong>em aberto</strong> at&eacute; ser paga.<br>
       Multas <strong>pagas</strong> e <strong>canceladas</strong> n&atilde;o entram na sele&ccedil;&atilde;o da tabela;
       para mudar uma delas, abra a multa em <strong>Editar</strong>.
     </div>
@@ -1413,7 +1417,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v113-20261014-1520';
+var LOKA_BUILD = 'v114-20261014-1705';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -12107,12 +12111,17 @@ function mltBaixaSelecionadas(){
 // Usa a MESMA seleção da baixa (as caixinhas da tabela) — é o jeito que o
 // operador já conhece. A diferença é o que cada botão faz com ela.
 //
-// 🔴 Aqui NÃO entram `paga`, `cobrada` e `repassada`. Essas três carregam
-// dinheiro: a baixa pergunta data e valor e grava `dataPagamento`/`valorPago`.
-// Marcar "paga" sem isso deixaria a multa paga sem pagamento registrado — e o
-// recibo, que exige multa paga, imprimiria um documento de um valor que o
-// sistema não tem. Para elas existe o botão "Baixar como pagas".
-var MLT_ST_LOTE = ['pendente', 'indicada', 'recurso', 'cancelada'];
+// 🔴 Aqui NÃO entra `paga`, e só ela. Paga significa dinheiro recebido:
+// tira a multa do total em aberto e e o que o recibo exige. Marcar paga sem
+// data nem valor deixaria a multa paga sem pagamento registrado, e o recibo
+// imprimiria um documento de um valor que o sistema não tem. Para ela existe
+// o botão "Baixar como pagas", que pergunta as duas coisas.
+//
+// ⚠️ `cobrada` e `repassada` ESTAO aqui de propósito: apesar de a baixa
+// também oferecê-las, elas não são pagamento. O total em aberto só ignora
+// `paga` e `cancelada` — uma multa cobrada continua em aberto. São estado de
+// COBRANÇA, e por isso mudam aqui sem mexer em `dataPagamento`/`valorPago`.
+var MLT_ST_LOTE = ['pendente', 'indicada', 'recurso', 'cobrada', 'repassada', 'cancelada'];
 
 function mltStatusAbrir(){
   var sel = mltBaixaSelecionadas();
@@ -12156,6 +12165,13 @@ function mltStatusAviso(){
     txt = 'Marca que há recurso em andamento. O prazo e o andamento continuam sendo acompanhados no órgão.';
   } else if (novo === 'pendente') {
     txt = 'Volta a multa para o estado inicial, em aberto.';
+  } else if (novo === 'cobrada') {
+    txt = 'Marca que a multa j\u00e1 foi cobrada do locat\u00e1rio (na fatura, por exemplo). '
+        + 'Ela <strong>continua em aberto</strong> at\u00e9 o pagamento \u2014 para registrar o pagamento, '
+        + 'use "Baixar como pagas".';
+  } else if (novo === 'repassada') {
+    txt = 'Marca que a multa foi repassada ao locat\u00e1rio. Ela <strong>continua em aberto</strong> '
+        + 'at\u00e9 o pagamento.';
   }
   if (novo && saindoDeInd && novo !== 'indicada') {
     txt += (txt ? '<br><br>' : '')
