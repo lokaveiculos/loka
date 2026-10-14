@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v111-20261014-1150** |
+| `gestao.html` | **v112-20261014-1240** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v13-20260930-1530** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -2948,6 +2948,27 @@ tem de exercitar a entrada desonesta, não só a esperada.**
   publicado e virou ocorrência: **VW Amarok, locatário RSC, status aberto,
   franquia false**, acentos intactos. Nada foi gravado em produção.
 - Regressão: **15 suítes, 831 testes**, nenhuma falha
+
+### 🔴 Corrigido na v112: o botão do link abria o WhatsApp sozinho
+
+Relato do Rogel: *"quando clicamos no link do formulario abre a opcao de abrir o
+whatsapp"*. Estava certo, e era **desenho meu**: `sinLinkFormulario()` copiava o
+link **e** chamava `window.open` do `wa.me` na mesma chamada. Quem clicava
+esperando um link ganhava uma janela que não pediu.
+
+Agora o botão abre um quadro com o endereço à vista e **três ações separadas**,
+cada uma um clique da pessoa: **Copiar link**, **Ver o formulário** e **Enviar no
+WhatsApp**. Ao clicar no botão, **nada acontece sozinho** — nem copia, nem abre.
+
+O endereço passou também a ignorar `?v=` e `#âncora` da URL atual.
+
+⚠️ **A lição:** juntar duas ações num botão só por conveniência tira a escolha de
+quem clica. O rótulo dizia "Link do formulário" e o botão fazia mais do que isso.
+
+Testes novos: o quadro abre sem abrir nada, cada botão faz só a sua coisa, e o
+link ignora query e âncora. Mais um defeito injetado que **reproduz exatamente a
+regressão reportada** — acusado por 4 testes.
+Total: **15 suítes, 841 testes**.
 
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir a aba Sinistros e usar os dois botões novos.
