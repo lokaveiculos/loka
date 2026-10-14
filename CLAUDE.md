@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v108-20261013-1030** |
+| `gestao.html` | **v110-20261014-1105** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v11-20260915-1050** |
 
@@ -2729,3 +2729,115 @@ em quantas vezes foi pago*. Essa linha não tem botão de excluir.
 ⚠️ Um defeito pode **estourar exceção** em vez de devolver resultado errado — a
 suíte passou a envolver tudo em `try/catch` e contar o crash como falha. Sem
 isso, dois dos seis defeitos matavam o teste sem acusar nada.
+
+---
+
+## ✅ Painel Faturamento por Veículo — 14/10/2026 (`fee7e0b`, v110) · gestao v110
+
+Pedido: "podemos criar um painel por veiculo onde possamos ver o faturamento do
+carro no mes?"
+
+### A fonte: o detalhamento da fatura, não um rateio
+Cada fatura guarda **`veiculosDetalhado[]`** — uma linha por carro, com placa,
+quantidade, aluguel, seguro, desconto e subtotal. São **480 linhas em 32 das 33
+faturas**, e **todas têm placa**. É o dado certo, e já existia.
+
+🔴 **O que o painel NÃO faz: ratear o total da fatura entre os carros.** A soma
+do detalhamento **não fecha** com o total em 16 das 32 faturas, e a diferença são
+os `outros` — multas, avarias, borracharia, juros, parcelamento. Dividir isso por
+carro seria inventar número.
+
+| | |
+|---|---|
+| soma dos subtotais (aluguel) | R$ 1.048.010,12 |
+| soma dos `outros` | R$ 136.506,02 |
+| soma dos totais das faturas | R$ 1.187.482,75 |
+
+### Os `outros` só entram num carro quando têm dono
+Dos 38 itens: **22 trazem placa** na referência ou na descrição
+(`Placa dianteira · GJU9H02`, `Franquia · GEZ8H54`) → R$ 47.391,10 vão para o
+carro, numa coluna **Extras** separada do aluguel. Os outros **16**
+(R$ 89.114,92 — parcelamento de R$ 54 mil, multas em lote, juros) vão para
+**"sem veículo identificado"**, listados item a item com o motivo.
+
+⚠️ **A placa só conta se existir na frota.** Sem essa trava, qualquer sigla de
+três letras seguida de números viraria carro. E item que cita **dois** carros não
+é dividido — vai para o não atribuído.
+
+### 🔴 A conferência que impede a tela de mentir
+O rodapé mostra: **total das faturas = atribuído aos veículos + sem veículo**.
+Quando não fecha, aparece aviso vermelho. Nos dados reais fecha nos 5 meses:
+
+| Mês | Faturas | Carros | Atribuído | Sem veículo | Total |
+|---|---|---|---|---|---|
+| 2026-06 | 7 | 73 | R$ 224.618,48 | R$ 13.550,27 | R$ 238.168,75 |
+| 2026-07 | 7 | 78 | R$ 268.763,37 | R$ 350,00 | R$ 269.113,37 |
+| 2026-08 | 8 | 78 | R$ 272.883,79 | R$ 63.308,73 | R$ 336.192,52 |
+| 2026-09 | 7 | 94 | R$ 312.546,64 | R$ 15.105,92 | R$ 327.652,56 |
+| 2026-10 | 4 | 5 | R$ 16.355,55 | R$ 0,00 | R$ 16.355,55 |
+
+Para fechar, **o que sobra do total de uma fatura vira item nomeado**. É o caso
+da **02/maio da ISS (R$ 3.200)** — a única fatura **sem detalhamento**, feita
+antes de esse campo existir: ela aparece como *"Fatura sem detalhamento por
+veículo · fatura antiga, sem a planilha por veículo"*, citando os 2 carros dela.
+
+### A tela
+Mês (só os que existem nas faturas) · busca por placa, modelo ou locatário ·
+ordem por maior/menor faturamento, placa ou locatário · opção de **mostrar os
+carros que não faturaram** (carro parado é informação).
+
+Colunas: Placa · Veículo · Locatário · **Aluguel** · **Extras do carro** ·
+**Total** · Situação · Histórico.
+
+O botão **📈 Histórico** abre o carro mês a mês, com barra comparativa, total do
+período, meses com faturamento e média por mês faturado.
+
+### 🔴 Defeito achado olhando a tela publicada: R$ 3.324,96**4**
+O cartão da média mostrava **três casas decimais**. O `brl()` do sistema só exige
+o **mínimo** de 2 (`minimumFractionDigits: 2`); sem `maximumFractionDigits`, o
+`toLocaleString` deixa chegar a 3. Nas outras telas não aparece porque os valores
+já chegam arredondados — aqui há **divisão** (média por carro), e a sobra apareceu.
+
+Entrou `_fvBRL()`, que arredonda antes de formatar, nas 22 chamadas do painel.
+⚠️ **O `brl()` global não foi tocado** — ele é usado em todas as telas, e mexer
+nele seria alterar o que não foi pedido. Mas o defeito está lá, latente, em
+qualquer lugar que venha a dividir.
+
+### Outros achados dos dados
+- **19 veículos da frota nunca aparecem em fatura nenhuma** — aparecem com R$ 0
+  quando a opção está marcada.
+- **1 placa foi faturada e não está no cadastro**: `GDE1E83`. A linha vem marcada
+  "fora do cadastro", e o histórico dela avisa.
+- Nenhum carro aparece em duas faturas do mesmo mês — mas se aparecer, o painel
+  soma numa linha só e mostra os dois locatários.
+
+### O que ficou de fora, de propósito
+- **Custo por veículo** (manutenção, multas) — ele pediu faturamento. O dado
+  existe; vira "resultado por veículo" quando for pedido.
+- **Faturamento x recebimento**: o painel mostra o que foi **faturado** (pela
+  competência, o campo `periodo`), não o que entrou. Quem responde por recebido é
+  o Contas a Receber.
+- Os aluguéis ativos **não têm valor por veículo** (4 contratos multi-veículo, e o
+  valor é do contrato), então não servem como fonte — seria rateio.
+
+### Validado
+- `node --check`; `<div>` balanceadas (668/668)
+- **68 testes** com o código real e os dados reais (33 faturas, 119 veículos):
+  leitura de valor, placa dentro de texto livre, os 5 meses, o cálculo conferido
+  contra conta feita por fora, **a invariante nos 5 meses**, extras com e sem
+  dono, item citando dois carros, subtotal vazio refeito, carro em duas faturas,
+  placa fora do cadastro, os filtros, as ordenações, os estados vazios, o
+  histórico e as bordas (sem fatura, sem cadastro, fatura sem total)
+- **7 defeitos injetados — todos acusados**: ratear o total, jogar `outros` sem
+  placa num carro, ignorar o subtotal vazio, não fechar o mês, aceitar placa de
+  qualquer texto, usar a emissão em vez da competência, e o valor com 3 casas
+- **No ar, no arquivo publicado**, com as 33 faturas e os 119 veículos reais: a
+  invariante fecha nos 5 meses, 94 linhas em setembro, rodapé somando
+  R$ 296.156,64 + R$ 16.390,00 = R$ 312.546,64, e zero valores com 3 casas
+- Regressão: **14 suítes, 761 testes**, nenhuma falha
+
+### ⏳ Não verificado
+Falta ver **logado**, dentro do menu — eu não autentico. O painel foi registrado
+em `PANELS`, `_TODOS_PAINEIS`, `TITLES`, `_PAINEL_LABEL`, `showPanel` e no perfil
+**Operador** (Master e Admin herdam pelo `_TODOS_PAINEIS.slice()`), que é a lição
+do painel `multasefrotas`.
