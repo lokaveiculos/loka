@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v108-20261013-1030 -->
+<!-- LOKA deploy: v109-20261014-1040 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -247,6 +247,7 @@ tr:hover td{background:#f8f9fe;}
     <div class="nav-sec">Documentos</div>
     
     <div data-label="Faturas" class="nav-item" id="ni-faturas" onclick="showPanel('faturas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Faturas</div>
+    <div data-label="Faturamento/Veículo" class="nav-item" id="ni-fatveiculo" onclick="showPanel('fatveiculo')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Faturamento/Veículo</div>
     <div data-label="Manutenção" class="nav-item" id="ni-manutencao" onclick="showPanel('manutencao')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Manutenção</div>
      <div data-label="Fornecedores" class="nav-item" id="ni-fornecedores" onclick="showPanel('fornecedores')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9"/><path d="M9 22V12h6v10"/></svg>Fornecedores</div>
     <div data-label="Multas" class="nav-item" id="ni-multas" onclick="showPanel('multas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas</div>
@@ -487,6 +488,33 @@ tr:hover td{background:#f8f9fe;}
       <div id="faturasGrid"></div>
     </div>
 
+
+    <!-- ══ FATURAMENTO POR VEÍCULO ══ -->
+    <div class="panel" id="panel-fatveiculo" style="display:none">
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+        <div class="search-box" style="flex:1;min-width:180px;">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="filter-input" id="fvBusca" type="text" placeholder="Buscar placa, modelo ou locat&aacute;rio..." oninput="fvRender()">
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
+          <span style="font-size:10px;font-weight:700;color:var(--muted)">&#128197; M&ecirc;s</span>
+          <select class="filter-sel" id="fvMes" onchange="fvRender()" style="font-size:11px;padding:5px"></select>
+        </div>
+        <select class="filter-sel" id="fvOrdem" onchange="fvRender()">
+          <option value="valor">&#11015; Maior faturamento</option>
+          <option value="valor_asc">&#11014; Menor faturamento</option>
+          <option value="placa">Placa (A-Z)</option>
+          <option value="cliente">Locat&aacute;rio (A-Z)</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--dark);cursor:pointer;background:#f0f2f9;padding:6px 10px;border-radius:8px">
+          <input type="checkbox" id="fvSemFat" onchange="fvRender()"> Mostrar carros que n&atilde;o faturaram
+        </label>
+        <button class="btn btn-outline" onclick="fvLimpar()" style="font-size:11px;padding:7px 12px">Limpar</button>
+      </div>
+
+      <div class="stats" id="fvStats" style="margin-bottom:12px"></div>
+      <div id="fvGrid"></div>
+    </div>
 
     <!-- ══ MANUTENÇÃO ══ -->
     <div class="panel" id="panel-manutencao" style="display:none;width:100%">
@@ -1357,7 +1385,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v108-20261013-1030';
+var LOKA_BUILD = 'v109-20261014-1040';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1407,13 +1435,14 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
     fornecedores: 'Fornecedores',
   multas: 'Multas',
   efrotas: 'e-Frotas (SENATRAN)',
   multasefrotas: 'Multas e-Frotas',
   sinistros: 'Ocorrências / Sinistros',
+  fatveiculo: 'Faturamento por Veículo',
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
   historico:'Histórico de Locações', faturas:'Faturas', manutencao:'Manutenção', financeiro:'Financeiro', reserva:'Reservas', cadastro:'Pré-Cadastro'
@@ -1449,9 +1478,9 @@ function _perfilAtual() {
 }
 
 // Todos os painéis controláveis por permissão
-var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
-var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',fatveiculo:'Faturamento por Veículo',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
   editarPrecos:'Editar preços dos veículos',
   gerenciarUsuarios:'Gerenciar usuários',
@@ -1491,7 +1520,7 @@ var _PERFIS_BUILTIN = {
   admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
               acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true, indicarCondutor:true } },
   operador: { nome:'Operador', builtin:true,
-              paineis:['dashboard','clientes','ativos','veiculos','faturas','manutencao','fornecedores','multas','sinistros','formularios','contratos','historico','reserva','cadastro'],
+              paineis:['dashboard','clientes','ativos','veiculos','faturas','fatveiculo','manutencao','fornecedores','multas','sinistros','formularios','contratos','historico','reserva','cadastro'],
               acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true } },
   // Oficina: inclui novas manutenções E consulta o histórico das placas da sua oficina
   oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
@@ -1731,6 +1760,7 @@ function showPanel(name) {
     if (name === 'financeiro')  { finInit(); finMostrarAba('acertos'); }
     if (name === 'multas')      { mltInit(); mltMostrarAba('lista'); }
     if (name === 'sinistros')   renderSinistros();
+    if (name === 'fatveiculo')  fvInit();
   } catch(e) {
     console.error('showPanel[' + name + ']:', e);
     // Exibir erro visual para debug
@@ -5516,6 +5546,422 @@ function renderFaturas() {
     var bView = e.target.closest('.fatura-view-btn');
     if (bView) { consultarFatura(bView.dataset.fatid, bView.dataset.cliid); return; }
   });
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// FATURAMENTO POR VEÍCULO
+// ══════════════════════════════════════════════════════════════
+// Quanto cada carro faturou no mês. A fonte é o DETALHAMENTO da fatura
+// (`veiculosDetalhado`), onde cada linha já é um veículo com o seu valor —
+// 480 linhas em 32 das 33 faturas, todas com placa.
+//
+// 🔴 O que NÃO é feito aqui: ratear o total da fatura entre os carros. A soma
+// do detalhamento não fecha com o total em 16 das 32 faturas, e a diferença
+// são os `outros` — multas, avarias, juros, parcelamento. Dividir isso por
+// carro seria inventar número.
+var _fvFaturas = null;    // cache do nó `faturas`
+var _fvCarregando = false;
+
+function _fvNum(s){
+  if (typeof s === 'number') return s;
+  return parseFloat(String(s == null ? '' : s).replace(/R\$|\s/g, '')
+    .replace(/\./g, '').replace(',', '.')) || 0;
+}
+function _fvPlaca(p){ return String(p == null ? '' : p).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+// Placa dentro de texto livre: pega o padrão antigo (ABC1234) e o Mercosul
+// (ABC1D23). Só vale se a placa existir na frota — senão qualquer sigla de
+// três letras seguida de números viraria "carro".
+function _fvPlacasNoTexto(txt){
+  var achadas = [], frota = _fvFrotaIndex();
+  String(txt == null ? '' : txt).toUpperCase().replace(/[A-Z]{3}[-\s]?[0-9][A-Z0-9][0-9]{2}/g, function(m){
+    var p = _fvPlaca(m);
+    if (frota[p] && achadas.indexOf(p) < 0) achadas.push(p);
+    return m;
+  });
+  return achadas;
+}
+
+var _fvFrotaCache = null;
+function _fvFrotaIndex(){
+  if (_fvFrotaCache) return _fvFrotaCache;
+  var ix = {};
+  ((db && db.veiculos) || []).forEach(function(v){ if (v && v.placa) ix[_fvPlaca(v.placa)] = v; });
+  _fvFrotaCache = ix;
+  return ix;
+}
+
+function _fvLista(){
+  if (!_fvFaturas) return [];
+  return _fvFaturas;
+}
+
+// O painel Faturas carrega o nó só quando é aberto; este painel é outro, então
+// carrega por conta própria. (Mesma armadilha da sincronização da v107.)
+function _fvCarregar(cb){
+  if (_fvFaturas) { cb(); return; }
+  if (_todasFaturas && _todasFaturas.length) { _fvFaturas = _todasFaturas.slice(); cb(); return; }
+  if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) { _fvFaturas = []; cb(); return; }
+  if (_fvCarregando) return;
+  _fvCarregando = true;
+  firebase.database().ref('faturas').once('value').then(function(snap){
+    var data = snap.val() || {};
+    _fvFaturas = [];
+    Object.keys(data).forEach(function(c){
+      var m = data[c]; if (!m) return;
+      Object.keys(m).forEach(function(k){
+        var f = m[k]; if (f && typeof f === 'object') _fvFaturas.push(f);
+      });
+    });
+    _fvCarregando = false;
+    cb();
+  }).catch(function(e){
+    _fvCarregando = false;
+    console.error('_fvCarregar:', e);
+    _fvFaturas = [];
+    toast('⚠️ Não deu para ler as faturas: ' + ((e && e.message) || 'erro'), '#c0392b');
+    cb();
+  });
+}
+
+// Meses que existem de verdade nas faturas, do mais novo para o mais velho.
+function _fvPeriodos(){
+  var vistos = {};
+  _fvLista().forEach(function(f){ if (f && f.periodo) vistos[f.periodo] = 1; });
+  return Object.keys(vistos).sort().reverse();
+}
+
+function _fvMesLabel(p){
+  if (!/^\d{4}-\d{2}$/.test(String(p||''))) return p || '—';
+  var d = new Date(p + '-01T00:00');
+  if (isNaN(d)) return p;
+  var s = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ── O cálculo ─────────────────────────────────────────────────
+// Devolve, para um mês: os carros com o que faturaram, o que não pôde ser
+// atribuído a carro nenhum, e o total das faturas daquele mês (para conferir).
+function _fvCalcular(periodo){
+  var carros = {}, naoAtrib = [], totalFaturas = 0, nFaturas = 0;
+  var frota = _fvFrotaIndex();
+
+  function carro(placa, nome){
+    var p = _fvPlaca(placa);
+    if (!carros[p]) {
+      var v = frota[p];
+      carros[p] = {
+        placa: (v && v.placa) || placa, chave: p,
+        nome: v ? ((v.marca||'') + ' ' + (v.modelo||'')).trim() : (nome || ''),
+        ano: (v && v.ano) || '', status: (v && v.status) || '',
+        noCadastro: !!v, aluguel: 0, extras: 0, itens: [], clientes: {}
+      };
+    }
+    return carros[p];
+  }
+
+  _fvLista().forEach(function(f){
+    if (!f || f.periodo !== periodo) return;
+    nFaturas++;
+    totalFaturas += _fvNum(f.total);
+    var coberto = 0;
+
+    // 1) o aluguel de cada carro, direto do detalhamento
+    (f.veiculosDetalhado || []).forEach(function(d){
+      if (!d || !d.placa) return;
+      var c = carro(d.placa, d.carro);
+      // O subtotal gravado é o que a fatura mostrou. Se vier vazio (a tela
+      // escreve "—" quando dá zero), refaz a conta da própria fatura.
+      var sub = _fvNum(d.subtotal);
+      if (!sub) sub = (_fvNum(d.aluguel) * (_fvNum(d.qtd) || 1)) + _fvNum(d.seguro) - _fvNum(d.desconto);
+      c.aluguel += sub;
+      coberto += sub;
+      c.clientes[f.cliente || ''] = 1;
+      c.itens.push({ tipo: 'aluguel', fatura: f.numero || '', cliente: f.cliente || '',
+                     valor: sub, desc: 'Aluguel' + (_fvNum(d.desconto) ? ' (desconto ' + brl(_fvNum(d.desconto)) + ')' : '') });
+    });
+
+    // 2) os "outros" só vão para um carro quando a placa está escrita neles
+    (f.outros || []).forEach(function(o){
+      if (!o) return;
+      var v = _fvNum(o.valor);
+      if (!v) return;
+      coberto += v;
+      var ps = _fvPlacasNoTexto(o.referencia);
+      if (!ps.length) ps = _fvPlacasNoTexto(o.descricao);
+      if (ps.length === 1) {
+        var c = carro(ps[0]);
+        c.extras += v;
+        c.clientes[f.cliente || ''] = 1;
+        c.itens.push({ tipo: 'extra', fatura: f.numero || '', cliente: f.cliente || '',
+                       valor: v, desc: o.descricao || 'Outros' });
+      } else {
+        // Sem placa, ou com mais de uma: dividir seria chute.
+        naoAtrib.push({ fatura: f.numero || '', cliente: f.cliente || '',
+                        desc: o.descricao || 'Outros', ref: o.referencia || '', valor: v,
+                        motivo: ps.length > 1 ? 'mais de um veículo citado' : 'sem veículo identificado' });
+      }
+    });
+
+    // 3) 🔴 O que sobrou do total da fatura sem passar por carro nenhum.
+    // Acontece com fatura ANTIGA, feita antes de o detalhamento por veículo
+    // existir: ela só tem o valor cheio. Ratear entre os carros seria inventar,
+    // então o valor aparece aqui, nomeado — e a conta do mês fecha.
+    var resto = Math.round((_fvNum(f.total) - coberto) * 100) / 100;
+    if (Math.abs(resto) >= 0.01) {
+      naoAtrib.push({ fatura: f.numero || '', cliente: f.cliente || '',
+        desc: (f.veiculosDetalhado && f.veiculosDetalhado.length)
+                ? 'Diferença não detalhada na fatura'
+                : 'Fatura sem detalhamento por veículo',
+        ref: (f.veiculos || []).join(' · '), valor: resto,
+        motivo: (f.veiculosDetalhado && f.veiculosDetalhado.length)
+                ? 'o total da fatura é maior que a soma das linhas'
+                : 'fatura antiga, sem a planilha por veículo' });
+    }
+  });
+
+  var lista = Object.keys(carros).map(function(k){
+    var c = carros[k];
+    c.total = Math.round((c.aluguel + c.extras) * 100) / 100;
+    c.cliente = Object.keys(c.clientes).filter(Boolean).join(', ');
+    return c;
+  });
+
+  return {
+    carros: lista, naoAtrib: naoAtrib, nFaturas: nFaturas,
+    totalFaturas: Math.round(totalFaturas * 100) / 100,
+    somaCarros: Math.round(lista.reduce(function(s,c){ return s + c.total; }, 0) * 100) / 100,
+    somaNaoAtrib: Math.round(naoAtrib.reduce(function(s,o){ return s + o.valor; }, 0) * 100) / 100
+  };
+}
+
+// ── Tela ──────────────────────────────────────────────────────
+function fvInit(){
+  _fvFrotaCache = null;
+  _fvCarregar(function(){
+    var sel = document.getElementById('fvMes');
+    if (sel) {
+      var per = _fvPeriodos();
+      var atual = sel.value;
+      sel.innerHTML = per.length
+        ? per.map(function(p){ return '<option value="'+p+'">'+_fvMesLabel(p)+'</option>'; }).join('')
+        : '<option value="">— sem faturas —</option>';
+      if (atual && per.indexOf(atual) >= 0) sel.value = atual;
+    }
+    fvRender();
+  });
+}
+
+function fvLimpar(){
+  var b = document.getElementById('fvBusca'); if (b) b.value = '';
+  var z = document.getElementById('fvSemFat'); if (z) z.checked = false;
+  var o = document.getElementById('fvOrdem'); if (o) o.value = 'valor';
+  fvRender();
+}
+
+function fvRender(){
+  var grid = document.getElementById('fvGrid');
+  if (!grid) return;
+  if (!_fvFaturas) { grid.innerHTML = '<div class="empty"><p>Carregando faturas…</p></div>'; return; }
+
+  var periodo = (document.getElementById('fvMes')||{}).value || '';
+  var q       = semAcento((document.getElementById('fvBusca')||{}).value || '');
+  var ordem   = (document.getElementById('fvOrdem')||{}).value || 'valor';
+  var semFat  = !!(document.getElementById('fvSemFat')||{}).checked;
+
+  var r = _fvCalcular(periodo);
+  var lista = r.carros.slice();
+
+  // Carros da frota que NÃO faturaram no mês. "Não faturou" é informação:
+  // carro parado, em manutenção ou entre contratos.
+  var comFat = {};
+  lista.forEach(function(c){ comFat[c.chave] = 1; });
+  var zerados = ((db && db.veiculos) || []).filter(function(v){
+    return v && v.placa && v.status !== 'inativo' && !comFat[_fvPlaca(v.placa)];
+  }).map(function(v){
+    return { placa: v.placa, chave: _fvPlaca(v.placa),
+             nome: ((v.marca||'')+' '+(v.modelo||'')).trim(), ano: v.ano||'',
+             status: v.status||'', noCadastro: true,
+             aluguel: 0, extras: 0, total: 0, itens: [], clientes: {}, cliente: '' };
+  });
+  if (semFat) lista = lista.concat(zerados);
+
+  if (q) lista = lista.filter(function(c){
+    return semAcento(c.placa + ' ' + c.nome + ' ' + c.cliente).indexOf(q) >= 0;
+  });
+
+  lista.sort(
+    ordem === 'valor_asc' ? function(a,b){ return a.total - b.total; }
+  : ordem === 'placa'     ? function(a,b){ return String(a.placa).localeCompare(String(b.placa)); }
+  : ordem === 'cliente'   ? function(a,b){ return String(a.cliente).localeCompare(String(b.cliente),'pt'); }
+  :                         function(a,b){ return b.total - a.total; }
+  );
+
+  // Cartões
+  var st = document.getElementById('fvStats');
+  if (st) {
+    var nFrota = ((db && db.veiculos) || []).filter(function(v){ return v && v.placa && v.status !== 'inativo'; }).length;
+    var media = r.carros.length ? r.somaCarros / r.carros.length : 0;
+    st.innerHTML =
+      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+brl(r.somaCarros)+'</div><div class="stat-label">Faturado nos ve&iacute;culos</div></div>'
+    + '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value">'+r.carros.length+'</div><div class="stat-label">Carros que faturaram'+(nFrota?' (de '+nFrota+' ativos)':'')+'</div></div>'
+    + '<div class="stat"><div class="stat-value" style="font-size:15px">'+brl(media)+'</div><div class="stat-label">M&eacute;dia por carro</div></div>'
+    + '<div class="stat" style="border-left-color:'+(r.somaNaoAtrib?'#b45309':'var(--border)')+'"><div class="stat-value" style="font-size:15px">'+brl(r.somaNaoAtrib)+'</div><div class="stat-label">Sem veículo identificado</div></div>';
+  }
+
+  if (!r.nFaturas) {
+    grid.innerHTML = '<div class="empty"><p>Nenhuma fatura em '+_fvMesLabel(periodo)+'</p>'
+      + '<small>O faturamento por ve&iacute;culo vem do detalhamento das faturas do m&ecirc;s.</small></div>';
+    return;
+  }
+  if (!lista.length) {
+    grid.innerHTML = '<div class="empty"><p>Nenhum ve&iacute;culo encontrado com esses filtros</p>'
+      + '<small>Ajuste a busca ou troque o m&ecirc;s.</small></div>';
+    return;
+  }
+
+  function th(t, extra){
+    return '<th style="padding:9px 12px;font-size:9px;font-weight:700;text-transform:uppercase;'+(extra||'')+'">'+t+'</th>';
+  }
+  var stLbl = { alugado:'🔑 Alugado', disponivel:'✅ Disponível', inativo:'⛔ Inativo' };
+
+  grid.innerHTML = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:900px">'
+    + '<thead><tr style="background:var(--dark)">'
+      + th('Placa') + th('Ve&iacute;culo') + th('Locat&aacute;rio')
+      + th('Aluguel', 'text-align:right') + th('Extras do carro', 'text-align:right')
+      + th('Total no m&ecirc;s', 'text-align:right') + th('Situa&ccedil;&atilde;o')
+      + th('', 'text-align:center')
+    + '</tr></thead><tbody>'
+    + lista.map(function(c){
+      var zero = c.total <= 0;
+      return '<tr style="border-bottom:1px solid #f0f2f8'+(zero?';background:#fcfcfd;opacity:.75':'')+'">'
+        + '<td style="padding:8px 12px;font-family:monospace;font-weight:700;font-size:11px">'+(c.placa||'—')
+          + (c.noCadastro ? '' : '<div style="font-size:9px;color:#b45309;font-weight:700">fora do cadastro</div>')+'</td>'
+        + '<td style="padding:8px 12px;font-size:11px">'+(c.nome||'—')
+          + (c.ano ? '<div style="font-size:9px;color:var(--muted)">'+c.ano+'</div>' : '')+'</td>'
+        + '<td style="padding:8px 12px;font-size:11px">'+(c.cliente||'<span style="color:var(--muted)">—</span>')+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-size:11px">'+(c.aluguel?brl(c.aluguel):'—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;font-size:11px;color:'+(c.extras?'#b45309':'var(--muted)')+'">'+(c.extras?brl(c.extras):'—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-weight:800;font-family:monospace;font-size:12px;color:'+(zero?'var(--muted)':'#0d7a3e')+'">'+brl(c.total)+'</td>'
+        + '<td style="padding:8px 12px;font-size:10px">'+(stLbl[c.status]||c.status||'—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:center">'
+          + '<button class="btn btn-outline" style="font-size:10px;padding:4px 8px" onclick="fvVerVeiculo(\''+c.chave+'\')">📈 Hist&oacute;rico</button></td>'
+      + '</tr>';
+    }).join('')
+    + '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D">'
+      + '<td colspan="3" style="padding:9px 12px">TOTAL &mdash; '+lista.length+' ve&iacute;culo(s)</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+brl(lista.reduce(function(s,c){return s+c.aluguel;},0))+'</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+brl(lista.reduce(function(s,c){return s+c.extras;},0))+'</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'+brl(lista.reduce(function(s,c){return s+c.total;},0))+'</td>'
+      + '<td colspan="2"></td>'
+    + '</tr></tfoot></table></div>'
+
+    // 🔴 A conferência que impede a tela de mentir: o que foi faturado no mês
+    // tem de bater com a soma das faturas. A diferença é o que não pertence a
+    // carro nenhum — e ela aparece, com os itens.
+    + '<div style="margin-top:12px;background:#f7f8fc;border:1px solid var(--border);border-radius:10px;padding:12px 14px">'
+      + '<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Confer&ecirc;ncia do m&ecirc;s</div>'
+      + '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px">'
+        + '<span>Faturas de '+_fvMesLabel(periodo)+': <strong>'+r.nFaturas+'</strong></span>'
+        + '<span>Total das faturas: <strong>'+brl(r.totalFaturas)+'</strong></span>'
+        + '<span>Atribu&iacute;do aos ve&iacute;culos: <strong style="color:#0d7a3e">'+brl(r.somaCarros)+'</strong></span>'
+        + '<span>Sem ve&iacute;culo: <strong style="color:#b45309">'+brl(r.somaNaoAtrib)+'</strong></span>'
+      + '</div>'
+      + (Math.abs(r.totalFaturas - r.somaCarros - r.somaNaoAtrib) >= 0.01
+          ? '<div style="font-size:11px;color:#c0392b;margin-top:6px;font-weight:700">⚠ Diferen&ccedil;a de '
+            + brl(r.totalFaturas - r.somaCarros - r.somaNaoAtrib)
+            + ' entre o total das faturas e a soma das partes &mdash; confira o detalhamento dessas faturas.</div>'
+          : '')
+      + (r.naoAtrib.length
+          ? '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:#b45309">'
+            + 'Ver os '+r.naoAtrib.length+' item(ns) que n&atilde;o pertencem a um ve&iacute;culo</summary>'
+            + '<div style="margin-top:6px;font-size:11px">'
+            + r.naoAtrib.map(function(o){
+                return '<div style="padding:4px 0;border-bottom:1px solid #eef0f6">'
+                  + '<strong>'+brl(o.valor)+'</strong> &middot; '+(o.desc||'')
+                  + (o.ref ? ' <span style="color:var(--muted)">('+o.ref+')</span>' : '')
+                  + '<div style="font-size:9px;color:var(--muted)">Fatura '+(o.fatura||'—')+' &middot; '+(o.cliente||'')
+                  + ' &middot; '+o.motivo+'</div></div>';
+              }).join('')
+            + '</div></details>'
+          : '')
+    + '</div>';
+}
+
+// ── Histórico de um veículo, mês a mês ────────────────────────
+function fvVerVeiculo(chave){
+  var frota = _fvFrotaIndex(), v = frota[chave];
+  var per = _fvPeriodos().slice().sort();   // do mais antigo para o mais novo
+  var linhas = [], total = 0, meses = 0;
+
+  per.forEach(function(p){
+    var r = _fvCalcular(p);
+    var c = r.carros.filter(function(x){ return x.chave === chave; })[0];
+    var val = c ? c.total : 0;
+    if (val) meses++;
+    total += val;
+    linhas.push({ periodo: p, valor: val, aluguel: c ? c.aluguel : 0, extras: c ? c.extras : 0,
+                  cliente: c ? c.cliente : '', itens: c ? c.itens : [] });
+  });
+
+  var nome = v ? ((v.marca||'')+' '+(v.modelo||'')).trim() : '';
+  var placa = v ? v.placa : chave;
+
+  var ex = document.getElementById('mFatVeic');
+  if (ex) ex.remove();
+  var p = document.createElement('div');
+  p.id = 'mFatVeic';
+  p.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  var maior = Math.max.apply(null, linhas.map(function(l){ return l.valor; }).concat([1]));
+
+  p.innerHTML = '<div style="background:#fff;border-radius:12px;width:680px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);max-height:90vh;overflow:auto">'
+    + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;border-radius:12px 12px 0 0">'
+      + '<div style="font-weight:800;font-size:14px">📈 '+placa+(nome?' &middot; '+nome:'')+'</div>'
+      + '<div style="font-size:11px;opacity:.8">Faturamento m&ecirc;s a m&ecirc;s</div></div>'
+    + '<div style="padding:16px 18px">'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+      + '<div style="flex:1;min-width:130px;background:#e8f5ef;border-radius:8px;padding:8px 12px">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#0d7a3e">Total no per&iacute;odo</div>'
+        + '<div style="font-size:15px;font-weight:800;color:#0d7a3e">'+brl(total)+'</div></div>'
+      + '<div style="flex:1;min-width:130px;background:#f0f2f9;border-radius:8px;padding:8px 12px">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted)">Meses com faturamento</div>'
+        + '<div style="font-size:15px;font-weight:800">'+meses+' de '+linhas.length+'</div></div>'
+      + '<div style="flex:1;min-width:130px;background:#f0f2f9;border-radius:8px;padding:8px 12px">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--muted)">M&eacute;dia por m&ecirc;s faturado</div>'
+        + '<div style="font-size:15px;font-weight:800">'+brl(meses?total/meses:0)+'</div></div>'
+    + '</div>'
+    + '<div style="border:1px solid var(--border);border-radius:9px;overflow:hidden">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    + '<thead><tr style="background:var(--dark)">'
+      + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:left">M&ecirc;s</th>'
+      + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:left">Locat&aacute;rio</th>'
+      + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Aluguel</th>'
+      + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Extras</th>'
+      + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Total</th>'
+      + '<th style="padding:8px 10px;font-size:9px;font-weight:700;text-transform:uppercase"></th>'
+    + '</tr></thead><tbody>'
+    + linhas.map(function(l){
+        var larg = Math.round((l.valor / maior) * 100);
+        return '<tr style="border-bottom:1px solid #f0f2f8'+(l.valor?'':';opacity:.6')+'">'
+          + '<td style="padding:7px 10px;font-size:11px;font-weight:700">'+_fvMesLabel(l.periodo)+'</td>'
+          + '<td style="padding:7px 10px;font-size:10px">'+(l.cliente||'<span style="color:var(--muted)">não faturou</span>')+'</td>'
+          + '<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:11px">'+(l.aluguel?brl(l.aluguel):'—')+'</td>'
+          + '<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:11px;color:'+(l.extras?'#b45309':'var(--muted)')+'">'+(l.extras?brl(l.extras):'—')+'</td>'
+          + '<td style="padding:7px 10px;text-align:right;font-weight:800;font-family:monospace;font-size:11px">'+brl(l.valor)+'</td>'
+          + '<td style="padding:7px 10px;width:110px"><div style="background:#eef1fd;border-radius:3px;height:8px"><div style="background:#2B4BF2;height:8px;border-radius:3px;width:'+larg+'%"></div></div></td>'
+        + '</tr>';
+      }).join('')
+    + '</tbody></table></div>'
+    + (v ? '' : '<p style="font-size:11px;color:#b45309;margin:8px 0 0">⚠ Esta placa foi faturada mas <strong>n&atilde;o est&aacute; no cadastro de ve&iacute;culos</strong>.</p>')
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">'
+      + '<button id="fvFechar" style="padding:9px 16px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Fechar</button>'
+    + '</div></div></div>';
+  document.body.appendChild(p);
+  p.querySelector('#fvFechar').onclick = function(){ p.remove(); };
+  p.addEventListener('click', function(e){ if (e.target === p) p.remove(); });
 }
 
 
