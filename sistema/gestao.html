@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v111-20261014-1150 -->
+<!-- LOKA deploy: v112-20261014-1240 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1387,7 +1387,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v111-20261014-1150';
+var LOKA_BUILD = 'v112-20261014-1240';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7486,19 +7486,64 @@ function sinImportarConfirmar(){
 }
 
 // Link do formulário, para o Rogel mandar aos colaboradores.
+// Mostra o link do formulário do colaborador.
+// 🔴 Nada acontece sozinho: antes, este botão copiava o link E abria o WhatsApp
+// por conta própria — quem clicava esperando um link ganhava uma janela que não
+// pediu. Cada ação aqui é um clique da pessoa.
 function sinLinkFormulario(){
-  var url = location.href.replace(/[^/]*$/, '') + 'sinistro-colaborador.html';
-  var txt = 'Formulário de registro de ocorrência da LOKÁ:\n' + url
-    + '\n\nAbra no celular ou no computador, preencha e me envie o código que ele gerar.';
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(function(){
-      toast('🔗 Link copiado — cole no WhatsApp do colaborador','#0d7a3e');
-    }).catch(function(){ prompt('Copie o link do formulário:', url); });
-  } else {
-    prompt('Copie o link do formulário:', url);
-  }
-  try { window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank'); } catch(e){}
+  var url = location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '') + 'sinistro-colaborador.html';
+
+  var ex = document.getElementById('mSinLink');
+  if (ex) ex.remove();
+  var p = document.createElement('div');
+  p.id = 'mSinLink';
+  p.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  p.innerHTML = '<div style="background:#fff;border-radius:12px;width:520px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25)">'
+    + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0">&#128279; Link do formul&aacute;rio de ocorr&ecirc;ncia</div>'
+    + '<div style="padding:18px">'
+    + '<p style="font-size:12px;color:#666;line-height:1.5;margin-bottom:10px">Mande este endere&ccedil;o ao colaborador. Ele abre no celular ou no computador, preenche e devolve um c&oacute;digo &mdash; que voc&ecirc; cola no bot&atilde;o <strong>Importar</strong>.</p>'
+    + '<input id="sinLinkUrl" readonly value="' + url + '" onclick="this.select()" '
+      + 'style="width:100%;padding:11px 12px;border:1.5px solid #d5dae8;border-radius:8px;font-family:monospace;font-size:12px;outline:none;background:#f7f8fc">'
+    + '<div id="sinLinkOk" style="display:none;background:#e8f5ef;color:#0d7a3e;padding:8px 12px;border-radius:7px;font-size:12px;font-weight:700;margin-top:9px;text-align:center">Link copiado</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
+      + '<button id="sinLinkCopiar" style="flex:1;min-width:130px;padding:11px 14px;background:#2B4BF2;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">&#128203; Copiar link</button>'
+      + '<button id="sinLinkAbrir" style="flex:1;min-width:130px;padding:11px 14px;background:#fff;color:#0E1B4D;border:1.5px solid #d5dae8;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">&#128065; Ver o formul&aacute;rio</button>'
+      + '<button id="sinLinkZap" style="flex:1;min-width:130px;padding:11px 14px;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">&#128172; Enviar no WhatsApp</button>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;margin-top:14px">'
+      + '<button id="sinLinkFechar" style="padding:9px 16px;background:#6b7280;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">Fechar</button>'
+    + '</div></div></div>';
+  document.body.appendChild(p);
+
+  function fechar(){ p.remove(); }
+  p.querySelector('#sinLinkFechar').onclick = fechar;
+  p.addEventListener('click', function(e){ if (e.target === p) fechar(); });
+
+  p.querySelector('#sinLinkCopiar').onclick = function(){
+    var el = document.getElementById('sinLinkUrl');
+    el.select();
+    el.setSelectionRange(0, 99999);
+    function ok(){ var m = document.getElementById('sinLinkOk'); if (m) m.style.display = 'block'; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(ok).catch(function(){
+        try { document.execCommand('copy'); ok(); } catch(e){ toast('Selecione o link e copie na mão','#b45309'); }
+      });
+    } else {
+      try { document.execCommand('copy'); ok(); } catch(e){ toast('Selecione o link e copie na mão','#b45309'); }
+    }
+  };
+
+  p.querySelector('#sinLinkAbrir').onclick = function(){ window.open(url, '_blank'); };
+
+  // Só abre o WhatsApp quando a pessoa pede. Mesmo assim, apenas ABRE com o
+  // texto escrito — quem escolhe o destinatário e envia é ela.
+  p.querySelector('#sinLinkZap').onclick = function(){
+    var txt = 'Formulário de registro de ocorrência da LOKÁ:\n' + url
+      + '\n\nAbra no celular ou no computador, preencha e me envie o código que ele gerar.';
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
 }
+
 
 
 function salvarSinistro(){
