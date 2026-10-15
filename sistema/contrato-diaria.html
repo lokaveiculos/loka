@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+<!-- LOKA deploy: diaria-v1-20261015-1130 -->
 <head>
   <!-- Auth Guard -->
   <script>
@@ -487,7 +488,6 @@
     color: var(--muted); cursor: pointer; transition: all .15s;
   }
   .sig-btn:hover { border-color: var(--blue); color: var(--blue); }
-  .sig-btn-qr { background: var(--light-blue); border-color: var(--blue); color: var(--blue); flex: 1; justify-content: center; }
 
   /* ── Fixed Locador Signature ── */
   .sig-fixed-wrap {
@@ -584,6 +584,12 @@
 
   /* ── Data ── */
   .date-row { font-size:8px !important; margin:3px 0 2px !important; }
+  /* A data e um CAMPO na tela, mas no papel tem de ser texto do contrato:
+     sem moldura e sem sublinhado de formulario. */
+  .data-contrato { border:none !important; background:transparent !important;
+    font-size:inherit !important; padding:0 !important; min-width:0 !important;
+    width:auto !important; color:#000 !important;
+    font-family:'Source Serif 4', serif !important; }
 
   /* ── Assinaturas — compactar ao máximo ── */
   .signatures { margin-top:4px !important; gap:8px !important;
@@ -646,7 +652,6 @@
   .clause { font-size:8.5px !important; }
   /* Mobile sig actions */
   .sig-actions { flex-wrap: wrap; }
-  .sig-btn-qr { width: 100% !important; }
 }
 </style>
 </head>
@@ -869,7 +874,9 @@
     <div class="section">
       <div class="section-title">Data e Assinaturas</div>
       <p class="date-row" id="dateRow">
-        Feira de Santana, <span id="autoDate" style="border-bottom:1.5px solid var(--line); padding:2px 8px; font-family:'Source Serif 4',serif; font-size:13px; color:var(--text); min-width:180px; display:inline-block;"></span>
+        Feira de Santana, <input id="autoDate" class="data-contrato" type="text"
+          title="Data do contrato — pode ser alterada"
+          style="border:none; border-bottom:1.5px solid var(--line); padding:2px 8px; font-family:'Source Serif 4',serif; font-size:13px; color:var(--text); min-width:200px; background:transparent;">
       </p>
       <div class="signatures">
 
@@ -887,9 +894,6 @@
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
               Limpar
             </button>
-            <button class="sig-btn sig-btn-qr" onclick="openMobileSig()">
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="4" height="4" rx=".5"/></svg>
-              Assinar pelo Celular
             </button>
           </div>
           <span class="sig-name-label" style="margin-top:4px;">Assinatura do Locatário</span>
@@ -912,27 +916,6 @@
 
   </div><!-- /contract-body -->
 
-  <!-- Mobile Signature Modal -->
-  <div id="mobileModal" style="display:none; position:fixed; inset:0; background:rgba(14,27,77,.7); z-index:1000; align-items:center; justify-content:center; padding:16px;">
-    <div style="background:#fff; border-radius:14px; padding:24px; max-width:480px; width:100%; box-shadow:0 16px 48px rgba(0,0,0,.3);">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <span style="font-family:'Montserrat',sans-serif; font-weight:800; font-size:14px; color:#0E1B4D;">Assinatura pelo Celular</span>
-        <button onclick="closeMobileSig()" style="border:none; background:none; cursor:pointer; font-size:20px; color:#5a607a;">✕</button>
-      </div>
-      <p style="font-family:'Source Serif 4',serif; font-size:12.5px; color:#5a607a; margin-bottom:12px;">Escaneie o QR Code com seu celular para assinar neste dispositivo:</p>
-      <div style="display:flex; flex-direction:column; align-items:center; gap:12px;">
-        <div id="qrPlaceholder" style="width:180px; height:180px; border:2px dashed #C5CCF5; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#F7F8FF;">
-          <canvas id="qrCanvas" width="180" height="180"></canvas>
-        </div>
-        <p style="font-size:11px; color:#5a607a; font-family:'Montserrat',sans-serif; text-align:center;">Ou assine diretamente abaixo com o dedo:</p>
-        <canvas id="mobileCanvas" width="400" height="140" style="border:1.5px solid #C5CCF5; border-radius:8px; touch-action:none; width:100%; background:#F7F8FF;"></canvas>
-        <div style="display:flex; gap:10px; width:100%;">
-          <button onclick="clearMobileSig()" style="flex:1; padding:10px; border:1.5px solid #C5CCF5; border-radius:8px; background:#fff; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:700; cursor:pointer; color:#5a607a;">Limpar</button>
-          <button onclick="confirmMobileSig()" style="flex:2; padding:10px; border:none; border-radius:8px; background:#0E1B4D; color:#fff; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:700; cursor:pointer;">Confirmar Assinatura</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Footer -->
   <div class="contract-footer">
@@ -943,6 +926,8 @@
 </div><!-- /contract -->
 
 <script>
+var LOKA_BUILD = 'diaria-v1-20261015-1130';
+try { console.log('LOKÁ contrato diaria-v1-20261015-1130'); } catch(e) {}
 /* ── Auto date ── */
 function setAutoDate() {
   const now = new Date();
@@ -951,7 +936,9 @@ function setAutoDate() {
   const m = months[now.getMonth()];
   const y = now.getFullYear();
   const el = document.getElementById('autoDate');
-  if (el) el.textContent = `${d} de ${m} de ${y}`;
+  // Sugere hoje, mas o campo é EDITÁVEL: contrato assinado em outro dia
+  // precisa levar a data certa. Por isso .value, não .textContent.
+  if (el) el.value = `${d} de ${m} de ${y}`;
 }
 setAutoDate();
 
@@ -1030,75 +1017,6 @@ function clearSig() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   hasSig = false;
   canvas.parentElement.classList.remove('signed');
-}
-
-/* ── Mobile signature modal ── */
-const mModal  = document.getElementById('mobileModal');
-const mCanvas = document.getElementById('mobileCanvas');
-const mCtx    = mCanvas.getContext('2d');
-let mDrawing  = false;
-
-mCtx.strokeStyle = '#0E1B4D';
-mCtx.lineWidth   = 2.5;
-mCtx.lineCap     = 'round';
-mCtx.lineJoin    = 'round';
-
-function mGetPos(e) {
-  const r = mCanvas.getBoundingClientRect();
-  const scaleX = mCanvas.width  / r.width;
-  const scaleY = mCanvas.height / r.height;
-  const src = e.touches ? e.touches[0] : e;
-  return { x: (src.clientX - r.left) * scaleX, y: (src.clientY - r.top) * scaleY };
-}
-
-mCanvas.addEventListener('mousedown',  e => { mDrawing = true; const p = mGetPos(e); mCtx.beginPath(); mCtx.moveTo(p.x, p.y); });
-mCanvas.addEventListener('mousemove',  e => { if (!mDrawing) return; const p = mGetPos(e); mCtx.lineTo(p.x, p.y); mCtx.stroke(); });
-mCanvas.addEventListener('mouseup',    () => mDrawing = false);
-mCanvas.addEventListener('touchstart', e => { e.preventDefault(); mDrawing = true; const p = mGetPos(e); mCtx.beginPath(); mCtx.moveTo(p.x, p.y); }, {passive:false});
-mCanvas.addEventListener('touchmove',  e => { e.preventDefault(); if (!mDrawing) return; const p = mGetPos(e); mCtx.lineTo(p.x, p.y); mCtx.stroke(); }, {passive:false});
-mCanvas.addEventListener('touchend',   () => mDrawing = false);
-
-function openMobileSig() {
-  mModal.style.display = 'flex';
-
-  // ── Gera URL temporária para assinatura no celular via localStorage compartilhado ──
-  // O celular abre uma página simples que salva a assinatura
-  const sigPageUrl = window.location.href.split('#')[0].replace(/[^/]+$/, '') + 'sig_mobile.html';
-
-  // Gera QR Code real usando api.qrserver.com
-  const qc = document.getElementById('qrCanvas');
-  const qx = qc.getContext('2d');
-  const img = new Image();
-  const qrData = encodeURIComponent(window.location.href);
-  img.onload = function() {
-    qx.clearRect(0,0,qc.width,qc.height);
-    qx.drawImage(img, 0, 0, qc.width, qc.height);
-  };
-  img.onerror = function() {
-    // Fallback: instrução manual
-    qx.fillStyle = '#F7F8FF';
-    qx.fillRect(0,0,qc.width,qc.height);
-    qx.fillStyle = '#0E1B4D';
-    qx.font = 'bold 11px Montserrat, sans-serif';
-    qx.textAlign = 'center';
-    qx.fillText('Use o canvas abaixo', qc.width/2, qc.height/2 - 10);
-    qx.fillText('para assinar com o dedo', qc.width/2, qc.height/2 + 10);
-  };
-  img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + qrData;
-}
-
-function closeMobileSig() { mModal.style.display = 'none'; }
-function clearMobileSig() { mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height); }
-
-function confirmMobileSig() {
-  const blank = document.createElement('canvas');
-  blank.width = mCanvas.width; blank.height = mCanvas.height;
-  if (mCanvas.toDataURL() !== blank.toDataURL()) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(mCanvas, 0, 0, canvas.width, canvas.height);
-    markSigned();
-  }
-  closeMobileSig();
 }
 
 function saveContract() { window.print(); }

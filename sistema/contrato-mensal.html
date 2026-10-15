@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+<!-- LOKA deploy: mensal-v1-20261015-1130 -->
 <head>
   <!-- Auth Guard -->
   <script>
@@ -154,7 +155,6 @@
   .sig-actions { display: flex; gap: 8px; margin-top: 6px; width: 100%; }
   .sig-btn { display: flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 6px; border: 1.5px solid var(--border); background: #fff; font-family: 'Montserrat', sans-serif; font-size: 10px; font-weight: 700; color: var(--muted); cursor: pointer; transition: all .15s; }
   .sig-btn:hover { border-color: var(--blue); color: var(--blue); }
-  .sig-btn-qr { background: var(--light-blue); border-color: var(--blue); color: var(--blue); flex: 1; justify-content: center; }
   .sig-fixed-wrap { width: 100%; border-radius: 8px; background: var(--field-bg); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; height: 110px; overflow: hidden; }
   .sig-name-label { font-family: 'Montserrat', sans-serif; font-size: 9.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
   .sig-company { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 800; color: var(--dark); }
@@ -223,6 +223,12 @@
   /* Observação vazia não deve reservar espaço nem desenhar linha à toa. */
   .obs-print:empty { border-bottom:none !important; min-height:0 !important; }
   .date-row { font-size:8px !important; margin:3px 0 2px !important; }
+  /* A data e um CAMPO na tela, mas no papel tem de ser texto do contrato:
+     sem moldura e sem sublinhado de formulario. */
+  .data-contrato { border:none !important; background:transparent !important;
+    font-size:inherit !important; padding:0 !important; min-width:0 !important;
+    width:auto !important; color:#000 !important;
+    font-family:'Source Serif 4', serif !important; }
   .signatures { margin-top:4px !important; gap:8px !important;
     break-inside:avoid !important; page-break-inside:avoid !important; }
   .sig-block { gap:1px !important; break-inside:avoid !important; }
@@ -272,7 +278,6 @@
   .clause { font-size:8.5px !important; }
   /* Mobile sig actions */
   .sig-actions { flex-wrap: wrap; }
-  .sig-btn-qr { width: 100% !important; }
 }
 </style>
 </head>
@@ -379,6 +384,12 @@
             <td><input list="listaVeiculosM" placeholder="AAA-0000" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onchange="autocompletarVeiculoM(this)"></td>
             <td><input placeholder="Cor"></td>
             <td><input placeholder="0000 km"></td>
+            <!-- 🔴 Esta célula FALTAVA. O cabeçalho tem 7 colunas e as linhas
+                 criadas pelo botão "+ veículo" também, mas esta primeira linha
+                 tinha 6: sem campo de Valor Unit., e o × de remover caindo
+                 debaixo daquele título. Era preciso criar uma segunda linha
+                 só para conseguir digitar o valor. -->
+            <td><input class="vValUnitM" type="text" placeholder="0,00" oninput="maskBRL(this);calcTotalMensal()" style="text-align:right;width:90px"></td>
             <td class="no-print" style="text-align:center;background:#fdecea;cursor:pointer;" onclick="removeVeiculo(this)" title="Remover">
               <span style="font-size:14px;color:#c0392b;font-weight:700;line-height:1;">×</span>
             </td>
@@ -470,7 +481,9 @@
     <div class="section">
       <div class="section-title">Data e Assinaturas</div>
       <p class="date-row">
-        Feira de Santana, <span id="autoDate" style="border-bottom:1.5px solid var(--line); padding:2px 8px; font-family:'Source Serif 4',serif; font-size:13px; color:var(--text); min-width:180px; display:inline-block;"></span>
+        Feira de Santana, <input id="autoDate" class="data-contrato" type="text"
+          title="Data do contrato — pode ser alterada"
+          style="border:none; border-bottom:1.5px solid var(--line); padding:2px 8px; font-family:'Source Serif 4',serif; font-size:13px; color:var(--text); min-width:200px; background:transparent;">
       </p>
       <div class="signatures">
 
@@ -488,9 +501,6 @@
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
               Limpar
             </button>
-            <button class="sig-btn sig-btn-qr" onclick="openMobileSig()">
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="4" height="4" rx=".5"/></svg>
-              Assinar pelo Celular
             </button>
           </div>
           <span class="sig-name-label" style="margin-top:4px;">Assinatura do Locatário</span>
@@ -521,24 +531,25 @@
 
 </div><!-- /contract -->
 
-<!-- Modal Celular -->
-<div id="mobileModal" style="display:none; position:fixed; inset:0; background:rgba(14,27,77,.7); z-index:1000; align-items:center; justify-content:center; padding:16px;">
-  <div style="background:#fff; border-radius:14px; padding:24px; max-width:480px; width:100%; box-shadow:0 16px 48px rgba(0,0,0,.3);">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <span style="font-family:'Montserrat',sans-serif; font-weight:800; font-size:14px; color:#0E1B4D;">Assinatura pelo Celular</span>
-      <button onclick="closeMobileSig()" style="border:none; background:none; cursor:pointer; font-size:20px; color:#5a607a;">✕</button>
-    </div>
-    <p style="font-family:'Source Serif 4',serif; font-size:12.5px; color:#5a607a; margin-bottom:12px;">Assine diretamente abaixo com o dedo:</p>
-    <canvas id="mobileCanvas" width="400" height="140" style="border:1.5px solid #C5CCF5; border-radius:8px; touch-action:none; width:100%; background:#F7F8FF;"></canvas>
-    <div style="display:flex; gap:10px; width:100%; margin-top:12px;">
-      <button onclick="clearMobileSig()" style="flex:1; padding:10px; border:1.5px solid #C5CCF5; border-radius:8px; background:#fff; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:700; cursor:pointer; color:#5a607a;">Limpar</button>
-      <button onclick="confirmMobileSig()" style="flex:2; padding:10px; border:none; border-radius:8px; background:#0E1B4D; color:#fff; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:700; cursor:pointer;">Confirmar Assinatura</button>
-    </div>
-  </div>
-</div>
 
 <script>
-/* Data automática */
+var LOKA_BUILD = 'mensal-v1-20261015-1130';
+try { console.log('LOKÁ contrato mensal-v1-20261015-1130'); } catch(e) {}
+/* ── Data do contrato ──
+   Sugere a data de hoje por extenso, mas o campo é EDITÁVEL: contrato
+   assinado em outro dia (ou refeito depois) precisa levar a data certa.
+   ⚠️ Antes aqui só havia este comentário e nenhum código — a linha da data
+   saía em BRANCO no contrato mensal. */
+const MESES_CT = ['janeiro','fevereiro','março','abril','maio','junho',
+                  'julho','agosto','setembro','outubro','novembro','dezembro'];
+function setAutoDate() {
+  const el = document.getElementById('autoDate');
+  if (!el) return;
+  const n = new Date();
+  el.value = n.getDate() + ' de ' + MESES_CT[n.getMonth()] + ' de ' + n.getFullYear();
+}
+setAutoDate();
+
 /* ── Multi-vehicle table ── */
 function addVeiculo() {
   const row = document.createElement('tr');
@@ -752,21 +763,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
-function openMobileSig(){
-  document.getElementById("mobileModal").style.display="flex";
-  const qc=document.getElementById("qrCanvas");
-  if(qc){
-    const qx=qc.getContext("2d");
-    const img=new Image();
-    img.onload=function(){qx.clearRect(0,0,qc.width,qc.height);qx.drawImage(img,0,0,qc.width,qc.height);};
-    img.onerror=function(){
-      qx.fillStyle="#F7F8FF";qx.fillRect(0,0,qc.width,qc.height);
-      qx.fillStyle="#0E1B4D";qx.font="bold 10px sans-serif";qx.textAlign="center";
-      qx.fillText("Assine no canvas abaixo",qc.width/2,qc.height/2);
-    };
-    img.src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data="+encodeURIComponent(window.location.href);
-  }
-}
 
 /* ── AUTO-FILL: Firebase pass (substitui localStorage) ── */
 async function runAutoFill() {
