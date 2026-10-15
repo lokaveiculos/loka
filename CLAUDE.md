@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v114-20261014-1705** |
+| `gestao.html` | **v115-20261014-2110** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v13-20260930-1530** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3278,3 +3278,94 @@ constante tardia existe. Engolir o erro faz o teste rodar com meio sistema.
 ### ⏳ Falta o Rogel clicar
 A página está pronta; a gravação é dele. Depois: abrir o painel Multas com
 **Ctrl+Shift+R** e conferir as 3 no nome da ISS.
+
+---
+
+## 🔴 "nenhuma infração reconhecida" — o parser do extrato (14/10/2026, v115)
+
+Relato do Rogel ao importar o PDF pelo botão: **"⚠ 1 falhou(ram): Multas
+SKT3B92.pdf — nenhuma infração reconhecida"**. Estava certo.
+
+### 🔴 O erro foi meu, e foi de método
+Horas antes eu afirmei, com 18 testes verdes, que *"o sistema já reconhece esse
+layout"*. **Os 18 testes rodaram contra um texto que eu mesmo reconstruí à mão**,
+porque o primeiro PDF não tinha camada de texto. Eu testei a minha suposição
+sobre o arquivo, não o arquivo.
+
+Quando ele mandou o PDF salvo direito, o texto real apareceu — e era **outro**:
+
+```
+Nº Controle: N° AIT: Valor: Data Infração:
+S051451059 R$130,16        ← o pdf.js agrupa por ALTURA: AIT e valor
+525744300 16/09/2026       ← …e o controle e a data caem noutra linha
+```
+
+O `mltParseDetranBA` exigia **AIT + valor + data na mesma linha**. No arquivo
+real eles nunca estão. Daí zero infrações, sem erro nenhum na tela.
+
+⚠️ **Regra:** texto de PDF reconstruído à mão não vale como entrada de teste.
+Extrair com o **pdf.js de verdade**, usando **cópia literal do
+`mltExtrairTexto`**, e testar com o que sai dali.
+
+### O conserto (v115)
+O parser passou a ler **cartão por cartão**, em vez de linha por linha: encontra
+cada rótulo `Nº Controle:`, recorta o bloco até o próximo, e só então procura
+AIT, valor, data e nº de controle **em qualquer linha do bloco**.
+
+Ganhos de quebra, que a versão antiga jogava fora:
+
+| Campo | Antes | Agora |
+|---|---|---|
+| Órgão autuador | `''` → caía no global **DNIT para todas** | por cartão: `DNIT` ou `PREF. DE: BA - SALVADOR` |
+| Nº de controle | perdido | vai para `obs` |
+| UF | perdida | vai para `obs` |
+| Situação | perdida | entra na descrição |
+| Vencida | sempre `false` | marcada quando o extrato diz |
+
+🔴 **O órgão por cartão não é detalhe:** `mltDetectarOrgao` varre o documento
+inteiro e devolve o **primeiro** nome da lista — `DNIT`. As duas multas de
+**Salvador** teriam entrado como DNIT, e o filtro por órgão mentiria.
+
+⚠️ `MLT_UF` (27 UFs + `DN`) existe porque a UF é o que separa o nome do órgão da
+situação, e **`[A-Z]{2}` genérico quebraria**: numa situação "EM TRAMITAÇÃO", o
+`EM` viraria a UF e o nome do órgão sairia cortado.
+
+Mudança mínima em `mltParsePDF`: o `obs` passou a **preservar o que o parser
+trouxe**, sem perder o aviso de vencida.
+
+A variante com tudo numa linha só **continua funcionando** (rede de segurança no
+fim da função), então nenhum PDF que já importava deixa de importar.
+
+### O arquivo tinha 5 multas, não 3
+O extrato novo (salvo em 14/10) traz **5 · R$ 715,87**, duas a mais que o de
+30/09 — `R007506418` (26/09) e `R007508012` (27/09), ambas de **Salvador**.
+A soma bate com o "Valor total" impresso, que é o que prova o conjunto.
+
+### 🔴 Dois "defeitos" injetados que PASSARAM — e o que isso ensinou
+Na injeção, dois trechos não mudaram resultado nenhum ao serem removidos:
+descartar as linhas de rótulo, e tirar data/valor antes de procurar o nº de
+controle. **São guardas defensivas, inertes neste layout** (nenhum rótulo tem
+número de 6+ dígitos; nenhuma data ou valor produz corrida de 6+ dígitos).
+
+Ficaram no código — custam nada e protegem variantes —, **mas a suíte não as
+cobre**, e isso está dito aqui em vez de ser contado como teste.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **51 testes** com o **texto real** do arquivo e os dados reais: as 5 multas
+  campo a campo, a soma, órgão por cartão, nº de controle sobrevivendo até o
+  `obs` do sistema, locatário e veículo ligados, gravidade pelo CTB, a variante
+  de uma linha, e as bordas (texto vazio, extrato sem multa, cartão sem AIT nem
+  valor, situação de duas palavras, VENCIDA)
+- **9 defeitos injetados — todos acusados**, entre eles **o parser antigo**, que
+  reproduz exatamente o erro relatado (33 testes falham)
+- **Ponta a ponta no navegador**, com o PDF de verdade e o `gestao.html` de
+  verdade: `mltExtrairTexto` → `mltParseBruto` → **5 multas, R$ 715,87**, órgãos
+  certos. Nada gravado em produção.
+- O primeiro teste da suíte **exige que o ambiente tenha carregado o sistema
+  inteiro** (`MLT_GRAV`), pela armadilha registrada em 14/10
+
+### A página alternativa continua lá, agora com 5
+`backups-loka\IMPORTAR-MULTAS-SKT3B92.html` foi regerada a partir do texto real
+(39 testes, 8 defeitos acusados). **Prefira o botão** — a página é só o caminho
+reserva.

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v114-20261014-1705 -->
+<!-- LOKA deploy: v115-20261014-2110 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1417,7 +1417,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v114-20261014-1705';
+var LOKA_BUILD = 'v115-20261014-2110';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -12482,6 +12482,12 @@ var MLT_RE_HORA  = /\b([01]\d|2[0-3]):([0-5]\d)\b/;
 var MLT_RE_VALOR = /R\$\s*([\d.]{1,12},\d{2})/g;
 var MLT_RE_AIT   = /\b([A-Z]{1,3}[\s-]?\d{6,12}|\d{9,14})\b/;
 
+// UFs válidas + DN (DNIT), para separar "ÓRGÃO | UF | SITUAÇÃO" no extrato
+// do DETRAN-BA. ⚠️ Sem a lista, um "EM" (de "EM TRAMITAÇÃO") seria tomado
+// por UF e o nome do órgão sairia cortado pela metade.
+var MLT_UF = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA',
+              'PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO','DN'];
+
 function mltDetectarGravidade(txt){
   var t = txt.toLowerCase();
   if (t.indexOf('gravíssim') >= 0 || t.indexOf('gravissim') >= 0) return 'gravissima';
@@ -12590,42 +12596,104 @@ function mltParseDetalhe(texto){
 }
 
 // ── Formato C: DETRAN-BA ──
+// ── Formato: EXTRATO DE MULTAS EM TRAMITAÇÃO (DETRAN-BA) ──
+// O documento é um CARTÃO por multa, com os rótulos numa altura e os
+// valores noutra:
+//     Nº Controle:   N° AIT:      Valor:     Data Infração:
+//     S051451059 R$130,16                 ← pdf.js junta por ALTURA…
+//     525744300 16/09/2026                ← …e isso cai em outra linha
+//     Órgão Autuador:               UF:        Situação:
+//     PREF. DE: BA - SALVADOR BA NOTIFICADA
+//
+// 🔴 Por isso NÃO dá para exigir AIT + valor + data na mesma linha: no
+// arquivo real eles se separam, e a importação não reconhecia nada.
+// Lemos o CARTÃO inteiro e só então procuramos cada campo dentro dele.
 function mltParseDetranBA(texto){
   var t = mltNormalizar(texto);
-  var out = [];
-  var placa = '';
-  var mp = t.match(/\n\s*([A-Z]{3}\d[A-Z0-9]\d{2})\s+R\$/);
-  if (mp) placa = mltNormPlaca(mp[1]);
-  else { var mp2 = t.match(/([A-Z]{3}\d[A-Z0-9]\d{2})\s+R\$[\d.,]+\s+\d+/); if (mp2) placa = mltNormPlaca(mp2[1]); }
-
-  // No pdf.js, AIT e nº controle podem vir em linhas separadas dos valores.
-  // Estratégia: coletar todos os AITs, valores e datas e parear por ordem.
-  var aits  = (t.match(/\b([A-Z]\d{9}|[A-Z]{1,3}\d{6,10})\b/g) || []).filter(function(a){ return !/^R/.test(a) || a.length>7; });
   var linhas = t.split('\n');
-  for (var i = 0; i < linhas.length; i++) {
-    // Procura linha com AIT + valor + data juntos OU só a combinação valor+data
-    var m = linhas[i].match(/([A-Z]\d{6,10})\s+.*?R\$\s*([\d.]+,\d{2})\s+(\d{2}\/\d{2}\/\d{4})/);
-    if (!m) m = linhas[i].match(/(\d{6,12})\s+([A-Z]\d{6,10})\s+R\$\s*([\d.]+,\d{2})\s+(\d{2}\/\d{2}\/\d{4})/);
-    if (m) {
-      var ait, valor, data;
-      if (m.length === 4) { ait=m[1]; valor=m[2]; data=m[3]; }
-      else { ait=m[2]; valor=m[3]; data=m[4]; }
-      out.push({ placa:placa, ait:ait.toUpperCase(), valor:mltNum(valor),
-                 dataInfracao:mltISO(data), horaInfracao:'', descricao:'Multa DETRAN-BA',
-                 local:'', orgao:'', vencida:false });
-    }
+
+  // Cabeçalho: "SKT3B92 R$715,87 5"
+  var placa = '';
+  for (var i = 0; i < linhas.length && !placa; i++) {
+    var mp = linhas[i].match(/\b([A-Z]{3}\d[A-Z0-9]\d{2})\b\s+R\$/);
+    if (mp) placa = mltNormPlaca(mp[1]);
   }
-  // Fallback: se não pareou na linha, usa a estrutura "AIT sozinho" + "controle valor data"
+  if (!placa) { var mp2 = t.match(/\b([A-Z]{3}\d[A-Z0-9]\d{2})\b/); if (mp2) placa = mltNormPlaca(mp2[1]); }
+
+  // Cada multa começa na linha de rótulos "Nº Controle:"
+  var inicios = [];
+  for (var j = 0; j < linhas.length; j++) {
+    if (/N[ºo°]?\s*Controle\s*:/i.test(linhas[j])) inicios.push(j);
+  }
+
+  var out = [];
+  for (var k = 0; k < inicios.length; k++) {
+    var ate = (k + 1 < inicios.length) ? inicios[k + 1] : linhas.length;
+    var r = mltExtratoCartao(linhas.slice(inicios[k], ate), placa);
+    if (r) out.push(r);
+  }
+
+  // Rede de segurança: variante sem a linha de rótulos, com tudo numa linha só
   if (!out.length) {
-    var mAit = t.match(/\b([A-Z]\d{9})\b/);
-    var mVD  = t.match(/(\d{6,12})\s+R\$\s*([\d.]+,\d{2})\s+(\d{2}\/\d{2}\/\d{4})/);
-    if (mAit && mVD) {
-      out.push({ placa:placa, ait:mAit[1].toUpperCase(), valor:mltNum(mVD[2]),
-                 dataInfracao:mltISO(mVD[3]), horaInfracao:'', descricao:'Multa DETRAN-BA',
-                 local:'', orgao:'', vencida:false });
+    for (var n = 0; n < linhas.length; n++) {
+      var m = linhas[n].match(/\b([A-Z]{1,3}\d{6,12})\b.*?R\$\s*([\d.]+,\d{2}).*?\b(\d{2}\/\d{2}\/\d{4})\b/);
+      if (m) out.push({ placa:placa, ait:m[1].toUpperCase(), valor:mltNum(m[2]),
+                        dataInfracao:mltISO(m[3]), horaInfracao:'', descricao:'Multa DETRAN-BA',
+                        local:'', orgao:'', obs:'', vencida:false });
     }
   }
   return out;
+}
+
+// Lê UM cartão do extrato. Devolve null quando não há o essencial —
+// cartão sem AIT e sem valor não vira multa.
+function mltExtratoCartao(bloco, placa){
+  var antes = [], depois = [], naSegundaParte = false;
+  bloco.forEach(function(l){
+    var s = String(l || '').trim();
+    if (!s) return;
+    if (/[ÓO]rg[ãa]o\s+Autuador\s*:/i.test(s)) { naSegundaParte = true; return; }
+    if (/:\s*$/.test(s)) return;                     // linha só de rótulos
+    (naSegundaParte ? depois : antes).push(s);
+  });
+
+  var cabeca = antes.join(' ');
+  var mAit   = cabeca.match(/\b([A-Z]{1,3}\d{6,12})\b/);
+  var mValor = cabeca.match(/R\$\s*([\d.]{1,12},\d{2})/);
+  var mData  = cabeca.match(/\b(\d{2}\/\d{2}\/\d{4})\b/);
+  if (!mAit && !mValor) return null;
+
+  // O nº de controle é o número que sobra depois de tirar data e valor
+  var sobra = cabeca.replace(/\b\d{2}\/\d{2}\/\d{4}\b/g, ' ')
+                    .replace(/R\$\s*[\d.]{1,12},\d{2}/g, ' ');
+  var mCtrl = sobra.match(/\b(\d{6,12})\b/);
+
+  // "PREF. DE: BA - SALVADOR BA NOTIFICADA" → órgão | UF | situação
+  var orgao = '', uf = '', situacao = '';
+  var cauda = depois.join(' ').trim();
+  if (cauda) {
+    var mo = cauda.match(new RegExp('^(.+)\\s+(' + MLT_UF.join('|') + ')\\s+(.+)$'));
+    if (mo) { orgao = mo[1].trim(); uf = mo[2]; situacao = mo[3].trim(); }
+    else orgao = cauda;
+  }
+
+  var notas = [];
+  if (mCtrl) notas.push('Nº Controle ' + mCtrl[1]);
+  if (uf)    notas.push('UF ' + uf);
+
+  return {
+    placa: placa,
+    ait: mAit ? mAit[1].toUpperCase() : '',
+    valor: mValor ? mltNum(mValor[1]) : 0,
+    dataInfracao: mData ? mltISO(mData[1]) : '',
+    horaInfracao: '',
+    // O extrato NÃO diz qual foi a infração — não inventamos uma.
+    descricao: 'Multa DETRAN-BA' + (situacao ? ' — situação no extrato: ' + situacao : ''),
+    local: '',
+    orgao: orgao,
+    obs: notas.length ? ('Extrato DETRAN-BA · ' + notas.join(' · ')) : '',
+    vencida: /VENCID/i.test(situacao)
+  };
 }
 
 // ── Roteador ──
@@ -12688,7 +12756,10 @@ function mltParsePDF(texto){
       vencimento: b.vencimento || '',
       prazoIndicacao: b.prazoIndicacao || '',
       status: 'pendente',
-      obs: b.vencida ? 'Consta como VENCIDA no extrato' : '',
+      // O parser pode trazer observação própria (nº de controle do extrato,
+      // UF). Quem está vencida continua avisando, sem perder essa nota.
+      obs: [(b.vencida ? 'Consta como VENCIDA no extrato' : ''), (b.obs || '')]
+             .filter(function(x){ return x; }).join(' · '),
       clienteId:   loc ? loc.clienteId   : null,
       clienteNome: loc ? loc.clienteNome : '',
       locacaoId:   loc ? loc.locacaoId   : null,
