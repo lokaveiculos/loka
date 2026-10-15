@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v122-20261015-0055 -->
+<!-- LOKA deploy: v123-20261015-1030 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1419,7 +1419,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v122-20261015-0055';
+var LOKA_BUILD = 'v123-20261015-1030';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4752,6 +4752,27 @@ function renderUsuarios() {
     + '</div></div>';
 }
 
+// ── SENHA COM HASH (SHA-256 + salt) ────────────────────────────
+// 🔴 Mesma função que entrou no index.html. Sem ela AQUI, a correção não se
+// sustenta: bastaria cadastrar ou editar um usuário nesta tela para a senha
+// voltar a ser texto puro no banco — e o banco é legível sem login.
+function _temCrypto() {
+  return !!(window.crypto && window.crypto.subtle && window.crypto.subtle.digest && window.TextEncoder);
+}
+function _novoSalt() {
+  var a = new Uint8Array(16);
+  window.crypto.getRandomValues(a);
+  return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+}
+function _hashSenha(senha, salt) {
+  var dados = new TextEncoder().encode(String(salt) + ':' + String(senha));
+  return window.crypto.subtle.digest('SHA-256', dados).then(function (buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+      return ('0' + b.toString(16)).slice(-2);
+    }).join('');
+  });
+}
+
 function salvarUsuario() {
   var login  = (document.getElementById('uLogin').value||'').trim().toLowerCase();
   var nome   = (document.getElementById('uNome').value||'').trim();
@@ -4776,7 +4797,6 @@ function salvarUsuario() {
     id:       'u' + Date.now(),
     usuario:  login,
     nome:     nome,
-    senha:    senha || (editId !== '' ? _usuariosFirebase[parseInt(editId)].senha : ''),
     perfil:   perfil,
     // "Todas"/"Todos" grava o curinga '*': vale também para oficinas e clientes
     // cadastrados depois, sem precisar reabrir este usuário.
@@ -4788,18 +4808,39 @@ function salvarUsuario() {
     clienteAssoc: ''   // legado (limpo — usamos clientesAssoc)
   };
 
-  if (editId !== '') {
-    _usuariosFirebase[parseInt(editId)] = Object.assign({}, _usuariosFirebase[parseInt(editId)], usuario);
-    usuario = _usuariosFirebase[parseInt(editId)];
-  } else {
-    _usuariosFirebase.push(usuario);
+  // Monta os campos de senha. Só mexe neles quando uma senha NOVA foi digitada —
+  // editar nome ou perfil não pode zerar a senha de ninguém.
+  function _comSenha() {
+    if (!senha) return Promise.resolve({});
+    if (!_temCrypto()) {
+      // Sem HTTPS/crypto não dá para gerar hash. Grava como antes e AVISA, em
+      // vez de recusar a gravação e deixar o usuário sem senha nenhuma.
+      toast('⚠️ Navegador sem suporte a hash — senha gravada sem proteção', '#b45309');
+      return Promise.resolve({ senha: senha, senhaHash: null, salt: null });
+    }
+    var salt = _novoSalt();
+    return _hashSenha(senha, salt).then(function (h) {
+      // 🔴 senha: null APAGA o texto puro do banco. É o ponto da mudança.
+      return { senhaHash: h, salt: salt, senha: null };
+    });
   }
 
-  // Salvar no Firebase
-  firebase.database().ref('loka_users').set(_usuariosFirebase).then(function() {
-    renderUsuarios();
-    limparFormUsuario();
-    toast(editId !== '' ? '✅ Usuário atualizado!' : '✅ Usuário criado!', '#0d7a3e');
+  _comSenha().then(function (campos) {
+    Object.assign(usuario, campos);
+
+    if (editId !== '') {
+      _usuariosFirebase[parseInt(editId)] = Object.assign({}, _usuariosFirebase[parseInt(editId)], usuario);
+      usuario = _usuariosFirebase[parseInt(editId)];
+    } else {
+      _usuariosFirebase.push(usuario);
+    }
+
+    // Salvar no Firebase
+    return firebase.database().ref('loka_users').set(_usuariosFirebase).then(function() {
+      renderUsuarios();
+      limparFormUsuario();
+      toast(editId !== '' ? '✅ Usuário atualizado!' : '✅ Usuário criado!', '#0d7a3e');
+    });
   }).catch(function(e) { toast('❌ Erro: ' + e.message, '#c0392b'); });
 }
 

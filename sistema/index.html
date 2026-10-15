@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+<!-- LOKA deploy: login-v1-20261015-1030 -->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
@@ -126,6 +127,60 @@ const SESSION_HOURS = 8;
   } catch(e) { sessionStorage.removeItem(SESSION_KEY); }
 })();
 
+var LOKA_BUILD = 'login-v1-20261015-1030';
+try { console.log('LOKÁ login ' + LOKA_BUILD); } catch (e) {}
+
+// ── SENHA COM HASH (SHA-256 + salt) ────────────────────────────
+// 🔴 Por que isto existe: a conferência de senha acontece NO NAVEGADOR, então
+// o nó loka_users precisa ser legível. Enquanto a senha for texto puro, QUALQUER
+// permissão de leitura entrega a senha — foi assim que, em 15/10/2026, as senhas
+// de 6 usuários foram lidas do banco sem nenhum login. Hash com salt é
+// irreversível: quem lê o banco passa a ver um embaralhado inútil.
+//
+// Exige HTTPS (crypto.subtle). O site tem. Sem ele, o login continua
+// funcionando pelo caminho antigo — nunca trancar ninguém para fora.
+function _temCrypto() {
+  return !!(window.crypto && window.crypto.subtle && window.crypto.subtle.digest && window.TextEncoder);
+}
+
+function _novoSalt() {
+  var a = new Uint8Array(16);
+  window.crypto.getRandomValues(a);
+  return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+}
+
+function _hashSenha(senha, salt) {
+  var dados = new TextEncoder().encode(String(salt) + ':' + String(senha));
+  return window.crypto.subtle.digest('SHA-256', dados).then(function (buf) {
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+      return ('0' + b.toString(16)).slice(-2);
+    }).join('');
+  });
+}
+
+// Confere a senha de um registro. Sempre devolve Promise<boolean>.
+function _conferirSenha(usr, p) {
+  if (usr && usr.senhaHash && usr.salt && _temCrypto()) {
+    return _hashSenha(p, usr.salt).then(function (h) { return h === usr.senhaHash; })
+      .catch(function () { return false; });
+  }
+  // Registro legado, ainda em texto puro.
+  return Promise.resolve(!!usr && usr.senha !== undefined && usr.senha !== null && usr.senha === p);
+}
+
+// Converte um registro legado para hash, no primeiro login CERTO.
+// 🔴 Falha aqui não pode barrar o login: a pessoa acertou a senha. Por isso o
+// catch engole o erro — pior que não migrar é trancar quem tem acesso legítimo.
+function _migrarParaHash(usr, p) {
+  if (!_temCrypto() || !usr || usr.senhaHash || usr._k === undefined) return Promise.resolve();
+  if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return Promise.resolve();
+  var salt = _novoSalt();
+  return _hashSenha(p, salt).then(function (h) {
+    return firebase.database().ref('loka_users/' + usr._k)
+      .update({ senhaHash: h, salt: salt, senha: null });
+  }).catch(function () { });
+}
+
 function autenticar(found) {
   const token = btoa(JSON.stringify({
     u: found.usuario, n: found.nome, p: found.perfil,
@@ -153,21 +208,39 @@ function doLogin() {
   const tentarFirebase = () => {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
       firebase.database().ref('loka_users').once('value').then(snap => {
-        const fbUsers = snap.val();
-        if (fbUsers) {
-          const list = Array.isArray(fbUsers) ? fbUsers : Object.values(fbUsers);
-          const found = list.find(usr => usr.usuario && usr.usuario.toLowerCase() === u && usr.senha === p);
-          if (found) { autenticar(found); return; }
-        }
-        // Fallback: usuários locais (USERS hardcoded)
-        const local = USERS.find(usr => usr.usuario.toLowerCase() === u && usr.senha === p);
-        if (local) { autenticar(local); return; }
-        // Falhou
-        loading.style.display = 'none';
-        btn.style.display     = 'block';
-        err.style.display     = 'block';
-        document.getElementById('inputPass').value = '';
-        document.getElementById('inputPass').focus();
+        const fbUsers = snap.val() || {};
+        // Guarda a CHAVE de cada registro: é por ela que a migração grava o
+        // hash de volta. Sem isso não dá para converter o legado.
+        const cand = [];
+        Object.keys(fbUsers).forEach(function (k) {
+          const usr = fbUsers[k];
+          if (usr && usr.usuario && String(usr.usuario).toLowerCase() === u) {
+            usr._k = k;
+            cand.push(usr);
+          }
+        });
+        // Confere um a um: a verificação por hash é assíncrona.
+        let i = 0;
+        const proximo = () => {
+          if (i >= cand.length) return Promise.resolve(null);
+          const usr = cand[i++];
+          return _conferirSenha(usr, p).then(ok => ok ? usr : proximo());
+        };
+        return proximo().then(found => {
+          if (found) {
+            // Migra e entra. A migração nunca barra o login.
+            return _migrarParaHash(found, p).then(() => autenticar(found));
+          }
+          // Fallback: usuários locais (USERS hardcoded)
+          const local = USERS.find(usr => usr.usuario.toLowerCase() === u && usr.senha === p);
+          if (local) { autenticar(local); return; }
+          // Falhou
+          loading.style.display = 'none';
+          btn.style.display     = 'block';
+          err.style.display     = 'block';
+          document.getElementById('inputPass').value = '';
+          document.getElementById('inputPass').focus();
+        });
       }).catch(() => {
         // Firebase offline — usar USERS local
         setTimeout(() => {

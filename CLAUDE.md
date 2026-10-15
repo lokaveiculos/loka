@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v122-20261015-0055** |
+| `gestao.html` | **v123-20261015-1030** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3877,3 +3877,86 @@ Para atualizar: *"exporte as conversas para o OneDrive"*.
 
 As três sessões rodam da **mesma pasta** (`…\Github\loka`), inclusive a do Auto
 Mais — por isso não há histórico separado por projeto.
+
+---
+
+## 🔐 Senha com hash no login da LOKÁ — 15/10/2026 (gestao v123 · login-v1)
+
+Decisão do Rogel: fechar o banco primeiro. Investigando, ficou claro que **não
+dá** — e por quê:
+
+```js
+// sistema/index.html, linha 155 — a tela de login:
+firebase.database().ref('loka_users').once('value')
+```
+
+🔴 **O login baixa a lista inteira de usuários para o navegador** e compara a
+senha ali. Para isso funcionar, o nó precisa ser legível por qualquer um — não há
+como distinguir o navegador do Rogel de um estranho com `curl`, porque o sistema
+não usa Firebase Auth. E como a senha era **texto puro**, qualquer leitura
+entregava a senha.
+
+**Guardar senha em texto e fechar o banco são o mesmo problema.** Daí o passo 1:
+tirar o texto puro. Autorizado por ele.
+
+### O estado que foi medido (15/10/2026)
+| | LOKÁ | Auto Mais |
+|---|---|---|
+| senhas na página publicada | 🔴 3 (rogel, admin, equipe) | 🔴 1 (regressão de 11/09 **ainda no ar**) |
+| senhas no banco, legíveis **sem login** | 🔴 6 usuários | 🔴 3 (sandro, bruno, daniel) |
+| protegidas por hash | ❌ nenhuma | ✅ 2 (rogel, thaina) |
+
+Os 6 usuários do `loka_users` foram lidos **sem autenticar em nada**.
+
+### 🔴 O fato que definiu o desenho: `rogel` NÃO existe no banco
+`loka_users` tem daniel, jtcar, ikaro, geraldo, edvan, wilson. **A conta do Rogel
+só existe escrita no `index.html`.** Remover o array `USERS` o deixaria sem
+acesso nenhum — por isso ele **fica**, por enquanto. As 3 senhas de lá já eram
+públicas; mantê-las não acrescenta exposição, e tirá-las antes de ele ter conta
+no banco seria trancá-lo para fora.
+
+### O que entrou
+**`sistema/index.html`** — `_temCrypto`, `_novoSalt`, `_hashSenha`,
+`_conferirSenha`, `_migrarParaHash`. O login passou a:
+1. procurar os candidatos pelo login, **guardando a chave do registro** (é por
+   ela que a migração grava de volta);
+2. conferir **hash primeiro**, texto puro depois;
+3. no primeiro login certo de um registro legado, **gravar `senhaHash` + `salt` e
+   apagar o texto puro** (`senha: null`).
+
+**`sistema/gestao.html`** — a tela de Usuários gravava `senha` em texto.
+🔴 **Sem consertar isso aqui, a correção não se sustentava:** bastaria cadastrar
+ou editar alguém para a senha voltar a ser texto puro. Agora ela gera hash+salt e
+apaga o texto. Editar nome ou perfil **sem digitar senha** não toca na senha.
+
+### Cuidados que não podem sair
+- **Falha ao gravar a migração NÃO barra o login** — a pessoa acertou a senha;
+  pior que não migrar é trancar quem tem acesso legítimo.
+- **Navegador sem `crypto.subtle`** cai no caminho antigo em vez de recusar.
+- **Banco fora do ar / sem firebase** → o array da página ainda entra.
+- **Hash antes do texto**: se um registro ficar com os dois (migração que gravou o
+  hash mas não apagou o texto), a senha **antiga tem de ser recusada** — senão
+  trocar a senha não adianta nada.
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (gestao 677/677, index 10/10)
+- **27 testes** com o `crypto.subtle` de verdade (o do Node): hash estável, salt
+  de 32 caracteres que muda o hash, hash sem a senha dentro, legado entrando e
+  migrando, hash conferido contra a senha digitada, sessão sem segredo, senha
+  errada recusada, quem já tem hash não remigra, e o registro misto
+- **9 defeitos injetados — todos acusados**, sendo **3 de trancamento**: tirar o
+  aceite do legado, tirar o fallback da página, e deixar a falha de gravação
+  barrar o login
+- Regressão: reneg 29, abas 28, extrato 51, duplicata 28, rótulo 13 — sem falha
+
+### ⏳ Os próximos passos (nesta ordem)
+1. **Rogel entra** e confirma que o login funciona. Cada um dos 6 do banco migra
+   sozinho no primeiro login certo.
+2. **Criar a conta `rogel` no banco** pela tela de Usuários, com senha nova
+   digitada por ele — aí ela nasce com hash.
+3. **Só então** remover o array `USERS` do `index.html`. Antes disso, não.
+4. Com ninguém mais em texto puro, aí sim as regras do banco podem apertar.
+
+⚠️ Mesmo com hash, **o nó continua legível** — o que muda é que ler não entrega
+mais senha. Fechar a leitura de verdade ainda depende de Firebase Auth
+(pendência 5).
