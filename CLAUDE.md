@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v116-20261014-2145** |
+| `gestao.html` | **v117-20261014-2230** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v13-20260930-1530** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3431,3 +3431,81 @@ lote* mora no `mltImportarArquivo`, que depende de `FileReader` e pdf.js; copiar
 o laço para o teste seria testar a minha cópia — o mesmo erro que deixou o parser
 verde com bug vivo. Então confiro **no fonte** que a fiação existe e que a regra
 antiga não sobrou em lugar nenhum. Um defeito injetado prova que esses 3 pegam.
+
+---
+
+## ✅ Várias abas, cada uma numa tela — 14/10/2026 (v117)
+
+Pedido: *"permitir a abertura de mais de uma aba para trabalharmos com várias
+telas abertas"*.
+
+### 🔴 Eram dois obstáculos, e nenhum era o esperado
+
+**1. A sessão é por aba.** O `gestao.html` guarda `loka_session` em
+**`sessionStorage`**, que o navegador mantém **separado por aba**. Abrir uma aba
+do zero e digitar o endereço → sem sessão → `location.replace('index.html')`.
+Medido no navegador: aba nova criada do zero **não enxerga** a sessão.
+
+**2. Não havia endereço por tela.** Nenhum `location.hash` em lugar nenhum: toda
+aba caía no Dashboard, sem como pedir uma tela específica nem sobreviver ao F5.
+
+### O conserto
+| | |
+|---|---|
+| `showPanel` | grava a tela no endereço (`#multas`) |
+| ao carregar | abre a tela do endereço (`_painelInicial`) em vez do Dashboard fixo |
+| `hashchange` | voltar/avançar do navegador e endereço editado trocam de painel |
+| botão **⧉** na barra do topo | abre a tela atual numa aba nova, **já logada** |
+
+🔴 **Por que um botão, e não "copie o endereço":** aberta por `window.open` a
+partir do sistema, a aba nova **herda o `sessionStorage`** do opener (é o que a
+especificação manda) e entra logada. Aberta do zero, não. O botão é o que faz a
+diferença entre funcionar e cair no login.
+
+⚠️ **`replaceState`, não `pushState`**: trocar de painel não é navegação.
+Empilhar histórico faria o "voltar" do navegador andar painel a painel em vez de
+sair do sistema.
+
+🔴 **O endereço NÃO burla permissão.** `_painelInicial` passa por `_podePainel`,
+e o `showPanel` continua decidindo. Pedir `#financeiro` num perfil sem acesso
+abre o padrão do perfil, como sempre. Há teste e defeito injetado para isso.
+
+Ficou intocado de propósito: o item **Dashboard** do menu continua indo para o
+dashboard, e **restaurar backup** continua caindo nele.
+
+### ⚠️ O que NÃO foi feito, e por quê
+**Não mexi na sincronização entre abas.** Já existe: o `loka_db` tem listener ao
+vivo com proteção de eco (`_isSaving`, `_escritasPendentes`, `_ultimaEscritaLocal`),
+então uma aba enxerga o que a outra grava.
+
+Mas **o `gestao.html` grava o `loka_db` inteiro** a cada `saveDB()`, e existe uma
+janela estreita de *last-write-wins*: se a aba A gravar **enquanto** a aba B está
+gravando, B ignora a atualização (pela proteção de eco) e a escrita de B, que não
+tem a mudança de A, chega por último. **É pré-existente, não foi introduzido
+aqui**, e consertar de verdade significa gravar por caminho em vez do nó inteiro
+— mudança grande, para ser pedida e feita com calma.
+
+**Na prática:** trabalhar com várias abas é seguro; **gravar nas duas ao mesmo
+tempo, no mesmo segundo, não é.** Ler numa e lançar na outra é o uso natural e
+não tem esse risco.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **28 testes**: leitura do endereço (maiúscula, espaço, painel inexistente, os
+  18 painéis), painel inicial, permissão, gravação do endereço, `replaceState`,
+  não reescrever à toa, a aba nova na tela certa, pop-up bloqueado e
+  `window.open` estourando
+- **10 defeitos injetados — todos acusados**, entre eles burlar permissão pelo
+  endereço, voltar ao Dashboard fixo e usar `pushState`
+- **No navegador**: aba criada do zero **não vê a sessão** — é a prova do
+  diagnóstico
+
+⚠️ **5 testes são estruturais** (conferem o fonte): o listener de `hashchange`,
+as 5 inicializações, o item Dashboard, o pós-restauração e o botão. Está dito em
+vez de contado como se fosse igual aos outros.
+
+### ⏳ Não verificado
+A **cópia da sessão para a aba nova** é comportamento de especificação, mas o
+painel do meu navegador transforma `window.open` em navegação na mesma aba, então
+**não consegui exercitar**. O Rogel confirma com um clique no ⧉: se a aba nova
+abrir já logada, está certo.

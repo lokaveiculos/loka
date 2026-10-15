@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v116-20261014-2145 -->
+<!-- LOKA deploy: v117-20261014-2230 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -278,6 +278,8 @@ tr:hover td{background:#f8f9fe;}
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <h2 id="pageTitle">Dashboard</h2>
+      <button class="menu-toggle-btn" id="btnNovaAba" onclick="abrirEmNovaAba()"
+              title="Abrir esta tela em uma nova aba (já logada)" style="font-size:15px;line-height:1">&#10697;</button>
     </div>
     <div id="syncBadge" style="display:none;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#0d7a3e;background:#e8f5ef;border-radius:20px;padding:3px 10px;white-space:nowrap">
       <span id="syncDot" style="width:7px;height:7px;background:#0d7a3e;border-radius:50%;display:inline-block;animation:syncPulse 1s infinite"></span>
@@ -1417,7 +1419,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v116-20261014-2145';
+var LOKA_BUILD = 'v117-20261014-2230';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1739,6 +1741,55 @@ function abrirMultasNovo() {
   window.open('multas.html?v=' + Date.now(), '_blank');
 }
 
+// ── Várias abas, cada uma numa tela ────────────────────────────
+var _painelAtual = 'dashboard';
+
+// Qual tela o endereço está pedindo. Devolve '' quando não pede nada
+// ou quando pede algo que não existe — aí o sistema abre o padrão.
+function _painelDoEndereco(){
+  var h = '';
+  try { h = String(location.hash || '').replace(/^#/, '').trim().toLowerCase(); } catch(e) { return ''; }
+  if (!h) return '';
+  for (var i = 0; i < PANELS.length; i++) if (PANELS[i].toLowerCase() === h) return PANELS[i];
+  return '';
+}
+
+// Tela a abrir ao carregar: a do endereço, se existir e o perfil puder.
+// ⚠️ Não burla permissão: o showPanel continua decidindo, e um painel
+// barrado cai no padrão do perfil como sempre caiu.
+function _painelInicial(){
+  var p = _painelDoEndereco();
+  return (p && _podePainel(p)) ? p : 'dashboard';
+}
+
+// Abre a tela atual numa aba nova, JÁ LOGADA.
+// 🔴 A sessão mora em sessionStorage, que é por aba. Uma aba aberta do
+// zero (digitando o endereço) nasce sem sessão e cai no login — foi por
+// isso que "o sistema não deixava abrir mais de uma aba". Aberta pelo
+// window.open a partir daqui, o navegador COPIA o sessionStorage, e a
+// aba nova já entra logada. Por isso este botão existe em vez de só
+// mandar copiar o endereço.
+function abrirEmNovaAba(painel){
+  var p = painel || _painelAtual || 'dashboard';
+  var url = location.pathname + location.search + '#' + p;
+  var w = null;
+  try { w = window.open(url, '_blank'); } catch(e) {}
+  if (!w) {
+    try { toast('⚠️ O navegador bloqueou a aba nova. Libere o pop-up para este site.', '#b45309'); } catch(e) {}
+    return null;
+  }
+  try { w.focus(); } catch(e) {}
+  return w;
+}
+
+// O endereço passa a mandar na tela: voltar/avançar do navegador e
+// endereço editado à mão trocam de painel. Sem isto, a aba mostraria
+// um painel e o endereço diria outro.
+window.addEventListener('hashchange', function(){
+  var p = _painelDoEndereco();
+  if (p && p !== _painelAtual) showPanel(p);
+});
+
 function showPanel(name) {
   // Controle de acesso por perfil (orientado a dados)
   if (!_podePainel(name)) {
@@ -1766,6 +1817,19 @@ function showPanel(name) {
     var fr = document.getElementById('frameMultasEfrotas');
     if (fr && !fr.src) fr.src = 'multas.html?embed=1&v=' + Date.now();
   }
+
+  // Guarda qual tela está aberta NO ENDEREÇO. É isso que permite ter
+  // várias abas, cada uma numa tela: a aba lembra onde está, sobrevive
+  // ao F5, e dá para abrir uma tela direto por link.
+  // ⚠️ replaceState, não pushState: trocar de painel não é navegação,
+  // e empilhar histórico faria o "voltar" do navegador andar painel a
+  // painel em vez de sair do sistema.
+  _painelAtual = name;
+  try {
+    if (location.hash.replace(/^#/, '') !== name) {
+      history.replaceState(null, '', location.pathname + location.search + '#' + name);
+    }
+  } catch(e) {}
 
   // Atualiza título
   var t = document.getElementById('pageTitle');
@@ -2037,7 +2101,7 @@ function inicializarCom(dados, origem) {
     } catch(e){}
     preencherCliSel();
     checkAlertas();
-    showPanel('dashboard');
+    showPanel(_painelInicial());
     if (origem) toast('📂 Dados carregados: ' + origem, '#2B4BF2');
     // LIBERA a trava: dados carregados, agora pode gravar com segurança
     _dadosCarregados = true;
@@ -2093,7 +2157,7 @@ function inicializarCom(dados, origem) {
         db.multas    = cleanArr(db.multas);
         db.checklists = cleanArr(db.checklists);
         normalizarDB();
-        preencherCliSel(); checkAlertas(); showPanel('dashboard');
+        preencherCliSel(); checkAlertas(); showPanel(_painelInicial());
         setupRealtimeSync(); registrarVersaoAtual(); escutarVersao(); iniciarVerificacaoPublicacao(); _iniciarTombstones(); setTimeout(backupAutomatico, 8000);
     try { firebase.database().ref('loka_db/_writerBuild').set(typeof LOKA_BUILD!=='undefined'?LOKA_BUILD:'v81'); } catch(e){}
         return;
@@ -2116,7 +2180,7 @@ function inicializarCom(dados, origem) {
       };
       // Salva apenas no localStorage, não no Firebase
       try { localStorage.setItem('loka_db', JSON.stringify(db)); } catch(e) {}
-      preencherCliSel(); checkAlertas(); showPanel('dashboard');
+      preencherCliSel(); checkAlertas(); showPanel(_painelInicial());
 
     }).catch(function() {
       // Firebase falhou — usar localStorage ou seed
@@ -2133,7 +2197,7 @@ function inicializarCom(dados, origem) {
       }
       if (!db.historico) db.historico = [];
       if (!db.contratos) db.contratos = [];
-      preencherCliSel(); checkAlertas(); showPanel('dashboard');
+      preencherCliSel(); checkAlertas(); showPanel(_painelInicial());
       // Sem sync em tempo real (Firebase falhou)
     });
 
@@ -2152,7 +2216,7 @@ function inicializarCom(dados, origem) {
     }
     if (!db.historico) db.historico = [];
     if (!db.contratos) db.contratos = [];
-    preencherCliSel(); checkAlertas(); showPanel('dashboard');
+    preencherCliSel(); checkAlertas(); showPanel(_painelInicial());
     // Libera a trava no fallback (sem Firebase ou offline) — usa dados locais/seed
     _dadosCarregados = true;
   }
