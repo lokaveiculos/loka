@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v121-20261015-0030** |
+| `gestao.html` | **v122-20261015-0055** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3772,3 +3772,34 @@ presos em Recebido) a tentação era mexer no número; o certo foi mostrar a con
    valor −R$ 110 mil): crédito legítimo ou erro?
 2. Os **R$ 13.800** em linhas marcadas como Recebido: quitação com desconto, ou
    falta receber?
+
+---
+
+## ✅ Os 2 lançamentos negativos são CRÉDITO legítimo — 14/10/2026 (v122)
+
+Decisão do Rogel: os dois lançamentos de saldo negativo (G7 com R$ 100.000
+recebidos sem valor · Transsouza com valor −R$ 110.000) **são créditos legítimos
+de cliente**.
+
+Consequência: **o saldo de R$ 1.096.295,11 está certo** — é o valor **líquido**,
+já descontado o crédito. Não há dado a corrigir.
+
+O aviso vermelho (`⚠ … saldo negativo`) tratava crédito legítimo como anomalia,
+então virou informação neutra:
+
+```
+2 crédito(s) de cliente abatendo R$ 210.000,00     ← azul, não vermelho
+antes dos créditos: R$ 1.306.295,11
+```
+
+⚠️ **Ainda é útil mostrar**, mesmo sendo legítimo: o operador precisa saber que
+há R$ 210 mil de crédito pendurado e qual era a dívida bruta. O que mudou foi o
+**tom** — informa, não alerta.
+
+### Continua em aberto
+Os **R$ 13.800,00** em 23 lançamentos marcados como "Recebido" **não** foram
+decididos: podem ser quitação com desconto (status certo) ou falta receber
+(dado torto). O aviso laranja segue na tela.
+
+Validado: `node --check`; `<div>` 677/677; **29 testes** e os 7 defeitos
+injetados da suíte, todos acusados.
