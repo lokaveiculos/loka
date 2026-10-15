@@ -51,9 +51,9 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v117-20261014-2230** |
+| `gestao.html` | **v118-20261014-2300** |
 | `fatura.html` | **v82-20261013-0910** |
-| `multas.html` | **v13-20260930-1530** |
+| `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 
 ## Modelo de dados — `loka_db`
@@ -3509,3 +3509,55 @@ A **cópia da sessão para a aba nova** é comportamento de especificação, mas
 painel do meu navegador transforma `window.open` em navegação na mesma aba, então
 **não consegui exercitar**. O Rogel confirma com um clique no ⧉: se a aba nova
 abrir já logada, está certo.
+
+---
+
+## ✅ Status "Repassada" passa a se chamar "Recebida do Cliente" — 14/10/2026 (gestao v118 · multas v14)
+
+Pedido: *"na aba multas, no status onde lê-se repassada cliente altera para
+Recebida do cliente"*.
+
+### Só o rótulo mudou — a chave gravada continua `repassada`
+🔴 Trocar o valor gravado quebraria as **638 multas já no banco** e todo código
+que compara com essa chave (`MLT_ST_LOTE`, os seletores, os totais). O que mudou
+foi **o que se lê na tela**, em 7 lugares:
+
+| Onde | |
+|---|---|
+| `MLT_STATUS.repassada.rot` | o selo da tabela |
+| filtro de status do painel Multas | |
+| modal "Alterar situação em lote" | |
+| modal "Baixar como pagas" | |
+| modal de edição da multa | |
+| texto explicativo do lote | |
+| `multas.html` (e-Frotas) | mesma situação, mesmo nome |
+
+⚠️ A `multas.html` foi incluída **sem ter sido pedida explicitamente**: deixar a
+mesma situação com dois nomes em duas telas seria pior que a inconsistência que o
+pedido vem corrigir. Fica registrado para ser revertido se ele não quiser.
+
+### 🔴 O que o nome novo NÃO significa
+`repassada` **não é pagamento**, e isso não mudou:
+
+```js
+if (m.status !== 'paga' && m.status !== 'cancelada') aberto += v;
+if (m.clienteId && m.status !== 'cobrada' && m.status !== 'cancelada') repassar += v;
+```
+
+A multa nesse estado **continua contando em "em aberto"** e, note, **continua
+contando em "a repassar"** — só `cobrada` sai de lá. Ou seja, a situação é
+puramente informativa: não mexe em nenhum total.
+
+Como "Recebida do Cliente" pode ser lido como *"o dinheiro entrou"*, o aviso do
+modal de lote foi reescrito para dizer isso com todas as letras: **"não é baixa
+de pagamento: a multa continua em aberto até ser marcada como paga"**.
+Quem quer registrar que o dinheiro entrou usa **Baixar como pagas**.
+
+### Validado
+- `node --check` nas duas páginas; `<div>` balanceadas (gestao 677/677, multas 23/23)
+- **13 testes**: o rótulo nos 7 lugares, a cor do selo intacta, nenhum "Repassada"
+  sobrando na tela, e — o que mais importa — **a chave intacta**: continua sendo
+  gravada como `repassada`, o lote continua oferecendo a situação, nenhuma multa
+  do banco passou a ter o rótulo como valor, e as que já estão como `repassada`
+  continuam achando o selo
+- Regressão: as 3 suítes do dia (abas 28, extrato 51, duplicata 28) sem falha

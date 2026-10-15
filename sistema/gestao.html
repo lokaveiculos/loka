@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v117-20261014-2230 -->
+<!-- LOKA deploy: v118-20261014-2300 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -638,7 +638,7 @@ tr:hover td{background:#f8f9fe;}
             <option value="indicada">Condutor Indicado</option>
             <option value="recurso">Em Recurso</option>
             <option value="paga">Paga</option>
-            <option value="repassada">Repassada Cliente</option>
+            <option value="repassada">Recebida do Cliente</option>
             <option value="cobrada">Cobrada</option>
             <option value="cancelada">Cancelada</option>
           </select>
@@ -1133,14 +1133,14 @@ tr:hover td{background:#f8f9fe;}
         <option value="indicada">Condutor Indicado</option>
         <option value="recurso">Em Recurso</option>
         <option value="cobrada">Cobrada do locat&aacute;rio</option>
-        <option value="repassada">Repassada</option>
+        <option value="repassada">Recebida do Cliente</option>
         <option value="cancelada">Cancelada</option>
       </select></div>
     <div id="mltStAviso" style="display:none;background:#fff8e6;border-left:3px solid #b45309;border-radius:6px;padding:9px 12px;font-size:11px;color:#7c5010;line-height:1.5;margin-top:10px"></div>
     <div style="font-size:10px;color:var(--muted);margin-top:12px;line-height:1.5">
       Para <strong>Paga</strong>, use <strong>&#128176; Baixar como pagas</strong> &mdash;
       ela pede a data e o valor do pagamento.<br>
-      <strong>Cobrada</strong> e <strong>Repassada</strong> mudam s&oacute; a situa&ccedil;&atilde;o: a multa
+      <strong>Cobrada</strong> e <strong>Recebida do Cliente</strong> mudam s&oacute; a situa&ccedil;&atilde;o: a multa
       continua contando como <strong>em aberto</strong> at&eacute; ser paga.<br>
       Multas <strong>pagas</strong> e <strong>canceladas</strong> n&atilde;o entram na sele&ccedil;&atilde;o da tabela;
       para mudar uma delas, abra a multa em <strong>Editar</strong>.
@@ -1162,7 +1162,7 @@ tr:hover td{background:#f8f9fe;}
         <select class="fs" id="mltBaixaStatus">
           <option value="paga">Paga</option>
           <option value="cobrada">Cobrada do locat&aacute;rio</option>
-          <option value="repassada">Repassada</option>
+          <option value="repassada">Recebida do Cliente</option>
         </select></div>
     </div>
     <div class="fg"><label class="fl">Valor pago <span style="font-weight:400;color:var(--muted)">— por multa, opcional</span></label>
@@ -1201,7 +1201,7 @@ tr:hover td{background:#f8f9fe;}
       <div class="fg" style="grid-column:1/-1"><label class="fl">Status</label><select class="fs" id="mltStatus">
         <option value="pendente">Pendente</option><option value="indicada">Condutor Indicado</option>
         <option value="recurso">Em Recurso</option><option value="paga">Paga</option>
-        <option value="repassada">Repassada ao Cliente</option><option value="cobrada">Cobrada</option>
+        <option value="repassada">Recebida do Cliente</option><option value="cobrada">Cobrada</option>
         <option value="cancelada">Cancelada</option></select></div>
       <div class="fg" style="grid-column:1/-1">
         <label class="fl">Locat&aacute;rio na data da infra&ccedil;&atilde;o</label>
@@ -1419,7 +1419,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v117-20261014-2230';
+var LOKA_BUILD = 'v118-20261014-2300';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -10122,7 +10122,7 @@ var MLT_STATUS = {
   indicada:  {rot:'Condutor Indicado',cor:'#2B4BF2', bg:'#eaeeff'},
   recurso:   {rot:'Em Recurso',      cor:'#7c3aed', bg:'#f2ebff'},
   paga:      {rot:'Paga',            cor:'#0d7a3e', bg:'#e6f5ec'},
-  repassada: {rot:'Repassada Cliente',cor:'#0e7490', bg:'#e0f5f8'},
+  repassada: {rot:'Recebida do Cliente',cor:'#0e7490', bg:'#e0f5f8'},
   cobrada:   {rot:'Cobrada',         cor:'#0d7a3e', bg:'#e6f5ec'},
   cancelada: {rot:'Cancelada',       cor:'#5a607a', bg:'#eef1fd'}
 };
@@ -12234,8 +12234,8 @@ function mltStatusAviso(){
         + 'Ela <strong>continua em aberto</strong> at\u00e9 o pagamento \u2014 para registrar o pagamento, '
         + 'use "Baixar como pagas".';
   } else if (novo === 'repassada') {
-    txt = 'Marca que a multa foi repassada ao locat\u00e1rio. Ela <strong>continua em aberto</strong> '
-        + 'at\u00e9 o pagamento.';
+    txt = 'Marca que a multa foi recebida do locat\u00e1rio. \u26a0\ufe0f Isto <strong>n\u00e3o \u00e9 baixa de '
+        + 'pagamento</strong>: a multa <strong>continua em aberto</strong> at\u00e9 ser marcada como paga.';
   }
   if (novo && saindoDeInd && novo !== 'indicada') {
     txt += (txt ? '<br><br>' : '')

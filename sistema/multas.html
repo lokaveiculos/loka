@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v13-20260930-1530 -->
+<!-- LOKA deploy: v14-20261014-2300 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -212,7 +212,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v13-20260930-1530';
+var LOKA_BUILD = 'v14-20261014-2300';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -338,7 +338,7 @@ function brData(d){
 var STATUS_ROT = {
   pendente:{r:'Pendente',c:'#b45309',b:'#fff4e5'}, indicada:{r:'Indicado',c:'#2B4BF2',b:'#eaeeff'},
   recurso:{r:'Recurso',c:'#7c3aed',b:'#f2ebff'}, paga:{r:'Paga',c:'#0d7a3e',b:'#e6f5ec'},
-  repassada:{r:'Repassada',c:'#0e7490',b:'#e0f5f8'}, cobrada:{r:'Cobrada',c:'#0d7a3e',b:'#e6f5ec'},
+  repassada:{r:'Recebida do Cliente',c:'#0e7490',b:'#e0f5f8'}, cobrada:{r:'Cobrada',c:'#0d7a3e',b:'#e6f5ec'},
   cancelada:{r:'Cancelada',c:'#5a607a',b:'#eef1fd'}
 };
 
