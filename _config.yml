@@ -1,0 +1,39 @@
+# Configuração do GitHub Pages (Jekyll) para lokaveiculos.com.br
+#
+# 🔴 O que estiver nesta pasta é PUBLICADO na internet, sem senha.
+# A lista abaixo diz ao GitHub Pages o que NÃO publicar.
+#
+# Conferido em 14/10/2026: todos estes estavam acessíveis no domínio.
+exclude:
+  # Registro de trabalho do projeto. Tem nome e valores de cliente (LGPD) e
+  # a descrição de cada falha de segurança conhecida do sistema — um mapa de
+  # como atacá-lo. Estava em https://lokaveiculos.com.br/CLAUDE.md (192 KB).
+  - CLAUDE.md
+
+  # Pacotes antigos do sistema inteiro. O loka_sistema_v16.zip traz
+  # sistema/cadastro.html com SENHA EM TEXTO PURO dentro. Nenhuma página do
+  # site aponta para eles: só serviam a quem fosse procurar.
+  - "*.zip"
+  - loka_deploy_final.zip
+  - loka_sistema_v6.zip
+  - loka_sistema_v7.zip
+  - loka_sistema_v8.zip
+  - loka_sistema_v9_unificado.zip
+  - loka_sistema_v12_unificado.zip
+  - loka_sistema_v13.zip
+  - loka_sistema_v14.zip
+  - loka_sistema_v15.zip
+  - loka_sistema_v16.zip
+
+  # Regras do banco de dados: entrega a estrutura e o que está aberto.
+  - database.rules.CORRIGIDA.json
+
+  # Script avulso de manutenção de dados, sem uso no site.
+  - criar_alugueis_empresas.js
+
+  # Este próprio arquivo.
+  - _config.yml
+
+# ⚠️ Excluir daqui tira do AR, mas os arquivos continuam no repositório, que é
+# público no GitHub. Apagá-los de vez e trocar as senhas que vazaram é o passo
+# seguinte — e é decisão do Rogel.
