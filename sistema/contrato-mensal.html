@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<!-- LOKA deploy: mensal-v1-20261015-1130 -->
+<!-- LOKA deploy: mensal-v2-20261015-1215 -->
 <head>
   <!-- Auth Guard -->
   <script>
@@ -179,7 +179,7 @@
   .logo-wrap img { height:26px !important; }
   .header-title h1 { font-size:9.5px !important; }
   .header-title p  { font-size:6px !important; margin-top:1px !important; }
-  .section { padding:2px 12px !important; margin:0 !important; }
+  .section { padding:1px 12px !important; margin:0 !important; }
   .section-title { font-size:6.5px !important; padding:1px 0 !important;
     margin-bottom:2px !important; letter-spacing:.8px !important; }
   .locatario-row { display:block !important; }
@@ -199,14 +199,14 @@
     text-align:left !important; color:#000 !important; }
 
   .data-table { margin:2px 0 !important; }
-  .data-table th { font-size:6px !important; padding:2px 3px !important; }
-  .data-table td { font-size:7.5px !important; padding:2px 3px !important; }
+  .data-table th { font-size:6px !important; padding:1px 3px !important; }
+  .data-table td { font-size:7.5px !important; padding:1px 3px !important; }
   .data-table input { font-size:7.5px !important; padding:0 2px !important;
     border:none !important; background:transparent !important; width:100% !important; }
   .clauses { column-count:2 !important; column-gap:8px !important;
     column-rule:0.4px solid #ccc !important; margin-top:2px !important; }
-  .clause { font-size:6.5px !important; line-height:1.25 !important;
-    margin:1px 0 !important; padding:0 !important; break-inside:avoid !important; }
+  .clause { font-size:6.5px !important; line-height:1.18 !important;
+    margin:0.5px 0 !important; padding:0 !important; break-inside:avoid !important; }
   .clause strong, .clause b { font-weight:700 !important; }
   /* O textarea sai de cena na impressão: altura fixa cortava o texto.
      Quem imprime é o espelho .obs-print, que cresce com o conteúdo. */
@@ -222,20 +222,20 @@
     font-family:'Source Serif 4', serif !important; color:#000 !important; }
   /* Observação vazia não deve reservar espaço nem desenhar linha à toa. */
   .obs-print:empty { border-bottom:none !important; min-height:0 !important; }
-  .date-row { font-size:8px !important; margin:3px 0 2px !important; }
+  .date-row { font-size:8px !important; margin:2px 0 1px !important; }
   /* A data e um CAMPO na tela, mas no papel tem de ser texto do contrato:
      sem moldura e sem sublinhado de formulario. */
   .data-contrato { border:none !important; background:transparent !important;
     font-size:inherit !important; padding:0 !important; min-width:0 !important;
     width:auto !important; color:#000 !important;
     font-family:'Source Serif 4', serif !important; }
-  .signatures { margin-top:4px !important; gap:8px !important;
+  .signatures { margin-top:2px !important; gap:8px !important;
     break-inside:avoid !important; page-break-inside:avoid !important; }
   .sig-block { gap:1px !important; break-inside:avoid !important; }
   .sig-fixed-wrap { display:none !important; }
   .sig-canvas-wrap { display:none !important; }
   .sig-block::before { content:''; display:block; width:100%;
-    height:22px; border:0.4px dashed #aaa; border-radius:3px; margin-bottom:2px; }
+    height:18px; border:0.4px dashed #aaa; border-radius:3px; margin-bottom:1px; }
   .sig-line { display:none !important; }
   .sig-name-label { font-size:6.5px !important; margin:1px 0 0 !important; }
   .sig-company    { font-size:7.5px !important; margin:0 !important; }
@@ -533,8 +533,8 @@
 
 
 <script>
-var LOKA_BUILD = 'mensal-v1-20261015-1130';
-try { console.log('LOKÁ contrato mensal-v1-20261015-1130'); } catch(e) {}
+var LOKA_BUILD = 'mensal-v2-20261015-1215';
+try { console.log('LOKÁ contrato mensal-v2-20261015-1215'); } catch(e) {}
 /* ── Data do contrato ──
    Sugere a data de hoje por extenso, mas o campo é EDITÁVEL: contrato
    assinado em outro dia (ou refeito depois) precisa levar a data certa.
