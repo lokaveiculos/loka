@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v118-20261014-2300 -->
+<!-- LOKA deploy: v119-20261014-2330 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1419,7 +1419,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v118-20261014-2300';
+var LOKA_BUILD = 'v119-20261014-2330';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8565,6 +8565,11 @@ function relatorioReceber(){
   var fTipo = (document.getElementById('recTipo')||{}).value||'';
 
   function statusReal(r){
+    // 🔴 Renegociado PRIMEIRO. Sem esta linha, um lançamento renegociado
+    // (que fica com recebido = 0) era classificado como PENDENTE e entrava
+    // no total como dívida em aberto — somando de novo o que já está sendo
+    // cobrado nas parcelas do acordo.
+    if (r.status==='renegociado') return 'renegociado';
     var receb = Number(r.recebido)||0, val = Number(r.valor)||0;
     if (r.status==='recebido' || (val>0 && receb>=val)) return 'recebido';
     if (receb>0 && receb<val) return 'parcial';
@@ -8590,8 +8595,8 @@ function relatorioReceber(){
     var m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
     return m ? m[3]+'/'+m[2]+'/'+m[1] : d;
   }
-  function stLabel(s){ return s==='recebido'?'Recebido':s==='parcial'?'Parcial':'Pendente'; }
-  function stCor(s){ return s==='recebido'?'#0d7a3e':s==='parcial'?'#b45309':'#c0392b'; }
+  function stLabel(s){ return s==='recebido'?'Recebido':s==='parcial'?'Parcial':s==='renegociado'?'Renegociada':'Pendente'; }
+  function stCor(s){ return s==='recebido'?'#0d7a3e':s==='parcial'?'#b45309':s==='renegociado'?'#9d174d':'#c0392b'; }
 
   // Agrupar por tipo
   var porTipo = {};
@@ -8607,11 +8612,15 @@ function relatorioReceber(){
   ordemTipos.forEach(function(tipo){
     var arr = porTipo[tipo];
     if (!arr || !arr.length) return;
-    var subTot=0, subRec=0;
+    var subTot=0, subRec=0, nReneg=0;
     var linhas = arr.map(function(r){
       var val=Number(r.valor)||0, rec=Number(r.recebido)||0, saldo=val-rec;
       var st=statusReal(r);
-      subTot+=val; subRec+=rec;
+      // 🔴 Renegociada aparece na lista (é histórico), mas NÃO entra na
+      // soma: o saldo dela migrou para as parcelas do acordo, que já estão
+      // contadas aqui. Somar as duas pontas cobraria a mesma dívida duas vezes.
+      if (st==='renegociado') nReneg++;
+      else { subTot+=val; subRec+=rec; }
       return '<tr>'
         + '<td>'+(r.cliente||'—')+'</td>'
         + '<td>'+(r.historico||'—')+'</td>'
@@ -8625,7 +8634,9 @@ function relatorioReceber(){
     totGeral+=subTot; recGeral+=subRec; saldoGeral+=(subTot-subRec);
     var cor = (typeof REC_TIPO_COR!=='undefined' && REC_TIPO_COR[tipo]) ? REC_TIPO_COR[tipo] : '#0E1B4D';
     blocos += '<div class="bloco">'
-      + '<div class="bloco-head" style="background:'+cor+'">'+tipo+' <span>'+arr.length+' conta(s) · Total '+fmt(subTot)+' · Saldo '+fmt(subTot-subRec)+'</span></div>'
+      + '<div class="bloco-head" style="background:'+cor+'">'+tipo+' <span>'+arr.length+' conta(s)'
+      + (nReneg ? ' · '+nReneg+' renegociada(s), fora do total' : '')
+      + ' · Total '+fmt(subTot)+' · Saldo '+fmt(subTot-subRec)+'</span></div>'
       + '<table><thead><tr><th>Cliente</th><th>Histórico</th><th style="text-align:right">Valor</th><th style="text-align:right">Recebido</th><th style="text-align:right">Saldo</th><th>Vencimento</th><th>Status</th></tr></thead>'
       + '<tbody>'+linhas+'</tbody></table></div>';
   });
@@ -8742,14 +8753,18 @@ function finRenderReceber() {
 
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">'
     + '<thead><tr>' + ['🤝','Cliente','Tipo','Valor (R$)','Recebido (R$)','Saldo','Vencimento','Histórico','Status','Recebido em',''].map(finTH).join('') + '</tr></thead><tbody>';
-  var totalVis=0, recebVis=0;
+  var totalVis=0, recebVis=0, nRenegVis=0;
   visiveis.forEach(function(o){
     var r=o.r, i=o.idx;
     var st = statusReal(r);
     var val = Number(r.valor)||0;
     var rec = Number(r.recebido)||0;
     var saldo = val - rec;
-    totalVis += val; recebVis += rec;
+    // 🔴 Renegociada continua na lista (é histórico), mas fora da soma:
+    // o saldo dela migrou para as parcelas do acordo, que também estão
+    // nesta tabela. Somar as duas pontas cobra a mesma dívida duas vezes.
+    if (st === 'renegociado') nRenegVis++;
+    else { totalVis += val; recebVis += rec; }
     function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'receber\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
     var stBadge = st==='recebido' ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">✅ Recebido</span>'
       : st==='parcial' ? '<span style="background:#dbeafe;color:#1e40af;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">◑ Parcial</span>'
@@ -8786,12 +8801,18 @@ function finRenderReceber() {
         + ' <button onclick="finDel(\'receber\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑</button>'
       + '</td></tr>';
   });
+  // ⚠️ São 11 colunas (🤝 · Cliente · Tipo · Valor · Recebido · Saldo ·
+  // Vencimento · Histórico · Status · Recebido em · ações). O rodapé tinha
+  // 10 células, e por isso os três totais saíam uma coluna à ESQUERDA do
+  // cabeçalho que prometiam. 3 + 1 + 1 + 1 + 5 = 11 põe cada um no lugar.
   html += '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D">'
-    + '<td style="padding:9px 10px">TOTAL FILTRADO ('+visiveis.length+')</td>'
+    + '<td colspan="3" style="padding:9px 10px">TOTAL FILTRADO ('+(visiveis.length-nRenegVis)+')'
+      + (nRenegVis ? '<span style="font-weight:600;font-size:10px;color:#9d174d"> · '+nRenegVis+' renegociada(s) fora do total</span>' : '')
+      + '</td>'
     + '<td style="padding:9px 10px;text-align:right;font-family:monospace">'+brl(totalVis)+'</td>'
     + '<td style="padding:9px 10px;text-align:right;font-family:monospace;color:#0d7a3e">'+brl(recebVis)+'</td>'
     + '<td style="padding:9px 10px;text-align:right;font-family:monospace;color:#c0392b">'+brl(totalVis-recebVis)+'</td>'
-    + '<td colspan="5"></td><td></td></tr></tfoot>';
+    + '<td colspan="5"></td></tr></tfoot>';
   html += '</table></div>';
   grid.innerHTML = html;
 }

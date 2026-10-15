@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v118-20261014-2300** |
+| `gestao.html` | **v119-20261014-2330** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3561,3 +3561,76 @@ Quem quer registrar que o dinheiro entrou usa **Baixar como pagas**.
   do banco passou a ter o rótulo como valor, e as que já estão como `repassada`
   continuam achando o selo
 - Regressão: as 3 suítes do dia (abas 28, extrato 51, duplicata 28) sem falha
+
+---
+
+## 🔴 Faturas renegociadas somavam no Contas a Receber — 14/10/2026 (v119)
+
+Relato: *"as faturas renegociadas estão somando no valor do contas a receber, o
+que não está correto pois quando renegociamos o sistema gera novos valores a
+receber com base nas parcelas negociadas"*. Estava certo, e eram **dois** lugares.
+
+### A conta, medida nos dados reais
+| | |
+|---|---|
+| lançamentos a receber | 100 |
+| **renegociados** | **19 · R$ 325.134,77** (todos com recebido = 0) |
+| parcelas do acordo | 6 · R$ 54.189,12 cada = R$ 325.134,72 |
+| total somando tudo | R$ 2.600.850,29 |
+| **total correto** | **R$ 2.275.715,52** |
+
+🔴 **R$ 325.134,77 contados duas vezes**: a dívida original *e* as parcelas que a
+substituíram.
+
+### Onde estava certo e onde estava errado
+✅ Os **cartões do topo** (Saldo a Receber · Já Recebido · Total Geral) **já
+excluíam** renegociado desde antes. Por isso o erro não saltava à vista.
+
+🔴 **Rodapé da tabela ("TOTAL FILTRADO")** somava tudo que estivesse visível,
+renegociadas inclusive.
+
+🔴 **Relatório de Contas a Receber** — o pior dos dois. Ele tem o **próprio**
+`statusReal`, e esse **não conhecia `renegociado`**:
+
+```js
+if (r.status==='recebido' || (val>0 && receb>=val)) return 'recebido';
+if (receb>0 && receb<val) return 'parcial';
+return 'pendente';            // ← as 19 renegociadas caíam aqui
+```
+
+Como renegociada fica com `recebido = 0`, **as 19 eram classificadas como
+PENDENTE** e entravam no total como dívida em aberto. O relatório impresso —
+justamente o que se leva para uma reunião — era o que mais errava.
+
+⚠️ **A lição:** havia **duas** funções `statusReal` no arquivo, uma por tela. A
+da tela aprendeu sobre renegociado; a do relatório ficou para trás. Lógica
+duplicada envelhece em ritmos diferentes.
+
+### O conserto
+Renegociada **continua aparecendo** (é histórico, com o selo 🤝), mas **fora da
+soma**, nos dois lugares. Cada um **diz quantas ficaram de fora**, para o número
+não virar mistério.
+
+🔴 **As parcelas do acordo continuam contando** — elas são a dívida de verdade
+agora. Há teste e defeito injetado garantindo que não saíram junto.
+
+### De quebra: o rodapé estava desalinhado
+São **11 colunas** e o rodapé tinha **10 células** — os três totais saíam **uma
+coluna à esquerda** do cabeçalho que prometiam (já registrado em 13/10 como
+achado não corrigido). Com `colspan="3"` no rótulo, 3+1+1+1+5 = 11 e cada total
+cai sob o seu título. Corrigido junto porque é o mesmo rodapé e é a mesma
+família de problema: número no lugar errado.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **18 testes** rodando o **render e o relatório reais** com os **100 lançamentos
+  reais**: o rodapé sem as renegociadas, a diferença batendo **exatamente** com
+  R$ 325.134,77, as 19 ainda visíveis na lista, as 11 colunas, o total do
+  relatório, o aviso nos dois lugares, as parcelas preservadas, e o filtro
+  "só renegociadas" dando total zero com as linhas à vista
+- **7 defeitos injetados — todos acusados**, inclusive **o defeito relatado** e
+  o de esconder as renegociadas em vez de só tirá-las da soma
+- Regressão do dia: abas 28, extrato 51, duplicata 28, rótulo 13 — sem falha
+
+### ⏳ Não verificado
+Falta o Rogel abrir a tela e conferir o número com os olhos.
