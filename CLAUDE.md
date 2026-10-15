@@ -3803,3 +3803,77 @@ decididos: podem ser quitação com desconto (status certo) ou falta receber
 
 Validado: `node --check`; `<div>` 677/677; **29 testes** e os 7 defeitos
 injetados da suíte, todos acusados.
+
+---
+
+## 🔴 Arquivos sensíveis estavam PUBLICADOS no domínio — 14/10/2026 (`428e98b`)
+
+Descoberto ao responder "como faço o histórico ficar no celular?": o registro do
+projeto estava na internet, aberto, no endereço da própria empresa.
+
+Medido em produção **antes** da correção:
+
+| Endereço | Resposta | O que entregava |
+|---|---|---|
+| `lokaveiculos.com.br/CLAUDE.md` | **200 · 192 KB** | este arquivo: cliente, valores, e a descrição de **cada falha de segurança conhecida** |
+| `…/CLAUDE.html` | **200 · 333 KB** | o mesmo, convertido pelo Jekyll |
+| **10 arquivos `.zip`** | **200** | o sistema inteiro. O `v16` traz `sistema/cadastro.html` com **`senha:"Loka@2024"` em texto puro** |
+| `…/database.rules.CORRIGIDA.json` | 200 | regras do banco |
+| `…/criar_alugueis_empresas.js` | 200 | script de manutenção de dados |
+
+🔴 **Nenhuma página do site apontava para nenhum deles.** Eram peso morto que só
+servia a quem fosse procurar — e juntos formam um manual de como atacar o sistema.
+
+### A correção: `_config.yml`
+O GitHub Pages roda Jekyll (foi por isso que o `.md` virou `.html` sozinho). O
+`_config.yml` com `exclude:` tira os arquivos da publicação. **Reversível**:
+basta tirar da lista.
+
+⚠️ O escopo foi **maior que o pedido** ("proteja o claude.md"). Proteger só ele
+deixaria o Rogel achando que estava resolvido enquanto o zip com a senha
+continuava baixável. Registrado para ser revertido se ele discordar.
+
+### Verificado no ar, depois do rebuild
+- os **16** endereços protegidos → **404** (os 10 zips conferidos um a um)
+- `index.html`, `sistema/gestao.html`, `multas.html`, `fatura.html` e
+  `sistema/index.html` → **200**: o site não caiu
+
+### 🔴 O que isso NÃO resolve
+**Tirar do ar não apaga.** Os arquivos seguem no repositório, que é **público no
+GitHub**: `github.com/lokaveiculos/loka` entrega tudo, inclusive versões antigas
+pelo histórico do git.
+
+Duas decisões pendentes do Rogel:
+1. **Trocar a `Loka@2024`** e qualquer senha presente nos zips — estiveram
+   baixáveis na internet, então valem como **queimadas** (igual à `daniel01`).
+2. **Apagar os zips e o `CLAUDE.md` do repositório.** Apagar não limpa o
+   histórico do git; para isso, reescrever o histórico ou tornar o repositório
+   privado — e aí o Pages passa a exigir plano pago.
+
+⚠️ **Padrão:** tudo que fica na pasta de um repositório servido por GitHub Pages
+**está na internet**, mesmo sem link apontando. Antes de versionar qualquer
+coisa aqui, perguntar: "eu publicaria isto num mural na rua?"
+
+## 💾 Histórico das conversas no OneDrive — 14/10/2026
+
+Pedido: ter o histórico no celular e em outros computadores, **sem comprometer o
+desempenho**.
+
+`OneDrive\Desktop\Github\historico-conversas\` (35 MB, **fora** dos
+repositórios — conferido que o git não enxerga):
+
+```
+AutoMais-ate-20260930.zip      6 MB
+Loka-ate-20261015.zip         28 MB
+CRM-veiculos-ate-20260826.zip 886 KB
+LEIA-ME.txt
+```
+
+⚠️ **O que NÃO foi sincronizado, de propósito:** `C:\Users\Usuario\.claude\projects`
+(52 MB). É a conversa viva, **reescrita a cada mensagem** — colocar no OneDrive
+faria o sincronizador trabalhar sem parar. As cópias exportadas são estáticas.
+
+Para atualizar: *"exporte as conversas para o OneDrive"*.
+
+As três sessões rodam da **mesma pasta** (`…\Github\loka`), inclusive a do Auto
+Mais — por isso não há histórico separado por projeto.
