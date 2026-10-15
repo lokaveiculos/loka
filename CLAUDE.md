@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v120-20261015-0005** |
+| `gestao.html` | **v121-20261015-0030** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3702,3 +3702,73 @@ informação de que existem R$ 210 mil de crédito pendurado.
 ### ⏳ Pendente de decisão do Rogel
 Dizer se os dois lançamentos são **crédito legítimo** (fica como está) ou **erro**
 (corrigir o dado, e aí o saldo passa a R$ 1.306.295,11 sozinho).
+
+---
+
+## ✅ O cartão Saldo a Receber mostra a própria composição — 14/10/2026 (v121)
+
+Dúvida do Rogel: *"o saldo pendente não contempla o saldo a receber dos
+recebimentos parciais, que deveria estar somado"*.
+
+### Contemplava — a tela é que não dizia
+Medido nos 100 lançamentos reais:
+
+| Situação | Qtd | Saldo |
+|---|---|---|
+| pendentes | 48 | R$ 755.078,29 |
+| **parciais (o que falta)** | **10** | **R$ 327.416,82** |
+| marcados como "Recebido" | 23 | 🔴 **R$ 13.800,00** |
+| **soma = o cartão** | **58** | **R$ 1.096.295,11** |
+
+Os parciais **já entravam** (o cálculo é `valor − recebido` para todo lançamento
+não renegociado). O problema era que o cartão mostrava **um número só**, sem
+dizer de onde vinha — e número grande sem composição vira desconfiança.
+
+O cartão passou a mostrar as partes. Agora quem olha confere a conta sozinho, em
+vez de precisar perguntar.
+
+### 🔴 O terceiro achado: R$ 13.800 presos em "Recebido"
+**23 lançamentos marcados como `recebido` ainda têm R$ 13.800,00 de saldo.**
+Acontece porque o `statusReal` confia no campo:
+
+```js
+if (r.status==='recebido' || (val>0 && receb>=val)) return 'recebido';
+```
+
+Marcar "recebido" à mão com `recebido < valor` deixa a linha verde na tela **e o
+saldo contando** — some da conta visual, continua no total. É irmão do problema
+dos negativos: dado que não bate com o rótulo.
+
+⚠️ **Não mexi nesses 23 lançamentos** nem na regra do `statusReal`. Mudar a regra
+reclassificaria 23 linhas de produção de uma vez; corrigir o dado é decisão do
+Rogel. O cartão **avisa**, que é o que faltava.
+
+### Agora o cartão se explica inteiro
+```
+R$ 1.096.295,11
+Saldo a Receber (58)
+48 pendente(s) R$ 755.078,29 · 10 parcial(is) R$ 327.416,82 a receber
+⚠ R$ 13.800,00 preso(s) em lançamento marcado como Recebido
+⚠ 2 lançamento(s) de saldo negativo abatendo R$ 210.000,00
+em aberto sem eles: R$ 1.306.295,11
+```
+
+⚠️ **Padrão que se repetiu três vezes hoje:** quando um total embute algo que o
+olho não vê, a tela tem de **dizer**. Nos três casos (renegociadas, negativos,
+presos em Recebido) a tentação era mexer no número; o certo foi mostrar a conta.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **29 testes** com o render real e os 100 lançamentos reais; os novos exigem que
+  as **3 partes somem exatamente** o valor do cartão, e um deles falha se o saldo
+  bater com a conta **sem** os parciais
+- **4 defeitos injetados — todos acusados**, incluindo *tirar os parciais do
+  saldo* (a suspeita do Rogel) e *somar o valor cheio do parcial em vez do que
+  falta*
+- Regressão: abas 28, extrato 51, duplicata 28, rótulo 13 — sem falha
+
+### ⏳ Duas decisões pendentes do Rogel
+1. Os **2 lançamentos negativos** (G7 R$ 100 mil recebido sem valor · Transsouza
+   valor −R$ 110 mil): crédito legítimo ou erro?
+2. Os **R$ 13.800** em linhas marcadas como Recebido: quitação com desconto, ou
+   falta receber?
