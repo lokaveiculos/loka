@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v115-20261014-2110 -->
+<!-- LOKA deploy: v116-20261014-2145 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1417,7 +1417,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v115-20261014-2110';
+var LOKA_BUILD = 'v116-20261014-2145';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -12705,6 +12705,32 @@ function mltParseBruto(texto){
   return mltParseSenatranLista(texto);
 }
 
+// ── A MESMA multa? ─────────────────────────────────────────────
+// 🔴 O AIT é o número do Auto de Infração: é ele que identifica a multa
+// perante o órgão. Quando os dois lados têm AIT, SÓ ele decide.
+//
+// A regra antiga era "mesma placa + mesma data = duplicada", e isso
+// **engolia autuação de verdade sem avisar**: dois autos no mesmo dia,
+// no mesmo carro, são comuns em frota (a auditoria de 30/09 achou 19
+// pares assim, vários com AITs consecutivos). Foi o que aconteceu com
+// a SKT3B92: S051451059 e S051451422, ambas de 16/09/2026 e com valores
+// diferentes — o extrato do DETRAN lista as duas, e o sistema importou uma.
+//
+// Sem AIT dos dois lados não há como decidir com segurança, então
+// exigimos placa + data + VALOR. Deixar passar uma repetida é visível e
+// se corrige na aba Auditoria; barrar uma multa real a torna invisível.
+function mltMesmaMulta(a, b){
+  if (!a || !b) return false;
+  var aa = String(a.ait || '').trim().toUpperCase();
+  var bb = String(b.ait || '').trim().toUpperCase();
+  if (aa && bb) return aa === bb;
+
+  var dA = mltISO(a.dataInfracao), dB = mltISO(b.dataInfracao);
+  return !!dB && dA === dB
+      && mltNormPlaca(a.placa) === mltNormPlaca(b.placa)
+      && mltNum(a.valor) === mltNum(b.valor);
+}
+
 // ── Converte os registros brutos no formato do sistema ─────────
 function mltParsePDF(texto){
   var placasConhecidas = {};
@@ -12736,10 +12762,7 @@ function mltParsePDF(texto){
 
     return {
       _sel: true,
-      _dup: mltMultas().some(function(x){
-        return (ait && (x.ait||'').toUpperCase() === ait)
-          || (mltNormPlaca(x.placa) === b.placa && mltISO(x.dataInfracao) === b.dataInfracao && b.dataInfracao);
-      }),
+      _dup: mltMultas().some(function(x){ return mltMesmaMulta(x, b); }),
       _naFrota: !!veic,
       ait: ait,
       placa: b.placa,
@@ -12865,10 +12888,7 @@ function mltLerArquivos(fila){
               r._arquivo = f.name;
               mltAplicarClientePadrao(r, padrao);
               // evita repetir o que já está no buffer desta sessão
-              var jaNoBuffer = _mltImport.some(function(x){
-                return (r.ait && x.ait && x.ait.toUpperCase() === r.ait.toUpperCase())
-                  || (x.placa === r.placa && x.dataInfracao === r.dataInfracao && r.dataInfracao);
-              });
+              var jaNoBuffer = _mltImport.some(function(x){ return mltMesmaMulta(x, r); });
               if (jaNoBuffer) r._dup = true;
               _mltImport.push(r);
               if (!r._dup) novas++;

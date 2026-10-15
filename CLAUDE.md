@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v115-20261014-2110** |
+| `gestao.html` | **v116-20261014-2145** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v13-20260930-1530** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3369,3 +3369,65 @@ cobre**, e isso está dito aqui em vez de ser contado como teste.
 `backups-loka\IMPORTAR-MULTAS-SKT3B92.html` foi regerada a partir do texto real
 (39 testes, 8 defeitos acusados). **Prefira o botão** — a página é só o caminho
 reserva.
+
+---
+
+## 🔴 A importação engolia multa: "placa + data = duplicada" (14/10/2026, v116)
+
+Relato: *"importamos o arquivo com 5 multas porém o sistema só exibe 4"*.
+Conferido no banco: entraram 4; faltou a **S051451422 · R$ 195,23 · 16/09/2026**.
+
+### A causa
+Dois pontos da importação tratavam como duplicata qualquer multa com a
+**mesma placa e a mesma data**, ignorando o AIT:
+
+```js
+|| (x.placa === r.placa && x.dataInfracao === r.dataInfracao && r.dataInfracao);
+```
+
+O extrato traz **duas autuações da SKT3B92 em 16/09/2026**: `S051451059`
+(R$ 130,16) e `S051451422` (R$ 195,23). AITs diferentes, **valores diferentes** —
+duas infrações distintas. A segunda foi marcada `_dup`, ficou **não selecionável**
+e nunca entrou. **Sem aviso nenhum:** a tela só mostrava 4.
+
+🔴 **Isso contradizia o que a própria auditoria de 30/09 já tinha estabelecido:**
+*"Todos os 595 AITs são únicos. O AIT é o número do Auto de Infração — é ele que
+identifica a multa perante o órgão"*, e os 19 pares de mesma placa/mesmo dia
+foram deixados intactos justamente por serem **autuação de verdade**. A
+importação usava um critério que a auditoria já havia rejeitado.
+
+### O conserto — `mltMesmaMulta(a, b)`
+Um critério único, usado nos dois pontos:
+
+| Situação | Decide por |
+|---|---|
+| os dois têm AIT | **só o AIT** |
+| falta AIT de um lado | placa + data + **valor** |
+| falta a data | não assume duplicata |
+
+⚠️ **O valor entrou no critério de propósito.** Placa + data sozinhos são grossos
+demais: foi exatamente o que apagou a multa. Com o valor, o caso "mesmo arquivo
+importado duas vezes" continua sendo pego.
+
+🔴 **A assimetria é deliberada:** deixar passar uma repetida é **visível** e se
+resolve na aba Auditoria; barrar uma multa real a torna **invisível** — ninguém
+procura o que não sabe que existe. Na dúvida, deixa entrar.
+
+### Para recuperar a que faltou
+Reimportar o mesmo PDF: as 4 já gravadas são reconhecidas pelo AIT e puladas, e
+só a `S051451422` entra. Conferido nos dados reais.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **28 testes** com o texto real e os dados reais (banco antes e depois da
+  importação): o caso relatado, AIT em caixa diferente, AIT com data divergente,
+  os três caminhos sem AIT, data em dois formatos, placa com hífen, nulo, e a
+  reimportação trazendo **só** a que falta
+- **8 defeitos injetados — todos acusados**, inclusive **a regra antiga**, que
+  reproduz o sumiço relatado
+
+⚠️ **3 testes são estruturais, e isso está dito.** A deduplicação *dentro do
+lote* mora no `mltImportarArquivo`, que depende de `FileReader` e pdf.js; copiar
+o laço para o teste seria testar a minha cópia — o mesmo erro que deixou o parser
+verde com bug vivo. Então confiro **no fonte** que a fiação existe e que a regra
+antiga não sobrou em lugar nenhum. Um defeito injetado prova que esses 3 pegam.
