@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v119-20261014-2330 -->
+<!-- LOKA deploy: v120-20261015-0005 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1419,7 +1419,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v119-20261014-2330';
+var LOKA_BUILD = 'v120-20261015-0005';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -8737,16 +8737,26 @@ function finRenderReceber() {
   var stats = document.getElementById('receberStats');
   if (stats) {
     var tTotal=0, tReceb=0, tSaldo=0, nPend=0, nParc=0, nRec=0, nReneg=0;
+    // 🔴 Lançamentos com saldo NEGATIVO (valor negativo, ou recebido maior que
+    // o valor) abatem do "Saldo a Receber" sem aparecer em lugar nenhum: a
+    // tela mostrava um saldo menor que a dívida em aberto e não dizia por quê.
+    // Eles continuam no cálculo — podem ser crédito ou adiantamento legítimo —
+    // mas agora o cartão DIZ quanto está sendo abatido.
+    var nNeg=0, tNeg=0;
     rows.forEach(function(r){
       if(!r) return;
       var v=Number(r.valor)||0, rc=Number(r.recebido)||0;
       var st=statusReal(r);
       if (st==='renegociado') { nReneg++; tReceb+=rc; return; } // saldo migrou p/ as parcelas do acordo
       tTotal+=v; tReceb+=rc; tSaldo+=(v-rc);
+      if ((v-rc) < -0.004) { nNeg++; tNeg += (v-rc); }
       if(st==='recebido') nRec++; else if(st==='parcial') nParc++; else nPend++;
     });
     stats.innerHTML =
-      '<div class="stat" style="border-left-color:#b45309"><div class="stat-value" style="font-size:15px">'+brl(tSaldo)+'</div><div class="stat-label">Saldo a Receber ('+(nPend+nParc)+')</div></div>'+
+      '<div class="stat" style="border-left-color:#b45309"><div class="stat-value" style="font-size:15px">'+brl(tSaldo)+'</div><div class="stat-label">Saldo a Receber ('+(nPend+nParc)+')'
+        + (nNeg ? '<br><span style="color:#c0392b;font-weight:700">⚠ '+nNeg+' lançamento(s) de saldo negativo abatendo '+brl(Math.abs(tNeg))+'</span>'
+                + '<br><span style="color:var(--muted)">em aberto sem eles: '+brl(tSaldo-tNeg)+'</span>' : '')
+        + '</div></div>'+
       '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'+brl(tReceb)+'</div><div class="stat-label">Já Recebido ('+nRec+' quit. · '+nParc+' parc.)</div></div>'+
       '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">'+brl(tTotal)+'</div><div class="stat-label">Total Geral'+(nReneg?' · '+nReneg+' reneg.':'')+'</div></div>';
   }

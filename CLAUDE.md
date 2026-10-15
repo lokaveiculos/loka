@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v119-20261014-2330** |
+| `gestao.html` | **v120-20261015-0005** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3634,3 +3634,71 @@ família de problema: número no lugar errado.
 
 ### ⏳ Não verificado
 Falta o Rogel abrir a tela e conferir o número com os olhos.
+
+---
+
+## 🔴 "Saldo a Receber" menor que a dívida — 2 lançamentos negativos (14/10/2026, v120)
+
+Relato: *"o saldo a receber na primeira tela continua desatualizado"*, apontando
+o cartão **Saldo a Receber** do Contas a Receber.
+
+### Não era renegociação — aquilo já estava certo
+Medido: o cartão **sempre excluiu** as renegociadas (a v119 consertou o rodapé e
+o relatório, não os cartões). Procurei em todas as telas antes de concluir:
+o Dashboard não tem cartão financeiro, e **nenhuma das 33 faturas está marcada
+como renegociada** — os 19 lançamentos renegociados **não têm vínculo com fatura
+nenhuma**, são manuais.
+
+### A causa: saldo negativo abatendo em silêncio
+O cartão soma `valor − recebido` de cada lançamento. **Dois** deles dão negativo:
+
+| Cliente | Tipo | Valor | Recebido | Efeito |
+|---|---|---|---|---|
+| **G7** | Fatura | R$ 0,00 | **R$ 100.000,00** | **−R$ 100.000,00** |
+| **Transsouza** | Fatura | **−R$ 110.000,00** | R$ 0,00 | **−R$ 110.000,00** |
+
+Juntos abatem **exatamente R$ 210.000,00**:
+
+| | |
+|---|---|
+| dívida em aberto de verdade | **R$ 1.306.295,11** |
+| o que o cartão mostrava | **R$ 1.096.295,11** |
+
+⚠️ E eles aparecem na lista como **"Pendente"**: o de R$ 100 mil recebidos passa
+por `statusReal` com `valor = 0`, não cai em *recebido* (exige `val > 0`) nem em
+*parcial*, e sobra como pendente. Um lançamento com R$ 100 mil recebidos exibido
+como pendente.
+
+### O que foi feito — e o que NÃO foi
+🔴 **Não mexi nos dois lançamentos.** Podem ser crédito/adiantamento legítimo (e
+aí abater está certo) ou erro de digitação (e aí o dado é que está torto).
+São R$ 210 mil de registro financeiro de cliente: a decisão é do Rogel.
+
+O cartão passou a **explicar o próprio número**:
+
+```
+R$ 1.096.295,11
+Saldo a Receber (58)
+⚠ 2 lançamento(s) de saldo negativo abatendo R$ 210.000,00
+em aberto sem eles: R$ 1.306.295,11
+```
+
+Os negativos **continuam no cálculo** — há teste e defeito injetado garantindo
+que o código não os esconde por conta própria.
+
+⚠️ **Padrão:** quando um total embute algo que o olho não vê, o certo é a tela
+**dizer**, não o código decidir. Esconder teria "consertado" o número e perdido a
+informação de que existem R$ 210 mil de crédito pendurado.
+
+### Validado
+- `node --check`; `<div>` balanceadas (677/677)
+- **24 testes** (os 18 da v119 + 6 novos) com o render real e os 100 lançamentos
+  reais: o aviso aparece, mostra os R$ 210.000,00, mostra o saldo sem eles,
+  **o cálculo não foi alterado**, e sem negativo o aviso não aparece
+- **3 defeitos injetados — todos acusados**: esconder os negativos do cálculo,
+  parar de avisar, e parar de contar
+- Regressão: abas 28, extrato 51, duplicata 28, rótulo 13 — sem falha
+
+### ⏳ Pendente de decisão do Rogel
+Dizer se os dois lançamentos são **crédito legítimo** (fica como está) ou **erro**
+(corrigir o dado, e aí o saldo passa a R$ 1.306.295,11 sozinho).
