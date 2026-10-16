@@ -1,0 +1,14 @@
+# O GitHub Pages publica TUDO que estiver aqui, mesmo sem link apontando.
+# Antes de versionar: "eu publicaria isto num mural na rua?"
+
+firebase-debug.log
+*-debug.log
+firebase-debug.*.log
+.firebase/
+node_modules/
+*.pfx
+*.pem
+*.key
+.env
+Thumbs.db
+desktop.ini
