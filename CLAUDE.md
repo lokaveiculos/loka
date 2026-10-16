@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v123-20261015-1030** |
+| `gestao.html` | **v124-20261016-0940** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -3960,3 +3960,84 @@ apaga o texto. Editar nome ou perfil **sem digitar senha** não toca na senha.
 ⚠️ Mesmo com hash, **o nó continua legível** — o que muda é que ler não entrega
 mais senha. Fechar a leitura de verdade ainda depende de Firebase Auth
 (pendência 5).
+
+---
+
+## ✅ Edição de contrato: guardar o contrato INTEIRO e reabrir — 16/10/2026 (gestao v124 · mensal-v3 · diaria-v3)
+
+Pedido (opção A, escolhida pelo Rogel): *"o master/adm tenha disponível a função
+de editar os contratos para atualização de informações (valores, condições)"*.
+
+### Por que não era "destravar campo"
+Os campos do contrato **já eram editáveis** — só o Total (calculado) e o nome na
+assinatura são travados. O que faltava era **guardar**: o registro em
+`loka_db/contratos` era um **resumo** (cliente, placa, tipo, data, vigência,
+valor, caução). Endereço, CPF, condições, valor por veículo e observações **não
+eram salvos** — reabrir não tinha o que trazer.
+
+⚠️ E a **diária nunca gravava em `contratos`**: só criava o aluguel em `ativos`.
+
+### O que entrou
+| | |
+|---|---|
+| `ctColeta()` | junta tudo que foi digitado: campos fixos (por **id**), observação e a lista de veículos |
+| `ctAplicar()` | devolve tudo à tela, **criando as linhas de veículo que faltam** |
+| `ctSalvarContrato()` | grava resumo + `campos` e **atualiza** quando já está editando |
+| `ctCarregarParaEdicao()` | abre `...?edit=<id>` já preenchido |
+| botão **Salvar contrato** | nas duas páginas |
+| botão **✏️** no painel Contratos | só master/admin |
+
+🔴 **Grava só o nó `loka_db/contratos`, por caminho** — nunca o `loka_db`
+inteiro (armadilha 3). Editar contrato não pode arriscar sobrescrever frota,
+clientes ou financeiro.
+
+⚠️ Os campos do locatário (CPF, endereço, CEP, telefone, e-mail) **não tinham
+id** — ganharam. Posição no HTML seria chave frágil: muda a cada ajuste de layout.
+
+### 🔴 O defeito da fatura, evitado de propósito
+`_ctEditandoId` guarda qual contrato está aberto. **Sem isso, salvar de novo
+criaria um contrato novo a cada clique** — exatamente o que a `fatura.html`
+sofreu (v79/v81). Há teste e defeito injetado para isso.
+
+Editar **preserva o `geradoEm`** e grava `editadoEm`: a data de origem do
+documento não muda porque alguém corrigiu um valor.
+
+### 🔴 Contrato antigo avisa, e o aviso não some
+Contrato gerado antes disto só tem o resumo. A página diz isso ao abrir.
+
+⚠️ **Na primeira versão o aviso era engolido:** eu chamava `_ctAviso` duas vezes
+e a segunda mensagem (genérica) apagava a primeira (o alerta). Agora é **uma
+mensagem só**. Foi um teste que pegou — não a leitura do código.
+
+### Permissão em duas camadas
+O botão só aparece para master/admin **e** `editarContrato()` confere de novo ao
+clicar. Esconder botão não é controle de acesso.
+
+### Validado
+- `node --check` nos três; `<div>` balanceadas (gestao 677/677, mensal 45/45, diária 48/48)
+- **53 testes** com o código real das três páginas, nos dois contratos: colher e
+  devolver todos os campos, os 3 veículos com os 6 dados, a observação (campo e
+  espelho impresso), o ciclo ida-e-volta idêntico, gravar só o nó certo, **salvar
+  de novo não criar outro**, `editadoEm`, `geradoEm` preservado, abrir por
+  `?edit=`, id inexistente, salvar sem nome, falha de gravação, sem banco, e o
+  contrato antigo
+- **12 defeitos injetados — todos acusados**, entre eles salvar sempre criando,
+  gravar o `loka_db` inteiro, não criar as linhas de veículo, qualquer perfil
+  editando e a permissão não conferida no clique
+- Regressão: reneg 29, abas 28, extrato 51, duplicata 28, rótulo 13, senha 27
+
+⚠️ **Três buracos do meu ambiente de teste, corrigidos no caminho:** o banco
+falso não guardava o que era gravado (então *"não cria outro contrato"* passava
+por engano), `createElement` não registrava o elemento (os avisos sumiam) e
+faltava `getContext`, o que fazia o script da diária estourar no canvas e rodar
+**meio carregado** — a armadilha já registrada em 14/10.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel salvar um contrato, fechar, reabrir pelo ✏️ e conferir
+que tudo voltou.
+
+### ⚠️ Achado não corrigido
+O "Registrar Contrato" das duas páginas ainda faz
+`firebase.database().ref('loka_db').set(db_inteiro)` — grava o banco inteiro,
+fora do `_setDBProtegido` (armadilha 3). É anterior a esta mudança e não foi
+tocado; o caminho novo de salvar **não** passa por lá.

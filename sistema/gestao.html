@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v123-20261015-1030 -->
+<!-- LOKA deploy: v124-20261016-0940 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1419,7 +1419,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v123-20261015-1030';
+var LOKA_BUILD = 'v124-20261016-0940';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9776,10 +9776,38 @@ function renderContratos() {
       '<td style="padding:9px 12px;font-size:11px;color:var(--muted)">'+(ct.geradoEm?new Date(ct.geradoEm).toLocaleString('pt-BR'):'—')+'</td>'+
       '<td style="padding:9px 12px"><div style="display:flex;gap:5px">'+
         '<button class="icon-btn" onclick="reabrirContrato('+n+')" title="Abrir contrato" style="color:#2B4BF2;border-color:#2B4BF2">📄</button>'+
+        // ✏️ Editar: reabre o contrato COM tudo que foi digitado, para
+        // atualizar valores e condições. Só master/admin — é documento
+        // assinado, não é tela de preenchimento.
+        // Contrato gerado antes desta função não tem `campos`: o botão
+        // aparece mesmo assim, e a própria página avisa que só há o resumo.
+        (_ctPodeEditar() ? '<button class="icon-btn" onclick="editarContrato('+n+')" title="Editar contrato (master/admin)" style="color:#0d7a3e;border-color:#0d7a3e">✏️</button>' : '')+
         '<button class="icon-btn" onclick="excluirContrato('+n+')" title="Excluir" style="color:#c0392b;border-color:#f5c6cb">🗑</button>'+
       '</div></td>'+
     '</tr>';
   }).join('');
+}
+
+// Quem pode editar contrato: master e admin. Os demais perfis continuam
+// podendo abrir e imprimir — só não alteram o documento salvo.
+function _ctPodeEditar() {
+  var p = _perfilAtual();
+  return p === 'master' || p === 'admin';
+}
+
+// Abre a página do contrato já preenchida com o que foi salvo.
+// ⚠️ Contrato antigo (sem `campos`) abre com o aviso da própria página:
+// melhor dizer que só há o resumo do que fingir que está tudo lá.
+function editarContrato(n) {
+  if (!_ctPodeEditar()) { toast('⚠️ Seu perfil não permite editar contratos', '#b45309'); return; }
+  var list = (db.contratos||[]).slice().reverse();
+  var ct = list[n];
+  if (!ct) { toast('⚠️ Contrato não encontrado', '#c0392b'); return; }
+  if (!ct.id) { toast('⚠️ Este contrato não tem identificador — não dá para reabrir para edição', '#b45309'); return; }
+  var arquivos = {diaria:'contrato-diaria.html', mensal:'contrato-mensal.html'};
+  var arq = arquivos[ct.tipo];
+  if (!arq) { toast('⚠️ Só contrato de diária e mensal podem ser editados', '#b45309'); return; }
+  window.open(arq + '?edit=' + encodeURIComponent(ct.id), '_blank');
 }
 
 function reabrirContrato(n) {

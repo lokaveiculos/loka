@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<!-- LOKA deploy: mensal-v2-20261015-1215 -->
+<!-- LOKA deploy: mensal-v3-20261016-0940 -->
 <head>
   <!-- Auth Guard -->
   <script>
@@ -285,6 +285,10 @@
 
 <!-- Botões -->
 <div class="action-bar">
+  <button class="btn" id="btnSalvarCt" onclick="ctSalvarContrato()" style="background:#2B4BF2;color:#fff;display:inline-flex;align-items:center;gap:7px" title="Guarda o contrato inteiro para poder reabrir e editar depois">
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    Salvar contrato
+  </button>
   <button class="btn" id="btnRegContratoM" onclick="registrarContratoMensal()" style="background:#0d7a3e;color:#fff;display:inline-flex;align-items:center;gap:7px">
     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
     Registrar Contrato
@@ -339,27 +343,27 @@
             </div>
             <div class="field-group">
               <span class="field-label">CPF / CNPJ</span>
-              <input class="field-input" type="text" placeholder="000.000.000-00">
+              <input class="field-input" type="text" id="locatarioDoc" placeholder="000.000.000-00">
             </div>
           </div>
           <div class="field-grid col-3" style="margin-bottom:10px;">
             <div class="field-group">
               <span class="field-label">Endereço</span>
-              <input class="field-input" type="text" placeholder="Rua, número, bairro">
+              <input class="field-input" type="text" id="locatarioEnd" placeholder="Rua, número, bairro">
             </div>
             <div class="field-group">
               <span class="field-label">CEP</span>
-              <input class="field-input" type="text" placeholder="00000-000">
+              <input class="field-input" type="text" id="locatarioCep" placeholder="00000-000">
             </div>
             <div class="field-group">
               <span class="field-label">Telefone</span>
-              <input class="field-input" type="text" placeholder="(75) 00000-0000">
+              <input class="field-input" type="text" id="locatarioTel" placeholder="(75) 00000-0000">
             </div>
           </div>
           <div class="field-grid col-full">
             <div class="field-group">
               <span class="field-label">E-mail</span>
-              <input class="field-input" type="email" placeholder="exemplo@email.com">
+              <input class="field-input" type="email" id="locatarioEmail" placeholder="exemplo@email.com">
             </div>
           </div>
         </div>
@@ -533,8 +537,211 @@
 
 
 <script>
-var LOKA_BUILD = 'mensal-v2-20261015-1215';
-try { console.log('LOKÁ contrato mensal-v2-20261015-1215'); } catch(e) {}
+var LOKA_BUILD = 'mensal-v3-20261016-0940';
+try { console.log('LOKÁ contrato mensal-v3-20261016-0940'); } catch(e) {}
+
+/* ══════════════════════════════════════════════════════════
+   EDIÇÃO DE CONTRATO — guardar o contrato INTEIRO e reabrir
+   ══════════════════════════════════════════════════════════
+   Antes, o sistema guardava só um RESUMO (cliente, placa, tipo, data,
+   valor, caução). Reabrir não trazia endereço, CPF, condições nem o valor
+   por veículo — não dava para editar, só para refazer do zero.
+   Agora o registro leva `campos`, com tudo que foi digitado.
+   ══════════════════════════════════════════════════════════ */
+
+var CT_TIPO   = "mensal";
+var CT_FIXOS  = ["locatarioNome","locatarioDoc","locatarioEnd","locatarioCep","locatarioTel","locatarioEmail","tarCondutor","tarTotal","tarCaucao","c11Danos","c11PerdaTotal","c11Parabrisa","c11Farois","autoDate","sigNome","tarMensal","dtInicio","dtVigencia"];
+var CT_TBODY  = "veiculosBody";
+
+/* 🔴 Guarda qual contrato está aberto. Sem isto, salvar de novo criaria um
+   contrato NOVO a cada clique — foi exatamente o defeito que a fatura teve
+   (v79/v81), e não vale a pena repetir. */
+var _ctEditandoId = null;
+
+function _ctLinhas() {
+  var tb = document.getElementById(CT_TBODY);
+  return tb ? Array.prototype.slice.call(tb.querySelectorAll("tr")) : [];
+}
+
+/* Lê a linha de veículo pela ORDEM das células. A ordem é definida num lugar
+   só (o HTML da primeira linha e a função que cria as demais), então é
+   estável — e evita ter de dar id a cada célula de cada linha. */
+function _ctLerLinha(tr) {
+  var ins = Array.prototype.slice.call(tr.querySelectorAll("input"));
+  return {
+    marca: (ins[0]||{}).value || "", modelo: (ins[1]||{}).value || "",
+    placa: (ins[2]||{}).value || "", cor:    (ins[3]||{}).value || "",
+    km:    (ins[4]||{}).value || "", valor:  (ins[5]||{}).value || ""
+  };
+}
+function _ctEscreverLinha(tr, v) {
+  var ins = Array.prototype.slice.call(tr.querySelectorAll("input"));
+  var ordem = ["marca","modelo","placa","cor","km","valor"];
+  ordem.forEach(function (nome, i) { if (ins[i]) ins[i].value = v[nome] || ""; });
+}
+
+/* Junta TUDO que foi digitado. */
+function ctColeta() {
+  var campos = {};
+  CT_FIXOS.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) campos[id] = el.value || "";
+  });
+  var obs = document.querySelector(".obs-area");
+  campos._obs = obs ? (obs.value || "") : "";
+  campos._veiculos = _ctLinhas().map(_ctLerLinha);
+  return campos;
+}
+
+/* Devolve tudo à tela. */
+function ctAplicar(campos) {
+  if (!campos) return;
+  CT_FIXOS.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && campos[id] !== undefined) el.value = campos[id];
+  });
+  var obs = document.querySelector(".obs-area");
+  if (obs && campos._obs !== undefined) {
+    obs.value = campos._obs;
+    // o espelho que de fato é impresso (a textarea some na impressão)
+    var esp = document.querySelector(".obs-print");
+    if (esp) esp.textContent = campos._obs;
+  }
+  var veics = campos._veiculos || [];
+  if (veics.length) {
+    // cria as linhas que faltam ANTES de escrever, senão os veículos
+    // a partir do segundo seriam perdidos em silêncio
+    while (_ctLinhas().length < veics.length && typeof addVeiculo === "function") {
+      addVeiculo();
+    }
+    var trs = _ctLinhas();
+    veics.forEach(function (v, i) { if (trs[i]) _ctEscreverLinha(trs[i], v); });
+  }
+  // refaz os totais a partir dos valores devolvidos
+  try { if (typeof calcTotalMensal  === "function") calcTotalMensal(); } catch (e) {}
+  try { if (typeof calcTotalDiaria  === "function") calcTotalDiaria(); } catch (e) {}
+}
+
+/* Abre um contrato já salvo: ...?edit=<id> */
+function ctCarregarParaEdicao() {
+  var id = new URLSearchParams(window.location.search).get("edit");
+  if (!id) return;
+  if (typeof firebase === "undefined" || !firebase.apps || !firebase.apps.length) {
+    _ctAviso("⚠️ Sem conexão com o banco — não deu para abrir o contrato salvo.", "err");
+    return;
+  }
+  firebase.database().ref("loka_db/contratos").once("value").then(function (snap) {
+    var lista = snap.val() || {};
+    var achado = null;
+    Object.keys(lista).forEach(function (k) {
+      var ct = lista[k];
+      if (ct && ct.id === id) achado = ct;
+    });
+    if (!achado) { _ctAviso("⚠️ Contrato não encontrado. Ele pode ter sido excluído.", "err"); return; }
+    // 🔴 Contrato salvo ANTES desta mudança só tem o resumo. O alerta vai na
+    //    MESMA mensagem: se fossem duas chamadas, a segunda apagaria a
+    //    primeira e o aviso que importa nunca seria lido.
+    var antigo = !achado.campos;
+    _ctEditandoId = achado.id;
+    ctAplicar(achado.campos);
+    _ctAviso(antigo
+      ? "⚠️ Editando o contrato de " + (achado.clienteNome || "—") +
+        " — ele foi gerado antes da edição existir: só o resumo foi guardado. " +
+        "Confira e complete os campos antes de salvar."
+      : "✏️ Editando o contrato de " + (achado.clienteNome || "—") +
+        ". Salvar atualiza este contrato, não cria outro.",
+      antigo ? "err" : "ok");
+  }).catch(function (e) {
+    _ctAviso("⚠️ Não deu para abrir o contrato: " + e.message, "err");
+  });
+}
+
+function _ctAviso(txt, tipo) {
+  var d = document.getElementById("ctAvisoEdicao");
+  if (!d) {
+    d = document.createElement("div");
+    d.id = "ctAvisoEdicao";
+    d.className = "no-print";
+    d.style.cssText = "position:sticky;top:0;z-index:900;padding:9px 16px;" +
+      "font-size:12px;font-weight:700;text-align:center;";
+    document.body.insertBefore(d, document.body.firstChild);
+  }
+  d.style.background = tipo === "err" ? "#fdecea" : "#e8f5ef";
+  d.style.color      = tipo === "err" ? "#8a2a20" : "#0a5c2f";
+  d.textContent = txt;
+}
+
+document.addEventListener("DOMContentLoaded", ctCarregarParaEdicao);
+
+/* Salva o contrato INTEIRO em loka_db/contratos.
+   🔴 Grava SO o no contratos, por caminho — nunca o loka_db inteiro
+   (armadilha 3 do sistema). Editar um contrato nao pode arriscar
+   sobrescrever frota, clientes ou financeiro. */
+function ctSalvarContrato() {
+  var btn = document.getElementById("btnSalvarCt");
+  if (typeof firebase === "undefined" || !firebase.apps || !firebase.apps.length) {
+    _ctAviso("⚠️ Sem conexão com o banco — o contrato NÃO foi salvo.", "err"); return;
+  }
+  var campos = ctColeta();
+  var nome = (campos.locatarioNome || "").trim();
+  if (!nome) { _ctAviso("⚠️ Informe o nome do locatário antes de salvar.", "err"); return; }
+
+  var veics = campos._veiculos || [];
+  var comPlaca = veics.filter(function (v) { return (v.placa || "").trim(); });
+  if (btn) { btn.disabled = true; btn.textContent = "Salvando..."; }
+
+  firebase.database().ref("loka_db/contratos").once("value").then(function (snap) {
+    var bruto = snap.val() || {};
+    // Armadilha 1: o array pode voltar como objeto {0:..,1:..}
+    var chaves = Object.keys(bruto);
+    var lista = chaves.map(function (k) { return bruto[k]; }).filter(Boolean);
+
+    var reg = {
+      id: _ctEditandoId || ("ct_" + Date.now()),
+      clienteNome: nome,
+      placa: (comPlaca[0] || {}).placa || "",
+      veiculoNome: comPlaca.map(function (v) {
+        return ((v.marca || "") + " " + (v.modelo || "")).trim();
+      }).filter(Boolean).join(", "),
+      tipo: CT_TIPO,
+      retirada: campos.dtRetirada || campos.dtInicio || "",
+      devolucao: campos.dtDevolucao || "",
+      vigencia: campos.dtVigencia || "",
+      valor: campos.tarTotal || "",
+      caucao: campos.tarCaucao || "",
+      campos: campos
+    };
+
+    var i = -1;
+    if (_ctEditandoId) {
+      for (var k = 0; k < lista.length; k++) {
+        if (lista[k] && lista[k].id === _ctEditandoId) { i = k; break; }
+      }
+    }
+    if (i >= 0) {
+      // preserva quando foi gerado: editar nao muda a origem do documento
+      reg.geradoEm  = lista[i].geradoEm || new Date().toISOString();
+      reg.editadoEm = new Date().toISOString();
+      lista[i] = Object.assign({}, lista[i], reg);
+    } else {
+      reg.geradoEm = new Date().toISOString();
+      lista.unshift(reg);
+    }
+    return firebase.database().ref("loka_db/contratos").set(lista).then(function () {
+      return { novo: i < 0, id: reg.id };
+    });
+  }).then(function (r) {
+    _ctEditandoId = r.id;
+    if (btn) { btn.disabled = false; btn.textContent = "Salvar contrato"; }
+    _ctAviso(r.novo ? "✅ Contrato salvo. Daqui em diante, salvar atualiza ESTE contrato."
+                    : "✅ Contrato atualizado.", "ok");
+  }).catch(function (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Tentar de novo"; }
+    // 🔴 Falha de gravacao nunca pode passar por sucesso.
+    _ctAviso("❌ O contrato NÃO foi salvo: " + e.message, "err");
+  });
+}
+
 /* ── Data do contrato ──
    Sugere a data de hoje por extenso, mas o campo é EDITÁVEL: contrato
    assinado em outro dia (ou refeito depois) precisa levar a data certa.
