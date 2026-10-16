@@ -4133,3 +4133,131 @@ contador. E clicar em **🔔 Ativar avisos** para autorizar a notificação.
 ### O que ficaria para depois (não foi pedido)
 - **Repetição** (mensal/anual) para IPVA, seguro, vistoria
 - **Aviso com o sistema fechado** — depende de resolver o servidor
+
+---
+
+## ✅ Aba Almoxarifado — estoque de peças e componentes — 16/10/2026 · gestao v126
+
+Pedido: *"criar a aba Almoxarifado para controle de estoque de peças e
+componentes"*. **Não existia nada de estoque nos dois sistemas** — a Manutenção
+registra o serviço e o custo, mas nunca soube o que havia na prateleira.
+
+### 🔴 A decisão que define tudo: o saldo NÃO é digitado
+
+O saldo de cada peça é **calculado** a partir das movimentações, sempre:
+
+```js
+function axSaldo(itemId) {
+  var t = 0;
+  axMovs().forEach(function (m) {
+    if (!m || m.itemId !== itemId) return;
+    var q = _axNum(m.qtd);
+    if (m.tipo === 'entrada')     t += q;
+    else if (m.tipo === 'saida')  t -= q;
+    else if (m.tipo === 'ajuste') t += q;   // já vem com sinal
+  });
+  return Math.round(t * 100) / 100;
+}
+```
+
+⚠️ **Campo de saldo editável é a forma clássica de o estoque mentir:** alguém
+corrige o número à mão, a movimentação não existe, e no mês seguinte ninguém sabe
+para onde foi a peça. Aqui, para o saldo mudar, **tem de haver um lançamento com
+data, quem fez e observação** — inclusive o acerto de inventário, que entra como
+movimentação do tipo **ajuste** (com sinal: `-3` tira três).
+
+São duas listas irmãs: `loka_db/almox` (a ficha da peça) e `loka_db/almox_mov`
+(o extrato). A ficha guarda código, nome, categoria, unidade, estoque mínimo,
+localização e fornecedor — **nunca quantidade**.
+
+### O que o sistema recusa, e por quê
+
+| Recusa | Por quê |
+|---|---|
+| **saída maior que o saldo** | estoque negativo não existe no mundo físico; o certo é lançar a entrada que faltou |
+| **ajuste que deixaria negativo** | idem — o ajuste serve para acertar, não para inventar falta |
+| quantidade **sem dígito** | `_axNum('abc')` devolve **0**, e 0 passaria calado. Mesma lição da baixa em lote de multas (v94) e da franquia dos sinistros (v99) |
+| movimentação **sem data** | sem data o lançamento não entra em filtro nem em conferência de período |
+| **código repetido** (ignorando maiúscula) | duas fichas com o mesmo código dividiriam o saldo da mesma peça ao meio |
+| **excluir peça que tem movimentação** | deixaria o extrato órfão: lançamento apontando para ficha que não existe. Quem não é mais usado vira **inativo**, não apagado |
+
+### Custo e valor em estoque
+`axCustoAtual()` usa o custo da **entrada mais recente** — é o que vale para
+repor. O valor em estoque é `saldo × custo atual`.
+
+⚠️ **Saída não grava custo**, de propósito: quem consome a peça não negocia
+preço, e deixar o campo aberto ali produziria dois números concorrentes para a
+mesma peça. Entrada grava; saída e ajuste, não.
+
+### Situação, badge e a faixa do topo
+`axSituacao()` devolve **zerado** (saldo ≤ 0), **baixo** (`min > 0 && saldo <= min`)
+ou **ok**. O `<=` é deliberado: saldo **igual** ao mínimo já é hora de comprar.
+
+A lista vem ordenada por **o que falta primeiro** — zerado, depois baixo, depois
+o resto —, o item do menu ganha badge com a contagem, e `axTextoAlerta()` entra
+na **mesma faixa de alertas** do topo que a Agenda e os aluguéis já usam.
+
+⚠️ `checkAlertas` tinha uma saída antecipada que dependia de haver aluguel ativo;
+virou `if (!db) return;`. Sem isso, um dia sem aluguel ativo esconderia também o
+aviso de estoque e o da Agenda.
+
+### Onde a aba foi registrada (a lição do `multasefrotas`)
+`PANELS`, `_TODOS_PAINEIS`, `TITLES`, `_PAINEL_LABEL`, `showPanel`, o perfil
+**Operador** (Master e Admin herdam pelo `_TODOS_PAINEIS.slice()`) e — 🔴 a que
+mais se esquece — **`normalizarDB`**, com `'almox'` **e** `'almox_mov'`. Sem
+isso, depois da **primeira exclusão** o Firebase devolve a lista como objeto e a
+aba quebra (armadilha 1), dias depois de publicar.
+
+### O que NÃO entrou, de propósito
+- **Fotos e anexos** — o sistema não usa Firebase Storage e já desativou
+  comprovantes em manutenção para não inflar o banco. Mesma decisão da aba de
+  Sinistros.
+- **Ligação automática com a Manutenção** (dar baixa na peça ao fechar o
+  serviço). A movimentação já aceita **placa** e observação, então a informação
+  cabe; automatizar muda a tela de Manutenção, que não foi pedida.
+- **Despesa automática na entrada.** A compra de peça é despesa, mas a
+  Manutenção→Despesa da Auto Mais ensinou que vincular dois mundos exige regra de
+  edição e exclusão nos dois lados. Fica para quando for pedido.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (737/737); os dois carimbos batendo
+- **70 testes** com o código real: o saldo nos três tipos de movimentação, o
+  ajuste com sinal, as 6 recusas, o custo da entrada mais recente, o valor em
+  estoque, as três situações com a borda do mínimo, a ordenação, os filtros das
+  duas sub-abas, o badge, a faixa do topo, o nome escapado, e a lista voltando
+  como objeto do Firebase
+- **24 defeitos injetados — todos acusados**, entre eles saída somando em vez de
+  subtrair, saída maior que o saldo passando, código repetido aceito, excluir
+  peça com histórico, e tirar o `'almox'` do `normalizarDB`
+- **No navegador, no arquivo publicado**, com 4 peças e 6 movimentações injetadas
+  **só na memória**: cartões 4 / 2 / 1 / R$ 407,50, saldos `[7,1,0,0]`, badge 3,
+  uma saída de 99 **barrada**, uma de 2 aceita (saldo 7 → 5), placa gravada em
+  maiúscula e a faixa *"⚠️ 2 peça(s) SEM ESTOQUE · 2 abaixo do mínimo"*.
+  **Nada foi gravado em produção.**
+- Regressão: **31 suítes, 1.475 testes**, nenhuma falha
+
+### ⚠️ Dois testes meus que passavam sem provar nada
+Antes de fechar, revi a suíte e **joguei dois testes fora**: um checava a guarda
+de dígito num ponto em que ela só muda a mensagem (o lançamento era recusado de
+outro jeito), e o outro conferia o id da movimentação, que **não é desenhado na
+tela** — a asserção nunca poderia falhar. Reescritos para exercitar o que
+prometem.
+
+⚠️ E o ambiente de teste mentiu de novo, pelo mesmo lugar: meu `value` falso
+devolvia número, não texto, então `.trim()` estourava onde o navegador não
+estouraria. **Stub de DOM tem de converter como o navegador converte** — em
+`<input>` o `value` é sempre string.
+
+### ⚠️ Teste estrutural ancorado no vizinho quebra sem defeito nenhum
+Entrar com `'almox','almox_mov'` no `normalizarDB` **quebrou duas asserções
+antigas** (`t-agenda` e `t-rec-registro`) que exigiam literalmente
+`'recibos','agenda'].forEach` — o nó continuava registrado, só não era mais o
+último da lista. As duas passaram a procurar **o nome dentro do corpo do
+`normalizarDB`**, sem depender de quem vem depois.
+
+É um defeito de teste com custo real: teste que falha pelo motivo errado ensina a
+ignorar teste vermelho. As duas injeções correspondentes continuam acusando.
+
+### ⏳ Não verificado
+Falta exercitar **logado**: o Rogel abrir o Almoxarifado, cadastrar uma peça de
+verdade, lançar uma entrada e uma saída e conferir o saldo. Eu não autentico.

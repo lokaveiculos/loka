@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v125-20261016-1500 -->
+<!-- LOKA deploy: v126-20261016-1620 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -254,6 +254,7 @@ tr:hover td{background:#f8f9fe;}
     <div data-label="Multas e-Frotas" class="nav-item" id="ni-multasefrotas" onclick="showPanel('multasefrotas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas e-Frotas</div>
     <div data-label="Ocorrências / Sinistros" class="nav-item" id="ni-sinistros" onclick="showPanel('sinistros')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Ocorrências / Sinistros</div>
     <div data-label="Agenda" class="nav-item" id="ni-agenda" onclick="showPanel('agenda')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Agenda<span id="agBadge" style="display:none;margin-left:auto;background:#c0392b;color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-weight:800"></span></div>
+    <div data-label="Almoxarifado" class="nav-item" id="ni-almox" onclick="showPanel('almox')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Almoxarifado<span id="axBadge" style="display:none;margin-left:auto;background:#b45309;color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-weight:800"></span></div>
     <div data-label="Financeiro" class="nav-item" id="ni-financeiro" onclick="showPanel('financeiro')" style="display:none"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro</div>
     <div data-label="Formulários" class="nav-item" id="ni-formularios" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
     <div data-label="Contratos Gerados" class="nav-item" id="ni-contratos" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
@@ -817,6 +818,83 @@ tr:hover td{background:#f8f9fe;}
         </table>
       </div>
     </div>
+
+    <!-- ALMOXARIFADO — estoque de peças e componentes -->
+    <div class="panel" id="panel-almox" style="display:none;width:100%">
+      <div class="stats" id="axStats" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <button id="axTabItens" class="btn btn-blue"    onclick="axAba('itens')" style="font-size:11px;padding:8px 14px">&#128230; Itens em estoque</button>
+        <button id="axTabMov"   class="btn btn-outline" onclick="axAba('mov')"   style="font-size:11px;padding:8px 14px">&#128203; Movimenta&ccedil;&otilde;es</button>
+      </div>
+
+      <!-- ABA ITENS -->
+      <div id="axAbaItens">
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <div class="search-box" style="flex:1;min-width:200px">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="filter-input" id="qAx" type="text" placeholder="Buscar peça, código, categoria, local..." oninput="renderAlmox()">
+          </div>
+          <select class="filter-sel" id="fAxCat" onchange="renderAlmox()"><option value="">Todas as categorias</option></select>
+          <select class="filter-sel" id="fAxSit" onchange="renderAlmox()">
+            <option value="">Todas as situações</option>
+            <option value="zerado">&#128308; Sem estoque</option>
+            <option value="baixo">&#128993; Abaixo do mínimo</option>
+            <option value="ok">&#128994; Normal</option>
+          </select>
+          <button class="btn btn-outline" onclick="axLimparFiltros()">Limpar</button>
+          <button class="btn btn-blue" onclick="axItemAbrir()">+ Nova peça</button>
+        </div>
+        <p id="axResumo" style="font-size:11px;color:var(--muted);margin:0 0 8px"></p>
+        <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:860px">
+            <thead><tr>
+              <th style="padding:9px 12px;text-align:left">Código</th>
+              <th style="padding:9px 12px;text-align:left">Peça / componente</th>
+              <th style="padding:9px 12px;text-align:left">Categoria</th>
+              <th style="padding:9px 12px;text-align:right">Em estoque</th>
+              <th style="padding:9px 12px;text-align:right">Mínimo</th>
+              <th style="padding:9px 12px;text-align:right">Valor em estoque</th>
+              <th style="padding:9px 12px;text-align:left">Situação</th>
+              <th style="padding:9px 12px;width:150px"></th>
+            </tr></thead>
+            <tbody id="axTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ABA MOVIMENTAÇÕES -->
+      <div id="axAbaMov" style="display:none">
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <div class="search-box" style="flex:1;min-width:200px">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="filter-input" id="qAxMov" type="text" placeholder="Buscar peça, motivo, placa, responsável..." oninput="renderAlmoxMov()">
+          </div>
+          <select class="filter-sel" id="fAxMovTipo" onchange="renderAlmoxMov()">
+            <option value="">Entradas e saídas</option>
+            <option value="entrada">&#11015; Só entradas</option>
+            <option value="saida">&#11014; Só saídas</option>
+            <option value="ajuste">&#9881; Só ajustes</option>
+          </select>
+          <input class="filter-input" id="axMovDe"  type="date" onchange="renderAlmoxMov()" title="De" style="max-width:150px">
+          <input class="filter-input" id="axMovAte" type="date" onchange="renderAlmoxMov()" title="Até" style="max-width:150px">
+          <button class="btn btn-outline" onclick="axLimparFiltrosMov()">Limpar</button>
+        </div>
+        <p id="axMovResumo" style="font-size:11px;color:var(--muted);margin:0 0 8px"></p>
+        <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:820px">
+            <thead><tr>
+              <th style="padding:9px 12px;text-align:left">Data</th>
+              <th style="padding:9px 12px;text-align:left">Peça</th>
+              <th style="padding:9px 12px;text-align:left">Movimento</th>
+              <th style="padding:9px 12px;text-align:right">Qtd</th>
+              <th style="padding:9px 12px;text-align:left">Motivo / veículo</th>
+              <th style="padding:9px 12px;text-align:left">Quem</th>
+            </tr></thead>
+            <tbody id="axMovTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     <div class="panel" id="panel-financeiro" style="display:none;width:100%">
       <div style="background:#fff;border-radius:10px;padding:12px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid #c0392b">
         <div style="font-size:13px;font-weight:800;color:var(--dark)">🔒 Área Financeira — Acesso Restrito</div>
@@ -1160,6 +1238,59 @@ tr:hover td{background:#f8f9fe;}
   </div>
 </div></div>
 
+<div class="modal-bg" id="mAxItem"><div class="modal" style="max-width:500px">
+  <div class="modal-head"><h3 id="axItemTitulo">Nova pe&ccedil;a</h3><button class="modal-close" onclick="closeM('mAxItem')">&#10005;</button></div>
+  <div class="modal-body">
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
+      <div class="fg"><label class="fl">C&oacute;digo</label><input class="fi" id="axCodigo" maxlength="30" placeholder="Ex: FO-1234"></div>
+      <div class="fg"><label class="fl">Pe&ccedil;a / componente *</label><input class="fi" id="axNome" maxlength="90" placeholder="Ex: Filtro de &oacute;leo"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Categoria</label><input class="fi" id="axCategoria" list="axCats" maxlength="40" placeholder="Ex: Filtros"><datalist id="axCats"></datalist></div>
+      <div class="fg"><label class="fl">Unidade</label>
+        <select class="fs" id="axUnidade">
+          <option value="un">un (unidade)</option><option value="pc">pç (peça)</option>
+          <option value="par">par</option><option value="jg">jg (jogo)</option>
+          <option value="L">L (litro)</option><option value="kg">kg</option><option value="m">m (metro)</option>
+        </select></div>
+      <div class="fg"><label class="fl">Estoque m&iacute;nimo</label><input class="fi" id="axMinimo" type="number" min="0" step="1" placeholder="0"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Local no almoxarifado</label><input class="fi" id="axLocal" maxlength="40" placeholder="Ex: Prateleira A3"></div>
+      <div class="fg"><label class="fl">Fornecedor habitual</label><input class="fi" id="axFornecedor" list="axForns" maxlength="60"><datalist id="axForns"></datalist></div>
+    </div>
+    <div class="fg"><label class="fl">Observa&ccedil;&atilde;o</label><input class="fi" id="axObs" maxlength="200" placeholder="Aplica&ccedil;&atilde;o, medida, equival&ecirc;ncia..."></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">
+      &#9888;&#65039; A quantidade em estoque <strong>n&atilde;o</strong> se digita aqui: ela vem das
+      <strong>entradas e sa&iacute;das</strong>. Para come&ccedil;ar com um saldo, cadastre a pe&ccedil;a e
+      lance uma <strong>entrada</strong>.
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mAxItem')">Cancelar</button>
+    <button class="btn btn-blue" id="btnAxItemSalvar" onclick="axItemSalvar()">Salvar</button>
+  </div>
+</div></div>
+
+<div class="modal-bg" id="mAxMov"><div class="modal" style="max-width:460px">
+  <div class="modal-head"><h3 id="axMovTitulo">Movimenta&ccedil;&atilde;o</h3><button class="modal-close" onclick="closeM('mAxMov')">&#10005;</button></div>
+  <div class="modal-body">
+    <div id="axMovItem" style="background:#EEF1FD;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Quantidade *</label><input class="fi" id="axMovQtd" type="number" min="0" step="0.01" placeholder="0"></div>
+      <div class="fg"><label class="fl">Data *</label><input class="fi" id="axMovData" type="date"></div>
+    </div>
+    <div class="fg" id="axMovCustoBox"><label class="fl">Custo unit&aacute;rio (R$)</label><input class="fi" id="axMovCusto" placeholder="0,00"></div>
+    <div class="fg" id="axMovPlacaBox"><label class="fl">Ve&iacute;culo (opcional)</label>
+      <input class="fi" id="axMovPlaca" list="axPlacas" maxlength="10" placeholder="Placa" style="text-transform:uppercase"><datalist id="axPlacas"></datalist></div>
+    <div class="fg"><label class="fl">Motivo</label><input class="fi" id="axMovMotivo" maxlength="120" placeholder="Ex: troca na revis&atilde;o de 40 mil km"></div>
+    <div id="axMovAviso" style="display:none;background:#fff8e6;border-left:3px solid #b45309;border-radius:6px;padding:9px 12px;font-size:11px;color:#7c5010;margin-top:10px"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mAxMov')">Cancelar</button>
+    <button class="btn btn-blue" id="btnAxMovSalvar" onclick="axMovSalvar()">Confirmar</button>
+  </div>
+</div></div>
 <div class="modal-bg" id="mAgenda"><div class="modal" style="max-width:460px">
   <div class="modal-head"><h3 id="agModalTitulo">Novo lembrete</h3><button class="modal-close" onclick="closeM('mAgenda')">&#10005;</button></div>
   <div class="modal-body">
@@ -1481,7 +1612,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v125-20261016-1500';
+var LOKA_BUILD = 'v126-20261016-1620';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1531,7 +1662,7 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','agenda','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','agenda','almox','financeiro','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
     fornecedores: 'Fornecedores',
   multas: 'Multas',
@@ -1539,6 +1670,7 @@ var TITLES = {
   multasefrotas: 'Multas e-Frotas',
   sinistros: 'Ocorrências / Sinistros',
   agenda: 'Agenda',
+  almox: 'Almoxarifado',
   fatveiculo: 'Faturamento por Veículo',
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
@@ -1575,9 +1707,9 @@ function _perfilAtual() {
 }
 
 // Todos os painéis controláveis por permissão
-var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','agenda','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','agenda','almox','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
-var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',fatveiculo:'Faturamento por Veículo',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',agenda:'Agenda',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',fatveiculo:'Faturamento por Veículo',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',agenda:'Agenda',almox:'Almoxarifado',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
   editarPrecos:'Editar preços dos veículos',
   gerenciarUsuarios:'Gerenciar usuários',
@@ -1617,7 +1749,7 @@ var _PERFIS_BUILTIN = {
   admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
               acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true, indicarCondutor:true } },
   operador: { nome:'Operador', builtin:true,
-              paineis:['dashboard','clientes','ativos','veiculos','faturas','fatveiculo','manutencao','fornecedores','multas','sinistros','agenda','formularios','contratos','historico','reserva','cadastro'],
+              paineis:['dashboard','clientes','ativos','veiculos','faturas','fatveiculo','manutencao','fornecedores','multas','sinistros','agenda','almox','formularios','contratos','historico','reserva','cadastro'],
               acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true } },
   // Oficina: inclui novas manutenções E consulta o histórico das placas da sua oficina
   oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
@@ -1920,6 +2052,7 @@ function showPanel(name) {
     if (name === 'multas')      { mltInit(); mltMostrarAba('lista'); }
     if (name === 'sinistros')   renderSinistros();
     if (name === 'agenda')      renderAgenda();
+    if (name === 'almox')       axInit();
     if (name === 'fatveiculo')  fvInit();
   } catch(e) {
     console.error('showPanel[' + name + ']:', e);
@@ -2295,7 +2428,7 @@ var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // quando há chaves não sequenciais, após exclusões). Chamado ao carregar/sincronizar.
 function normalizarDB(){
   if (!db) return;
-  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros','recibos','agenda'].forEach(function(nome){
+  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros','recibos','agenda','almox','almox_mov'].forEach(function(nome){
     if (db[nome] === undefined || db[nome] === null) { db[nome] = []; return; }
     if (!Array.isArray(db[nome])) {
       if (typeof db[nome] === 'object') {
@@ -2955,6 +3088,7 @@ function checkAlertas() {
   if (hoje3.length) partes.push(hoje3.length + ' vencendo em até 3 dias');
   // lembretes da Agenda entram na MESMA faixa
   try { var _ag = agTextoAlerta(); if (_ag) partes.push(_ag); } catch(e){}
+  try { var _ax = axTextoAlerta(); if (_ax) partes.push(_ax); } catch(e){}
   if (partes.length) {
     text.textContent = '⚠️ ' + partes.join(' · ');
     banner.classList.add('open');
@@ -10652,6 +10786,514 @@ function agTextoAlerta() {
 // confere ao abrir e de meia em meia hora, enquanto o sistema estiver aberto
 setTimeout(function () { try { agVerificar(false); } catch (e) {} }, 4000);
 setInterval(function () { try { agVerificar(false); } catch (e) {} }, 1800000);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ALMOXARIFADO — estoque de peças e componentes
+   ═══════════════════════════════════════════════════════════════
+   loka_db/almox[]      itens  { id, codigo, nome, categoria, unidade,
+                                 minimo, local, fornecedor, obs, criadoEm, criadoPor }
+   loka_db/almox_mov[]  movs   { id, itemId, tipo, qtd, data, custo,
+                                 placa, motivo, quem, criadoEm }
+
+   🔴 O SALDO NÃO É UM CAMPO. Ele é a soma das movimentações.
+   Saldo digitado à mão desanda: alguém corrige o número, ninguém sabe por
+   quê, e o estoque deixa de explicar a própria conta. Derivando das
+   entradas e saídas, todo saldo tem histórico — e um ajuste é um
+   lançamento visível, não uma edição silenciosa.
+   ═══════════════════════════════════════════════════════════════ */
+
+function axItens() {
+  if (!db) return [];
+  if (!Array.isArray(db.almox)) {
+    db.almox = db.almox && typeof db.almox === 'object'
+      ? Object.keys(db.almox).map(function (k) { return db.almox[k]; }).filter(Boolean) : [];
+  }
+  return db.almox;
+}
+function axMovs() {
+  if (!db) return [];
+  if (!Array.isArray(db.almox_mov)) {
+    db.almox_mov = db.almox_mov && typeof db.almox_mov === 'object'
+      ? Object.keys(db.almox_mov).map(function (k) { return db.almox_mov[k]; }).filter(Boolean) : [];
+  }
+  return db.almox_mov;
+}
+
+function _axNum(v) {
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  var s = String(v == null ? '' : v).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+function _axQtdTxt(n) {
+  // quantidade inteira não mostra casa decimal à toa
+  return (Math.round(n * 100) / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+/* Saldo de um item = entradas − saídas ± ajustes.
+   🔴 'ajuste' é assinado: positivo acrescenta, negativo tira. É o único
+   jeito de corrigir uma contagem, e fica registrado quem corrigiu. */
+function axSaldo(itemId) {
+  var t = 0;
+  axMovs().forEach(function (m) {
+    if (!m || m.itemId !== itemId) return;
+    var q = _axNum(m.qtd);
+    if (m.tipo === 'entrada')     t += q;
+    else if (m.tipo === 'saida')  t -= q;
+    else if (m.tipo === 'ajuste') t += q;   // já vem com sinal
+  });
+  return Math.round(t * 100) / 100;
+}
+
+/* Custo unitário mais recente informado numa ENTRADA. Serve para estimar
+   o valor parado em estoque. ⚠️ Não é custo médio ponderado — dizer que é
+   seria inventar precisão que não temos. */
+function axCustoAtual(itemId) {
+  var ultimo = 0, quando = '';
+  axMovs().forEach(function (m) {
+    if (!m || m.itemId !== itemId || m.tipo !== 'entrada') return;
+    var c = _axNum(m.custo);
+    if (!c) return;
+    var d = m.data || '';
+    if (!quando || d >= quando) { quando = d; ultimo = c; }
+  });
+  return ultimo;
+}
+
+function axSituacao(item) {
+  var s = axSaldo(item.id);
+  var min = _axNum(item.minimo);
+  if (s <= 0) return 'zerado';
+  if (min > 0 && s <= min) return 'baixo';
+  return 'ok';
+}
+var AX_SIT = {
+  zerado: { rot: '🔴 Sem estoque',      cor: '#c0392b', bg: '#fdecea' },
+  baixo:  { rot: '🟡 Abaixo do mínimo', cor: '#b45309', bg: '#fff4e5' },
+  ok:     { rot: '🟢 Normal',           cor: '#0d7a3e', bg: '#e6f5ec' }
+};
+
+function axContagem() {
+  var c = { itens: 0, zerado: 0, baixo: 0, valor: 0 };
+  axItens().forEach(function (it) {
+    if (!it) return;
+    c.itens++;
+    var sit = axSituacao(it);
+    if (sit === 'zerado') c.zerado++;
+    else if (sit === 'baixo') c.baixo++;
+    c.valor += axSaldo(it.id) * axCustoAtual(it.id);
+  });
+  c.valor = Math.round(c.valor * 100) / 100;
+  return c;
+}
+
+/* ── Abas ───────────────────────────────────────────────────── */
+function axAba(qual) {
+  var itens = document.getElementById('axAbaItens');
+  var mov   = document.getElementById('axAbaMov');
+  var bi = document.getElementById('axTabItens'), bm = document.getElementById('axTabMov');
+  if (itens) itens.style.display = (qual === 'mov') ? 'none' : 'block';
+  if (mov)   mov.style.display   = (qual === 'mov') ? 'block' : 'none';
+  if (bi) bi.className = (qual === 'mov') ? 'btn btn-outline' : 'btn btn-blue';
+  if (bm) bm.className = (qual === 'mov') ? 'btn btn-blue' : 'btn btn-outline';
+  if (qual === 'mov') renderAlmoxMov(); else renderAlmox();
+}
+
+function axInit() {
+  axItens(); axMovs();
+  axPreencherListas();
+  axAba('itens');
+}
+
+/* Alimenta os datalists e o filtro de categoria com o que já existe —
+   lista fechada obrigaria a migrar o que já foi digitado. */
+function axPreencherListas() {
+  var cats = {};
+  axItens().forEach(function (it) { if (it && it.categoria) cats[it.categoria] = 1; });
+  var nomes = Object.keys(cats).sort();
+
+  var dl = document.getElementById('axCats');
+  if (dl) dl.innerHTML = nomes.map(function (c) { return '<option value="' + _axEsc(c) + '">'; }).join('');
+
+  var sel = document.getElementById('fAxCat');
+  if (sel) {
+    var atual = sel.value;   // preserva a seleção ao redesenhar
+    sel.innerHTML = '<option value="">Todas as categorias</option>'
+      + nomes.map(function (c) {
+          return '<option value="' + _axEsc(c) + '"' + (c === atual ? ' selected' : '') + '>' + _axEsc(c) + '</option>';
+        }).join('');
+  }
+
+  var df = document.getElementById('axForns');
+  if (df) {
+    var fs = {};
+    (db.fornecedores || []).forEach(function (f) { if (f && f.nome) fs[f.nome] = 1; });
+    axItens().forEach(function (it) { if (it && it.fornecedor) fs[it.fornecedor] = 1; });
+    df.innerHTML = Object.keys(fs).sort().map(function (n) { return '<option value="' + _axEsc(n) + '">'; }).join('');
+  }
+
+  var dp = document.getElementById('axPlacas');
+  if (dp) {
+    dp.innerHTML = (db.veiculos || []).filter(function (v) { return v && v.placa; })
+      .map(function (v) { return '<option value="' + _axEsc(v.placa) + '">'; }).join('');
+  }
+}
+
+function _axEsc(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ── Itens ──────────────────────────────────────────────────── */
+function axLimparFiltros() {
+  ['qAx'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+  ['fAxCat', 'fAxSit'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+  renderAlmox();
+}
+
+function axFiltrados() {
+  var q   = semAcento((document.getElementById('qAx')   || {}).value || '');
+  var cat = (document.getElementById('fAxCat') || {}).value || '';
+  var sit = (document.getElementById('fAxSit') || {}).value || '';
+  return axItens().filter(function (it) {
+    if (!it) return false;
+    if (cat && it.categoria !== cat) return false;
+    if (sit && axSituacao(it) !== sit) return false;
+    if (q) {
+      var alvo = semAcento([it.nome, it.codigo, it.categoria, it.local, it.fornecedor, it.obs]
+        .filter(Boolean).join(' '));
+      if (alvo.indexOf(q) < 0) return false;
+    }
+    return true;
+  }).sort(function (a, b) {
+    // o que precisa de atenção primeiro: sem estoque, depois abaixo do mínimo
+    var ordem = { zerado: 0, baixo: 1, ok: 2 };
+    var d = ordem[axSituacao(a)] - ordem[axSituacao(b)];
+    if (d) return d;
+    return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt');
+  });
+}
+
+function renderAlmox() {
+  if (!db) return;
+  axPreencherListas();
+  var c = axContagem();
+
+  var st = document.getElementById('axStats');
+  if (st) {
+    st.innerHTML =
+        '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value">' + c.itens + '</div><div class="stat-label">Itens cadastrados</div></div>'
+      + '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value">' + c.zerado + '</div><div class="stat-label">Sem estoque</div></div>'
+      + '<div class="stat" style="border-left-color:#b45309"><div class="stat-value">' + c.baixo + '</div><div class="stat-label">Abaixo do mínimo</div></div>'
+      + '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">' + brl(c.valor) + '</div><div class="stat-label">Valor em estoque</div></div>';
+  }
+
+  var lista = axFiltrados();
+  var res = document.getElementById('axResumo');
+  if (res) res.textContent = c.itens ? (lista.length + ' de ' + c.itens + ' item(ns)') : '';
+
+  var tb = document.getElementById('axTable');
+  if (!tb) return;
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">'
+      + (c.itens ? 'Nenhuma peça encontrada com esses filtros.' : 'Nenhuma peça cadastrada. Use “+ Nova peça”.')
+      + '</td></tr>';
+    axAtualizarBadge();
+    return;
+  }
+
+  tb.innerHTML = lista.map(function (it) {
+    var sit = axSituacao(it), m = AX_SIT[sit];
+    var saldo = axSaldo(it.id), custo = axCustoAtual(it.id);
+    var idx = axItens().indexOf(it);
+    return '<tr style="border-bottom:1px solid #f0f2f8">'
+      + '<td style="padding:9px 12px;font-family:monospace">' + _axEsc(it.codigo || '—') + '</td>'
+      + '<td style="padding:9px 12px"><strong>' + _axEsc(it.nome || '—') + '</strong>'
+        + (it.local ? '<br><span style="font-size:10px;color:var(--muted)">📍 ' + _axEsc(it.local) + '</span>' : '')
+      + '</td>'
+      + '<td style="padding:9px 12px;font-size:11px">' + _axEsc(it.categoria || '—') + '</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace">'
+        + _axQtdTxt(saldo) + ' <span style="font-size:9px;color:var(--muted)">' + _axEsc(it.unidade || 'un') + '</span></td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace;color:var(--muted)">'
+        + (_axNum(it.minimo) ? _axQtdTxt(_axNum(it.minimo)) : '—') + '</td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace">'
+        + (custo ? brl(saldo * custo) : '—') + '</td>'
+      + '<td style="padding:9px 12px"><span style="background:' + m.bg + ';color:' + m.cor
+        + ';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">' + m.rot + '</span></td>'
+      + '<td style="padding:9px 12px"><div style="display:flex;gap:4px">'
+        + '<button class="icon-btn" onclick="axMovAbrir(' + idx + ',\'entrada\')" title="Entrada" style="color:#0d7a3e;border-color:#0d7a3e">⬇</button>'
+        + '<button class="icon-btn" onclick="axMovAbrir(' + idx + ',\'saida\')" title="Saída" style="color:#c0392b;border-color:#c0392b">⬆</button>'
+        + '<button class="icon-btn" onclick="axMovAbrir(' + idx + ',\'ajuste\')" title="Ajuste de contagem">⚙</button>'
+        + '<button class="icon-btn" onclick="axItemAbrir(' + idx + ')" title="Editar" style="color:#2B4BF2;border-color:#2B4BF2">✏️</button>'
+        + '<button class="icon-btn" onclick="axItemExcluir(' + idx + ')" title="Excluir" style="color:#c0392b;border-color:#f5c6cb">🗑</button>'
+      + '</div></td></tr>';
+  }).join('');
+
+  axAtualizarBadge();
+}
+
+var _axEdit = null;
+
+function axItemAbrir(idx) {
+  _axEdit = (idx === undefined || idx === null) ? null : idx;
+  var it = _axEdit !== null ? axItens()[_axEdit] : null;
+  if (_axEdit !== null && !it) { toast('⚠️ Peça não encontrada', '#c0392b'); return; }
+  axPreencherListas();
+  var v = function (id, val) { var e = document.getElementById(id); if (e) e.value = val == null ? '' : val; };
+  v('axCodigo', it ? it.codigo : '');
+  v('axNome', it ? it.nome : '');
+  v('axCategoria', it ? it.categoria : '');
+  v('axUnidade', it ? (it.unidade || 'un') : 'un');
+  v('axMinimo', it ? it.minimo : '');
+  v('axLocal', it ? it.local : '');
+  v('axFornecedor', it ? it.fornecedor : '');
+  v('axObs', it ? it.obs : '');
+  var t = document.getElementById('axItemTitulo');
+  if (t) t.textContent = it ? 'Editar peça' : 'Nova peça';
+  openM('mAxItem');
+}
+
+function axItemSalvar() {
+  var nome = ((document.getElementById('axNome') || {}).value || '').trim();
+  if (!nome) { toast('⚠️ Informe o nome da peça', '#b45309'); return; }
+
+  var get = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+  var codigo = get('axCodigo');
+  var lista = axItens();
+
+  // 🔴 Código repetido faz duas fichas para a mesma peça — e aí o saldo de
+  //    cada uma conta só metade das movimentações.
+  var dup = lista.filter(function (x, i) {
+    return x && codigo && String(x.codigo || '').toLowerCase() === codigo.toLowerCase()
+      && i !== _axEdit;
+  })[0];
+  if (dup) { toast('⚠️ Já existe uma peça com o código ' + codigo + ' (' + (dup.nome || '') + ')', '#c0392b'); return; }
+
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
+  var dados = {
+    codigo: codigo, nome: nome, categoria: get('axCategoria'),
+    unidade: get('axUnidade') || 'un', minimo: _axNum(get('axMinimo')),
+    local: get('axLocal'), fornecedor: get('axFornecedor'), obs: get('axObs')
+  };
+
+  if (_axEdit !== null && lista[_axEdit]) {
+    lista[_axEdit] = Object.assign({}, lista[_axEdit], dados);
+  } else {
+    dados.id = 'ax' + Date.now();
+    dados.criadoEm = new Date().toISOString();
+    dados.criadoPor = sess.nome || sess.usuario || '';
+    lista.push(dados);
+  }
+  db.almox = lista;
+  saveDB();
+  _axEdit = null;
+  closeM('mAxItem');
+  renderAlmox();
+  toast('✅ Peça salva', '#0d7a3e');
+}
+
+function axItemExcluir(idx) {
+  var it = axItens()[idx];
+  if (!it) { toast('⚠️ Peça não encontrada', '#c0392b'); return; }
+  var movs = axMovs().filter(function (m) { return m && m.itemId === it.id; });
+  // 🔴 Apagar a peça deixaria as movimentações órfãs — histórico sem dono.
+  //    Com movimento, o certo é zerar por ajuste, não excluir.
+  if (movs.length) {
+    toast('⚠️ "' + (it.nome || '') + '" tem ' + movs.length + ' movimentação(ões) e não pode ser excluída. Zere o saldo por ajuste.', '#b45309');
+    return;
+  }
+  if (!confirm('Excluir a peça "' + (it.nome || '') + '"?\n\nO almoxarifado não tem lixeira — isso não volta.')) return;
+  axItens().splice(idx, 1);
+  saveDB();
+  renderAlmox();
+  toast('🗑 Peça excluída', '#5a607a');
+}
+
+/* ── Movimentações ──────────────────────────────────────────── */
+var _axMovItem = null, _axMovTipo = '';
+
+function axMovAbrir(idx, tipo) {
+  var it = axItens()[idx];
+  if (!it) { toast('⚠️ Peça não encontrada', '#c0392b'); return; }
+  _axMovItem = it; _axMovTipo = tipo;
+  axPreencherListas();
+
+  var saldo = axSaldo(it.id);
+  var rot = { entrada: 'Entrada', saida: 'Saída', ajuste: 'Ajuste de contagem' }[tipo] || 'Movimentação';
+  var t = document.getElementById('axMovTitulo'); if (t) t.textContent = rot + ' — ' + (it.nome || '');
+  var cx = document.getElementById('axMovItem');
+  if (cx) cx.innerHTML = '<strong>' + _axEsc(it.nome || '') + '</strong>'
+    + (it.codigo ? ' <span style="font-family:monospace;color:var(--muted)">' + _axEsc(it.codigo) + '</span>' : '')
+    + '<br>Em estoque agora: <strong>' + _axQtdTxt(saldo) + ' ' + _axEsc(it.unidade || 'un') + '</strong>';
+
+  var v = function (id, val) { var e = document.getElementById(id); if (e) e.value = val; };
+  v('axMovQtd', ''); v('axMovCusto', ''); v('axMovPlaca', ''); v('axMovMotivo', '');
+  var d = new Date();
+  v('axMovData', d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2));
+
+  // custo só faz sentido na entrada; placa só na saída
+  var bc = document.getElementById('axMovCustoBox'); if (bc) bc.style.display = (tipo === 'entrada') ? 'block' : 'none';
+  var bp = document.getElementById('axMovPlacaBox'); if (bp) bp.style.display = (tipo === 'saida') ? 'block' : 'none';
+
+  var av = document.getElementById('axMovAviso');
+  if (av) {
+    if (tipo === 'ajuste') {
+      av.style.display = 'block';
+      av.innerHTML = 'O ajuste corrige uma contagem. Informe a quantidade <strong>que falta ou que sobra</strong>: '
+        + 'use <strong>número negativo</strong> para tirar do estoque. Fica registrado quem ajustou e por quê.';
+    } else { av.style.display = 'none'; av.innerHTML = ''; }
+  }
+  var b = document.getElementById('btnAxMovSalvar');
+  if (b) { b.disabled = false; b.textContent = rot; }
+  openM('mAxMov');
+}
+
+function axMovSalvar() {
+  if (!_axMovItem) { toast('⚠️ Nenhuma peça selecionada', '#c0392b'); return; }
+  var txt = ((document.getElementById('axMovQtd') || {}).value || '').trim();
+  var data = (document.getElementById('axMovData') || {}).value || '';
+
+  // 🔴 Exige dígito: _axNum('abc') devolve 0, e 0 nunca é movimentação
+  //    válida — sem conferir, um erro de digitação viraria lançamento vazio.
+  if (!/\d/.test(txt)) { toast('⚠️ Informe a quantidade', '#b45309'); return; }
+  var qtd = _axNum(txt);
+  if (_axMovTipo !== 'ajuste' && qtd <= 0) { toast('⚠️ A quantidade precisa ser maior que zero', '#b45309'); return; }
+  if (_axMovTipo === 'ajuste' && qtd === 0) { toast('⚠️ Ajuste de zero não muda nada', '#b45309'); return; }
+  if (!data) { toast('⚠️ Informe a data', '#b45309'); return; }
+
+  var saldo = axSaldo(_axMovItem.id);
+  // 🔴 Saída maior que o saldo deixaria estoque negativo — isso é erro de
+  //    dado, não um fato. Quem precisa corrigir contagem usa o Ajuste.
+  if (_axMovTipo === 'saida' && qtd > saldo) {
+    toast('⚠️ Em estoque há apenas ' + _axQtdTxt(saldo) + ' ' + (_axMovItem.unidade || 'un')
+      + '. Para corrigir a contagem, use o Ajuste.', '#c0392b');
+    return;
+  }
+  if (_axMovTipo === 'ajuste' && (saldo + qtd) < 0) {
+    toast('⚠️ Esse ajuste deixaria o estoque negativo (' + _axQtdTxt(saldo + qtd) + ')', '#c0392b');
+    return;
+  }
+
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
+  var mov = {
+    id: 'axm' + Date.now(),
+    itemId: _axMovItem.id,
+    tipo: _axMovTipo,
+    qtd: qtd,
+    data: data,
+    custo: (_axMovTipo === 'entrada') ? _axNum((document.getElementById('axMovCusto') || {}).value || '') : 0,
+    placa: (_axMovTipo === 'saida')
+      ? String((document.getElementById('axMovPlaca') || {}).value || '').toUpperCase().trim() : '',
+    motivo: ((document.getElementById('axMovMotivo') || {}).value || '').trim(),
+    quem: sess.nome || sess.usuario || '',
+    criadoEm: new Date().toISOString()
+  };
+  axMovs().push(mov);
+  db.almox_mov = axMovs();
+  saveDB();
+  closeM('mAxMov');
+  renderAlmox();
+  var novo = axSaldo(_axMovItem.id);
+  toast('✅ ' + (mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'saida' ? 'Saída' : 'Ajuste')
+    + ' registrada — estoque agora: ' + _axQtdTxt(novo) + ' ' + (_axMovItem.unidade || 'un'), '#0d7a3e');
+  _axMovItem = null;
+}
+
+function axLimparFiltrosMov() {
+  ['qAxMov', 'axMovDe', 'axMovAte'].forEach(function (id) {
+    var e = document.getElementById(id); if (e) e.value = '';
+  });
+  var s = document.getElementById('fAxMovTipo'); if (s) s.value = '';
+  renderAlmoxMov();
+}
+
+function axNomeItem(itemId) {
+  var it = axItens().filter(function (x) { return x && x.id === itemId; })[0];
+  // peça excluída não deixa o histórico sem nome
+  return it ? (it.nome || '—') : '(peça removida)';
+}
+
+function renderAlmoxMov() {
+  if (!db) return;
+  var q    = semAcento((document.getElementById('qAxMov') || {}).value || '');
+  var tipo = (document.getElementById('fAxMovTipo') || {}).value || '';
+  var de   = (document.getElementById('axMovDe')  || {}).value || '';
+  var ate  = (document.getElementById('axMovAte') || {}).value || '';
+
+  var lista = axMovs().filter(function (m) {
+    if (!m) return false;
+    if (tipo && m.tipo !== tipo) return false;
+    if ((de || ate) && !m.data) return false;
+    if (de  && m.data < de)  return false;
+    if (ate && m.data > ate) return false;
+    if (q) {
+      var alvo = semAcento([axNomeItem(m.itemId), m.motivo, m.placa, m.quem].filter(Boolean).join(' '));
+      if (alvo.indexOf(q) < 0) return false;
+    }
+    return true;
+  }).sort(function (a, b) {
+    return String(b.data || '').localeCompare(String(a.data || ''))
+        || String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+  });
+
+  var res = document.getElementById('axMovResumo');
+  if (res) res.textContent = axMovs().length ? (lista.length + ' de ' + axMovs().length + ' movimentação(ões)') : '';
+
+  var tb = document.getElementById('axMovTable');
+  if (!tb) return;
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">'
+      + (axMovs().length ? 'Nenhuma movimentação encontrada com esses filtros.' : 'Nenhuma movimentação registrada ainda.')
+      + '</td></tr>';
+    return;
+  }
+
+  var ROT = {
+    entrada: { t: '⬇ Entrada', c: '#0d7a3e', b: '#e6f5ec' },
+    saida:   { t: '⬆ Saída',   c: '#c0392b', b: '#fdecea' },
+    ajuste:  { t: '⚙ Ajuste',  c: '#5a607a', b: '#eef1fd' }
+  };
+  tb.innerHTML = lista.map(function (m) {
+    var r = ROT[m.tipo] || ROT.ajuste;
+    var sinal = m.tipo === 'saida' ? '−' : (m.tipo === 'ajuste' && _axNum(m.qtd) < 0 ? '' : '+');
+    return '<tr style="border-bottom:1px solid #f0f2f8">'
+      + '<td style="padding:9px 12px;white-space:nowrap">' + (m.data ? String(m.data).split('-').reverse().join('/') : '—') + '</td>'
+      + '<td style="padding:9px 12px">' + _axEsc(axNomeItem(m.itemId)) + '</td>'
+      + '<td style="padding:9px 12px"><span style="background:' + r.b + ';color:' + r.c
+        + ';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">' + r.t + '</span></td>'
+      + '<td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700">'
+        + sinal + _axQtdTxt(Math.abs(_axNum(m.qtd))) + '</td>'
+      + '<td style="padding:9px 12px;font-size:11px">' + _axEsc(m.motivo || '—')
+        + (m.placa ? '<br><span style="font-size:10px;color:var(--muted)">🚗 ' + _axEsc(m.placa) + '</span>' : '') + '</td>'
+      + '<td style="padding:9px 12px;font-size:11px">' + _axEsc(m.quem || '—') + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+/* ── Aviso: contador no menu + faixa do topo ────────────────── */
+function axAtualizarBadge() {
+  var b = document.getElementById('axBadge');
+  if (!b) return;
+  var c = axContagem();
+  var n = c.zerado + c.baixo;
+  b.textContent = n;
+  b.style.display = n ? 'inline-block' : 'none';
+  b.title = c.zerado + ' sem estoque · ' + c.baixo + ' abaixo do mínimo';
+}
+
+/* Texto do almoxarifado para a faixa de alertas do topo. Devolve ''
+   quando está tudo em ordem — assim a faixa não abre à toa. */
+function axTextoAlerta() {
+  if (!db) return '';
+  var c = axContagem();
+  var p = [];
+  if (c.zerado) p.push(c.zerado + ' peça(s) SEM ESTOQUE');
+  if (c.baixo)  p.push(c.baixo + ' abaixo do mínimo');
+  return p.join(' · ');
+}
+
+setTimeout(function () { try { axAtualizarBadge(); } catch (e) {} }, 4500);
 
 // MÓDULO MULTAS — LOKÁ
 // ═══════════════════════════════════════════════════════════════════
