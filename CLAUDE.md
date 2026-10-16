@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v124-20261016-0940** |
+| `gestao.html` | **v125-20261016-1500** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -4041,3 +4041,95 @@ O "Registrar Contrato" das duas páginas ainda faz
 `firebase.database().ref('loka_db').set(db_inteiro)` — grava o banco inteiro,
 fora do `_setDBProtegido` (armadilha 3). É anterior a esta mudança e não foi
 tocado; o caminho novo de salvar **não** passa por lá.
+
+---
+
+## ✅ Agenda com lembretes e avisos — 16/10/2026 (gestao v125)
+
+Pedido: *"criar uma agenda que emita notificações com os lembretes que vamos
+inserir manualmente"*.
+
+**Não existia nada disso.** O que havia era a **faixa de alertas do topo**
+(`checkAlertas`), que avisa sobre aluguéis vencendo — e foi nela que a agenda
+entrou, em vez de criar um segundo banner.
+
+### 🔴 O limite que precisa estar claro
+**O aviso só aparece com o sistema ABERTO numa aba.** Notificação que chega com
+tudo fechado precisa de algo que dispare na hora certa — ou seja, **servidor**.
+E aqui: o site é GitHub Pages (estático, não recebe POST) e a **Org Policy do
+projeto barra criar Cloud Function nova**. É o mesmo degrau do webhook do SNE e
+da API do WhatsApp.
+
+Por isso a agenda avisa de **três jeitos que funcionam sem servidor**:
+1. **contador vermelho** no item Agenda do menu (atrasados + de hoje)
+2. a **faixa do topo**, junto com os aluguéis vencendo
+3. **notificação do navegador**, se a pessoa autorizar no botão 🔔
+
+### Os dados
+`loka_db/agenda[]` — `{ id, titulo, data, hora, obs, quem, status, criadoEm,
+criadoPor, concluidoEm }`.
+
+🔴 `'agenda'` entrou em **`normalizarDB`**. Sem isso, depois da **primeira
+exclusão** o Firebase devolve o array como objeto e a tela quebra — armadilha 1,
+e ela só aparece dias depois de publicar.
+
+O painel foi registrado em **PANELS, _TODOS_PAINEIS, TITLES, _PAINEL_LABEL,
+showPanel e no perfil Operador** (Master e Admin herdam pelo `slice()`) — a lição
+do `multasefrotas`.
+
+### Decisões
+| | Por quê |
+|---|---|
+| **Data obrigatória** | lembrete sem data nunca avisa — vira bilhete perdido |
+| **Concluído é avaliado ANTES do prazo** | lembrete resolvido não pode voltar como atrasado só porque a data passou |
+| Hora é opcional | nem todo lembrete tem hora |
+| A permissão de notificar só é pedida **no clique** do 🔔 | pedir sozinho ao abrir é intrusivo, e o navegador costuma bloquear de vez |
+| O mesmo lembrete **não é notificado duas vezes** na sessão | aviso repetido vira ruído e a pessoa para de olhar |
+| Lembrete **sem data** sai do resultado quando há período | não dá para afirmar que cai no intervalo. Mesma regra dos Aluguéis Ativos |
+| "Nenhum na agenda" ≠ "nenhum com esses filtros" | some a dúvida de "sumiu tudo?" |
+
+### 🔴 Dois defeitos que os testes pegaram antes de publicar
+1. **`om()` / `cm()` / `comFoco` não existem no `gestao.html`** — eu os assumi do
+   Auto Mais. É exatamente o defeito que deixou o CRM em branco: função chamada
+   que nunca foi definida. O padrão aqui é `openM(id)`/`closeM(id)` com o HTML do
+   modal já na página, e o campo de busca da LOKÁ fica no HTML estático (por isso
+   não precisa de `comFoco`).
+2. **O filtro "Próximos 7 dias" não batia com o cartão**: o cartão conta de
+   amanhã em diante (hoje tem cartão próprio), e o filtro incluía hoje — cartão
+   dizia 1, lista mostrava 2. Número na tela diferente da lista é o problema que
+   já apareceu três vezes neste sistema.
+
+⚠️ `checkAlertas` **saía cedo quando não havia aluguel ativo** (`if (!db ||
+!db.ativos || !db.ativos.length) return;`) — e com isso a agenda nunca apareceria
+na faixa num dia sem locação. A guarda passou a ser só sobre o `db`.
+
+### Validado
+- `node --check`; `<div>` balanceadas (695/695)
+- **66 testes** com o código real: as cinco situações de prazo, as contagens, os
+  6 modos de filtro, período com pontas inclusivas, busca sem acento, ordenação,
+  salvar/editar/concluir/reabrir/excluir, `confirm` recusado, índice inexistente,
+  os três avisos, notificação sem permissão, navegador sem `Notification`,
+  título com HTML dentro, e agenda vindo como objeto do Firebase
+- **16 defeitos injetados — todos acusados**, entre eles concluído voltando a
+  contar como atrasado, notificar repetido, notificar sem permissão, editar
+  duplicando e tirar a agenda do `normalizarDB`
+- **No navegador, no arquivo publicado**, com 6 lembretes injetados **só na
+  memória** e o `saveDB` neutralizado (**nada gravado em produção**): painel
+  abre, cartões 2/1/1/1, 5 linhas, resumo "5 de 6", contador 3 no menu, faixa do
+  topo com o texto certo, e o modal abrindo com a data de hoje e preenchendo ao
+  editar
+- Regressão: reneg 29, abas 28, extrato 51, duplicata 28, rótulo 13, senha 27,
+  contrato 53 — sem falha
+
+⚠️ Um teste meu passou por **engano** e foi corrigido: a guarda do "sem data no
+período" é **inerte** quando o "De" está preenchido (`'' < qualquer data`, então
+ele já cairia fora). Quem a exercita é o filtro **só com o "Até"**. Sem esse
+caso, o defeito injetado passava.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel criar um lembrete de verdade, fechar, reabrir e ver o
+contador. E clicar em **🔔 Ativar avisos** para autorizar a notificação.
+
+### O que ficaria para depois (não foi pedido)
+- **Repetição** (mensal/anual) para IPVA, seguro, vistoria
+- **Aviso com o sistema fechado** — depende de resolver o servidor

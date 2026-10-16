@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v124-20261016-0940 -->
+<!-- LOKA deploy: v125-20261016-1500 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -253,6 +253,7 @@ tr:hover td{background:#f8f9fe;}
     <div data-label="Multas" class="nav-item" id="ni-multas" onclick="showPanel('multas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas</div>
     <div data-label="Multas e-Frotas" class="nav-item" id="ni-multasefrotas" onclick="showPanel('multasefrotas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Multas e-Frotas</div>
     <div data-label="Ocorrências / Sinistros" class="nav-item" id="ni-sinistros" onclick="showPanel('sinistros')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Ocorrências / Sinistros</div>
+    <div data-label="Agenda" class="nav-item" id="ni-agenda" onclick="showPanel('agenda')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Agenda<span id="agBadge" style="display:none;margin-left:auto;background:#c0392b;color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-weight:800"></span></div>
     <div data-label="Financeiro" class="nav-item" id="ni-financeiro" onclick="showPanel('financeiro')" style="display:none"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro</div>
     <div data-label="Formulários" class="nav-item" id="ni-formularios" onclick="showPanel('formularios')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Formulários</div>
     <div data-label="Contratos Gerados" class="nav-item" id="ni-contratos" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
@@ -779,6 +780,43 @@ tr:hover td{background:#f8f9fe;}
       <div id="sinGrid"></div>
     </div>
 
+
+    <!-- AGENDA — lembretes lançados à mão -->
+    <div class="panel" id="panel-agenda" style="display:none;width:100%">
+      <div class="stats" id="agStats" style="margin-bottom:12px"></div>
+      <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+        <div class="search-box" style="flex:1;min-width:200px">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="filter-input" id="qAg" type="text" placeholder="Buscar lembrete, observação, responsável..." oninput="comFoco(renderAgenda)">
+        </div>
+        <select class="filter-sel" id="fAgQuando" onchange="renderAgenda()">
+          <option value="abertos">⏳ Pendentes (padrão)</option>
+          <option value="atrasados">🔴 Só atrasados</option>
+          <option value="hoje">📅 Só de hoje</option>
+          <option value="semana">🗓 Próximos 7 dias</option>
+          <option value="concluidos">✅ Concluídos</option>
+          <option value="todos">Todos</option>
+        </select>
+        <input class="filter-input" id="agDe" type="date" onchange="renderAgenda()" title="De" style="max-width:150px">
+        <input class="filter-input" id="agAte" type="date" onchange="renderAgenda()" title="Até" style="max-width:150px">
+        <button class="btn btn-outline" onclick="agLimparFiltros()">Limpar</button>
+        <button class="btn btn-blue" onclick="agAbrir()">+ Novo lembrete</button>
+        <button class="btn btn-outline" id="btnAgNotif" onclick="agPedirPermissao()" title="Permite que o navegador mostre um aviso na tela">🔔 Ativar avisos</button>
+      </div>
+      <p id="agResumo" style="font-size:11px;color:var(--muted);margin:0 0 8px"></p>
+      <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:680px">
+          <thead><tr>
+            <th style="padding:9px 12px;text-align:left">Quando</th>
+            <th style="padding:9px 12px;text-align:left">Lembrete</th>
+            <th style="padding:9px 12px;text-align:left">Responsável</th>
+            <th style="padding:9px 12px;text-align:left">Situação</th>
+            <th style="padding:9px 12px;width:120px"></th>
+          </tr></thead>
+          <tbody id="agTable"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="panel" id="panel-financeiro" style="display:none;width:100%">
       <div style="background:#fff;border-radius:10px;padding:12px 18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid #c0392b">
         <div style="font-size:13px;font-weight:800;color:var(--dark)">🔒 Área Financeira — Acesso Restrito</div>
@@ -1122,6 +1160,30 @@ tr:hover td{background:#f8f9fe;}
   </div>
 </div></div>
 
+<div class="modal-bg" id="mAgenda"><div class="modal" style="max-width:460px">
+  <div class="modal-head"><h3 id="agModalTitulo">Novo lembrete</h3><button class="modal-close" onclick="closeM('mAgenda')">&#10005;</button></div>
+  <div class="modal-body">
+    <div class="fg"><label class="fl">O que lembrar *</label>
+      <input class="fi" id="agTitulo" maxlength="120" placeholder="Ex: Renovar o seguro da frota"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Data *</label><input class="fi" id="agData" type="date"></div>
+      <div class="fg"><label class="fl">Hora (opcional)</label><input class="fi" id="agHora" type="time"></div>
+    </div>
+    <div class="fg"><label class="fl">Respons&aacute;vel</label>
+      <input class="fi" id="agQuem" maxlength="60" placeholder="Quem cuida disso"></div>
+    <div class="fg"><label class="fl">Observa&ccedil;&atilde;o</label>
+      <textarea class="fi" id="agObs" rows="3" maxlength="500" placeholder="Detalhes, telefone, n&uacute;mero do documento..."></textarea></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.5">
+      O aviso aparece no <strong>contador do menu</strong>, na <strong>faixa do topo</strong> e,
+      se voc&ecirc; autorizar em <strong>&#128276; Ativar avisos</strong>, tamb&eacute;m como notifica&ccedil;&atilde;o do navegador.
+      <br>&#9888;&#65039; O aviso s&oacute; aparece com o sistema <strong>aberto</strong> &mdash; aviso com tudo fechado exige servidor.
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mAgenda')">Cancelar</button>
+    <button class="btn btn-blue" id="btnAgSalvar" onclick="agSalvar()">Salvar</button>
+  </div>
+</div></div>
 <div class="modal-bg" id="mltStatusLote"><div class="modal" style="max-width:460px">
   <div class="modal-head"><h3>Alterar situa&ccedil;&atilde;o das multas</h3><button class="modal-close" onclick="closeM('mltStatusLote')">&#10005;</button></div>
   <div class="modal-body">
@@ -1419,7 +1481,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v124-20261016-0940';
+var LOKA_BUILD = 'v125-20261016-1500';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -1469,13 +1531,14 @@ var _curCli = -1, _curAtivo = null, _prorId = null, _encId = null;
 var _manutVId = null, _pagtoAId = null;
 var _pgCli = 1, _pgHist = 1;
 var PAGE = 20;
-var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var PANELS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','agenda','financeiro','formularios','contratos','historico','reserva','cadastro'];
 var TITLES = {
     fornecedores: 'Fornecedores',
   multas: 'Multas',
   efrotas: 'e-Frotas (SENATRAN)',
   multasefrotas: 'Multas e-Frotas',
   sinistros: 'Ocorrências / Sinistros',
+  agenda: 'Agenda',
   fatveiculo: 'Faturamento por Veículo',
   dashboard:'Dashboard', clientes:'Clientes', ativos:'Aluguéis Ativos',
   veiculos:'Veículos', frota:'Frota Ativa', formularios:'Formulários', contratos:'Contratos Gerados',
@@ -1512,9 +1575,9 @@ function _perfilAtual() {
 }
 
 // Todos os painéis controláveis por permissão
-var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','financeiro','formularios','contratos','historico','reserva','cadastro'];
+var _TODOS_PAINEIS = ['dashboard','clientes','ativos','veiculos','frota','faturas','fatveiculo','manutencao','fornecedores','multas','multasefrotas','efrotas','sinistros','agenda','financeiro','formularios','contratos','historico','reserva','cadastro'];
 // Rótulos amigáveis (usados no editor de perfis)
-var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',fatveiculo:'Faturamento por Veículo',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
+var _PAINEL_LABEL = {dashboard:'Dashboard',clientes:'Clientes',ativos:'Aluguéis Ativos',veiculos:'Veículos',frota:'Frota Ativa',faturas:'Faturas',fatveiculo:'Faturamento por Veículo',manutencao:'Manutenção',fornecedores:'Fornecedores',multas:'Multas',multasefrotas:'Multas e-Frotas',efrotas:'e-Frotas (SENATRAN)',sinistros:'Ocorrências / Sinistros',agenda:'Agenda',financeiro:'Financeiro',formularios:'Formulários',contratos:'Contratos',historico:'Aluguéis Encerrados',reserva:'Reservas',cadastro:'Pré-Cadastro'};
 var _ACAO_LABEL   = {
   editarPrecos:'Editar preços dos veículos',
   gerenciarUsuarios:'Gerenciar usuários',
@@ -1554,7 +1617,7 @@ var _PERFIS_BUILTIN = {
   admin:    { nome:'Admin',    builtin:true, paineis:_TODOS_PAINEIS.slice(),
               acoes:{ editarPrecos:true,  gerenciarUsuarios:true,  gerenciarPerfis:true,  verRelatorio:true, indicarCondutor:true } },
   operador: { nome:'Operador', builtin:true,
-              paineis:['dashboard','clientes','ativos','veiculos','faturas','fatveiculo','manutencao','fornecedores','multas','sinistros','formularios','contratos','historico','reserva','cadastro'],
+              paineis:['dashboard','clientes','ativos','veiculos','faturas','fatveiculo','manutencao','fornecedores','multas','sinistros','agenda','formularios','contratos','historico','reserva','cadastro'],
               acoes:{ editarPrecos:false, gerenciarUsuarios:false, gerenciarPerfis:false, verRelatorio:true } },
   // Oficina: inclui novas manutenções E consulta o histórico das placas da sua oficina
   oficina:  { nome:'Oficina',  builtin:true, paineis:['manutencao'],
@@ -1856,6 +1919,7 @@ function showPanel(name) {
     if (name === 'financeiro')  { finInit(); finMostrarAba('acertos'); }
     if (name === 'multas')      { mltInit(); mltMostrarAba('lista'); }
     if (name === 'sinistros')   renderSinistros();
+    if (name === 'agenda')      renderAgenda();
     if (name === 'fatveiculo')  fvInit();
   } catch(e) {
     console.error('showPanel[' + name + ']:', e);
@@ -2231,7 +2295,7 @@ var _escritasPendentes = 0;     // quantas gravações no Firebase estão em voo
 // quando há chaves não sequenciais, após exclusões). Chamado ao carregar/sincronizar.
 function normalizarDB(){
   if (!db) return;
-  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros','recibos'].forEach(function(nome){
+  ['ativos','veiculos','clients','historico','contratos','manutencoes','multas','checklists','baixasHistorico','fornecedores','sinistros','recibos','agenda'].forEach(function(nome){
     if (db[nome] === undefined || db[nome] === null) { db[nome] = []; return; }
     if (!Array.isArray(db[nome])) {
       if (typeof db[nome] === 'object') {
@@ -2872,13 +2936,13 @@ function maskBRL(el) {
 
 // ── ALERTAS ────────────────────────────────────────────────────
 function checkAlertas() {
-  if (!db || !db.ativos || !db.ativos.length) return;
+  if (!db) return;
   var hoje = new Date(); hoje.setHours(0,0,0,0);
-  var venc = db.ativos.filter(function(a) {
+  var venc = (db.ativos||[]).filter(function(a) {
     if (!a.devolucao) return false;
     return new Date(a.devolucao+'T00:00') < hoje;
   });
-  var hoje3 = db.ativos.filter(function(a) {
+  var hoje3 = (db.ativos||[]).filter(function(a) {
     if (!a.devolucao) return false;
     var d = Math.ceil((new Date(a.devolucao+'T00:00') - hoje) / 86400000);
     return d >= 0 && d <= 3;
@@ -2889,6 +2953,8 @@ function checkAlertas() {
   var partes = [];
   if (venc.length) partes.push(venc.length + ' locação(ões) VENCIDA(S)');
   if (hoje3.length) partes.push(hoje3.length + ' vencendo em até 3 dias');
+  // lembretes da Agenda entram na MESMA faixa
+  try { var _ag = agTextoAlerta(); if (_ag) partes.push(_ag); } catch(e){}
   if (partes.length) {
     text.textContent = '⚠️ ' + partes.join(' · ');
     banner.classList.add('open');
@@ -10227,6 +10293,366 @@ function renderFormularios() { preencherCliSel(); } // alias
 
 
 // ═══════════════════════════════════════════════════════════════════
+
+/* ═══════════════════════════════════════════════════════════════
+   AGENDA — lembretes lançados à mão, com aviso na tela
+   ═══════════════════════════════════════════════════════════════
+   Guarda em loka_db/agenda[]. Cada lembrete:
+     { id, titulo, data (AAAA-MM-DD), hora (HH:MM ou ''), obs, quem,
+       status ('pendente'|'concluido'), criadoEm, criadoPor, concluidoEm }
+
+   🔴 LIMITE QUE PRECISA ESTAR CLARO: o aviso só aparece com o sistema
+   ABERTO numa aba. Notificação que chega com tudo fechado precisa de um
+   servidor para disparar na hora certa — e aqui o site é GitHub Pages
+   (estático) e a Org Policy do projeto barra criar Cloud Function nova.
+   Por isso a agenda avisa de três jeitos que funcionam sem servidor:
+     1. contador vermelho no item Agenda do menu
+     2. a faixa de alertas do topo, junto com os aluguéis vencendo
+     3. notificação do navegador, se a pessoa autorizar
+   ═══════════════════════════════════════════════════════════════ */
+
+var _agAvisadas = {};   // o que já foi notificado nesta sessão
+
+function agLista() {
+  if (!db) return [];
+  if (!Array.isArray(db.agenda)) {
+    // Armadilha 1: o Firebase devolve array como objeto depois de exclusões
+    db.agenda = db.agenda && typeof db.agenda === 'object'
+      ? Object.keys(db.agenda).map(function (k) { return db.agenda[k]; }).filter(Boolean)
+      : [];
+  }
+  return db.agenda;
+}
+
+function _agHojeISO() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
+/* Situação pelo prazo. 🔴 Concluído vem PRIMEIRO: lembrete já resolvido
+   não pode aparecer como atrasado só porque a data passou. */
+function agSituacao(l) {
+  if (!l) return 'pendente';
+  if (l.status === 'concluido') return 'concluido';
+  var hoje = _agHojeISO();
+  if (!l.data) return 'sem_data';
+  if (l.data < hoje) return 'atrasado';
+  if (l.data === hoje) return 'hoje';
+  return 'futuro';
+}
+
+var AG_SIT = {
+  atrasado:  { rot: '🔴 Atrasado',  cor: '#c0392b', bg: '#fdecea' },
+  hoje:      { rot: '📅 Hoje',      cor: '#b45309', bg: '#fff4e5' },
+  futuro:    { rot: '⏳ Agendado',  cor: '#2B4BF2', bg: '#eaeeff' },
+  sem_data:  { rot: '— Sem data',   cor: '#5a607a', bg: '#eef1fd' },
+  concluido: { rot: '✅ Concluído', cor: '#0d7a3e', bg: '#e6f5ec' }
+};
+
+function _agDias(data) {
+  if (!data) return null;
+  var h = new Date(_agHojeISO() + 'T00:00');
+  var d = new Date(data + 'T00:00');
+  if (isNaN(d)) return null;
+  return Math.round((d - h) / 86400000);
+}
+
+function _agQuandoTxt(l) {
+  if (!l.data) return 'sem data';
+  var br = l.data.split('-').reverse().join('/');
+  var n = _agDias(l.data);
+  var extra = '';
+  if (l.status !== 'concluido' && n !== null) {
+    if (n < 0)       extra = ' · ' + Math.abs(n) + ' dia(s) atrás';
+    else if (n === 0) extra = ' · hoje';
+    else if (n === 1) extra = ' · amanhã';
+    else if (n <= 7)  extra = ' · em ' + n + ' dias';
+  }
+  return br + (l.hora ? ' ' + l.hora : '') + extra;
+}
+
+/* ── Filtro + render ────────────────────────────────────────── */
+function agLimparFiltros() {
+  ['qAg', 'agDe', 'agAte'].forEach(function (id) {
+    var e = document.getElementById(id); if (e) e.value = '';
+  });
+  var s = document.getElementById('fAgQuando'); if (s) s.value = 'abertos';
+  renderAgenda();
+}
+
+function agFiltrados() {
+  var q    = semAcento((document.getElementById('qAg') || {}).value || '');
+  var modo = (document.getElementById('fAgQuando') || {}).value || 'abertos';
+  var de   = (document.getElementById('agDe')  || {}).value || '';
+  var ate  = (document.getElementById('agAte') || {}).value || '';
+
+  return agLista().filter(function (l) {
+    if (!l) return false;
+    var sit = agSituacao(l);
+
+    if (modo === 'abertos'    && sit === 'concluido') return false;
+    if (modo === 'atrasados'  && sit !== 'atrasado')  return false;
+    if (modo === 'hoje'       && sit !== 'hoje')      return false;
+    if (modo === 'concluidos' && sit !== 'concluido') return false;
+    if (modo === 'semana') {
+      var n = _agDias(l.data);
+      // de AMANHA em diante, para bater com o cartao (hoje tem cartao proprio)
+      if (sit === 'concluido' || n === null || n <= 0 || n > 7) return false;
+    }
+
+    // ⚠️ Lembrete SEM data sai do resultado quando há período: não dá para
+    // afirmar que ele cai no intervalo pedido. Mesma regra dos Aluguéis Ativos.
+    if ((de || ate) && !l.data) return false;
+    if (de  && l.data < de)  return false;
+    if (ate && l.data > ate) return false;
+
+    if (q) {
+      var alvo = semAcento([l.titulo, l.obs, l.quem].filter(Boolean).join(' '));
+      if (alvo.indexOf(q) < 0) return false;
+    }
+    return true;
+  }).sort(function (a, b) {
+    // sem data vai para o fim; o resto por data e hora
+    if (!a.data && !b.data) return 0;
+    if (!a.data) return 1;
+    if (!b.data) return -1;
+    return (a.data + (a.hora || '')).localeCompare(b.data + (b.hora || ''));
+  });
+}
+
+function agContagem() {
+  var c = { atrasado: 0, hoje: 0, semana: 0, concluido: 0, pendente: 0 };
+  agLista().forEach(function (l) {
+    var sit = agSituacao(l);
+    if (sit === 'concluido') { c.concluido++; return; }
+    c.pendente++;
+    if (sit === 'atrasado') c.atrasado++;
+    else if (sit === 'hoje') c.hoje++;
+    var n = _agDias(l.data);
+    if (n !== null && n > 0 && n <= 7) c.semana++;
+  });
+  return c;
+}
+
+function renderAgenda() {
+  if (!db) return;
+  agLista();
+  var c = agContagem();
+
+  var st = document.getElementById('agStats');
+  if (st) {
+    st.innerHTML =
+        '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value">' + c.atrasado + '</div><div class="stat-label">Atrasados</div></div>'
+      + '<div class="stat" style="border-left-color:#b45309"><div class="stat-value">' + c.hoje + '</div><div class="stat-label">Para hoje</div></div>'
+      + '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value">' + c.semana + '</div><div class="stat-label">Próximos 7 dias</div></div>'
+      + '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value">' + c.concluido + '</div><div class="stat-label">Concluídos</div></div>';
+  }
+
+  var lista = agFiltrados();
+  var tot = agLista().length;
+  var res = document.getElementById('agResumo');
+  if (res) res.textContent = tot ? (lista.length + ' de ' + tot + ' lembrete(s)') : '';
+
+  var tb = document.getElementById('agTable');
+  if (!tb) return;
+  if (!lista.length) {
+    // "não há nada" ≠ "o filtro não achou nada" — a dúvida de "sumiu tudo?"
+    tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">'
+      + (tot ? 'Nenhum lembrete encontrado com esses filtros.' : 'Nenhum lembrete na agenda. Use “+ Novo lembrete”.')
+      + '</td></tr>';
+    agAtualizarBadge();
+    return;
+  }
+
+  tb.innerHTML = lista.map(function (l) {
+    var sit = agSituacao(l), m = AG_SIT[sit] || AG_SIT.pendente;
+    var idx = agLista().indexOf(l);
+    return '<tr style="border-bottom:1px solid #f0f2f8' + (sit === 'concluido' ? ';opacity:.6' : '') + '">'
+      + '<td style="padding:9px 12px;white-space:nowrap">' + _agQuandoTxt(l) + '</td>'
+      + '<td style="padding:9px 12px"><strong>' + _agEsc(l.titulo || '—') + '</strong>'
+        + (l.obs ? '<br><span style="font-size:10px;color:var(--muted)">' + _agEsc(l.obs) + '</span>' : '')
+      + '</td>'
+      + '<td style="padding:9px 12px;font-size:11px">' + _agEsc(l.quem || '—') + '</td>'
+      + '<td style="padding:9px 12px"><span style="background:' + m.bg + ';color:' + m.cor
+        + ';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">' + m.rot + '</span></td>'
+      + '<td style="padding:9px 12px"><div style="display:flex;gap:5px">'
+        + (sit === 'concluido'
+            ? '<button class="icon-btn" onclick="agConcluir(' + idx + ',false)" title="Reabrir">↩</button>'
+            : '<button class="icon-btn" onclick="agConcluir(' + idx + ',true)" title="Marcar como concluído" style="color:#0d7a3e;border-color:#0d7a3e">✓</button>')
+        + '<button class="icon-btn" onclick="agAbrir(' + idx + ')" title="Editar" style="color:#2B4BF2;border-color:#2B4BF2">✏️</button>'
+        + '<button class="icon-btn" onclick="agExcluir(' + idx + ')" title="Excluir" style="color:#c0392b;border-color:#f5c6cb">🗑</button>'
+      + '</div></td></tr>';
+  }).join('');
+
+  agAtualizarBadge();
+}
+
+function _agEsc(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ── Novo / editar ──────────────────────────────────────────── */
+var _agEdit = null;
+
+function agAbrir(idx) {
+  _agEdit = (idx === undefined || idx === null) ? null : idx;
+  var l = _agEdit !== null ? agLista()[_agEdit] : null;
+  if (_agEdit !== null && !l) { toast('⚠️ Lembrete não encontrado', '#c0392b'); return; }
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
+
+  var v = function (id, val) { var e = document.getElementById(id); if (e) e.value = val || ''; };
+  v('agTitulo', l ? l.titulo : '');
+  v('agData',   l ? l.data   : _agHojeISO());
+  v('agHora',   l ? l.hora   : '');
+  v('agQuem',   l ? l.quem   : (sess.nome || ''));
+  v('agObs',    l ? l.obs    : '');
+  var t = document.getElementById('agModalTitulo');
+  if (t) t.textContent = l ? 'Editar lembrete' : 'Novo lembrete';
+  var b = document.getElementById('btnAgSalvar');
+  if (b) { b.disabled = false; b.textContent = 'Salvar'; }
+  openM('mAgenda');
+}
+
+function agSalvar() {
+  var titulo = (document.getElementById('agTitulo') || {}).value || '';
+  var data   = (document.getElementById('agData')   || {}).value || '';
+  titulo = titulo.trim();
+  if (!titulo) { toast('⚠️ Escreva o que você quer lembrar', '#b45309'); return; }
+  // 🔴 Sem data não há quando avisar — e um lembrete que nunca avisa é só
+  //    um bilhete perdido. Por isso a data é obrigatória.
+  if (!data)   { toast('⚠️ Informe a data do lembrete', '#b45309'); return; }
+
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
+  var lista = agLista();
+  var novo = {
+    titulo: titulo,
+    data: data,
+    hora: (document.getElementById('agHora') || {}).value || '',
+    quem: ((document.getElementById('agQuem') || {}).value || '').trim(),
+    obs:  ((document.getElementById('agObs')  || {}).value || '').trim()
+  };
+
+  var btn = document.getElementById('btnAgSalvar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+
+  if (_agEdit !== null && lista[_agEdit]) {
+    // editar NUNCA duplica, e preserva quem criou e quando
+    lista[_agEdit] = Object.assign({}, lista[_agEdit], novo);
+  } else {
+    novo.id = 'ag' + Date.now();
+    novo.status = 'pendente';
+    novo.criadoEm = new Date().toISOString();
+    novo.criadoPor = sess.nome || sess.usuario || '';
+    lista.push(novo);
+  }
+  db.agenda = lista;
+  saveDB();
+  _agEdit = null;
+  closeM('mAgenda');
+  renderAgenda();
+  toast('✅ Lembrete salvo', '#0d7a3e');
+}
+
+function agConcluir(idx, feito) {
+  var l = agLista()[idx];
+  if (!l) { toast('⚠️ Lembrete não encontrado', '#c0392b'); return; }
+  l.status = feito ? 'concluido' : 'pendente';
+  if (feito) l.concluidoEm = new Date().toISOString();
+  else delete l.concluidoEm;
+  saveDB();
+  renderAgenda();
+  toast(feito ? '✅ Lembrete concluído' : '↩ Lembrete reaberto', '#0d7a3e');
+}
+
+function agExcluir(idx) {
+  var l = agLista()[idx];
+  if (!l) { toast('⚠️ Lembrete não encontrado', '#c0392b'); return; }
+  if (!confirm('Excluir o lembrete "' + (l.titulo || '') + '"?\n\nA agenda não tem lixeira — isso não volta.')) return;
+  agLista().splice(idx, 1);
+  saveDB();
+  renderAgenda();
+  toast('🗑 Lembrete excluído', '#5a607a');
+}
+
+/* ── Aviso 1: contador no menu ──────────────────────────────── */
+function agAtualizarBadge() {
+  var b = document.getElementById('agBadge');
+  if (!b) return;
+  var c = agContagem();
+  var n = c.atrasado + c.hoje;
+  b.textContent = n;
+  b.style.display = n ? 'inline-block' : 'none';
+  b.title = c.atrasado + ' atrasado(s) · ' + c.hoje + ' para hoje';
+}
+
+/* ── Aviso 2: notificação do navegador ──────────────────────── */
+function agPedirPermissao() {
+  if (typeof Notification === 'undefined') {
+    toast('⚠️ Este navegador não mostra avisos na tela', '#b45309'); return;
+  }
+  if (Notification.permission === 'granted') {
+    toast('🔔 Os avisos já estão ativados', '#0d7a3e'); agVerificar(true); return;
+  }
+  if (Notification.permission === 'denied') {
+    toast('⚠️ Você bloqueou os avisos para este site — libere no cadeado da barra de endereço', '#b45309');
+    return;
+  }
+  // ⚠️ A permissão só é pedida com um CLIQUE. Pedir sozinho ao abrir a
+  //    página é intrusivo e o navegador costuma bloquear de vez.
+  Notification.requestPermission().then(function (p) {
+    if (p === 'granted') { toast('🔔 Avisos ativados', '#0d7a3e'); agVerificar(true); }
+    else toast('Avisos não ativados — a agenda continua avisando pelo menu e pela faixa do topo', '#5a607a');
+  }).catch(function () {});
+}
+
+function _agNotificar(l) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  // 🔴 Não repetir o mesmo lembrete na mesma sessão: aviso repetido vira ruído
+  //    e a pessoa para de olhar.
+  var chave = (l.id || l.titulo) + '|' + l.data;
+  if (_agAvisadas[chave]) return;
+  _agAvisadas[chave] = true;
+  try {
+    new Notification('LOKÁ — lembrete', {
+      body: (l.titulo || '') + (l.hora ? ' (' + l.hora + ')' : '')
+            + (l.quem ? '\n' + l.quem : ''),
+      tag: chave
+    });
+  } catch (e) {}
+}
+
+/* ── Aviso 3: faixa do topo + a verificação periódica ───────── */
+function agVerificar(forcar) {
+  if (!db) return;
+  var c = agContagem();
+  agAtualizarBadge();
+  if (c.atrasado + c.hoje === 0) return;
+  agLista().forEach(function (l) {
+    var sit = agSituacao(l);
+    if (sit === 'atrasado' || sit === 'hoje') _agNotificar(l);
+  });
+  if (forcar) {
+    toast('🔔 ' + (c.atrasado + c.hoje) + ' lembrete(s) para ver hoje', '#b45309');
+  }
+}
+
+/* Texto da agenda para a faixa de alertas do topo, que já avisa sobre
+   aluguéis vencendo. Devolve '' quando não há nada — assim o banner não
+   abre à toa. */
+function agTextoAlerta() {
+  if (!db) return '';
+  var c = agContagem();
+  var p = [];
+  if (c.atrasado) p.push(c.atrasado + ' lembrete(s) ATRASADO(S)');
+  if (c.hoje)     p.push(c.hoje + ' lembrete(s) para hoje');
+  return p.join(' · ');
+}
+
+// confere ao abrir e de meia em meia hora, enquanto o sistema estiver aberto
+setTimeout(function () { try { agVerificar(false); } catch (e) {} }, 4000);
+setInterval(function () { try { agVerificar(false); } catch (e) {} }, 1800000);
+
 // MÓDULO MULTAS — LOKÁ
 // ═══════════════════════════════════════════════════════════════════
 var MLT_STATUS = {
