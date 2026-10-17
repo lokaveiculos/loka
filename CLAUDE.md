@@ -51,10 +51,11 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v127-20261017-0940** |
+| `gestao.html` | **v128-20261017-1120** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
+| `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
 
 ## Modelo de dados — `loka_db`
 
@@ -4354,3 +4355,160 @@ script primeiro, religar `db`, `toast`, `saveDB` e os render depois.**
 ### ⏳ Não verificado
 Falta **logado**: o Rogel cadastrar uma peça de verdade com quantidade e conferir
 o saldo e o extrato. Eu não autentico.
+
+---
+
+## ✅ Recibo de Pagamento + 2ª via do Termo de Prorrogação — 17/10/2026 (gestao v128 · recibo v2)
+
+Dois pedidos, os dois no painel **Formulários**: um recibo para o cliente
+discriminando **a origem do que foi pago**, e acesso ao **recibo de prorrogação
+que já existe no sistema**.
+
+### 1. `sistema/recibo.html` (novo) — Recibo de Pagamento
+
+Página avulsa, como os outros formulários do painel. Card com **Abrir** e
+**Com Cliente**, e o recibo também entra no seletor "Gerar com Cliente".
+
+#### 🔴 O total é a SOMA das linhas — não existe campo de total
+Não há onde digitar o total. Ele vem das linhas de origem, e por isso o
+documento **nunca pode dizer um valor diferente do que está discriminado** nele.
+Mesma regra do saldo do Almoxarifado: o número que importa é derivado, não
+digitado.
+
+| Cuidado | Por quê |
+|---|---|
+| linha com valor **sem dígito** avisa | `num('abc')` devolve **0**, e 0 passaria calado no total — é a lição da baixa em lote (v94), da franquia (v99) e da quantidade inicial (v127) |
+| linha **em branco** não é erro | é linha que a pessoa ainda não preencheu; só não entra no documento |
+| não imprime **sem nome**, **sem data** ou com **total zero** | recibo de R$ 0,00 entregue a cliente é pior que nenhum |
+| a placa sobe para **maiúscula** | é identidade do veículo, como no resto do sistema |
+| nome e descrição são **escapados** | nome com `"` ou `<` não quebra o documento |
+| data inicial em hora **local** | `toISOString()` jogaria o recibo da noite para o dia seguinte |
+
+#### As origens vêm do vocabulário do sistema, não da minha cabeça
+Medido antes de escrever: o campo `tipo` do Contas a Receber usa **Fatura (65),
+Avarias (17), Multas (9), Renegociação (6), Pneus (1)**, e os itens `outros` das
+faturas trazem franquia, borracharia, juros, parcelamento e peça trocada.
+
+As 13 origens espelham isso: aluguel, multa, avaria, franquia de sinistro,
+caução, diária extra/prorrogação, pneus, combustível, lavagem, manutenção,
+juros/mora, parcelamento (acordo) e outros.
+
+⚠️ **Inventar nome aqui faria o recibo não conversar com o Financeiro** na hora
+de conferir o que entrou — a mesma razão pela qual os tipos de sinistro saíram da
+Cláusula 11ª do contrato.
+
+#### O documento
+Papel timbrado da casa (mesmo logo dos outros documentos), valor em destaque e
+**por extenso** (a mesma implementação do `_mltExtenso` do recibo de multa, que
+já passou por 11 casos de teste), a frase de quitação, a tabela das origens com
+total, observação, data, assinatura de quem recebeu e rodapé com o CNPJ.
+
+Sai em **1 ou 2 vias** (padrão 2: cliente e empresa), a 2ª com quebra de página.
+
+🔴 **A quitação é ressalvada de propósito:** o texto dá quitação
+*"exclusivamente quanto às origens aqui discriminadas"*. Um recibo que desse
+quitação geral do contrato ao receber uma multa seria um problema jurídico, não
+um detalhe de redação.
+
+#### Numeração
+Sugerida e **editável**: `RP-AAAAMMDD-HHMM`. O prefixo é **RP**, não `REC`, para
+não se confundir com o recibo de multa do `gestao.html` (`REC-AAAAMMDD-NNN`) na
+hora de conferir. Há teste para isso.
+
+#### ⚠️ O que NÃO faz: não grava no banco
+O recibo **imprime, não registra**. Dois motivos:
+1. `loka_db/recibos` é do recibo de multa e guarda `multas[]` congeladas — a aba
+   **Recibos** reimprime a partir dali. Um registro de forma diferente naquele nó
+   quebraria aquela tela.
+2. A página é **pública** (GitHub Pages) e as regras do banco estão abertas
+   (pendência 3): seria mais uma porta de escrita sem login. Mesma decisão do
+   formulário de sinistro do colaborador.
+
+**Registrar e consultar é um passo separado** — dá para fazer, mas envolve
+decidir o nó, a numeração sequencial e quem pode emitir. Não construí por não
+ter sido pedido.
+
+### 2. Termo de Prorrogação no painel Formulários
+
+#### 🔴 O documento já existia; o que faltava era chegar nele depois
+`gerarTermoProrrogacao` existe desde antes e é emitido ao prorrogar pelo painel
+**Aluguéis Ativos**. Mas:
+
+| | |
+|---|---|
+| prorrogações no banco | **39**, em 26 locações |
+| em locação **ativa** | 12 |
+| 🔴 em locação **ENCERRADA** | **27** |
+
+As 27 estão em `historico`, que o painel de ativos não lista — **não havia como
+reimprimir aquelas**. A lista nova varre `ativos` **e** `historico`.
+
+#### Dois botões, e a diferença entre eles é dita na tela
+| Botão | O que faz |
+|---|---|
+| **🖨 2ª via do termo** | reimprime do que já está gravado. **Não altera nada** — nem data, nem valor |
+| **Prorrogar locação** | leva ao fluxo que já existe, que **altera a data de devolução** |
+
+🔴 O segundo abre com aviso em destaque dizendo isso. Formulários é um painel de
+documentos: um botão ali que mudasse a data de uma locação sem avisar seria uma
+armadilha. Ele também só lista locação **ativa** — não se prorroga o que acabou.
+
+A reimpressão sai com carimbo **2ª VIA**, dizendo quando a prorrogação foi
+registrada. `gerarTermoProrrogacao` ganhou um **8º argumento opcional**
+(`segundaVia`); sem ele o fluxo normal sai exatamente como antes — há teste e
+defeito injetado para isso.
+
+A busca usa `semAcento` **nos dois lados**, e dá para esconder as encerradas.
+
+### Validado
+- `node --check` nas duas páginas; `<div>` balanceadas (gestao 776/776, recibo 30/30)
+- **99 testes** com o código real das duas páginas e as **39 prorrogações reais**:
+  a soma das origens, o documento inteiro, as 4 recusas de impressão, escape de
+  HTML, 8 casos de extenso, remover linha, "Com Cliente", copiar resumo, limpar,
+  a lista das prorrogações nos dois nós, o carimbo, os filtros, os estados vazios
+  e o celular
+- **31 defeitos injetados — todos acusados**, entre eles total que ignora as
+  linhas, imprimir sem nome/sem data/com zero, a 2ª via não varrer o histórico, e
+  reimprimir mexendo no registro original
+- **No ar, nas páginas publicadas**: recibo de 3 origens → R$ 2.175,73 conferido
+  contra soma feita por fora, extenso certo, 2 vias rotuladas, **cabe no A4**
+  (726px de largura, 710px de altura, nada transborda, nem com R$ 12.500,00 e
+  descrição longa), e a 375px não rola de lado. A 2ª via rodou contra o **banco
+  real** (105 ativos, 92 encerrados): 39 prorrogações, documento de uma locação
+  **encerrada**, com carimbo, `saveDB` armado para estourar se fosse chamado —
+  **o banco ficou byte a byte idêntico**
+- Regressão: **33 suítes, 1.616 testes**, nenhuma falha
+
+### ⚠️ Cinco testes meus passaram com defeito vivo — e o que cada um ensinou
+Na injeção, 5 defeitos não foram acusados na primeira rodada:
+
+| O que passou | Por que o teste era fraco |
+|---|---|
+| data em UTC | de manhã UTC e local **batem**; só um relógio fixo em 22h30 distingue |
+| busca sem acento | eu só testava digitar **sem** acento para achar nome **com**. O defeito de normalizar um lado só aparece no sentido oposto |
+| card fora do painel | eu procurava a string `Recibo de Pagamento`, que também existe no `<option>` do seletor — passava por card |
+| recibo via `abrirContrato` | eu chamava a função direto, sem passar pelo desvio do `gerarFormSelecionado` |
+| 3 casas decimais | **inerte**: o `brl()` já arredonda com `Math.round` antes de formatar, então `maximumFractionDigits` não muda nada. Ficou no código, **sem teste**, e está dito aqui |
+
+### ⚠️ Achados não corrigidos
+- `gerarTermoProrrogacao` lê **`a.placa` direto** (armadilha 2 — contrato
+  multi-veículo). Conferido: **nenhuma** das 26 locações com prorrogação é
+  multi-veículo, então hoje não há erro. É anterior a esta mudança.
+- `abrirContrato` **não faz nada** para tipo que não está no mapa `files` — falha
+  em silêncio. Foi por isso que o recibo recebeu desvio próprio.
+
+### 🔴 Perda minha: sobrescrevi uma suíte de teste
+Dei à suíte nova o nome `t-recibo.js`, que **já era** o da suíte do recibo de
+multa (106 testes, de 08/10). O arquivo foi sobrescrito e **não há cópia** — o
+scratchpad não é versionado. A minha foi renomeada para `t-recibo-pag.js`.
+
+**O que isso significa:** nenhuma regressão agora (o recibo de multa não foi
+tocado hoje, e a outra suíte dele, `t-rec-registro.js` com 58 testes,
+sobreviveu), mas a cobertura do **documento** do recibo de multa se foi. Antes de
+mexer naquele gerador, vale refazê-la.
+
+⚠️ **Regra:** antes de criar suíte, conferir se o nome já existe (`ls t-*.js`).
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Formulários, emitir um recibo de verdade e tirar
+uma 2ª via de um termo. Eu não autentico.
