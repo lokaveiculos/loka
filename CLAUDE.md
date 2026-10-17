@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v125-20261016-1500** |
+| `gestao.html` | **v127-20261017-0940** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v14-20261014-2300** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -4261,3 +4261,96 @@ ignorar teste vermelho. As duas injeções correspondentes continuam acusando.
 ### ⏳ Não verificado
 Falta exercitar **logado**: o Rogel abrir o Almoxarifado, cadastrar uma peça de
 verdade, lançar uma entrada e uma saída e conferir o saldo. Eu não autentico.
+
+---
+
+## 🔴 O cadastro da peça não tinha campo de quantidade — 17/10/2026 (gestao v127)
+
+Relato: *"a tela de cadastramento do item no almoxarifado não mostra o campo da
+quantidade, mostra apenas o campo da quantidade mínima"*. Estava certo, e o
+desenho era meu.
+
+### O que eu errei
+A regra de que **o saldo vem das movimentações** (v126) continua certa — mas eu a
+transformei em *ausência de campo*, deixando um aviso em letra miúda dizendo
+"cadastre a peça e depois lance uma entrada". Para quem está **cadastrando o que
+já está na prateleira**, isso é trabalho dobrado em duas abas, e a tela parecia
+incompleta. **A regra era boa; a tela, não.**
+
+### O conserto: o campo existe, e alimenta o extrato
+Entrou **"Quantidade em estoque hoje"** (+ **custo unitário**, opcional) no
+formulário da peça. O que a pessoa digita **não é gravado na ficha**: vira uma
+**entrada no extrato**, com a data de hoje e motivo *"Saldo inicial do cadastro"*.
+
+| | |
+|---|---|
+| saldo continua sendo | a soma das movimentações |
+| a ficha guarda quantidade? | **não** — nem `qtd`, nem `saldo`, nem `estoque` |
+| quem olhar o extrato daqui a um ano | vê de onde esse saldo veio, e quem lançou |
+
+⚠️ **O custo unitário entrou junto por necessidade, não por capricho:** sem ele a
+entrada inicial nasce com custo 0 e o cartão **"valor em estoque" mostraria R$ 0,00**
+para uma prateleira cheia. Com ele, 10 × R$ 32,50 = R$ 325,00, conferido no ar.
+
+### 🔴 O campo existe só no CADASTRO
+Na edição ele **dá lugar ao saldo atual**, em texto:
+
+```
+Em estoque hoje: 10 un — para mudar, lance uma entrada ou saída,
+que ficam registradas no extrato.
+```
+
+Sem isso, **corrigir o nome ou o local de uma peça somaria estoque a cada
+salvamento** — o estoque subiria sozinho, sem ninguém entender por quê. Há teste
+e defeito injetado para os dois lados, inclusive para o caso de alguém abrir um
+cadastro novo, digitar uma quantidade, fechar e ir editar outra peça: o valor
+esquecido no campo escondido é **ignorado**.
+
+### As recusas
+| Entrada | O que acontece |
+|---|---|
+| em branco ou `0` | peça criada, **nenhuma movimentação** — saldo zero |
+| texto sem dígito (`abc`) | **recusa** e nada é criado. `_axNum('abc')` devolve **0**, e 0 passaria calado — mesma lição da baixa em lote (v94) e da franquia (v99) |
+| negativa | **recusa** — estoque não começa negativo; acerto se faz pelo **Ajuste** |
+| nome vazio | recusa antes de criar qualquer entrada |
+| código repetido | continua barrado, **sem deixar entrada órfã** |
+
+🔴 **Ficha e entrada vão numa gravação só.** Em duas, uma falha no meio deixaria
+a entrada apontando para uma peça que não existe.
+
+### ⚠️ A data é local, não UTC — e o teste precisou de relógio falso
+A entrada usa `getFullYear/getMonth/getDate`, como a tela de movimentação já
+fazia. Com `toISOString()` um lançamento feito **depois das 21h** no Brasil cairia
+no **dia seguinte**.
+
+O detalhe de método: meu primeiro teste comparava a data com "hoje" calculado do
+mesmo jeito — e **de manhã UTC e local batem**, então o defeito injetado
+**passou**. O teste só vale com o relógio fixado em **17/10 22h30 local = 18/10
+01h30 UTC**. Defeito que só aparece em certa hora do dia precisa de hora fixa no
+teste; "rodou e passou" não diz nada sobre as outras 3 horas.
+
+### Validado
+- `node --check`; `<div>` balanceadas (741/741); os dois carimbos batendo
+- **53 testes** com o código real: o campo no HTML, abrir novo × abrir edição, a
+  entrada criada (tipo, id, data, custo, motivo, quem), **a ficha sem quantidade**,
+  a gravação única, as 5 recusas, decimal (`12,5`) e milhar (`1.250,00`),
+  convivência com peça que já existia, lista vindo como objeto do Firebase, e a
+  situação (zerado/baixo) já certa na peça recém-criada
+- **15 defeitos injetados — todos acusados**, entre eles gravar a quantidade na
+  ficha, a edição criando entrada, aceitar negativo, gravar duas vezes, a data em
+  UTC e o aviso dizendo que entrou estoque quando não entrou
+- **No navegador, contra o arquivo publicado**: cadastro com 10 un a R$ 32,50 →
+  1 peça, 1 entrada, saldo 10, R$ 325,00, uma gravação, aviso *"Peça salva com 10
+  un em estoque"*; editar → campo oculto, saldo **continua 10**; `abc` e `-5`
+  recusados com a mensagem certa. **Nada foi gravado em produção.**
+- Regressão: **32 suítes, 1.528 testes**, nenhuma falha
+
+### ⚠️ Armadilha nova do ambiente de teste
+O `<script>` do `gestao.html` **declara `var db`**, e isso **anula o `db` que eu
+passei no contexto** do `vm` — o primeiro teste estourou com *"Cannot set
+properties of null"*. É a mesma sequência já registrada para os stubs: **avaliar o
+script primeiro, religar `db`, `toast`, `saveDB` e os render depois.**
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel cadastrar uma peça de verdade com quantidade e conferir
+o saldo e o extrato. Eu não autentico.
