@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v127-20261017-0940 -->
+<!-- LOKA deploy: v128-20261017-1120 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1036,12 +1036,16 @@ tr:hover td{background:#f8f9fe;}
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#fdecea"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#c0392b" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></div><div><div class="form-card-title">Indicação de Condutor</div><div class="form-card-sub">Transferir a multa ao condutor</div></div></div><div class="form-card-body">Formulário com os dados que o SENATRAN exige para indicar o condutor. Imprima para colher a assinatura ou copie os dados para colar no portal. <strong>Prazo legal: 15 dias.</strong></div><div class="form-card-foot"><button class="btn" style="background:#c0392b;color:#fff" onclick="window.open('indicacao-condutor.html','_blank')">Abrir Formulário</button><button class="btn btn-outline" onclick="copiarLinkIndicacao()">📋 Copiar Link</button></div></div>
 
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#EEF1FD"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#2B4BF2" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div><div class="form-card-title">Orçamento Online</div><div class="form-card-sub">Cliente cota e envia pedido</div></div></div><div class="form-card-body">Formulário mobile: o cliente escolhe categoria e período, vê o preço na hora e envia o pedido pelo WhatsApp.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="window.open('orcamento.html','_blank')">Abrir Orçamento</button><button class="btn btn-outline" onclick="copiarLinkOrcamento()">📋 Copiar Link</button></div></div>
+
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#e6f5ec"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="form-card-title">Recibo de Pagamento</div><div class="form-card-sub">Com a origem do valor recebido</div></div></div><div class="form-card-body">Recibo para entregar ao cliente, discriminando <strong>de onde vem cada valor</strong> &mdash; aluguel, multa, avaria, franquia, cau&ccedil;&atilde;o, pneus. O total &eacute; a soma das linhas e sai tamb&eacute;m por extenso.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="abrirReciboPagamento(false)">Abrir Recibo</button><button class="btn btn-outline" onclick="abrirReciboPagamento(true)">Com Cliente</button></div></div>
+
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#fef3cd"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#b45309" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14l3 3-3 3"/></svg></div><div><div class="form-card-title">Termo de Prorroga&ccedil;&atilde;o</div><div class="form-card-sub">Locação estendida</div></div></div><div class="form-card-body">A <strong>2&ordf; via</strong> reimprime um termo j&aacute; emitido, inclusive de loca&ccedil;&atilde;o encerrada, e <strong>n&atilde;o altera nada</strong>. Prorrogar de novo leva ao fluxo dos Alugu&eacute;is Ativos &mdash; esse <strong>muda a data de devolu&ccedil;&atilde;o</strong>.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="prorReimpAbrir()">🖨 2ª via do termo</button><button class="btn btn-outline" onclick="prorNovaAbrir()">Prorrogar locação</button></div></div>
       </div>
       <div style="margin-top:20px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
         <div class="sec-label" style="margin-top:0">Gerar com Cliente</div>
         <div class="g2" style="margin-top:10px;">
           <div class="fg"><label class="fl">Cliente</label><select class="fs" id="fCliSel"><option value="">— Selecione —</option></select></div>
-          <div class="fg"><label class="fl">Tipo</label><select class="fs" id="fTipoSel"><option value="diaria">Contrato Diária</option><option value="mensal">Contrato Mensal</option><option value="reserva">Recibo de Reserva</option><option value="checklist">Checklist</option></select></div>
+          <div class="fg"><label class="fl">Tipo</label><select class="fs" id="fTipoSel"><option value="diaria">Contrato Diária</option><option value="mensal">Contrato Mensal</option><option value="reserva">Recibo de Reserva</option><option value="recibo">Recibo de Pagamento</option><option value="checklist">Checklist</option></select></div>
         </div>
         <button class="btn btn-blue" style="margin-top:12px" onclick="gerarFormSelecionado()">Gerar Formulário</button>
       </div>
@@ -1236,6 +1240,47 @@ tr:hover td{background:#f8f9fe;}
     <button class="btn btn-outline" onclick="closeM('mReciboMulta')">Cancelar</button>
     <button class="btn btn-green" id="mltRecBtnGerar" onclick="mltRecGerar()">&#129534; Gerar recibo (PDF)</button>
   </div>
+</div></div>
+
+<div class="modal-bg" id="mProrReimp"><div class="modal" style="max-width:860px">
+  <div class="modal-head"><h3>2&ordf; via do Termo de Prorroga&ccedil;&atilde;o</h3><button class="modal-close" onclick="closeM('mProrReimp')">&#10005;</button></div>
+  <div class="modal-body">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+      Reimprime um termo <strong>j&aacute; emitido</strong>, a partir do que est&aacute; gravado na
+      loca&ccedil;&atilde;o. <strong>Nada &eacute; alterado</strong> &mdash; nem data, nem valor.
+    </div>
+    <div style="display:grid;grid-template-columns:2fr auto auto;gap:10px;align-items:end;margin-bottom:10px">
+      <div class="fg" style="margin:0"><label class="fl">Buscar</label>
+        <input class="fi" id="prorBusca" placeholder="Cliente, ve&iacute;culo ou placa" oninput="renderProrReimp()"></div>
+      <label style="font-size:11px;display:flex;align-items:center;gap:6px;padding-bottom:8px;white-space:nowrap">
+        <input type="checkbox" id="prorIncEnc" checked onchange="renderProrReimp()"> Incluir encerradas</label>
+      <button class="btn btn-outline" style="margin-bottom:2px" onclick="document.getElementById('prorBusca').value='';renderProrReimp()">Limpar</button>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px" id="prorReimpResumo"></div>
+    <div style="overflow-x:auto"><table style="min-width:640px"><thead><tr style="background:var(--dark)">
+      <th>Cliente / Ve&iacute;culo</th><th>Devolu&ccedil;&atilde;o</th><th>Valor</th><th>Loca&ccedil;&atilde;o</th><th>A&ccedil;&atilde;o</th>
+    </tr></thead><tbody id="prorReimpTabela"></tbody></table></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-outline" onclick="closeM('mProrReimp')">Fechar</button></div>
+</div></div>
+
+<div class="modal-bg" id="mProrNova"><div class="modal" style="max-width:780px">
+  <div class="modal-head"><h3>Prorrogar uma loca&ccedil;&atilde;o</h3><button class="modal-close" onclick="closeM('mProrNova')">&#10005;</button></div>
+  <div class="modal-body">
+    <div style="background:#fef3cd;border:1px solid #f0d58a;border-radius:6px;padding:9px 12px;font-size:11px;color:#8a5a00;line-height:1.5;margin-bottom:10px">
+      &#9888;&#65039; Isto <strong>n&atilde;o &eacute; s&oacute; imprimir</strong>: prorrogar
+      <strong>altera a data de devolu&ccedil;&atilde;o</strong> da loca&ccedil;&atilde;o e fica
+      registrado no hist&oacute;rico dela. Para apenas reimprimir um termo antigo, use a
+      <strong>2&ordf; via</strong>.
+    </div>
+    <div class="fg"><label class="fl">Buscar</label>
+      <input class="fi" id="prorNovaBusca" placeholder="Cliente, ve&iacute;culo ou placa" oninput="renderProrNova()"></div>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);margin:8px 0 6px" id="prorNovaResumo"></div>
+    <div style="overflow-x:auto"><table style="min-width:560px"><thead><tr style="background:var(--dark)">
+      <th>Cliente</th><th>Ve&iacute;culo</th><th>Devolu&ccedil;&atilde;o atual</th><th>A&ccedil;&atilde;o</th>
+    </tr></thead><tbody id="prorNovaTabela"></tbody></table></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-outline" onclick="closeM('mProrNova')">Cancelar</button></div>
 </div></div>
 
 <div class="modal-bg" id="mAxItem"><div class="modal" style="max-width:500px">
@@ -1622,7 +1667,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v127-20261017-0940';
+var LOKA_BUILD = 'v128-20261017-1120';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4145,7 +4190,7 @@ function confirmarPror() {
   }, 300);
 }
 
-function gerarTermoProrrogacao(a, datAnterior, novaData, motivo, valor, pgtoStatus, pgtoForma) {
+function gerarTermoProrrogacao(a, datAnterior, novaData, motivo, valor, pgtoStatus, pgtoForma, segundaVia) {
   if (!a) return;
   var fmtD = function(s){ if(!s)return'—'; var d=new Date(s+'T00:00'); return isNaN(d)?s:d.toLocaleDateString('pt-BR'); };
   var pgtoLabels = {a_pagar:'⏳ A Pagar', pago:'✅ Pago', parcial:'⚠️ Pago Parcialmente'};
@@ -4194,6 +4239,7 @@ function gerarTermoProrrogacao(a, datAnterior, novaData, motivo, valor, pgtoStat
       + '</div>'
     + '</div>'
 
+    + (segundaVia ? '<div style="background:#fef3cd;border:1px solid #f0d58a;border-radius:6px;padding:8px 12px;font-size:10px;font-weight:700;color:#8a5a00;margin-bottom:12px">2&ordf; VIA &mdash; reimpress&atilde;o de termo j&aacute; emitido. A prorroga&ccedil;&atilde;o foi registrada em '+(a._prorEm ? new Date(a._prorEm).toLocaleDateString('pt-BR') : 'data anterior')+'.</div>' : '')
     + '<div class="dt">Feira de Santana-BA, '+new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})+'</div>'
 
     // Dados da locação
@@ -4247,6 +4293,166 @@ function gerarTermoProrrogacao(a, datAnterior, novaData, motivo, valor, pgtoStat
   var w = window.open('','_blank');
   if (w) { w.document.write(html); w.document.close(); }
 }
+
+/* ════════ Termo de Prorrogação pelo painel Formulários ════════════════════
+   O termo já existe (gerarTermoProrrogacao) e já é emitido ao prorrogar pelo
+   painel Aluguéis Ativos. O que faltava era CHEGAR nele depois:
+   🔴 das 39 prorrogações do banco, 27 estão em locações ENCERRADAS, que o
+      painel de ativos não lista — não havia como reimprimir aquelas.
+   Aqui a lista varre ativos E histórico. Reimprimir não altera nada. */
+
+function _prorTodas() {
+  var saida = [];
+  [['ativos', 'ativa'], ['historico', 'encerrada']].forEach(function (par) {
+    var lista = db && db[par[0]];
+    if (!lista) return;
+    if (!Array.isArray(lista)) {
+      lista = Object.keys(lista).map(function (k) { return lista[k]; }).filter(function (x) { return x != null; });
+    }
+    lista.forEach(function (a, i) {
+      if (!a || !a.prorrogacoes) return;
+      var ps = a.prorrogacoes;
+      if (!Array.isArray(ps)) {
+        ps = Object.keys(ps).sort(function (x, y) { return Number(x) - Number(y); })
+          .map(function (k) { return ps[k]; }).filter(function (x) { return x != null; });
+      }
+      ps.forEach(function (p, j) {
+        if (p) saida.push({ chave: par[0] + ':' + i + ':' + j, origem: par[0], situacao: par[1], ativo: a, pror: p });
+      });
+    });
+  });
+  // Mais recente primeiro: é a que se reimprime no dia a dia.
+  return saida.sort(function (x, y) {
+    return String(y.pror.em || y.pror.novaData || '').localeCompare(String(x.pror.em || x.pror.novaData || ''));
+  });
+}
+
+function _prorFiltradas() {
+  var b = semAcento(((document.getElementById('prorBusca') || {}).value || '').trim());
+  var mostrarEnc = !!(document.getElementById('prorIncEnc') || {}).checked;
+  return _prorTodas().filter(function (r) {
+    if (!mostrarEnc && r.situacao === 'encerrada') return false;
+    if (!b) return true;
+    var alvo = semAcento([r.ativo.clienteNome, r.ativo.veiculoNome, r.ativo.placa,
+      r.pror.novaData, r.pror.valor].join(' '));
+    return alvo.indexOf(b) >= 0;
+  });
+}
+
+function renderProrReimp() {
+  var tb = document.getElementById('prorReimpTabela');
+  if (!tb) return;
+  var todas = _prorTodas(), lista = _prorFiltradas();
+  var res = document.getElementById('prorReimpResumo');
+  if (res) {
+    res.textContent = todas.length
+      ? lista.length + ' de ' + todas.length + ' prorrogação(ões)'
+      : 'Nenhuma prorrogação registrada';
+  }
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:18px">'
+      + (todas.length
+        ? 'Nenhuma prorrogação encontrada com esta busca'
+        : 'Nenhuma prorrogação foi registrada ainda. Elas nascem no painel <strong>Aluguéis Ativos</strong>, no botão Prorrogar.')
+      + '</td></tr>';
+    return;
+  }
+  tb.innerHTML = lista.map(function (r) {
+    var p = r.pror, a = r.ativo;
+    var selo = r.situacao === 'encerrada'
+      ? '<span style="background:#f3f4f6;color:#4b5563;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:700">ENCERRADA</span>'
+      : '<span style="background:#e6f5ec;color:#0d7a3e;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:700">ATIVA</span>';
+    var pg = p.pgtoStatus === 'pago' ? '✅ Pago'
+      : p.pgtoStatus === 'parcial' ? '⚠️ Parcial' : '⏳ A pagar';
+    return '<tr>'
+      + '<td><strong>' + _axEsc(a.clienteNome || '—') + '</strong><br>'
+        + '<span style="color:var(--muted);font-size:10px">' + _axEsc(a.veiculoNome || '') + ' · ' + _axEsc(a.placa || '') + '</span></td>'
+      + '<td>' + fmt(p.dataAnterior) + ' → <strong>' + fmt(p.novaData) + '</strong></td>'
+      + '<td>' + (p.valor ? 'R$ ' + _axEsc(String(p.valor)) : '—') + '<br>'
+        + '<span style="font-size:10px;color:var(--muted)">' + pg + '</span></td>'
+      + '<td>' + selo + '<br><span style="font-size:10px;color:var(--muted)">'
+        + (p.em ? new Date(p.em).toLocaleDateString('pt-BR') : '—') + '</span></td>'
+      + '<td><button class="btn btn-outline" style="padding:4px 9px;font-size:10px" '
+        + 'onclick="prorReimprimir(\'' + r.chave + '\')">🖨 2ª via</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function prorReimpAbrir() {
+  var b = document.getElementById('prorBusca'); if (b) b.value = '';
+  var c = document.getElementById('prorIncEnc'); if (c) c.checked = true;
+  renderProrReimp();
+  openM('mProrReimp');
+}
+
+function prorReimprimir(chave) {
+  var r = _prorTodas().filter(function (x) { return x.chave === chave; })[0];
+  if (!r) { toast('⚠️ Prorrogação não encontrada', '#c0392b'); return; }
+  var p = r.pror;
+  // 🔴 Reimprimir NÃO altera a locação: só redesenha o documento a partir do
+  //    que já está gravado. O carimbo de 2ª via diz que é reimpressão.
+  var copia = Object.assign({}, r.ativo, { _prorEm: p.em || '' });
+  gerarTermoProrrogacao(copia, p.dataAnterior, p.novaData, p.obs, p.valor,
+    p.pgtoStatus, p.pgtoForma, true);
+  toast('🖨 2ª via do termo de ' + (r.ativo.clienteNome || 'locação'), '#0d7a3e');
+}
+
+/* Nova prorrogação: manda para o fluxo que já existe, que ALTERA a data de
+   devolução. Só locação ativa pode ser prorrogada. */
+function renderProrNova() {
+  var tb = document.getElementById('prorNovaTabela');
+  if (!tb) return;
+  var b = semAcento(((document.getElementById('prorNovaBusca') || {}).value || '').trim());
+  var lista = (db && db.ativos || []).filter(function (a) {
+    if (!a) return false;
+    if (!b) return true;
+    return semAcento([a.clienteNome, a.veiculoNome, a.placa].join(' ')).indexOf(b) >= 0;
+  });
+  var res = document.getElementById('prorNovaResumo');
+  if (res) res.textContent = lista.length + ' de ' + (db && db.ativos || []).length + ' aluguel(éis) ativo(s)';
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:18px">'
+      + 'Nenhum aluguel ativo encontrado</td></tr>';
+    return;
+  }
+  tb.innerHTML = lista.map(function (a) {
+    return '<tr>'
+      + '<td><strong>' + _axEsc(a.clienteNome || '—') + '</strong></td>'
+      + '<td>' + _axEsc(a.veiculoNome || '') + '<br><span style="color:var(--muted);font-size:10px">'
+        + _axEsc(a.placa || '') + '</span></td>'
+      + '<td>' + (a.devolucao ? fmt(a.devolucao) : '<span style="color:var(--muted)">contínuo</span>') + '</td>'
+      + '<td><button class="btn btn-blue" style="padding:4px 9px;font-size:10px" '
+        + 'onclick="prorNovaEscolher(\'' + String(a.id).replace(/'/g, "\\'") + '\')">Prorrogar</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function prorNovaAbrir() {
+  var b = document.getElementById('prorNovaBusca'); if (b) b.value = '';
+  renderProrNova();
+  openM('mProrNova');
+}
+
+function prorNovaEscolher(id) {
+  closeM('mProrNova');
+  openProrrogacao(id);
+}
+
+/* Recibo de pagamento (página avulsa, como os outros formulários) */
+function abrirReciboPagamento(comCliente) {
+  if (comCliente) {
+    if (_curCli < 0) { toast('Selecione um cliente primeiro', '#b45309'); return; }
+    var cl = (db.clients || [])[_curCli] || {};
+    var dados = {
+      nome: cl.nome || '', cpf: cl.cpf || '', tel: cl.telefone || '',
+      end: cl.endereco || '', bairro: cl.bairro || '', cidade: cl.cidade || '',
+      uf: cl.uf || '', cep: cl.cep || ''
+    };
+    try { localStorage.setItem('loka_contrato_client', JSON.stringify(dados)); } catch (e) {}
+  }
+  window.open('recibo.html', '_blank');
+}
+
 function openEncerramento(id) {
   garantirArray('ativos'); garantirArray('veiculos'); 
   _encId = id;
@@ -9957,6 +10163,14 @@ function preencherCliSel() {
 function gerarFormSelecionado() {
   var idx = parseInt(document.getElementById('fCliSel').value||'');
   var tipo = document.getElementById('fTipoSel').value;
+  // O recibo de pagamento não passa por abrirContrato: aquele registra em
+  // db.contratos, e recibo não é contrato — iria poluir a lista de Contratos
+  // (e o ✏️ da v124 não tem página para abrir num tipo 'recibo').
+  if (tipo === 'recibo') {
+    if (!isNaN(idx) && idx >= 0) { _curCli = idx; abrirReciboPagamento(true); }
+    else abrirReciboPagamento(false);
+    return;
+  }
   if (!isNaN(idx)&&idx>=0) { _curCli=idx; abrirContrato(tipo); }
   else { var f={diaria:'contrato-diaria.html',mensal:'contrato-mensal.html',reserva:'recibo-reserva.html',checklist:'checklist.html'}; window.open(f[tipo],'_blank'); }
 }
