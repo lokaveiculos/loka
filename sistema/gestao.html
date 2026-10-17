@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v126-20261016-1620 -->
+<!-- LOKA deploy: v127-20261017-0940 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1253,7 +1253,16 @@ tr:hover td{background:#f8f9fe;}
           <option value="par">par</option><option value="jg">jg (jogo)</option>
           <option value="L">L (litro)</option><option value="kg">kg</option><option value="m">m (metro)</option>
         </select></div>
-      <div class="fg"><label class="fl">Estoque m&iacute;nimo</label><input class="fi" id="axMinimo" type="number" min="0" step="1" placeholder="0"></div>
+      <div class="fg"><label class="fl">Estoque m&iacute;nimo <span style="font-weight:400;color:var(--muted)">(alerta)</span></label><input class="fi" id="axMinimo" type="number" min="0" step="1" placeholder="0"></div>
+    </div>
+    <div id="axQtdIniLinha" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Quantidade em estoque hoje</label>
+        <input class="fi" id="axQtdIni" placeholder="0"></div>
+      <div class="fg"><label class="fl">Custo unit&aacute;rio (R$) <span style="font-weight:400;color:var(--muted)">opcional</span></label>
+        <input class="fi" id="axCustoIni" placeholder="0,00"></div>
+    </div>
+    <div id="axSaldoAtualLinha" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 10px;font-size:11px;color:#1e40af;line-height:1.5">
+      <span id="axSaldoAtualTxt"></span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="fg"><label class="fl">Local no almoxarifado</label><input class="fi" id="axLocal" maxlength="40" placeholder="Ex: Prateleira A3"></div>
@@ -1261,9 +1270,10 @@ tr:hover td{background:#f8f9fe;}
     </div>
     <div class="fg"><label class="fl">Observa&ccedil;&atilde;o</label><input class="fi" id="axObs" maxlength="200" placeholder="Aplica&ccedil;&atilde;o, medida, equival&ecirc;ncia..."></div>
     <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5">
-      &#9888;&#65039; A quantidade em estoque <strong>n&atilde;o</strong> se digita aqui: ela vem das
-      <strong>entradas e sa&iacute;das</strong>. Para come&ccedil;ar com um saldo, cadastre a pe&ccedil;a e
-      lance uma <strong>entrada</strong>.
+      &#9888;&#65039; A quantidade informada aqui entra como <strong>entrada no extrato</strong>, com a
+      data de hoje &mdash; o saldo da pe&ccedil;a sempre vem das <strong>entradas e sa&iacute;das</strong>,
+      nunca de um n&uacute;mero digitado por cima. Depois de cadastrada, para mudar o saldo use
+      <strong>&#10133; Entrada</strong> ou <strong>&#10134; Sa&iacute;da</strong>.
     </div>
   </div>
   <div class="modal-foot">
@@ -1612,7 +1622,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v126-20261016-1620';
+var LOKA_BUILD = 'v127-20261017-0940';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -11049,6 +11059,23 @@ function axItemAbrir(idx) {
   v('axLocal', it ? it.local : '');
   v('axFornecedor', it ? it.fornecedor : '');
   v('axObs', it ? it.obs : '');
+  v('axQtdIni', '');
+  v('axCustoIni', '');
+
+  // 🔴 A quantidade inicial só existe no CADASTRO. Na edição ela viraria uma
+  //    entrada nova a cada vez que alguém corrigisse o nome ou o local da peça
+  //    — o estoque subiria sozinho. Editando, o campo dá lugar ao saldo atual.
+  var linhaQtd = document.getElementById('axQtdIniLinha');
+  var linhaSal = document.getElementById('axSaldoAtualLinha');
+  var txtSal = document.getElementById('axSaldoAtualTxt');
+  if (linhaQtd) linhaQtd.style.display = it ? 'none' : 'grid';
+  if (linhaSal) linhaSal.style.display = it ? 'block' : 'none';
+  if (txtSal && it) {
+    txtSal.innerHTML = 'Em estoque hoje: <strong>' + _axQtdTxt(axSaldo(it.id)) + ' '
+      + _axEsc(it.unidade || 'un') + '</strong> &mdash; para mudar, lance uma '
+      + '<strong>entrada</strong> ou <strong>saída</strong>, que ficam registradas no extrato.';
+  }
+
   var t = document.getElementById('axItemTitulo');
   if (t) t.textContent = it ? 'Editar peça' : 'Nova peça';
   openM('mAxItem');
@@ -11070,6 +11097,19 @@ function axItemSalvar() {
   })[0];
   if (dup) { toast('⚠️ Já existe uma peça com o código ' + codigo + ' (' + (dup.nome || '') + ')', '#c0392b'); return; }
 
+  // Quantidade inicial: só no cadastro novo (na edição o campo está escondido).
+  var ehNova = !(_axEdit !== null && lista[_axEdit]);
+  var qtdIniTxt = ehNova ? get('axQtdIni') : '';
+  var qtdIni = 0;
+  if (qtdIniTxt) {
+    // 🔴 Mesma regra da movimentação: _axNum('abc') devolve 0, então texto sem
+    //    dígito nenhum é erro de digitação, não "zero".
+    if (!/\d/.test(qtdIniTxt)) { toast('⚠️ A quantidade em estoque não parece um número', '#b45309'); return; }
+    qtdIni = _axNum(qtdIniTxt);
+    // Estoque não começa negativo. Quem tem acerto a fazer usa o Ajuste depois.
+    if (qtdIni < 0) { toast('⚠️ A quantidade em estoque não pode ser negativa', '#c0392b'); return; }
+  }
+
   var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
   var dados = {
     codigo: codigo, nome: nome, categoria: get('axCategoria'),
@@ -11077,20 +11117,47 @@ function axItemSalvar() {
     local: get('axLocal'), fornecedor: get('axFornecedor'), obs: get('axObs')
   };
 
-  if (_axEdit !== null && lista[_axEdit]) {
-    lista[_axEdit] = Object.assign({}, lista[_axEdit], dados);
-  } else {
+  var movIni = null;
+  if (ehNova) {
     dados.id = 'ax' + Date.now();
     dados.criadoEm = new Date().toISOString();
     dados.criadoPor = sess.nome || sess.usuario || '';
     lista.push(dados);
+
+    // 🔴 A quantidade digitada NÃO é gravada na ficha: ela vira uma entrada no
+    //    extrato. Assim o saldo continua sendo sempre a soma das movimentações,
+    //    e quem olhar o extrato daqui a um ano vê de onde esse saldo veio.
+    if (qtdIni > 0) {
+      var d = new Date();
+      movIni = {
+        id: 'axm' + Date.now(),
+        itemId: dados.id,
+        tipo: 'entrada',
+        qtd: qtdIni,
+        data: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
+        custo: _axNum(get('axCustoIni')),
+        placa: '',
+        motivo: 'Saldo inicial do cadastro',
+        quem: sess.nome || sess.usuario || '',
+        criadoEm: d.toISOString()
+      };
+      var movs = axMovs();
+      movs.push(movIni);
+      db.almox_mov = movs;
+    }
+  } else {
+    lista[_axEdit] = Object.assign({}, lista[_axEdit], dados);
   }
   db.almox = lista;
+  // 🔴 Uma gravação só: ficha e entrada juntas. Gravar em duas vezes poderia
+  //    deixar a entrada apontando para uma peça que não existe.
   saveDB();
   _axEdit = null;
   closeM('mAxItem');
   renderAlmox();
-  toast('✅ Peça salva', '#0d7a3e');
+  toast(movIni
+    ? '✅ Peça salva com ' + _axQtdTxt(qtdIni) + ' ' + (dados.unidade || 'un') + ' em estoque'
+    : '✅ Peça salva', '#0d7a3e');
 }
 
 function axItemExcluir(idx) {
