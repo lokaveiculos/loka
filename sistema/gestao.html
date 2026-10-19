@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v129-20261019-1140 -->
+<!-- LOKA deploy: v130-20261019-1225 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1672,7 +1672,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v129-20261019-1140';
+var LOKA_BUILD = 'v130-20261019-1225';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9215,6 +9215,10 @@ function recStatusPinta(cont){
       + 'border-radius:7px;border:1px solid ' + o.cor + ';'
       + (ligado ? 'background:' + o.cor + ';color:#fff;font-weight:700'
                 : 'background:#fff;color:' + o.cor + ';font-weight:600');
+    // Estado marcado também em atributo, não só na cor: é o que o leitor de
+    // tela anuncia, e é verificável sem depender de como o navegador
+    // normaliza a cor (ele reescreve #c0392b como rgb(192,57,43)).
+    b.setAttribute('aria-pressed', ligado ? 'true' : 'false');
     b.title = ligado ? 'Clique para tirar ' + o.rot + ' do filtro'
                      : 'Clique para mostrar só ' + o.rot + ' (soma com as outras marcadas)';
   });
