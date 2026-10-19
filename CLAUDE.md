@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v128-20261017-1120** |
+| `gestao.html` | **v132-20261019-1410** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -4638,3 +4638,100 @@ real, medido hoje, é **1.578**. Corrigido no registro.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir a `multas.html`, clicar no botão e gerar o
 relatório de hoje. Eu não autentico — a página tem portão próprio.
+
+---
+
+## ✅ Multi-seleção da situação no Contas a Receber — 19/10/2026 · gestao v129 → v132
+
+Pedido: *"no contas a receber permitir multi seleção no status"*.
+
+O `<select>` de uma situação só virou **quatro botões que somam**:
+⏳ Pendentes · ◑ Parciais · ✅ Recebidos · 🤝 Renegociadas.
+Nenhum marcado = **todas**, igual ao "Todos status" de antes. Um ✕ ao lado volta
+para todas.
+
+Cada botão mostra **quantos lançamentos aquela situação traria**, respeitando os
+outros filtros (busca, tipo, período) e **ignorando o próprio status** — o número
+diz o que se ganha ao clicar, não o que já está na tela. Hoje, nos dados reais:
+47 pendentes · 10 parciais · 25 recebidos · 19 renegociadas.
+
+### 🔴 Dois leitores, uma fonte só
+Quem lê esse filtro são **dois** lugares: a tela (`finRenderReceber`) e o
+**relatório impresso** (`relatorioReceber`) — e cada um tem o seu `statusReal`.
+Foi exatamente assim que a v119 imprimiu número errado.
+
+A seleção passou a morar em **`_recStatusFiltro()`**, e nenhum dos dois lê o DOM
+por conta própria. O cabeçalho do relatório nomeia **todas** as situações
+escolhidas ("Situações: Pendente, Parcial"), no singular quando é uma só.
+Há defeito injetado para o relatório divergir da tela.
+
+⚠️ As duas funções `statusReal` continuam duplicadas — é anterior a isto e não
+foi pedido. Mas agora há teste exigindo que a conta do relatório bata com a da
+tela, o que pega a divergência se uma das duas mudar sozinha.
+
+### O que NÃO mudou
+Os **cartões do topo** continuam somando **todos** os lançamentos: eles são o
+panorama com a composição explicada (v120–v122), não o recorte. Quem reflete o
+filtro é o **rodapé**, como já era.
+
+### 🔴 Eu troquei o desenho por uma medição errada, e voltei atrás (v131 → v132)
+Depois de publicar, medi a barra de filtros e vi **117px → 162px**: parecia que
+os quatro botões custavam uma linha inteira. Troquei tudo pelo padrão do filtro
+de órgão das Multas (um botão que abre painel com checkbox) e publiquei a v131.
+
+**A medição estava errada.** Para comparar "antes e depois" eu substituía a caixa
+de situação no markup com um regex — e o regex comia outros controles da barra.
+Eu comparei duas barras diferentes.
+
+Medido direito, buscando os arquivos **publicados** de cada versão e sem tocar no
+markup:
+
+| Versão | 900px | 1100px | 1300px |
+|---|---|---|---|
+| v128 (select antigo) | 160px | 160px | 157px |
+| v129 (4 botões) | 160px | 160px | 157px |
+| v131 (botão + painel) | 160px | 160px | 157px |
+
+**Idênticas.** Os botões não custavam linha nenhuma — a barra já tinha aquela
+altura com o `select`. A v132 reverte a v131 e volta aos botões, que mostram a
+contagem sem abrir nada e filtram com um clique.
+
+⚠️ **A lição:** medir "antes e depois" exige que o *antes* seja o arquivo real
+daquela versão. Markup remendado por regex para simular a versão antiga não é a
+versão antiga — e o número que sai dali decide errado. Buscar o arquivo publicado
+do commit anterior custa uma linha de `fetch`.
+
+Ficou do caminho: o `aria-pressed` (v130), que é útil por si — é o que o leitor de
+tela anuncia, e **o estado não pode ser verificado pela cor**: o navegador
+reescreve `#c0392b` como `rgb(192, 57, 43)`, então a conferência por texto do
+`cssText` passava no DOM falso e falhava no navegador de verdade.
+
+A medição está registrada em comentário no fonte, para a mesma dúvida não voltar.
+
+### Validado
+- `node --check`; `<div>` balanceadas (777/777); os dois carimbos batendo
+- **48 testes** com o código real e os **101 lançamentos reais**: estado inicial,
+  uma situação, duas (47+10=57), três (76), as quatro = nenhuma (101), desmarcar,
+  limpar, convivência com busca/tipo/período, a contagem de cada botão batendo com
+  a lista em cada combinação, o relatório concordando com a tela, o cabeçalho
+  impresso, lista vazia, lançamento nulo (com e sem situação marcada), situação
+  inexistente, e a v119 preservada
+- **19 defeitos injetados — todos acusados**, entre eles nenhuma marcada esconder
+  tudo, voltar a aceitar uma só, o relatório ler o DOM por conta própria, a
+  contagem circular e o nulo quebrando
+- **No ar, no arquivo publicado**: 47 → 57 → 76 → 29 → 101 conforme marca e
+  desmarca, botão marcado com fundo `rgb(192,57,43)` e `aria-pressed=true`, ✕
+  aparecendo e sumindo, e a barra medida em 900/1100/1300px
+- Regressão **medida**: **34 suítes, 1.626 testes**, nenhuma falha
+
+### ⚠️ Duas suítes antigas precisaram de conserto — e uma passava por motivo errado
+- `t-reneg.js` (a da v119) acionava o filtro pelo `<select>` que deixou de
+  existir. Um dos seus testes — *"filtrando só renegociadas, as linhas continuam
+  visíveis"* — **passava sem filtro nenhum aplicado**. Agora exercita o filtro de
+  verdade.
+- O elemento falso daquela suíte não tinha `style.cssText` nem `setAttribute`, e o
+  render estourava antes de qualquer teste. Completado.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o Contas a Receber, marcar duas situações e
+conferir a lista e o relatório impresso. Eu não autentico.
