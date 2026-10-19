@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v128-20261017-1120 -->
+<!-- LOKA deploy: v129-20261019-1140 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -954,13 +954,18 @@ tr:hover td{background:#f8f9fe;}
             <input class="filter-input" id="recDataFim" type="date" onchange="finRenderReceber()" style="width:130px;padding:5px">
             <button onclick="finLimparDataReceber()" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">✕</button>
           </div>
-          <select class="filter-sel" id="recStatus" onchange="finRenderReceber()">
-            <option value="">Todos status</option>
-            <option value="pendente">⏳ Pendentes</option>
-            <option value="parcial">◑ Parciais</option>
-            <option value="recebido">✅ Recebidos</option>
-            <option value="renegociado">🤝 Renegociadas</option>
-          </select>
+          <!-- Multi-seleção: com 4 situações, botões cabem na barra e mostram a
+               contagem sem precisar abrir nada. Painel com checkbox (como o dos
+               18 órgãos nas Multas) seria peso demais para quatro itens. -->
+          <div id="recStatusBox" style="display:flex;align-items:center;gap:4px;background:#f0f2f9;padding:4px 6px;border-radius:8px;flex-wrap:wrap">
+            <span style="font-size:10px;font-weight:700;color:var(--muted)">Situa&ccedil;&atilde;o</span>
+            <button type="button" class="btn" id="recSt-pendente"    onclick="recStatusToggle('pendente')"></button>
+            <button type="button" class="btn" id="recSt-parcial"     onclick="recStatusToggle('parcial')"></button>
+            <button type="button" class="btn" id="recSt-recebido"    onclick="recStatusToggle('recebido')"></button>
+            <button type="button" class="btn" id="recSt-renegociado" onclick="recStatusToggle('renegociado')"></button>
+            <button type="button" id="recStLimpar" onclick="recStatusTodos(false)" title="Mostrar todas as situa&ccedil;&otilde;es"
+                    style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;display:none">&#10005;</button>
+          </div>
           <select class="filter-sel" id="recTipo" onchange="finRenderReceber()">
             <option value="">Todos os tipos</option>
             <option value="Fatura">📄 Fatura</option>
@@ -1667,7 +1672,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v128-20261017-1120';
+var LOKA_BUILD = 'v129-20261019-1140';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9018,7 +9023,9 @@ function relatorioReceber(){
   var q = semAcento((document.getElementById('qReceber')&&document.getElementById('qReceber').value||''));
   var di = (document.getElementById('recDataIni')||{}).value||'';
   var df = (document.getElementById('recDataFim')||{}).value||'';
-  var fst = (document.getElementById('recStatus')||{}).value||'';
+  // 🔴 Mesma fonte da tela. Lendo o DOM por conta própria, o relatório voltaria
+  //    a divergir do que está na lista — foi o defeito da v119.
+  var fsts = _recStatusFiltro();
   var fTipo = (document.getElementById('recTipo')||{}).value||'';
 
   function statusReal(r){
@@ -9036,7 +9043,7 @@ function relatorioReceber(){
   var lista = rows.filter(function(r){
     if (!r) return false;
     var st = statusReal(r);
-    if (fst && st!==fst) return false;
+    if (fsts.length && fsts.indexOf(st)<0) return false;
     if (q && semAcento((r.cliente||'')).indexOf(q)<0) return false;
     if (fTipo && (r.tipo||'Outros')!==fTipo) return false;
     var dref = st==='recebido' ? (r.recebidoEm||r.vencimento) : r.vencimento;
@@ -9101,7 +9108,10 @@ function relatorioReceber(){
   // Descrição dos filtros aplicados
   var filtros = [];
   if (fTipo) filtros.push('Tipo: '+fTipo);
-  if (fst) filtros.push('Status: '+stLabel(fst));
+  // Lista TODAS as situações escolhidas: dizer só a primeira faria o papel
+  // impresso descrever um recorte diferente do que ele mostra.
+  if (fsts.length) filtros.push((fsts.length === 1 ? 'Situação: ' : 'Situações: ')
+    + fsts.map(stLabel).join(', '));
   if (di||df) filtros.push('Período: '+(di?fmtData(di):'…')+' a '+(df?fmtData(df):'…'));
   if (q) filtros.push('Busca: "'+q+'"');
   var filtroTxt = filtros.length ? filtros.join(' · ') : 'Todas as contas';
@@ -9149,6 +9159,69 @@ function relatorioReceber(){
   win.document.close();
 }
 
+/* ══════════ Filtro de situação em multi-seleção (Contas a Receber) ════════
+   Nenhuma situação marcada = TODAS, igual ao "Todos status" que havia antes.
+   🔴 Quem lê este filtro são DOIS lugares — a tela e o relatório impresso —,
+   e cada um tem o seu `statusReal`. Foi assim que a v119 produziu relatório
+   com número errado. Por isso a seleção mora numa função só: nenhum dos dois
+   lê o DOM por conta própria. */
+var _recStatusSel = [];
+
+var REC_STATUS_OPC = [
+  { k: 'pendente',    rot: 'Pendentes',    icone: '⏳', cor: '#c0392b' },
+  { k: 'parcial',     rot: 'Parciais',     icone: '◑',  cor: '#b45309' },
+  { k: 'recebido',    rot: 'Recebidos',    icone: '✅', cor: '#0d7a3e' },
+  { k: 'renegociado', rot: 'Renegociadas', icone: '🤝', cor: '#9d174d' }
+];
+
+function _recStatusFiltro(){ return (_recStatusSel || []).slice(); }
+
+function _recStatusRotulo(k){
+  for (var i = 0; i < REC_STATUS_OPC.length; i++) {
+    if (REC_STATUS_OPC[i].k === k) return REC_STATUS_OPC[i].rot;
+  }
+  return k;
+}
+
+function recStatusToggle(k){
+  if (!_recStatusSel) _recStatusSel = [];
+  var i = _recStatusSel.indexOf(k);
+  if (i >= 0) _recStatusSel.splice(i, 1); else _recStatusSel.push(k);
+  finRenderReceber();
+}
+
+function recStatusTodos(marcar){
+  // 🔴 "Marcar todas" e "nenhuma marcada" dão a MESMA lista. Deixar as quatro
+  //    marcadas seria um estado diferente na tela e igual no resultado — então
+  //    marcar todas volta para "todas", que é o estado limpo.
+  _recStatusSel = marcar ? [] : [];
+  finRenderReceber();
+}
+
+/* Pinta os botões com a contagem do que cada situação traria, respeitando os
+   OUTROS filtros (busca, tipo, período) e ignorando o próprio status — o
+   número tem de dizer o que se ganha ao clicar. */
+function recStatusPinta(cont){
+  cont = cont || {};
+  var sel = _recStatusFiltro();
+  REC_STATUS_OPC.forEach(function(o){
+    var b = document.getElementById('recSt-' + o.k);
+    if (!b) return;
+    var n = cont[o.k] || 0;
+    var ligado = sel.indexOf(o.k) >= 0;
+    b.innerHTML = o.icone + ' ' + o.rot
+      + ' <span style="opacity:.75;font-weight:700">' + n + '</span>';
+    b.style.cssText = 'font-size:10px;padding:4px 8px;white-space:nowrap;cursor:pointer;'
+      + 'border-radius:7px;border:1px solid ' + o.cor + ';'
+      + (ligado ? 'background:' + o.cor + ';color:#fff;font-weight:700'
+                : 'background:#fff;color:' + o.cor + ';font-weight:600');
+    b.title = ligado ? 'Clique para tirar ' + o.rot + ' do filtro'
+                     : 'Clique para mostrar só ' + o.rot + ' (soma com as outras marcadas)';
+  });
+  var x = document.getElementById('recStLimpar');
+  if (x) x.style.display = sel.length ? '' : 'none';
+}
+
 function finRenderReceber() {
   var grid = document.getElementById('finGridReceber');
   if (!grid) return;
@@ -9157,7 +9230,7 @@ function finRenderReceber() {
   var q = semAcento((document.getElementById('qReceber')&&document.getElementById('qReceber').value||''));
   var di = (document.getElementById('recDataIni')||{}).value||'';
   var df = (document.getElementById('recDataFim')||{}).value||'';
-  var fst = (document.getElementById('recStatus')||{}).value||'';
+  var fsts = _recStatusFiltro();
   var ordem = (document.getElementById('recOrdenar')||{}).value||'';
   var fTipo = (document.getElementById('recTipo')||{}).value||'';
 
@@ -9171,16 +9244,33 @@ function finRenderReceber() {
     return 'pendente';
   }
 
-  var visiveis = rows.map(function(r,idx){ return {r:r,idx:idx}; }).filter(function(o){
-    var r=o.r; if(!r) return false;
+  // Tudo menos a situação — é esta base que alimenta a contagem dos botões.
+  function passaBase(r){
+    if (!r) return false;
     var st = statusReal(r);
-    if (fst && st!==fst) return false;
     if (q && semAcento((r.cliente||'')).indexOf(q)<0) return false;
     if (fTipo && (r.tipo||'Outros')!==fTipo) return false;
     var dref = st==='recebido' ? (r.recebidoEm||r.vencimento) : r.vencimento;
     if (di && (!dref || dref < di)) return false;
     if (df && (!dref || dref > df)) return false;
     return true;
+  }
+
+  // A contagem de cada botão ignora o próprio filtro de situação: ela diz o
+  // que se GANHA ao marcar aquela situação, não o que já está na tela.
+  var contStatus = {};
+  rows.forEach(function(r){
+    if (!passaBase(r)) return;
+    var st = statusReal(r);
+    contStatus[st] = (contStatus[st] || 0) + 1;
+  });
+  recStatusPinta(contStatus);
+
+  var visiveis = rows.map(function(r,idx){ return {r:r,idx:idx}; }).filter(function(o){
+    var r=o.r; if(!r) return false;
+    // Nenhuma marcada = todas.
+    if (fsts.length && fsts.indexOf(statusReal(r))<0) return false;
+    return passaBase(r);
   });
 
   // Ordenação
