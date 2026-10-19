@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v130-20261019-1225 -->
+<!-- LOKA deploy: v131-20261019-1310 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -954,18 +954,13 @@ tr:hover td{background:#f8f9fe;}
             <input class="filter-input" id="recDataFim" type="date" onchange="finRenderReceber()" style="width:130px;padding:5px">
             <button onclick="finLimparDataReceber()" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">✕</button>
           </div>
-          <!-- Multi-seleção: com 4 situações, botões cabem na barra e mostram a
-               contagem sem precisar abrir nada. Painel com checkbox (como o dos
-               18 órgãos nas Multas) seria peso demais para quatro itens. -->
-          <div id="recStatusBox" style="display:flex;align-items:center;gap:4px;background:#f0f2f9;padding:4px 6px;border-radius:8px;flex-wrap:wrap">
-            <span style="font-size:10px;font-weight:700;color:var(--muted)">Situa&ccedil;&atilde;o</span>
-            <button type="button" class="btn" id="recSt-pendente"    onclick="recStatusToggle('pendente')"></button>
-            <button type="button" class="btn" id="recSt-parcial"     onclick="recStatusToggle('parcial')"></button>
-            <button type="button" class="btn" id="recSt-recebido"    onclick="recStatusToggle('recebido')"></button>
-            <button type="button" class="btn" id="recSt-renegociado" onclick="recStatusToggle('renegociado')"></button>
-            <button type="button" id="recStLimpar" onclick="recStatusTodos(false)" title="Mostrar todas as situa&ccedil;&otilde;es"
-                    style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700;display:none">&#10005;</button>
-          </div>
+          <!-- Multi-seleção no padrão do filtro de órgão das Multas: um botão
+               que diz o que está filtrado e abre um painel com checkbox.
+               ⚠️ Medido: quatro botões soltos aqui custavam uma LINHA INTEIRA
+               na barra (117px → 162px a 1100px de largura). Um botão só mantém
+               a barra na altura que ela tinha. -->
+          <button type="button" class="btn btn-outline" id="recBtnStatus" onclick="recStatusAbrir()"
+                  style="white-space:nowrap" aria-expanded="false">Todas as situa&ccedil;&otilde;es &#9662;</button>
           <select class="filter-sel" id="recTipo" onchange="finRenderReceber()">
             <option value="">Todos os tipos</option>
             <option value="Fatura">📄 Fatura</option>
@@ -990,6 +985,7 @@ tr:hover td{background:#f8f9fe;}
           <button class="btn" style="background:#0d7a3e;color:#fff;font-size:11px;white-space:nowrap" onclick="relatorioReceber()" title="Gerar relatório para imprimir ou PDF">📄 Relatório</button>
           <button class="btn btn-green" onclick="finAddLinha('receber')">+ Nova Conta</button>
         </div>
+        <div id="recPainelStatus" style="display:none;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;max-width:420px"></div>
         <div class="stats" id="receberStats" style="margin-bottom:12px"></div>
         <div id="finGridReceber"></div>
       </div>
@@ -1672,7 +1668,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v130-20261019-1225';
+var LOKA_BUILD = 'v131-20261019-1310';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9183,11 +9179,16 @@ function _recStatusRotulo(k){
   return k;
 }
 
+// Contagem por situação, guardada pelo render para o painel desenhar quando
+// for aberto, sem recalcular nem reler o DOM.
+var _recStatusCont = {};
+var _recStatusAberto = false;
+
 function recStatusToggle(k){
   if (!_recStatusSel) _recStatusSel = [];
   var i = _recStatusSel.indexOf(k);
   if (i >= 0) _recStatusSel.splice(i, 1); else _recStatusSel.push(k);
-  finRenderReceber();
+  finRenderReceber();          // recalcula as contagens e repinta o botão
 }
 
 function recStatusTodos(marcar){
@@ -9198,32 +9199,73 @@ function recStatusTodos(marcar){
   finRenderReceber();
 }
 
-/* Pinta os botões com a contagem do que cada situação traria, respeitando os
-   OUTROS filtros (busca, tipo, período) e ignorando o próprio status — o
-   número tem de dizer o que se ganha ao clicar. */
-function recStatusPinta(cont){
-  cont = cont || {};
+function recStatusAbrir(){
+  _recStatusAberto = !_recStatusAberto;
+  var p = document.getElementById('recPainelStatus');
+  if (p) p.style.display = _recStatusAberto ? 'block' : 'none';
+  var b = document.getElementById('recBtnStatus');
+  if (b) b.setAttribute('aria-expanded', _recStatusAberto ? 'true' : 'false');
+  if (_recStatusAberto) recStatusPainel();
+}
+
+function recStatusFechar(){
+  _recStatusAberto = false;
+  var p = document.getElementById('recPainelStatus');
+  if (p) p.style.display = 'none';
+  var b = document.getElementById('recBtnStatus');
+  if (b) b.setAttribute('aria-expanded', 'false');
+}
+
+/* O painel mostra, para cada situação, QUANTOS lançamentos ela traria —
+   respeitando os outros filtros (busca, tipo, período) e ignorando o próprio
+   status. O número tem de dizer o que se ganha ao marcar, não o que já está
+   na tela. */
+function recStatusPainel(){
+  var p = document.getElementById('recPainelStatus');
+  if (!p) return;
   var sel = _recStatusFiltro();
+  var cont = _recStatusCont || {};
+  var h = '<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">'
+        + '<strong style="font-size:11px;flex:1">Situa&ccedil;&otilde;es a mostrar</strong>'
+        + '<button type="button" class="btn btn-outline" style="font-size:10px;padding:4px 9px" onclick="recStatusTodos(false)">Todas</button>'
+        + '<button type="button" class="btn btn-outline" style="font-size:10px;padding:4px 9px" onclick="recStatusFechar()">&#10005; Fechar</button>'
+        + '</div>'
+        + '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">';
   REC_STATUS_OPC.forEach(function(o){
-    var b = document.getElementById('recSt-' + o.k);
-    if (!b) return;
-    var n = cont[o.k] || 0;
-    var ligado = sel.indexOf(o.k) >= 0;
-    b.innerHTML = o.icone + ' ' + o.rot
-      + ' <span style="opacity:.75;font-weight:700">' + n + '</span>';
-    b.style.cssText = 'font-size:10px;padding:4px 8px;white-space:nowrap;cursor:pointer;'
-      + 'border-radius:7px;border:1px solid ' + o.cor + ';'
-      + (ligado ? 'background:' + o.cor + ';color:#fff;font-weight:700'
-                : 'background:#fff;color:' + o.cor + ';font-weight:600');
-    // Estado marcado também em atributo, não só na cor: é o que o leitor de
-    // tela anuncia, e é verificável sem depender de como o navegador
-    // normaliza a cor (ele reescreve #c0392b como rgb(192,57,43)).
-    b.setAttribute('aria-pressed', ligado ? 'true' : 'false');
-    b.title = ligado ? 'Clique para tirar ' + o.rot + ' do filtro'
-                     : 'Clique para mostrar só ' + o.rot + ' (soma com as outras marcadas)';
+    var marcada = sel.indexOf(o.k) >= 0;
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid #eef0f8;cursor:pointer;font-size:11px">'
+      +  '<input type="checkbox" id="recSt-' + o.k + '" ' + (marcada ? 'checked' : '')
+      +  ' onchange="recStatusToggle(\'' + o.k + '\')">'
+      +  '<span style="flex:1;color:' + o.cor + ';font-weight:' + (marcada ? '700' : '600') + '">'
+      +  o.icone + ' ' + o.rot + '</span>'
+      +  '<span style="color:var(--muted);font-weight:700">' + (cont[o.k] || 0) + '</span></label>';
   });
-  var x = document.getElementById('recStLimpar');
-  if (x) x.style.display = sel.length ? '' : 'none';
+  h += '</div><div style="font-size:10px;color:var(--muted);margin-top:7px;line-height:1.5">'
+    + (sel.length
+        ? 'Mostrando ' + sel.length + ' de 4 situa&ccedil;&otilde;es. O n&uacute;mero ao lado &eacute; quanto cada uma traria.'
+        : 'Nenhuma marcada = <strong>todas</strong> aparecem.')
+    + '</div>';
+  p.innerHTML = h;
+}
+
+/* O botão diz o que está filtrado sem obrigar a abrir o painel. */
+function recStatusBotao(){
+  var b = document.getElementById('recBtnStatus');
+  if (!b) return;
+  var sel = _recStatusFiltro();
+  if (!sel.length) {
+    b.innerHTML = 'Todas as situa&ccedil;&otilde;es &#9662;';
+    b.style.fontWeight = '';
+    return;
+  }
+  b.innerHTML = (sel.length === 1 ? _recStatusRotulo(sel[0]) : sel.length + ' situa&ccedil;&otilde;es') + ' &#9662;';
+  b.style.fontWeight = '700';
+}
+
+function recStatusPinta(cont){
+  _recStatusCont = cont || {};
+  recStatusBotao();
+  if (_recStatusAberto) recStatusPainel();
 }
 
 function finRenderReceber() {
