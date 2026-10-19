@@ -53,7 +53,7 @@ DNS via Cloudflare.
 |---|---|
 | `gestao.html` | **v128-20261017-1120** |
 | `fatura.html` | **v82-20261013-0910** |
-| `multas.html` | **v14-20261014-2300** |
+| `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
 
@@ -4477,7 +4477,7 @@ A busca usa `semAcento` **nos dois lados**, e dá para esconder as encerradas.
   real** (105 ativos, 92 encerrados): 39 prorrogações, documento de uma locação
   **encerrada**, com carimbo, `saveDB` armado para estourar se fosse chamado —
   **o banco ficou byte a byte idêntico**
-- Regressão: **33 suítes, 1.616 testes**, nenhuma falha
+- Regressão: **33 suítes**, nenhuma falha (⚠️ o total de testes que eu anotei aqui, 1.616, foi conta minha somando duas vezes; o número medido é **1.578**, conferido em 19/10)
 
 ### ⚠️ Cinco testes meus passaram com defeito vivo — e o que cada um ensinou
 Na injeção, 5 defeitos não foram acusados na primeira rodada:

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v14-20261014-2300 -->
+<!-- LOKA deploy: v15-20261019-1030 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multas · LOKÁ</title>
@@ -157,6 +157,9 @@
       <button class="btn btn-green"  id="btnConsultar" onclick="efConsultarFrota()">🔄 Consultar toda a frota</button>
       <button class="btn btn-ghost"  id="btnDiag"      onclick="efDiagnostico()">🩺 Diagnóstico</button>
       <button class="btn btn-ghost"  id="btnDiagBanco" onclick="efDiagnosticoBanco()">🗄 Testar o banco (grátis)</button>
+      <!-- Fora do setBtns de propósito: ler o que já entrou é grátis e não
+           conflita com a varredura em andamento. -->
+      <button class="btn btn-ghost"  id="btnRelatorios" onclick="efAbrirRelatorios()">📄 Relatório de multas novas</button>
     </div>
     <div class="status-line" id="statusLine"></div>
   </div>
@@ -164,6 +167,7 @@
   <!-- Painel de status / seletor de placas / log — migrados do gestao.html -->
   <div id="efStatusCard"></div>
   <div id="efSeletor"></div>
+  <div id="efRelatorios"></div>
   <div id="efLog"></div>
 
   <div id="configWarn" class="note" style="display:none">
@@ -212,7 +216,7 @@ var dbRef = firebase.database();
 var FN_REGION = 'southamerica-east1';
 
 // Carimbo de versão — precisa bater com o comentário da linha 4.
-var LOKA_BUILD = 'v14-20261014-2300';
+var LOKA_BUILD = 'v15-20261019-1030';
 try { console.log('%cLOKÁ Multas — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // Retrato do loka_db (veiculos, ativos, multas, efrotas_status).
@@ -644,75 +648,128 @@ function _efRodarLote(){
 // O backend devolve só a CONTAGEM de novas, não a lista. Para saber QUAIS
 // multas entraram, o relatório usa o carimbo de início da varredura e pega as
 // de origem 'efrotas' criadas dali para cá. Por isso _efLote guarda `quando`.
+/* ══════════ Relatório das multas novas de cada varredura ══════════════════
+   O botão do fim da varredura (abaixo) só existe no instante em que ela
+   termina: recarregou a página, fechou a aba ou voltou amanhã → acabou.
+   🔴 E o `loka_db/efrotas_status` NÃO serve para reconstruir: ele é
+   sobrescrito a cada LOTE, então guarda os contadores do último lote.
+   Medido em 19/10/2026: o nó dizia `novas: 0` e tinham entrado 13 multas.
+   Por isso as varreduras são reconstruídas das PRÓPRIAS multas: as de
+   `origem === 'efrotas'` agrupadas pela proximidade do `criadoEm`.        */
+
+var EF_REL_CORTE_MIN = 30;   // intervalo que separa uma varredura da seguinte
+
 function _efRelMultasDaVarredura(){
   var desde = _efLote && _efLote.quando;
   if (!desde) return [];
   return _arr(DB && DB.multas).filter(function(m){
     return m && m.origem === 'efrotas' && String(m.criadoEm || '') >= desde;
-  }).sort(function(a,b){
-    return String(a.placa||'').localeCompare(String(b.placa||''))
-        || String(a.dataInfracao||'').localeCompare(String(b.dataInfracao||''));
-  });
+  }).sort(_efRelOrdem);
 }
 
-function efGerarRelatorio(){
-  var novas = _efRelMultasDaVarredura();
-  var L = _efLote || {};
-  var ini = L.quando ? new Date(L.quando) : new Date();
-  var esc = function(s){
-    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  };
-  // Numero ja vem pronto: no banco o valor e 195.23, e ali o ponto e DECIMAL.
-  // Tratar tudo como texto no formato BR (ponto = milhar) transformava
-  // 195.23 em 19523 — o relatorio mostraria R$ 19.523,00.
-  var money = function(v){
-    var n = (typeof v === 'number') ? v
-          : Number(String(v == null ? 0 : v).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.')) || 0;
-    return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-  };
-  var dataBR = function(s){
-    if (!s) return '—';
-    s = String(s).slice(0,10);
-    var p = s.split('-');
-    return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
-  };
-  var _v = function(x){
-    return (typeof x === 'number') ? x
-         : Number(String(x == null ? 0 : x).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.')) || 0;
-  };
-  var total = novas.reduce(function(a,m){ return a + _v(m.valor); }, 0);
+function _efRelOrdem(a, b){
+  return String(a.placa||'').localeCompare(String(b.placa||''))
+      || String(a.dataInfracao||'').localeCompare(String(b.dataInfracao||''));
+}
 
-  var cards = [
-    ['Placas consultadas', L.total || 0, '#0E1B4D'],
-    ['Multas novas',       L.novas || 0, '#c0392b'],
-    ['Atualizadas',        L.atualizadas || 0, '#b45309'],
-    ['Baixadas como pagas',L.baixadas || 0, '#0d7a3e'],
-    ['Placas com erro',    L.erros || 0, (L.erros ? '#c0392b' : '#5a607a')]
-  ].map(function(c){
-    return '<div class="card"><div class="cv" style="color:'+c[2]+'">'+c[1]+'</div><div class="cl">'+c[0]+'</div></div>';
+/* Agrupa as multas do e-Frotas em varreduras. Devolve da mais recente para a
+   mais antiga. ⚠️ Só entra `origem === 'efrotas'`: multa de PDF não veio de
+   consulta e não pode aparecer num relatório de varredura. */
+function _efVarreduras(){
+  var lista = _arr(DB && DB.multas).filter(function(m){
+    return m && m.origem === 'efrotas' && m.criadoEm;
+  }).sort(function(a,b){ return String(a.criadoEm).localeCompare(String(b.criadoEm)); });
+
+  var grupos = [], atual = null;
+  lista.forEach(function(m){
+    var t = new Date(m.criadoEm).getTime();
+    if (isNaN(t)) return;
+    if (atual && (t - atual._ult) / 60000 <= EF_REL_CORTE_MIN) {
+      atual.multas.push(m); atual._ult = t;
+    } else {
+      atual = { inicio: m.criadoEm, _ult: t, multas: [m] };
+      grupos.push(atual);
+    }
+  });
+
+  return grupos.map(function(g){
+    var placas = {}, total = 0;
+    g.multas.forEach(function(m){
+      if (m.placa) placas[_efNormPlaca(m.placa)] = true;
+      total += _efRelNum(m.valor);
+    });
+    return {
+      inicio: g.inicio,
+      fim: g.multas[g.multas.length - 1].criadoEm,
+      multas: g.multas.slice().sort(_efRelOrdem),
+      placas: Object.keys(placas).length,
+      total: Math.round(total * 100) / 100
+    };
+  }).reverse();
+}
+
+function _efRelNum(v){
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  var n = Number(String(v == null ? 0 : v).replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function _efRelDin(v){
+  return 'R$ ' + _efRelNum(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function _efRelEsc(s){
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function _efRelDataBR(s){
+  if (!s) return '—';
+  s = String(s).slice(0,10);
+  var p = s.split('-');
+  return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+}
+
+function _efRelQuando(s){
+  if (!s) return '—';
+  var d = new Date(s);
+  return isNaN(d) ? String(s) : d.toLocaleString('pt-BR');
+}
+
+/* ── O documento ────────────────────────────────────────────────────────────
+   Um só gerador para os dois caminhos. Duas cópias envelheceriam em ritmos
+   diferentes — foi o que produziu o relatório com "renegociado" errado
+   (v119): duas funções `statusReal`, uma aprendeu e a outra não.          */
+function _efRelDoc(o){
+  var novas = o.novas || [];
+  var total = novas.reduce(function(a,m){ return a + _efRelNum(m.valor); }, 0);
+
+  var cards = (o.cards || []).map(function(c){
+    return '<div class="card"><div class="cv" style="color:'+c[2]+'">'+c[1]+'</div>'
+         + '<div class="cl">'+_efRelEsc(c[0])+'</div></div>';
   }).join('');
 
   var linhas = novas.length
     ? novas.map(function(m){
-        return '<tr><td>'+esc(m.placa||'—')+'</td><td>'+esc(m.veiculoNome||'—')+'</td>'
-          + '<td>'+esc(m.ait||'—')+'</td><td>'+dataBR(m.dataInfracao)
-          + (m.horaInfracao ? ' '+esc(m.horaInfracao) : '')+'</td>'
-          + '<td>'+esc(m.descricao||'—')+'</td>'
-          + '<td>'+esc(m.orgao||'—')+'</td>'
-          + '<td>'+esc(m.clienteNome||'não identificado')+'</td>'
-          + '<td class="r">'+money(m.valor)+'</td></tr>';
+        return '<tr><td>'+_efRelEsc(m.placa||'—')+'</td><td>'+_efRelEsc(m.veiculoNome||'—')+'</td>'
+          + '<td>'+_efRelEsc(m.ait||'—')+'</td><td>'+_efRelDataBR(m.dataInfracao)
+          + (m.horaInfracao ? ' '+_efRelEsc(m.horaInfracao) : '')+'</td>'
+          + '<td>'+_efRelEsc(m.descricao||'—')+'</td>'
+          + '<td>'+_efRelEsc(m.orgao||'—')+'</td>'
+          + '<td>'+_efRelEsc(m.clienteNome||'não identificado')+'</td>'
+          + '<td class="r">'+_efRelDin(m.valor)+'</td></tr>';
       }).join('')
     : '<tr><td colspan="8" class="vazio">Nenhuma multa nova nesta varredura.</td></tr>';
 
   // As placas que falharam entram no relatório: sem elas o documento daria a
   // entender que a frota inteira foi consultada com sucesso.
   var errosHtml = '';
-  var lista = L.errosLista || [];
+  var lista = o.errosLista || [];
   if (lista.length) {
     errosHtml = '<h2>Placas com erro — ' + lista.length + '</h2>'
       + '<table><thead><tr><th>Placa</th><th>Motivo</th></tr></thead><tbody>'
       + lista.map(function(e){
-          return '<tr><td>'+esc(e.placa || e.Placa || '—')+'</td><td>'+esc(e.erro || e.motivo || e.msg || '—')+'</td></tr>';
+          return '<tr><td>'+_efRelEsc(e.placa || e.Placa || '—')+'</td>'
+               + '<td>'+_efRelEsc(e.erro || e.motivo || e.msg || '—')+'</td></tr>';
         }).join('')
       + '</tbody></table>'
       + '<p class="obs">Estas placas não foram consultadas com sucesso — as multas delas podem não estar no total acima.</p>';
@@ -733,24 +790,125 @@ function efGerarRelatorio(){
     + 'td.vazio{text-align:center;color:#555;padding:14px}'
     + 'tfoot td{font-weight:700;background:#f8fafc}'
     + 'p.obs{font-size:10px;color:#555;margin:4px 0 0}'
+    + 'p.fonte{font-size:9.5px;color:#555;border-top:1px solid #e2e8f0;margin-top:16px;padding-top:8px;line-height:1.5}'
     + '@media print{@page{size:A4 landscape;margin:11mm}}'
     + '</style></head><body>'
-    + '<h1>Consulta e-Frotas — relatório da varredura</h1>'
-    + '<p class="sub">LOKÁ Aluguel de Veículos · varredura iniciada em '
-      + ini.toLocaleString('pt-BR') + ' · relatório emitido em ' + new Date().toLocaleString('pt-BR') + '</p>'
+    + '<h1>' + _efRelEsc(o.titulo || 'Consulta e-Frotas — relatório da varredura') + '</h1>'
+    + '<p class="sub">' + _efRelEsc(o.subtitulo || '') + '</p>'
     + '<div class="cards">' + cards + '</div>'
     + '<h2>Multas novas — ' + novas.length + '</h2>'
     + '<table><thead><tr><th>Placa</th><th>Veículo</th><th>AIT</th><th>Data</th>'
     + '<th>Infração</th><th>Órgão</th><th>Locatário</th><th class="r">Valor</th></tr></thead>'
     + '<tbody>' + linhas + '</tbody>'
-    + (novas.length ? '<tfoot><tr><td colspan="7">Total das multas novas</td><td class="r">' + money(total) + '</td></tr></tfoot>' : '')
+    + (novas.length ? '<tfoot><tr><td colspan="7">Total das multas novas</td><td class="r">' + _efRelDin(total) + '</td></tr></tfoot>' : '')
     + '</table>'
     + errosHtml
+    + (o.fonte ? '<p class="fonte">' + o.fonte + '</p>' : '')
     + '<script>window.onload=function(){window.print();}<\/script></body></html>';
 
   var w = window.open('', '_blank');
-  if (!w) { toast('O navegador bloqueou a janela de impressão', '#b45309'); return; }
+  if (!w) { toast('O navegador bloqueou a janela de impressão', '#b45309'); return false; }
   w.document.write(h); w.document.close();
+  return true;
+}
+
+/* ── Caminho 1: logo depois da varredura (tem os contadores da sessão) ──── */
+function efGerarRelatorio(){
+  var L = _efLote || {};
+  var ini = L.quando ? new Date(L.quando) : new Date();
+  return _efRelDoc({
+    novas: _efRelMultasDaVarredura(),
+    errosLista: L.errosLista || [],
+    titulo: 'Consulta e-Frotas — relatório da varredura',
+    subtitulo: 'LOKÁ Aluguel de Veículos · varredura iniciada em '
+      + ini.toLocaleString('pt-BR') + ' · relatório emitido em ' + new Date().toLocaleString('pt-BR'),
+    cards: [
+      ['Placas consultadas', L.total || 0, '#0E1B4D'],
+      ['Multas novas',       L.novas || 0, '#c0392b'],
+      ['Atualizadas',        L.atualizadas || 0, '#b45309'],
+      ['Baixadas como pagas',L.baixadas || 0, '#0d7a3e'],
+      ['Placas com erro',    L.erros || 0, (L.erros ? '#c0392b' : '#5a607a')]
+    ]
+  });
+}
+
+/* ── Caminho 2: qualquer varredura, a qualquer momento ───────────────────
+   🔴 Aqui os contadores de placas consultadas / atualizadas / com erro NÃO
+   existem: eles só viviam na sessão de quem rodou. Em vez de inventar (ou
+   de repetir os do `efrotas_status`, que são do último lote e mentiriam),
+   o documento mostra só o que é verdade — as multas — e DIZ de onde veio. */
+function efRelatorioVarredura(i){
+  var vs = _efVarreduras();
+  var v = vs[i];
+  if (!v) { toast('⚠️ Varredura não encontrada', '#c0392b'); return false; }
+  var mesmaHora = String(v.inicio).slice(0,10) === String(v.fim).slice(0,10);
+  return _efRelDoc({
+    novas: v.multas,
+    errosLista: [],
+    titulo: 'Consulta e-Frotas — multas novas de ' + _efRelDataBR(v.inicio),
+    subtitulo: 'LOKÁ Aluguel de Veículos · multas gravadas entre '
+      + _efRelQuando(v.inicio) + ' e ' + (mesmaHora ? String(v.fim).slice(11,16) : _efRelQuando(v.fim))
+      + ' · relatório emitido em ' + new Date().toLocaleString('pt-BR'),
+    cards: [
+      ['Multas novas',     v.multas.length, '#c0392b'],
+      ['Placas diferentes', v.placas, '#0E1B4D'],
+      ['Valor total',      _efRelDin(v.total), '#b45309']
+    ],
+    fonte: '<strong>De onde vêm estes números:</strong> da própria lista de multas do sistema — as de '
+      + 'origem e-Frotas gravadas nesse intervalo. Quantas placas foram consultadas, quantas multas '
+      + 'foram atualizadas e quais placas deram erro <strong>não ficam guardados</strong> no banco '
+      + 'depois que a consulta termina, então não constam aqui. Esses dados aparecem no relatório '
+      + 'gerado logo ao fim da varredura.'
+  });
+}
+
+/* ── A janela de escolha ─────────────────────────────────────────────────── */
+function efAbrirRelatorios(){
+  var alvo = document.getElementById('efRelatorios');
+  if (!alvo) return;
+  var vs = _efVarreduras();
+
+  if (!vs.length) {
+    alvo.innerHTML = '<div class="note" style="margin-top:12px">'
+      + '<strong>📄 Relatório de multas novas</strong><br>'
+      + 'Nenhuma multa do e-Frotas foi gravada ainda, então não há varredura para relatar. '
+      + 'Depois de <strong>🔄 Consultar toda a frota</strong>, o relatório fica disponível aqui.'
+      + '<div style="margin-top:8px"><button class="btn btn-outline" style="font-size:11px;padding:5px 11px" '
+      + 'onclick="efFecharRelatorios()">Fechar</button></div></div>';
+    return;
+  }
+
+  var linhas = vs.map(function(v, i){
+    var mesmoDia = String(v.inicio).slice(0,10) === String(v.fim).slice(0,10);
+    return '<tr>'
+      + '<td>' + (i === 0 ? '<strong>' + _efRelDataBR(v.inicio) + '</strong> <span style="color:var(--green);font-size:9px;font-weight:700">MAIS RECENTE</span>' : _efRelDataBR(v.inicio)) + '</td>'
+      + '<td>' + String(v.inicio).slice(11,16) + (mesmoDia ? '–' + String(v.fim).slice(11,16) : '') + '</td>'
+      + '<td style="text-align:right"><strong>' + v.multas.length + '</strong></td>'
+      + '<td style="text-align:right">' + v.placas + '</td>'
+      + '<td style="text-align:right">' + _efRelDin(v.total) + '</td>'
+      + '<td><button class="btn btn-blue" style="font-size:10px;padding:4px 9px" '
+      + 'onclick="efRelatorioVarredura(' + i + ')">📄 Gerar</button></td>'
+      + '</tr>';
+  }).join('');
+
+  alvo.innerHTML = '<div class="note" style="margin-top:12px">'
+    + '<strong>📄 Relatório de multas novas por varredura</strong>'
+    + '<p style="font-size:11px;color:var(--muted);margin:6px 0 10px;line-height:1.5">'
+    + 'Cada linha é uma consulta ao e-Frotas, reconstruída a partir das multas que ela trouxe '
+    + '(agrupadas por proximidade de horário, corte de ' + EF_REL_CORTE_MIN + ' min). '
+    + 'Multa importada de PDF não entra aqui — só o que veio da consulta.</p>'
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+    + '<thead><tr style="background:var(--dark)">'
+    + '<th>Data</th><th>Hora</th><th style="text-align:right">Multas</th>'
+    + '<th style="text-align:right">Placas</th><th style="text-align:right">Valor</th><th></th>'
+    + '</tr></thead><tbody>' + linhas + '</tbody></table></div>'
+    + '<div style="margin-top:10px"><button class="btn btn-outline" style="font-size:11px;padding:5px 11px" '
+    + 'onclick="efFecharRelatorios()">Fechar</button></div></div>';
+}
+
+function efFecharRelatorios(){
+  var alvo = document.getElementById('efRelatorios');
+  if (alvo) alvo.innerHTML = '';
 }
 
 // ── Seletor de placas ─────────────────────────────────────────
