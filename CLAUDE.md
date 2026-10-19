@@ -4512,3 +4512,129 @@ mexer naquele gerador, vale refazê-la.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir Formulários, emitir um recibo de verdade e tirar
 uma 2ª via de um termo. Eu não autentico.
+
+---
+
+## ✅ Relatório das multas novas de qualquer varredura — 19/10/2026 · multas v15
+
+Pedido: *"um botão que gere o relatório de multas novas a cada vez que fizermos
+a consulta no e-Frotas"*.
+
+### O relatório já existia — o que faltava era chegar nele
+`efGerarRelatorio()` existe desde 30/09, mas o botão só era desenhado **dentro
+do log**, no instante em que a varredura terminava. Recarregou a página, fechou a
+aba ou voltou no dia seguinte: o `_efLote` zerava e não havia mais como gerar.
+
+Agora há um **botão fixo na barra do e-Frotas** — "📄 Relatório de multas novas" —
+que abre a lista das varreduras e gera o relatório de qualquer uma.
+
+⚠️ O botão **não entra no `setBtns`** de propósito: ler o que já está gravado é
+grátis e não conflita com uma varredura em andamento.
+
+### 🔴 Por que NÃO usei o `loka_db/efrotas_status`
+Era o caminho óbvio, e está errado. Aquele nó é **sobrescrito a cada LOTE**, e
+alguns campos são do último lote enquanto outros são acumulados. Medido em
+19/10/2026, logo depois de uma varredura real:
+
+| `efrotas_status` dizia | A verdade |
+|---|---|
+| `novas: 0` | **13 multas** gravadas entre 12:19 e 12:21 |
+| `placasConsultadas: 9` | 109 placas processadas (`processadosAteAgora`) |
+
+Um relatório lido dali diria "0 multas novas" com 13 linhas na tabela.
+
+### A fonte certa: as próprias multas
+As varreduras são **reconstruídas** das multas de `origem === 'efrotas'`,
+agrupadas pela proximidade do `criadoEm` (corte de **30 min**, constante
+`EF_REL_CORTE_MIN`). Funciona **retroativamente** — todo o histórico aparece, sem
+depender de nada que o backend passe a gravar.
+
+Conferido no banco real (638 multas, 297 do e-Frotas):
+
+| Data | Multas | Placas | Valor |
+|---|---|---|---|
+| 19/10 12:19 | 13 | 12 | R$ 2.701,34 |
+| 14/10 17:56 | 13 | 12 | R$ 2.245,83 |
+| 07/10 19:39 | 17 | 13 | R$ 2.506,17 |
+| 30/09 18:02 | 9 | 8 | R$ 2.116,92 |
+| 25/09 14:58 | 8 | 8 | R$ 1.171,42 |
+| 24/09 12:42 | 11 | 9 | R$ 1.887,29 |
+| 15/09 19:42 | 55 | 26 | R$ 11.851,72 |
+| 18/08 19:18 | 171 | 54 | R$ 42.107,22 |
+
+🔴 **A invariante que mantém isso honesto:** a soma das varreduras tem de dar
+exatamente o total de multas do e-Frotas com `criadoEm` — **297 = 297**, nenhuma
+perdida, nenhuma em duas listas. É teste, e há defeito injetado para ela.
+
+⚠️ O corte é de multa para multa, **não** do início da varredura: a de 18/08
+durou 15 minutos, e medir do início a partiria em duas.
+
+⚠️ Multa importada de **PDF nunca entra** — ela não veio de consulta. A janela diz
+isso, e um defeito injetado prova que o filtro pega.
+
+### 🔴 O relatório histórico não imprime número que não sabe
+Placas consultadas, atualizadas, baixadas e placas com erro **só existiam na
+sessão** de quem rodou a varredura. No relatório histórico eles **não aparecem** —
+nem inventados, nem repetidos do `efrotas_status`. O documento mostra o que é
+verdade (multas novas · placas diferentes · valor total) e traz uma nota dizendo
+**de onde vêm os números** e o que não ficou guardado.
+
+É o mesmo padrão dos cartões do Contas a Receber (v120–v122): quando um total
+embute algo que o olho não vê, a tela **diz**, em vez de o código decidir.
+
+O relatório gerado **ao fim da varredura** continua completo, com os 5 contadores
+e a tabela das placas com erro.
+
+### Um gerador, não dois
+O documento foi extraído para **`_efRelDoc(o)`**, usado pelos dois caminhos.
+⚠️ Duplicar o HTML seria repetir o acidente da v119: havia **duas** funções
+`statusReal`, uma aprendeu sobre `renegociado` e a outra não — e o relatório
+impresso era justamente o que errava.
+
+### Validado
+- `node --check`; `<div>` balanceadas (24/24); os dois carimbos batendo
+- **os 48 testes que já cobriam o relatório da sessão continuam passando** — é o
+  que prova que o refactor não mexeu no caminho que funcionava
+- **57 testes novos** com o código real e as 638 multas reais: as 8 varreduras, a
+  ordem, a invariante dos 297, nenhuma multa em duas listas, PDF fora, o corte de
+  29 × 31 min, banco vazio, `criadoEm` ausente/vazio/**nulo**/inválido, lista
+  vindo como objeto do Firebase, placa com hífen, o documento inteiro, escape de
+  HTML, valor numérico (195.23 → R$ 195,23), as recusas, a janela nos dois
+  estados e o caminho da sessão intacto
+- **23 defeitos injetados — todos acusados**, entre eles PDF entrando, medir do
+  início, corte de 1 min, ordem invertida, imprimir "Placas consultadas", parar de
+  dizer de onde vem, pop-up fingindo sucesso, e o relatório da sessão perdendo os
+  contadores
+- **No ar, no arquivo publicado, com o banco real** (só leitura): 8 varreduras
+  listadas, a de hoje marcada como mais recente, documento de 13 linhas com
+  título "multas novas de 19/10/2026", total, a nota de origem, e **zero**
+  menção a "Placas consultadas"
+- Regressão **medida**: **33 suítes, 1.578 testes**, nenhuma falha
+
+### ⚠️ Um teste meu passou com defeito vivo
+Tirar a guarda `&& m.criadoEm` do filtro **não foi acusado** na primeira rodada.
+Parecia inerte, porque o `isNaN` adiante já descarta `undefined` e `''`. Mas
+`new Date(null)` é **1970-01-01, válido** — uma multa com `criadoEm: null` passava
+e era **absorvida na varredura anterior** (a diferença fica negativa e passa no
+corte), saindo no relatório como linha sem data. O teste passou a cobrir `null`
+separadamente, e a asserção é sobre **quantas multas entram**, não sobre a data da
+varredura.
+
+### ⚠️ Correção de um número que eu anotei errado
+A linha "33 suítes, **1.616** testes" do registro de 17/10 era **conta somada duas
+vezes** — eu adicionei à mão uma suíte que já estava no total medido. O número
+real, medido hoje, é **1.578**. Corrigido no registro.
+
+⚠️ **Regra:** número de teste que vai para o registro é o que a regressão
+**imprime**, nunca soma feita de cabeça.
+
+### O que ficaria para depois (não foi pedido)
+- **Gravar o resumo de cada varredura** (`efrotas_varreduras[]`) ao rodar, para o
+  relatório histórico também ter placas consultadas e placas com erro. Exige uma
+  porta de escrita nova na `multas.html` — decisão do Rogel.
+- O mesmo botão no `gestao.html` **não** faz sentido: o painel e-Frotas de lá é
+  código morto (`ni-efrotas` não está no menu).
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir a `multas.html`, clicar no botão e gerar o
+relatório de hoje. Eu não autentico — a página tem portão próprio.
