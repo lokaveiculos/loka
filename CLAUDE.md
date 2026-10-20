@@ -4846,3 +4846,133 @@ já são). Virar campo na aba de Sinistros é trabalho separado, se ele quiser.
 ### ✅ Conferido logado — 20/10/2026
 O Rogel abriu o contrato e conferiu as duas cláusulas no documento. Nada a
 ajustar.
+
+---
+
+## ✅ Sinistros: cobrança de reparo abaixo da franquia — 20/10/2026 (`987cc66`) · gestao v133
+
+A Cláusula 11ª passou a prever (hoje, mensal v4 / diária v4) que veículo devolvido
+avariado cujo conserto **não atinja a franquia** é reparado em oficina credenciada
+e o orçamento é cobrado do locatário, **incluindo as diárias em que o carro ficar
+parado**. A aba de Ocorrências só sabia cobrar **franquia** — o registro de ontem
+já anotava isso como trabalho separado.
+
+### 🔴 As duas cobranças são MUTUAMENTE EXCLUSIVAS
+Dois motivos apontam para o mesmo lado:
+1. **O contrato cobra uma OU outra**: conserto alcança a franquia → seguro, cobra-se
+   a franquia; não alcança → cobra-se orçamento + diárias.
+2. **O lançamento em Contas a Receber é UM por ocorrência**, achado por
+   `sinistroId`. Duas marcadas criariam duas cobranças disputando o mesmo
+   registro, e **uma apagaria a outra em silêncio**.
+
+Marcar uma desmarca a outra e avisa. A validação recusa as duas de novo ao salvar
+— esconder botão não é controle, e o checkbox pode ser mexido por fora.
+
+⚠️ `_snMostrarCobrancas()` existe **só** para mostrar/esconder as caixas, separado
+dos dois handlers. Sem essa separação, `snAlternarFranquia` e `snAlternarReparo`
+se chamariam de volta — há defeito injetado que prova a recursão.
+
+### O orçamento reusa o campo que já existia
+O campo **Custo do reparo** (`snCustoReparo`) já estava no formulário, sem uso
+nenhum além de registro. Ele passou a ser a **base da cobrança**.
+
+⚠️ **Dois campos para o mesmo conserto virariam dois números concorrentes**, e um
+deles ficaria velho. É a mesma razão pela qual o saldo do Almoxarifado não é
+digitado e o total do recibo não tem campo próprio.
+
+A conta é `orçamento + (dias × diária)`, mostrada ao vivo na tela com as três
+partes à vista, para quem preenche conferir sem fazer conta de cabeça.
+
+### A diária vem do cadastro, e não atropela quem digitou
+Ao escolher o veículo, a diária do cadastro entra no campo — **mas só quando ele
+está vazio**. Se o operador já ajustou o valor, trocar o veículo não apaga o que
+ele digitou. Veículo sem `diaria` cadastrada deixa o campo em branco (2 dos 119).
+
+### 🔴 Uma função para as duas cobranças
+`_sinSincronizarFranquia` virou **`_sinSincronizarCobranca`**, e quanto/por que
+cada ocorrência cobra saiu para **`_sinCobranca(reg)`**.
+
+⚠️ Duplicar a lógica foi exatamente o acidente da **v119**: havia **duas**
+`statusReal`, uma aprendeu sobre `renegociado` e a outra não — e o relatório
+impresso era o que errava. Aqui tela e relatório leem a mesma função.
+
+As proteções continuam valendo, agora para as duas cobranças: lançamento com
+**recebimento** (parcial ou total) **não é reescrito nem apagado**, inclusive ao
+**trocar de tipo de cobrança** — seria perder dinheiro já registrado. O aviso diz
+o que fazer.
+
+### 🔴 O lançamento passa a nascer com tipo "Avarias"
+Antes ele nascia **sem tipo** e caía em **"Outros"** no filtro do Contas a Receber.
+`'Avarias'` já existe em `REC_TIPOS` e na `<option>` do filtro.
+
+⚠️ Conferido antes: **nenhum lançamento de sinistro existia** (zero entradas com
+`sinistroId`), então o carimbo não mexe em dado nenhum. Editar **carimba** um
+lançamento que esteja sem tipo — senão a cobrança ficaria fora do filtro para
+sempre; há teste e defeito injetado só para isso.
+
+### Painel, coluna e relatório somam as DUAS
+O cartão virou **"A cobrar dos locatários"**, a coluna **"A cobrar"** (dizendo
+embaixo se é *franquia* ou *reparo + diárias*) e o rodapé do relatório **"Total a
+cobrar dos locatários"**.
+
+🔴 Somando só a franquia, uma ocorrência com cobrança de reparo apareceria como
+**"—" e R$ 0** — a tela mentiria sobre o que há para receber. É o mesmo defeito que
+o relatado na v119, e está entre os injetados.
+
+### Validação (a lição do `mltNum('abc') = 0`)
+| Recusa | Por quê |
+|---|---|
+| orçamento **sem dígito** | `mltNum('abc')` devolve **0**, e 0 passaria calado |
+| orçamento **zero**, mesmo com diárias preenchidas | sem conserto não há diária de carro parado para conserto |
+| **dias parado > 0 sem valor de diária** | cobraria R$ 0,00 por dia sem ninguém notar |
+| **as duas cobranças** marcadas | o lançamento é um por ocorrência |
+
+Zero dias parado **salva** — pode não ter ficado parado.
+
+### A importação nunca aceita cobrança de fora
+O código `LOKA-SIN::` é um texto que qualquer um monta à mão. `reparoDevido`,
+`reparoDias`, `reparoDiariaValor` e `reparoVencimento` entram **sempre vazios**,
+como `franquiaDevida` já fazia: **cobrar o locatário é decisão da LOKÁ, caso a
+caso**, e quem está na rua registra o fato, não decide a cobrança.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**784/784**; eram 777, +7 do bloco
+  novo); os dois carimbos batendo
+- **85 testes novos** com o código real: a conta em 7 entradas, a exclusividade
+  nos dois sentidos, as 6 recusas, o registro, o lançamento (valor, tipo,
+  vencimento, `sinistroId`, histórico mostrando a conta), editar sem duplicar,
+  **trocar de tipo de cobrança nos dois sentidos**, as 4 faces da proteção do que
+  já foi recebido, excluir, `confirm` recusado, cartão/coluna/relatório, reabrir,
+  a diária do cadastro, a importação e lista vindo como objeto do Firebase
+- **os 72 testes da suíte de Sinistros (v99) continuam passando** — é o que prova
+  que a franquia não mudou de comportamento
+- **32 defeitos injetados — todos acusados**, entre eles somar as duas cobranças,
+  esquecer as diárias, esquecer o orçamento, o cartão e o relatório somando só a
+  franquia, reescrever lançamento já recebido, a diária atropelando o operador, a
+  importação aceitando cobrança de fora, e a recursão entre os handlers
+- **No ar, no arquivo publicado**, com os **119 veículos, 106 aluguéis e 101
+  lançamentos reais**, sem firebase no ambiente (**nada gravado em produção** —
+  conferido relendo o banco: segue com 5 ocorrências e 101 lançamentos):
+  VW Amarok RHI1I58, locatário resolvido sozinho, diária 600,00 vinda do cadastro,
+  1.350,00 + 4 × 600,00 = **R$ 3.750,00**, lançamento `Avarias` pendente no nome
+  certo; editar para 2 dias → **R$ 2.550,00 no mesmo lançamento** (102 → 102);
+  recebimento parcial → valor **intacto** com o aviso; cartão, coluna e relatório
+  batendo com a soma feita por fora
+- Regressão **medida**: **36 suítes, 1.753 testes**, nenhuma falha
+
+### ⚠️ Quatro testes meus passaram com defeito vivo
+| O que passou | Por que o teste era fraco |
+|---|---|
+| aceitar **orçamento zero** | eu testava com dias/diária vazios, e aí o `total <= 0` já barrava. O caso que só essa guarda pega é orçamento 0 **com** diárias |
+| **editar não carimbar o tipo** | meus lançamentos eram sempre criados pelo código novo, que já põe `Avarias`. O caso real é lançamento **sem tipo** |
+| importação lendo **dias/diária** de fora | a asserção aceitava "contém `''`" — e `d.reparoDias\|\|''` também contém. Passou a exigir o valor **exatamente** `''` |
+| a **recursão** entre handlers | minha injeção era inerte: trocar o fim de um handler pelo outro não fecha ciclo. O ciclo real é `_snMostrarCobrancas` chamar os handlers |
+
+⚠️ Mais um tropeço de montagem: inseri um teste novo **entre o preparo e a
+asserção** do teste seguinte, e ele passou a falhar por contaminação de estado.
+Teste que falha pelo motivo errado ensina a ignorar teste vermelho.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir uma ocorrência, marcar "Conserto não atinge a
+franquia", preencher orçamento e dias parado e conferir a cobrança em Contas a
+Receber, com o tipo **Avarias**. Eu não autentico.
