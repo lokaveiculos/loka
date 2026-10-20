@@ -56,6 +56,8 @@ DNS via Cloudflare.
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
+| `contrato-mensal.html` | **mensal-v4-20261020-0910** |
+| `contrato-diaria.html` | **diaria-v4-20261020-0910** |
 
 ## Modelo de dados — `loka_db`
 
@@ -4735,3 +4737,112 @@ A medição está registrada em comentário no fonte, para a mesma dúvida não 
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir o Contas a Receber, marcar duas situações e
 conferir a lista e o relatório impresso. Eu não autentico.
+
+---
+
+## ✅ Cláusulas 10 e 11 dos contratos — 20/10/2026 · mensal v4 · diária v4
+
+Pedido: acrescentar à **Cláusula 11** o caso do veículo devolvido avariado cujo
+conserto não atinge a franquia, e mudar o prazo de devolução da caução da
+**Cláusula 10** para **10 dias**.
+
+### As duas cláusulas existem nos DOIS contratos
+`contrato-mensal.html` e `contrato-diaria.html` têm **Cláusula 10ª – Da Caução**
+e **Cláusula 11ª – Do Seguro** com a mesma redação de base. As alterações
+entraram nos dois: deixar um contrato dizendo 72h e o outro 10 dias seria pior
+que não mexer.
+
+⚠️ **Conferido antes de editar:** esse texto **não existe em nenhuma outra
+página**. A única menção a "Cláusula 11" fora dos contratos é um **comentário**
+no `gestao.html` (de onde vieram os tipos de sinistro) — nada funcional depende
+do texto.
+
+### Cláusula 10 — só o prazo mudou
+`em até 72h` → **`em até 10 (dez) dias`**. O resto da frase ficou intacto
+(Cartão de Crédito/PIX, avaliação física, verificação de multas e pedágios).
+
+🔴 **A diária tem uma frase que o mensal não tem** — "caso o veículo seja
+devolvido sujo, a caução somente será devolvida após lavagem" — e ela **não podia
+ser tocada** ao mexer no prazo. Há teste dos dois lados: a frase continua na
+diária, e **não** apareceu no mensal.
+
+O número vai escrito **e por extenso** ("10 (dez) dias"): em contrato, algarismo
+sozinho é o que se contesta depois.
+
+### Cláusula 11 — o acréscimo
+> Caso o veículo seja devolvido avariado e o valor do conserto não atinja o valor
+> da franquia do seguro, o reparo será realizado em oficina credenciada e o
+> respectivo orçamento será cobrado do LOCATÁRIO, incluindo o valor referente às
+> diárias em que o veículo necessitar permanecer parado para a realização dos
+> serviços.
+
+A redação é a do Rogel, ajustada à linguagem do próprio documento — que trata as
+partes como **LOCATÁRIO / LOCADOR em maiúscula** (conferido na Cláusula 3ª).
+
+🔴 **Entrou DENTRO do parágrafo da Cláusula 11ª, não como cláusula nova.**
+Cláusula nova renumeraria o contrato — e há defeito injetado que prova que o
+teste pega isso (a numeração passou a ser verificada sequencial, 1…13 no mensal e
+1…15 na diária).
+
+As **4 franquias continuam lá**, com os **4 campos editáveis** (`c11Danos`,
+`c11PerdaTotal`, `c11Parabrisa`, `c11Farois`) e a formatação de moeda
+(`moedaClausula`) — isso é testado, porque o acréscimo foi colado no mesmo
+parágrafo onde eles vivem.
+
+### Cabe no A4 — medido, não suposto
+O acréscimo tem ~330 caracteres, e em 16/10 houve ajuste explícito para o
+contrato caber numa folha. Medido no navegador, com as regras de `@media print`
+aplicadas e comparando com o **arquivo v3 real do commit anterior**:
+
+| | altura | páginas A4 | sobra |
+|---|---|---|---|
+| mensal v3 | 922px | 0,86 | 148px |
+| **mensal v4** | **930px** (+8) | **0,87** | **140px** |
+| diária v3 | 957px | 0,89 | 113px |
+| **diária v4** | **972px** (+15) | **0,91** | **98px** |
+
+A4 útil = **726 × 1070px** (A4 menos a margem de 7mm 9mm do `@page`).
+Os dois continuam em **uma folha**, sem transbordar a largura.
+
+⚠️ A medição é do formulário **em branco** (sem linhas de veículo, e sem os
+scripts — o portão de sessão redirecionaria o iframe). Com muitos veículos o
+documento cresce; a diária é a que tem menos folga (98px).
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (mensal 45/45, diária 48/48 —
+  iguais ao registro da v124); os **três** carimbos de cada arquivo batendo
+- **42 testes** que travam a **redação**, não só a presença: o prazo em
+  "10 (dez) dias", nenhum "72h" sobrando, a frase do veículo sujo só na diária,
+  as 5 partes do acréscimo (condição, gatilho, oficina credenciada, cobrança do
+  LOCATÁRIO, diárias do veículo parado), o texto **idêntico nos dois contratos**,
+  as 4 franquias, os 4 campos editáveis, a numeração sequencial e o ponto final
+- **18 defeitos injetados — todos acusados**, entre eles voltar para 72h, trocar
+  a condição para *"atinja"* a franquia, esquecer as diárias, não dizer de quem é
+  a cobrança, o acréscimo entrar num contrato e não no outro, e virar cláusula
+  própria
+- **No ar, nos arquivos publicados**, parseados pelo navegador: builds v4, o
+  texto das duas cláusulas, o acréscimo idêntico nos dois, 4 franquias e os 4
+  valores (5.000,00 / 5.000,00 / 800,00 / 600,00) intactos
+- Regressão **medida**: **35 suítes, 1.668 testes**, nenhuma falha
+
+### ⚠️ Dois tropeços meus de verificação (os dois pegos por recusa, não por sorte)
+1. O script de alteração **recusou aplicar** porque esperava 2 carimbos e achou
+   3 — há um terceiro no `console.log` de cada contrato. Melhor parar e conferir
+   do que trocar só dois e publicar com carimbo desencontrado.
+2. A primeira medição de A4 deu **1070px para as quatro versões** — número limpo
+   e medição nenhuma: o iframe tinha a altura de **uma página**, então o
+   `scrollHeight` empatava com o contêiner. Com altura folgada (6000px) os
+   números passaram a variar. É a mesma família do erro de ontem: **medida que
+   não varia entre versões diferentes não está medindo.**
+
+### ⚠️ O que o sistema ainda NÃO faz com essa cláusula nova (não foi pedido)
+A aba **Ocorrências / Sinistros** só tem o campo de **franquia**
+(`franquiaDevida` / `franquiaValor`), que gera o lançamento em Contas a Receber.
+A cobrança que a cláusula nova descreve — **orçamento do reparo + diárias do
+veículo parado** — não tem campo próprio: hoje ela entra como lançamento manual
+em Contas a Receber, tipo **Avarias** (que é o que os 17 lançamentos desse tipo
+já são). Virar campo na aba de Sinistros é trabalho separado, se ele quiser.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir um contrato pelo painel Formulários e conferir as
+duas cláusulas no documento impresso. A página exige sessão e eu não autentico.
