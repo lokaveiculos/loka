@@ -4843,6 +4843,6 @@ veículo parado** — não tem campo próprio: hoje ela entra como lançamento m
 em Contas a Receber, tipo **Avarias** (que é o que os 17 lançamentos desse tipo
 já são). Virar campo na aba de Sinistros é trabalho separado, se ele quiser.
 
-### ⏳ Não verificado
-Falta **logado**: o Rogel abrir um contrato pelo painel Formulários e conferir as
-duas cláusulas no documento impresso. A página exige sessão e eu não autentico.
+### ✅ Conferido logado — 20/10/2026
+O Rogel abriu o contrato e conferiu as duas cláusulas no documento. Nada a
+ajustar.
