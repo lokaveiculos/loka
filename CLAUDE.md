@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v132-20261019-1410** |
+| `gestao.html` | **v134-20261020-1210** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -4976,3 +4976,106 @@ Teste que falha pelo motivo errado ensina a ignorar teste vermelho.
 Falta **logado**: o Rogel abrir uma ocorrência, marcar "Conserto não atinge a
 franquia", preencher orçamento e dias parado e conferir a cobrança em Contas a
 Receber, com o tipo **Avarias**. Eu não autentico.
+
+---
+
+## ✅ Menu reorganizado por característica — 20/10/2026 · gestao v134
+
+Pedido: *"reorganize o menu conforme característica. Exemplo. na aba financeiro
+incluir Fatura."*
+
+### O que estava errado
+A seção **"Documentos"** tinha **13 dos 20 itens**, e a maioria não era documento
+nenhum: Manutenção, Fornecedores, Multas, Agenda, Almoxarifado e o próprio
+Financeiro moravam ali. Sobravam duas seções quase vazias ("Principal" com 5,
+"Público" com 3). Na prática o menu era uma lista só.
+
+### As 7 seções
+| Seção | Itens |
+|---|---|
+| **Principal** | Dashboard |
+| **Locação** | Aluguéis Ativos · Aluguéis Encerrados · Contratos Gerados |
+| **Financeiro** | **Faturas** · Faturamento/Veículo · Contas a Receber / Pagar · Multas · Multas e-Frotas |
+| **Frota** | Veículos · Frota Ativa · Manutenção · Almoxarifado · Ocorrências / Sinistros |
+| **Cadastros** | Clientes · Fornecedores |
+| **Ferramentas** | Agenda · Formulários · Relatório |
+| **Público** | Reservas · Pré-Cadastro |
+
+**Faturas no Financeiro** é o exemplo que ele deu.
+
+**Multas entram no Financeiro** por serem fluxo de dinheiro — baixa como paga,
+cobrada do locatário, recebida do cliente, recibo —, não por serem papel de
+trâmite. É a característica que o operador usa; se ele preferir em Frota, é mover
+uma linha.
+
+⚠️ **"Público" foi mantida de propósito:** Reservas e Pré-Cadastro são os
+**únicos painéis alimentados por página sem login** (pendência 7). Espalhá-los em
+Locação e Cadastros perderia exatamente essa distinção.
+
+🔴 **Nenhum painel nasce, morre ou troca de função.** Mudou a ordem e os
+cabeçalhos — e o teste trava isso: todo painel de `_TODOS_PAINEIS` tem item no
+menu, todo item é painel, nenhum repetido. **Perder um item aqui tira o painel do
+sistema**, porque para vários deles o menu é a única porta.
+
+### "Financeiro > Financeiro" não se lê
+O item do painel `financeiro` virou **"Contas a Receber / Pagar"** — que é o que
+o painel é (receber, pagar, acertos). Mudou nos **três** lugares: menu, título do
+painel (`TITLES`) e tela de perfis (`_PAINEL_LABEL`). Há teste exigindo que os
+três digam a mesma coisa; a chave gravada (`financeiro`) **não mudou**, então
+nenhum perfil salvo é afetado.
+
+### 🔴 O cabeçalho acompanha os itens
+Com 7 seções, cabeçalho sem item visível vira **título solto com nada embaixo**.
+O perfil **Oficina** vê 1 painel: ficaria com 6 títulos vazios. (Com 3 seções isso
+já acontecia e passava; com 7, não passaria.)
+
+Entrou **`_ajustarSecoesMenu()`**, que caminha pelos filhos do `nav` e esconde o
+cabeçalho quando nenhum item entre ele e o próximo está visível.
+
+⚠️ **Chamada no fim do `_aplicarPermissoesUI`, DEPOIS de o Relatório receber a
+permissão** — ele não está em `_TODOS_PAINEIS` e é o único item de "Ferramentas"
+que depende de **ação** (`verRelatorio`), não de painel. Chamar antes decidiria o
+cabeçalho com o display velho. **Eu errei essa ordem na primeira versão** e
+corrigi antes de publicar; há defeito injetado para ela.
+
+🔴 **Esconder usa `display:none`, mas MOSTRAR limpa o estilo inline** em vez de
+pôr `'block'`. No celular o CSS esconde `.nav-sec` de propósito (linha 173 — o
+menu virou barra horizontal), e um `block` inline **venceria aquela regra**,
+enchendo a barra do celular de títulos. Medido no navegador a 420px: cabeçalho
+`none`, inline vazio.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**788/788**; eram 784, +4 — 7
+  cabeçalhos novos menos os 3 antigos); os dois carimbos batendo
+- **55 testes**: as 7 seções na ordem, cada um dos 21 itens na seção certa,
+  nenhum item perdido/repetido/sem painel, o `efrotas` morto seguindo fora do
+  menu, os 3 rótulos do financeiro iguais, o `onclick` de cada item, o ícone, e o
+  ajuste de cabeçalho rodando a **função real** para master / Oficina / Clientes /
+  sem Relatório / sem painel nenhum, mais `nav` ausente e filho sem classe
+- **21 defeitos injetados — todos acusados**, entre eles **perder um item do
+  menu**, duplicar, tirar Faturas do Financeiro, o cabeçalho não acompanhar os
+  itens, o ajuste rodar antes do Relatório, e o `'block'` que quebraria o celular
+- **No ar, no arquivo publicado**, montando a sidebar real com o CSS real e
+  rodando a `_ajustarSecoesMenu` publicada: master **7** seções · Oficina
+  **Frota + Ferramentas** · Clientes **Financeiro + Frota + Ferramentas** · sem
+  Relatório **só Frota** · sem painel **nenhuma** · e volta a 7 quando os painéis
+  voltam. A 420px o cabeçalho continua escondido pelo CSS, com o inline vazio.
+- Regressão **medida**: **37 suítes, 1.808 testes**, nenhuma falha
+
+### ⚠️ Duas suítes travavam o NÚMERO do build
+`t-sinreparo` (e depois a própria `t-menu`) exigiam literalmente
+`v133-20261020-1050`. Publicar a v134 fez a suíte da v133 **falhar sem defeito
+nenhum** — é a armadilha do teste estrutural ancorado no vizinho, de novo.
+
+A regra do CLAUDE.md é **"os DOIS carimbos batem"**, não "o carimbo é vNNN". As
+duas passaram a comparar linha 4 **com** `LOKA_BUILD`, sem número fixo; o defeito
+injetado "os carimbos deixam de bater" continua sendo acusado.
+
+⚠️ E o heredoc comeu os escapes **mais uma vez** ao tentar fazer essa troca por
+script (`\n` virou quebra de linha de verdade dentro da string do teste). Para
+texto com escape, **ferramenta de escrita — nunca heredoc.**
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o sistema e ver o menu novo. Eu não autentico.
+Se alguma seção não fizer sentido para o jeito dele trabalhar, mover item entre
+seções é uma linha.
