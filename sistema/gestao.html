@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v132-20261019-1410 -->
+<!-- LOKA deploy: v133-20261020-1050 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1677,7 +1677,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v132-20261019-1410';
+var LOKA_BUILD = 'v133-20261020-1050';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7641,15 +7641,18 @@ function renderSinistros(){
     var nAb = todos.filter(function(s){ return s && (s.status||'aberto')==='aberto'; }).length;
     var nAn = todos.filter(function(s){ return s && s.status==='em_analise'; }).length;
     var nRe = todos.filter(function(s){ return s && s.status==='reparo'; }).length;
+    // 🔴 Soma as DUAS cobranças. Somando só a franquia, uma ocorrência com
+    //    cobrança de reparo apareceria como R$ 0 — a tela mentiria sobre o
+    //    que há para receber.
     var aReceber = todos.reduce(function(acc,s){
-      if (!s || !s.franquiaDevida) return acc;
-      return acc + mltNum(s.franquiaValor);
+      var c = s ? _sinCobranca(s) : null;
+      return acc + (c ? c.valor : 0);
     }, 0);
     st.innerHTML =
       '<div class="stat" style="border-left-color:#c0392b"><div class="stat-value">'+nAb+'</div><div class="stat-label">Abertos</div></div>'+
       '<div class="stat" style="border-left-color:#b45309"><div class="stat-value">'+nAn+'</div><div class="stat-label">Em análise</div></div>'+
       '<div class="stat" style="border-left-color:#7c3aed"><div class="stat-value">'+nRe+'</div><div class="stat-label">Em reparo</div></div>'+
-      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:16px">'+fmtBRL(aReceber)+'</div><div class="stat-label">Franquia a cobrar</div></div>';
+      '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:16px">'+fmtBRL(aReceber)+'</div><div class="stat-label">A cobrar dos locatários</div></div>';
   }
 
   var grid = document.getElementById('sinGrid');
@@ -7674,15 +7677,17 @@ function renderSinistros(){
     + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:820px">'
     + '<thead><tr style="background:var(--dark)">'
       + th('Veículo') + th('Data', 'text-align:center') + th('Tipo')
-      + th('Ocorrência') + th('Condutor') + th('Franquia', 'text-align:right')
+      + th('Ocorrência') + th('Condutor') + th('A cobrar', 'text-align:right')
       + th('Status') + th('Ações', 'text-align:center')
     + '</tr></thead><tbody>'
     + list.slice().sort(function(a,b){
         return String(b.data||'').localeCompare(String(a.data||''));
       }).map(function(s){
       var stt = s.status || 'aberto';
-      var fr  = s.franquiaDevida
-        ? '<strong style="color:#8a5a00">'+fmtBRL(s.franquiaValor)+'</strong>'
+      var cob = _sinCobranca(s);
+      var fr  = cob
+        ? '<strong style="color:'+(cob.rotulo==='reparo'?'#1e40af':'#8a5a00')+'">'+fmtBRL(cob.valor)+'</strong>'
+          + '<br><span style="font-size:9px;color:var(--muted)">'+(cob.rotulo==='reparo'?'reparo + diárias':'franquia')+'</span>'
           + (s.receberId ? '<br><span style="font-size:9px;color:#0d7a3e;font-weight:700">✓ lançada</span>' : '')
         : '—';
       return '<tr style="border-bottom:1px solid #f0f2f8">'
@@ -7757,6 +7762,12 @@ function snAoTrocarVeiculo(){
   var v = (db.veiculos||[]).filter(Boolean).find(function(x){ return x.id===vid; });
   if (!vid || !v) { box.style.display = 'none'; return; }
   _snSet('snBuscaPlaca', v.placa||'');
+  // A diária vem do cadastro, mas só preenche quando está vazia: se o operador
+  // já ajustou o valor, trocar o veículo não pode apagar o que ele digitou.
+  if (!_snGet('snReparoDiaria') && Number(v.diaria) > 0) {
+    _snSet('snReparoDiaria', fmtBRL(v.diaria).replace('R$', '').trim());
+    snCalcReparo();
+  }
   var loc = _locatariaAtual(v.placa, v.id);
   box.style.display = 'block';
   if (loc && loc.clienteNome) {
@@ -7768,10 +7779,69 @@ function snAoTrocarVeiculo(){
   }
 }
 
+// Só mostra/esconde. Separado dos handlers para eles poderem desmarcar o
+// outro sem se chamarem de volta (recursão infinita).
+function _snMostrarCobrancas(){
+  var f  = document.getElementById('snFranquiaDevida');
+  var r  = document.getElementById('snReparoDevido');
+  var bf = document.getElementById('snFranquiaCampos');
+  var br = document.getElementById('snReparoCampos');
+  if (bf) bf.style.display = (f && f.checked) ? 'block' : 'none';
+  if (br) br.style.display = (r && r.checked) ? 'block' : 'none';
+}
+
+// 🔴 As duas cobranças são MUTUAMENTE EXCLUSIVAS, por dois motivos que apontam
+//    para o mesmo lado:
+//    1) o contrato (Cláusula 11ª) cobra a franquia quando o conserto a alcança,
+//       e o orçamento + diárias quando NÃO alcança — nunca os dois;
+//    2) o lançamento em Contas a Receber é UM por ocorrência, achado por
+//       sinistroId. Dois marcados criariam duas cobranças disputando o mesmo
+//       registro, e uma apagaria a outra em silêncio.
 function snAlternarFranquia(){
-  var ck = document.getElementById('snFranquiaDevida');
-  var bx = document.getElementById('snFranquiaCampos');
-  if (bx) bx.style.display = (ck && ck.checked) ? 'block' : 'none';
+  var f = document.getElementById('snFranquiaDevida');
+  var r = document.getElementById('snReparoDevido');
+  if (f && f.checked && r && r.checked) {
+    r.checked = false;
+    toast('A cobrança é uma só: desmarquei o reparo abaixo da franquia.', '#b45309');
+  }
+  _snMostrarCobrancas();
+}
+
+function snAlternarReparo(){
+  var f = document.getElementById('snFranquiaDevida');
+  var r = document.getElementById('snReparoDevido');
+  if (r && r.checked && f && f.checked) {
+    f.checked = false;
+    toast('A cobrança é uma só: desmarquei a franquia.', '#b45309');
+  }
+  _snMostrarCobrancas();
+  snCalcReparo();
+}
+
+// Orçamento + (dias × diária). O orçamento é o "Custo do reparo" do próprio
+// formulário: dois campos para o mesmo conserto virariam dois números
+// concorrentes, e um deles ficaria velho.
+function _snReparoTotal(){
+  var orc   = mltNum(_snGet('snCustoReparo'));
+  var dias  = mltNum(_snGet('snReparoDias'));
+  var diar  = mltNum(_snGet('snReparoDiaria'));
+  var paradas = Math.round(dias * diar * 100) / 100;
+  return { orcamento: orc, dias: dias, diaria: diar, paradas: paradas,
+           total: Math.round((orc + paradas) * 100) / 100 };
+}
+
+function snCalcReparo(){
+  var el = document.getElementById('snReparoTotal');
+  if (!el) return;
+  var c = _snReparoTotal();
+  if (!c.total) {
+    el.innerHTML = '<span style="color:var(--muted)">Informe o <strong>Custo do reparo</strong> acima e os dias parados.</span>';
+    return;
+  }
+  el.innerHTML = 'Or&ccedil;amento <strong>' + fmtBRL(c.orcamento) + '</strong>'
+    + (c.paradas ? ' + ' + c.dias + ' di&aacute;ria(s) de ' + fmtBRL(c.diaria)
+        + ' = <strong>' + fmtBRL(c.paradas) + '</strong>' : '')
+    + ' &rarr; a cobrar <strong style="font-size:14px">' + fmtBRL(c.total) + '</strong>';
 }
 
 function openSinistro(id){
@@ -7802,16 +7872,22 @@ function openSinistro(id){
   _snSet('snCustoReparo',s ? (s.custoReparo||'') : '');
   _snSet('snFranquiaValor', s ? (s.franquiaValor||'') : '');
   _snSet('snFranquiaVenc',  s ? (s.franquiaVencimento||'') : '');
+  _snSet('snReparoDias',   s ? (s.reparoDias||'') : '');
+  _snSet('snReparoDiaria', s ? (s.reparoDiariaValor||'') : '');
+  _snSet('snReparoVenc',   s ? (s.reparoVencimento||'') : '');
   var ck = document.getElementById('snFranquiaDevida');
   if (ck) ck.checked = !!(s && s.franquiaDevida);
-  snAlternarFranquia();
+  var cr = document.getElementById('snReparoDevido');
+  if (cr) cr.checked = !!(s && s.reparoDevido);
+  _snMostrarCobrancas();
+  snCalcReparo();
   _snSet('snObs', s ? (s.obs||'') : '');
 
   snAoTrocarVeiculo();
   openM('mSinistro');
 }
 
-// ── FRANQUIA → CONTAS A RECEBER ───────────────────────────────
+// ── COBRANÇA DA OCORRÊNCIA → CONTAS A RECEBER ─────────────────
 // O lançamento carrega sinistroId, e é por ele que o encontramos de novo.
 // Sem essa marca, editar criaria um segundo lançamento a cada salvamento.
 function _sinReceberLista(){
@@ -7830,39 +7906,76 @@ function _sinRecebido(r){
   return !!(r && (r.status === 'recebido' || mltNum(r.recebido) > 0));
 }
 
-function _sinSincronizarFranquia(reg){
+// Quanto e por que esta ocorrência cobra. Uma função só para as duas
+// cobranças: duas cópias envelheceriam em ritmos diferentes — foi assim que a
+// v119 acabou com duas `statusReal`, uma sabendo de "renegociado" e a outra não.
+function _sinCobranca(reg){
+  if (reg.franquiaDevida) {
+    return {
+      valor: mltNum(reg.franquiaValor),
+      vencimento: reg.franquiaVencimento || '',
+      rotulo: 'franquia',
+      historico: 'Franquia de sinistro · ' + (reg.placa||'') + ' · '
+        + (SIN_TIPO_LBL[reg.tipo]||reg.tipo||'').replace(/^\S+\s/, '')
+        + ' · ' + fmt(reg.data)
+    };
+  }
+  if (reg.reparoDevido) {
+    var orc  = mltNum(reg.custoReparo);
+    var dias = mltNum(reg.reparoDias);
+    var diar = mltNum(reg.reparoDiariaValor);
+    var par  = Math.round(dias * diar * 100) / 100;
+    return {
+      valor: Math.round((orc + par) * 100) / 100,
+      vencimento: reg.reparoVencimento || '',
+      rotulo: 'reparo',
+      // O histórico mostra a conta: quem abrir o Contas a Receber daqui a um
+      // ano precisa saber de onde veio o valor sem voltar à ocorrência.
+      historico: 'Reparo de avaria · ' + (reg.placa||'') + ' · orçamento ' + fmtBRL(orc)
+        + (par ? ' + ' + dias + ' diária(s) de ' + fmtBRL(diar) : '')
+        + ' · ' + fmt(reg.data)
+    };
+  }
+  return null;
+}
+
+function _sinSincronizarCobranca(reg){
   var L   = _sinReceberLista();
   var idx = _sinAcharReceber(reg.id);
   var tem = idx >= 0;
+  var cob = _sinCobranca(reg);
 
-  if (!reg.franquiaDevida) {
+  if (!cob) {
     if (tem && _sinRecebido(L[idx])) {
-      return { aviso: 'A franquia já tinha recebimento lançado, então o lançamento foi mantido no Financeiro. Ajuste por lá se for o caso.' };
+      return { aviso: 'A cobrança desta ocorrência já tinha recebimento lançado, então o lançamento foi mantido no Financeiro. Ajuste por lá se for o caso.' };
     }
     if (tem) { L.splice(idx,1); reg.receberId = ''; }
     return {};
   }
 
-  var hist = 'Franquia de sinistro · ' + (reg.placa||'') + ' · '
-           + (SIN_TIPO_LBL[reg.tipo]||reg.tipo||'').replace(/^\S+\s/, '')
-           + ' · ' + fmt(reg.data);
-
   if (tem) {
+    // 🔴 Lançamento com recebimento não é reescrito: seria perder dinheiro já
+    //    registrado. Vale trocando de tipo de cobrança também.
     if (_sinRecebido(L[idx])) {
       reg.receberId = reg.id;
-      return { aviso: 'O lançamento desta franquia já tem recebimento, por isso o valor no Financeiro não foi alterado.' };
+      return { aviso: 'O lançamento desta ocorrência já tem recebimento, por isso o valor no Financeiro não foi alterado.' };
     }
     L[idx].cliente    = reg.clienteNome || L[idx].cliente || '';
-    L[idx].valor      = mltNum(reg.franquiaValor);
-    L[idx].vencimento = reg.franquiaVencimento || L[idx].vencimento || '';
-    L[idx].historico  = hist;
+    L[idx].valor      = cob.valor;
+    L[idx].vencimento = cob.vencimento || L[idx].vencimento || '';
+    L[idx].historico  = cob.historico;
+    L[idx].tipo       = 'Avarias';
   } else {
     L.push({
       cliente: reg.clienteNome || '',
-      valor: mltNum(reg.franquiaValor),
+      valor: cob.valor,
       recebido: 0,
-      vencimento: reg.franquiaVencimento || '',
-      historico: hist,
+      vencimento: cob.vencimento,
+      historico: cob.historico,
+      // Antes o lançamento nascia SEM tipo e caía em "Outros" no filtro do
+      // Contas a Receber. Conferido em 20/10: nenhum lançamento de sinistro
+      // existia ainda, então corrigir aqui não mexe em dado nenhum.
+      tipo: 'Avarias',
       status: 'pendente',
       recebidoEm: '',
       sinistroId: reg.id
@@ -8027,6 +8140,12 @@ function sinImportarConfirmar(){
       // 🔴 A franquia NÃO vem do formulário. Cobrar o locatário é decisão da
       // LOKÁ, caso a caso — pode ser da locadora ou de terceiro.
       franquiaDevida:     false,
+      // Mesma razão da franquia: cobrar o locatário é decisão da LOKÁ, caso a
+      // caso. Código vindo de fora não decide cobrança.
+      reparoDevido:       false,
+      reparoDias:         '',
+      reparoDiariaValor:  '',
+      reparoVencimento:   '',
       franquiaValor:      '',
       franquiaVencimento: '',
       receberId:   '',
@@ -8130,6 +8249,23 @@ function salvarSinistro(){
     if (mltNum(fvTxt) <= 0) { toast('⚠️ O valor da franquia deve ser maior que zero','#b45309'); return; }
   }
 
+  var reparo = !!(document.getElementById('snReparoDevido')||{}).checked;
+  if (reparo) {
+    // 🔴 Não pode haver as duas: o lançamento é um por ocorrência.
+    if (franq) { toast('⚠️ Marque só uma cobrança: franquia OU orçamento + diárias','#c0392b'); return; }
+    var crTxt = _snGet('snCustoReparo');
+    // Mesma regra do valor da franquia: exigir dígito, porque mltNum('abc') = 0.
+    if (!/\d/.test(crTxt)) { toast('⚠️ Informe o Custo do reparo — é o orçamento que será cobrado','#b45309'); return; }
+    var cRep = _snReparoTotal();
+    if (cRep.orcamento <= 0) { toast('⚠️ O custo do reparo deve ser maior que zero','#b45309'); return; }
+    // Dias parados é opcional (pode não ter ficado parado), mas dia informado
+    // sem valor de diária cobraria R$ 0,00 por dia sem ninguém notar.
+    if (cRep.dias > 0 && cRep.diaria <= 0) {
+      toast('⚠️ Informe o valor da diária — ou zere os dias parados','#b45309'); return;
+    }
+    if (cRep.total <= 0) { toast('⚠️ O total a cobrar deve ser maior que zero','#b45309'); return; }
+  }
+
   var v = (db.veiculos||[]).filter(Boolean).find(function(x){ return x.id===vid; }) || {};
   var loc = _locatariaAtual(v.placa, v.id);
   var antigo = _sinEditId ? _sinLista().find(function(x){ return x && x.id===_sinEditId; }) : null;
@@ -8159,13 +8295,17 @@ function salvarSinistro(){
     franquiaDevida:     franq,
     franquiaValor:      franq ? fvTxt : '',
     franquiaVencimento: franq ? _snGet('snFranquiaVenc') : '',
+    reparoDevido:       reparo,
+    reparoDias:         reparo ? _snGet('snReparoDias') : '',
+    reparoDiariaValor:  reparo ? _snGet('snReparoDiaria') : '',
+    reparoVencimento:   reparo ? _snGet('snReparoVenc') : '',
     receberId:   antigo ? (antigo.receberId||'') : '',
     obs:         _snGet('snObs'),
     criadoEm:    antigo ? (antigo.criadoEm || new Date().toISOString()) : new Date().toISOString(),
     atualizadoEm:new Date().toISOString()
   };
 
-  var r = _sinSincronizarFranquia(reg);
+  var r = _sinSincronizarCobranca(reg);
 
   var L = _sinLista();
   if (_sinEditId) {
@@ -8193,8 +8333,8 @@ function excluirSinistro(){
   var msg = 'Excluir esta ocorrência?';
   if (idx >= 0) {
     msg += recebido
-      ? '\n\nA cobrança da franquia JÁ TEM RECEBIMENTO lançado, então ela será MANTIDA no Financeiro.'
-      : '\n\nA cobrança da franquia em Contas a Receber será removida junto.';
+      ? '\n\nA cobrança desta ocorrência JÁ TEM RECEBIMENTO lançado, então ela será MANTIDA no Financeiro.'
+      : '\n\nA cobrança desta ocorrência em Contas a Receber será removida junto.';
   }
   if (!confirm(msg)) return;
 
@@ -8206,7 +8346,7 @@ function excluirSinistro(){
   renderSinistros();
   if (typeof finRenderReceber === 'function') { try { finRenderReceber(); } catch(e){} }
   toast('🗑 Ocorrência excluída.','#c0392b');
-  if (recebido) setTimeout(function(){ toast('⚠️ A cobrança da franquia ficou no Financeiro porque já tinha recebimento.','#b45309'); }, 2600);
+  if (recebido) setTimeout(function(){ toast('⚠️ A cobrança desta ocorrência ficou no Financeiro porque já tinha recebimento.','#b45309'); }, 2600);
   _sinEditId = null;
 }
 
@@ -8216,7 +8356,8 @@ function excluirSinistro(){
 function relatorioSinistros(){
   var list = sinFiltrados();
   if (!list.length) { toast('⚠️ Nada para imprimir com esses filtros','#b45309'); return; }
-  var total = list.reduce(function(a,s){ return a + (s.franquiaDevida ? mltNum(s.franquiaValor) : 0); }, 0);
+  // Mesma fonte da tela: as duas cobranças.
+  var total = list.reduce(function(a,s){ var c = _sinCobranca(s); return a + (c ? c.valor : 0); }, 0);
   var di = (document.getElementById('fSinDataIni')||{}).value || '';
   var df = (document.getElementById('fSinDataFim')||{}).value || '';
   var per = (di||df) ? ('Período: '+(di?fmt(di):'início')+' até '+(df?fmt(df):'hoje')) : 'Todas as datas';
@@ -8234,7 +8375,7 @@ function relatorioSinistros(){
     + '<h1>Ocorrências e Sinistros</h1>'
     + '<p class="sub">LOKÁ Aluguel de Veículos · '+per+' · '+list.length+' ocorrência(s) · emitido em '+new Date().toLocaleString('pt-BR')+'</p>'
     + '<table><thead><tr><th>Data</th><th>Placa</th><th>Veículo</th><th>Locatário</th>'
-    + '<th>Tipo</th><th>Condutor</th><th>Local</th><th>BO</th><th>Status</th><th>Franquia</th></tr></thead><tbody>'
+    + '<th>Tipo</th><th>Condutor</th><th>Local</th><th>BO</th><th>Status</th><th>A cobrar</th></tr></thead><tbody>'
     + list.slice().sort(function(a,b){ return String(a.data||'').localeCompare(String(b.data||'')); })
         .map(function(s){
       function c(x){ return '<td>'+String(x==null||x===''?'—':x).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td>'; }
@@ -8242,9 +8383,9 @@ function relatorioSinistros(){
         + c((SIN_TIPO_LBL[s.tipo]||s.tipo||'').replace(/^\S+\s/,''))
         + c(s.condutor)+c(s.local)+c(s.bo)
         + c((SIN_ST_LBL[s.status||'aberto']||'').replace(/^\S+\s/,''))
-        + c(s.franquiaDevida ? fmtBRL(s.franquiaValor) : '')+'</tr>';
+        + c((function(){ var x = _sinCobranca(s); return x ? fmtBRL(x.valor) : ''; })())+'</tr>';
     }).join('')
-    + '</tbody><tfoot><tr><td colspan="9">Total de franquia a cobrar</td><td>'+fmtBRL(total)+'</td></tr></tfoot></table>'
+    + '</tbody><tfoot><tr><td colspan="9">Total a cobrar dos locatários</td><td>'+fmtBRL(total)+'</td></tr></tfoot></table>'
     + '<script>window.onload=function(){window.print();}<\/script></body></html>';
 
   var w = window.open('', '_blank');
@@ -15521,6 +15662,30 @@ function _efDiagFuncao(add){
             O lançamento fica ligado a esta ocorrência: editar atualiza o mesmo,
             excluir remove. Se a franquia já tiver sido recebida, o lançamento
             não é mexido — o aviso explica o que fazer.
+          </p>
+        </div>
+      </div>
+
+      <!-- Reparo abaixo da franquia (Cláusula 11ª, redação de 20/10/2026) -->
+      <div class="fg" style="grid-column:1/-1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#1e40af;cursor:pointer">
+          <input type="checkbox" id="snReparoDevido" onchange="snAlternarReparo()">
+          Conserto n&atilde;o atinge a franquia &mdash; cobrar or&ccedil;amento + di&aacute;rias paradas
+        </label>
+        <div id="snReparoCampos" style="display:none;margin-top:10px">
+          <div class="g3">
+            <div class="fg"><label class="fl">Dias parado</label>
+              <input class="fi" id="snReparoDias" type="number" min="0" step="1" placeholder="0" oninput="snCalcReparo()"></div>
+            <div class="fg"><label class="fl">Valor da di&aacute;ria (R$)</label>
+              <input class="fi" id="snReparoDiaria" placeholder="0,00" oninput="snCalcReparo()"></div>
+            <div class="fg"><label class="fl">Vencimento</label>
+              <input class="fi" id="snReparoVenc" type="date"></div>
+          </div>
+          <div id="snReparoTotal" style="font-size:12px;color:#1e40af;margin-top:8px;line-height:1.6"></div>
+          <p style="font-size:11px;color:#1e40af;margin:6px 0 0">
+            O or&ccedil;amento vem do campo <strong>Custo do reparo</strong> acima &mdash; &eacute; o mesmo
+            n&uacute;mero, para n&atilde;o haver dois valores concorrentes para o mesmo conserto.
+            A di&aacute;ria vem do cadastro do ve&iacute;culo e pode ser ajustada.
           </p>
         </div>
       </div>
