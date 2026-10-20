@@ -56,7 +56,7 @@ DNS via Cloudflare.
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
-| `contrato-mensal.html` | **mensal-v4-20261020-0910** |
+| `contrato-mensal.html` | **mensal-v5-20261020-1340** |
 | `contrato-diaria.html` | **diaria-v4-20261020-0910** |
 
 ## Modelo de dados — `loka_db`
@@ -5079,3 +5079,111 @@ texto com escape, **ferramenta de escrita — nunca heredoc.**
 Falta **logado**: o Rogel abrir o sistema e ver o menu novo. Eu não autentico.
 Se alguma seção não fizer sentido para o jeito dele trabalhar, mover item entre
 seções é uma linha.
+
+---
+
+## ✅ Cláusula 7ª do contrato mensal: multa e juros por atraso — 20/10/2026 (`48bc2e4`) · mensal v5
+
+Pedido: *"em caso de atraso de pagamento, fica reservado ao locador o direito de
+cobrar multa de 2% e juros de 6% ao mes calculados sobre o valor devido."*
+
+### Como ficou
+> Cláusula 7ª – Do Pagamento. […] via cartão de crédito ou PIX 39.911.638/0001-10.
+> **Em caso de atraso no pagamento, fica reservado ao LOCADOR o direito de cobrar
+> multa de 2% (dois por cento) e juros de 6% (seis por cento) ao mês, calculados
+> sobre o valor devido.**
+
+A redação é a dele, ajustada à linguagem do documento (**LOCADOR** em maiúscula,
+como na Cláusula 3ª) e com os números **também por extenso** — mesma regra do
+"10 (dez) dias" da Cláusula 10: em contrato, algarismo sozinho é o que se
+contesta depois.
+
+🔴 **Entrou DENTRO do parágrafo da Cláusula 7ª, não como cláusula nova** —
+cláusula nova renumeraria o contrato. Os dados bancários (boleto, Itaú 7314 /
+98590-9, cartão, PIX) ficaram **intactos**, e isso é testado: o acréscimo foi
+colado no mesmo parágrafo onde eles vivem.
+
+### 🔴 Só o MENSAL — e isso é deliberado
+Ele **nomeou o documento** ("na clausula 7ª do contrato mensal"). A
+`contrato-diaria.html` tem a **mesma Cláusula 7ª – Do Pagamento** e **não foi
+tocada**.
+
+⚠️ Diferente das Cláusulas 10 e 11 de hoje de manhã, em que ele disse só
+"contrato de aluguel" e aplicar nos dois era a leitura certa. Aqui o escopo foi
+dito. Há **teste travando as duas pontas**: entrou no mensal, continua fora da
+diária — e um defeito injetado que faz o texto **vazar** para a diária é acusado.
+
+Confirmado no ar: a diária publicada segue em `diaria-v4` sem o acréscimo.
+
+### Conferido antes de escrever
+**Não havia nenhuma menção a mora, juros ou atraso no contrato mensal**
+(`mora`, `juros`, `atras`, `2%`, `6%` → **0 ocorrências cada**). Então não há
+duas regras se contradizendo — e há teste exigindo que `multa de 2%` apareça
+**uma vez só**, com defeito injetado que duplica a regra.
+
+### ⚠️ O que eu sinalizei e ele decide (não é decisão minha)
+**6% ao mês é 72% ao ano.** O padrão usual de mora em contrato no Brasil é 1% ao
+mês, e em relação com pessoa física há limites do CDC. Um percentual bem acima do
+usual pode ser **reduzido ou afastado em juízo** — e aí a cláusula não cobra nada.
+
+Isso é **pergunta para o advogado/contador dele**, não para mim: errar aí não é
+bug, é discussão judicial. O pedido foi aplicado **exatamente como ele escreveu**;
+trocar o número é uma linha, se o advogado orientar diferente.
+
+A multa de 2% está dentro do que se vê normalmente.
+
+### Cabe no A4 — medido nos arquivos reais das duas versões
+| | altura do `.contract` | páginas A4 | sobra |
+|---|---|---|---|
+| mensal v4 (antes) | **929px** | 0,87 | 141px |
+| **mensal v5 (agora)** | **937px** (+8) | **0,88** | **133px** |
+
+A4 útil = **726 × 1070px**. Continua em **uma folha**, sem transbordar a largura
+(722px). O acréscimo são 179 caracteres.
+
+⚠️ **A v4 veio do commit `1f10daf` pelo raw do GitHub, não de markup remendado** —
+é a regra de 19/10: o *antes* tem de ser o arquivo real daquela versão.
+
+### ⚠️ A armadilha do A4, agora pelo lado oposto
+A medição deu **5996px para as duas versões** — e 5996 era exatamente a altura do
+iframe. Em 20/10 o problema foi iframe **curto** (empatava em 1070); aqui foi
+iframe **folgado** com `body { min-height: 100vh }`, que faz o body **sempre**
+preencher o container.
+
+Quem tem a altura do documento é o **`.contract`**, não o `body`. Medindo ele, os
+números passaram a variar (929 ≠ 937).
+
+🔴 **A regra vale nas duas direções:** *medida que não varia entre versões
+diferentes não está medindo.* Dois empates em dois dias, por causas opostas.
+
+### Validado
+- `node --check`; `<div>` balanceadas (45/45, como na v124); os **três** carimbos
+  batendo
+- **20 testes novos** na suíte das cláusulas (**61 no total**): as 5 partes do
+  acréscimo, a condição, de quem é o direito, a base de cálculo, os dois números
+  com extenso, **a ordem do "ao mês"** (ligado aos juros, não à multa), os dados
+  bancários intactos, uma só regra de mora, o texto não vazando para outra
+  cláusula, e a diária limpa nas duas pontas
+- **33 defeitos injetados — todos acusados**, entre eles **2% → 20%**,
+  **6% ao mês → ao ano**, o extenso não bater com o algarismo (`6% (dois por
+  cento)`), a multa ganhar periodicidade, apagar os dados bancários, virar
+  cláusula própria, a regra aparecer **duas vezes** e **vazar para a diária**
+- **No ar, no arquivo publicado**, parseado pelo navegador: a Cláusula 7ª com o
+  texto exato, 17 cláusulas no documento, as Cláusulas 10 e 11 de hoje de manhã
+  intactas, e a diária em `v4` sem o acréscimo
+- Regressão **medida**: **37 suítes, 1.827 testes**, nenhuma falha
+
+### ⚠️ A asserção que eu escrevi errada e o teste pegou
+Meu primeiro teste da periodicidade era
+`!/multa de 2%[^.]*(ao m[êe]s|ao ano)/` — e ele **falha na frase CERTA**, porque
+o "ao mês" dos juros cai na mesma oração. O que importa não é a ausência da
+palavra, é a **ordem**: multa → juros → "ao mês". Reescrito por índice.
+
+⚠️ E a suíte travava o carimbo em `mensal-v4` (a armadilha já registrada hoje em
+duas outras suítes). Passou a exigir **os dois carimbos batendo entre si** mais
+**o prefixo do arquivo** (`mensal-v` / `diaria-v`) — que é a regra de verdade, e
+pega o caso de o mensal sair carimbado como diária.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel gerar um contrato mensal e ler a Cláusula 7ª no
+documento impresso.
