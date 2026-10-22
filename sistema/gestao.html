@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v134-20261020-1210 -->
+<!-- LOKA deploy: v135-20261022-1150 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1492,6 +1492,23 @@ tr:hover td{background:#f8f9fe;}
       <div class="fg"><label class="fl">Caução (R$)</label><input class="fi" id="aCaucao" placeholder="0,00" oninput="maskBRL(this)"></div>
       <div class="fg"><label class="fl">KM Saída</label><input class="fi" id="aKm" type="number" placeholder="000000"></div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Obs</label><input class="fi" id="aObs" placeholder="Observações"></div>
+
+      <div class="fg" style="grid-column:1/-1;background:#ecfeff;border:1px solid #a5e8f0;border-radius:10px;padding:12px">
+        <label class="fl" style="color:#0e7490;font-weight:700">👤 Condutor do ve&iacute;culo</label>
+        <div class="g2" style="margin-top:8px">
+          <div class="fg" style="grid-column:1/-1"><label class="fl">Nome completo</label>
+            <input class="fi" id="aCondNome" placeholder="Quem vai dirigir"></div>
+          <div class="fg"><label class="fl">CPF</label><input class="fi" id="aCondCpf" placeholder="000.000.000-00"></div>
+          <div class="fg"><label class="fl">CNH n&ordm;</label><input class="fi" id="aCondCnh" placeholder="N&ordm; de registro"></div>
+          <div class="fg"><label class="fl">Categoria</label><input class="fi" id="aCondCat" placeholder="B, AB, D..."></div>
+          <div class="fg"><label class="fl">Telefone</label><input class="fi" id="aCondTel" placeholder="(00) 00000-0000"></div>
+        </div>
+        <p style="font-size:11px;color:#0e7490;margin:8px 0 0;line-height:1.5">
+          Sem isso, a indica&ccedil;&atilde;o de condutor de uma multa deste aluguel sai no nome do
+          <strong>locat&aacute;rio</strong>. Com isso, sai no nome de quem dirigia &mdash; que &eacute; o que o
+          &oacute;rg&atilde;o pede. D&aacute; para preencher depois, pelo bot&atilde;o 👤 da lista.
+        </p>
+      </div>
     </div>
   </div>
   <div class="modal-foot">
@@ -1501,6 +1518,38 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <!-- MODAL: PRORROGAÇÃO -->
+<div class="modal-bg" id="mCondutor"><div class="modal">
+  <div class="modal-head" style="background:#0e7490"><h3>👤 Condutor do ve&iacute;culo</h3><button class="modal-close" onclick="closeM('mCondutor')">✕</button></div>
+  <div class="modal-body">
+    <div id="condInfo" style="background:#f0f2fa;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px"></div>
+
+    <div style="background:#ecfeff;border:1px solid #a5e8f0;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:#0e7490;margin-bottom:8px">Registrar condutor</div>
+      <div class="g2">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Nome completo *</label>
+          <input class="fi" id="cdNome" placeholder="Quem dirige o ve&iacute;culo"></div>
+        <div class="fg"><label class="fl">CPF</label><input class="fi" id="cdCpf" placeholder="000.000.000-00"></div>
+        <div class="fg"><label class="fl">CNH n&ordm;</label><input class="fi" id="cdCnh" placeholder="N&ordm; de registro"></div>
+        <div class="fg"><label class="fl">Categoria</label><input class="fi" id="cdCat" placeholder="B, AB, D..."></div>
+        <div class="fg"><label class="fl">Telefone</label><input class="fi" id="cdTel" placeholder="(00) 00000-0000"></div>
+        <div class="fg"><label class="fl">Dirige desde *</label><input class="fi" id="cdDesde" type="date"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Observa&ccedil;&atilde;o</label>
+          <input class="fi" id="cdObs" placeholder="Opcional"></div>
+      </div>
+      <p style="font-size:11px;color:#0e7490;margin:8px 0 0;line-height:1.5">
+        Trocar de condutor <strong>n&atilde;o apaga o anterior</strong>: o de antes ganha data de fim e
+        continua no hist&oacute;rico. &Eacute; isso que permite indicar certo uma multa antiga.
+      </p>
+    </div>
+
+    <div id="condHist"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mCondutor')">Fechar</button>
+    <button class="btn btn-primary" id="btnCondSalvar" onclick="condSalvar()" style="background:#0e7490">Registrar condutor</button>
+  </div>
+</div></div>
+
 <div class="modal-bg" id="mProrrogacao"><div class="modal" style="max-width:440px">
   <div class="modal-head" style="background:#2B4BF2"><h3>📅 Prorrogar Locação</h3><button class="modal-close" onclick="closeM('mProrrogacao')">✕</button></div>
   <div class="modal-body">
@@ -1680,7 +1729,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v134-20261020-1210';
+var LOKA_BUILD = 'v135-20261022-1150';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -3937,6 +3986,7 @@ function renderAtivos() {
       '<td style="padding:9px 12px;text-align:center">'+dStr+'</td>'+
       '<td style="padding:9px 12px;text-align:right;font-weight:700;font-size:11px">'+(a.valor||'—')+'<br>'+pgBadge+'</td>'+
       '<td style="padding:9px 12px"><div style="display:flex;gap:4px;justify-content:center">'+
+        '<button class="icon-btn" data-act="cond" data-idx="'+ri+'" title="Condutor" style="color:#0e7490;border-color:#0e7490">👤</button>'+
         '<button class="icon-btn" data-act="pror" data-idx="'+ri+'" title="Prorrogar" style="color:#2B4BF2;border-color:#2B4BF2">📅</button>'+
         '<button class="icon-btn" data-act="pgto" data-idx="'+ri+'" title="Pagamento" style="color:#0d7a3e;border-color:#0d7a3e">💳</button>'+
         '<button class="icon-btn" data-act="enc"  data-idx="'+ri+'" title="Encerrar"  style="color:#c0392b;border-color:#c0392b">🔴</button>'+
@@ -3970,6 +4020,7 @@ function renderAtivos() {
     var a   = db.ativos[idx];
     if (!a) return;
     var act = btn.dataset.act;
+    if (act==='cond')  condAbrir(a.id);
     if (act==='pror')  openProrrogacao(a.id);
     if (act==='pgto')  openPagamento(a.id);
     if (act==='enc')   openEncerramento(a.id);
@@ -4122,6 +4173,200 @@ function validarPeriodo(dataIni, dataFim, contexto){
   return true;
 }
 
+// ══════════════════════════════════════════════════════════════
+// CONDUTOR DO ALUGUEL
+// ══════════════════════════════════════════════════════════════
+// Resolucao CONTRAN 918/2022, art. 5 §1 II: para indicar sem a assinatura do
+// condutor, o contrato precisa identificar o CONDUTOR (alinea c) e o PERIODO
+// em que o veiculo esteve na posse dele (alinea e). Por isso: lista com
+// periodo, nao campo unico.
+//
+// ⚠️ Array dentro de objeto tambem volta como {0:…} do Firebase (armadilha 1).
+//    O normalizarDB cuida das listas de raiz; esta e aninhada, entao a
+//    normalizacao mora aqui, no unico ponto que le.
+// Escapa para HTML. 🔴 NAO existe `esc` global neste arquivo: as 5 que há são
+// `var esc` dentro de outras funções, e três delas escapam CSV, não HTML.
+function _condEsc(x) {
+  return String(x == null ? '' : x)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+var _condAtivoId = null;
+
+function condAbrir(id) {
+  if (!db) return;
+  var a = (db.ativos || []).filter(Boolean).filter(function (x) { return x.id === id; })[0];
+  if (!a) { toast('⚠️ Aluguel não encontrado', '#b45309'); return; }
+  _condAtivoId = id;
+  ['cdNome','cdCpf','cdCnh','cdCat','cdTel','cdObs'].forEach(function (k) {
+    var el = document.getElementById(k); if (el) el.value = '';
+  });
+  var hoje = new Date();
+  var dHoje = hoje.getFullYear() + '-' + ('0'+(hoje.getMonth()+1)).slice(-2) + '-' + ('0'+hoje.getDate()).slice(-2);
+  var dd = document.getElementById('cdDesde');
+  // Primeiro condutor começa na retirada; os seguintes, hoje.
+  if (dd) dd.value = _condLista(a).length ? dHoje : (String(a.retirada || '').slice(0,10) || dHoje);
+  condRender();
+  openM('mCondutor');
+}
+
+function condRender() {
+  var a = (db.ativos || []).filter(Boolean).filter(function (x) { return x.id === _condAtivoId; })[0];
+  if (!a) return;
+  var inf = document.getElementById('condInfo');
+  if (inf) {
+    var at = _condAtual(a);
+    inf.innerHTML = '<strong>' + _condEsc(a.clienteNome || '') + '</strong>'
+      + ' · <span style="font-family:monospace">' + _condEsc(_placasDoAtivo(a).join(', ')) + '</span>'
+      + '<br><span style="color:var(--muted)">Locação de ' + fmt(a.retirada)
+      + (a.devolucao ? ' a ' + fmt(a.devolucao) : ' (contínua)') + '</span>'
+      + '<br>' + (at
+          ? '👤 Condutor atual: <strong>' + _condEsc(at.nome) + '</strong>'
+          : '<span style="color:#b45309">⚠ Sem condutor registrado — a indicação sai no nome do locatário</span>');
+  }
+  var h = document.getElementById('condHist');
+  if (!h) return;
+  var L = _condLista(a).slice().sort(function (x, y) {
+    return String(y.desde || '').localeCompare(String(x.desde || ''));
+  });
+  if (!L.length) { h.innerHTML = ''; return; }
+  h.innerHTML = '<div style="font-size:12px;font-weight:700;margin-bottom:8px">Histórico de condutores</div>'
+    + '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:560px"><tbody>'
+    + L.map(function (c) {
+        var i = _condLista(a).indexOf(c);
+        return '<tr style="border-bottom:1px solid #f0f2f8">'
+          + '<td style="padding:8px"><strong>' + _condEsc(c.nome) + '</strong>'
+            + (c.cpf ? '<br><span style="font-size:10px;color:var(--muted)">CPF ' + _condEsc(c.cpf) + '</span>' : '')
+            + (c.cnh ? '<br><span style="font-size:10px;color:var(--muted)">CNH ' + _condEsc(c.cnh)
+                       + (c.cnhCat ? ' · ' + _condEsc(c.cnhCat) : '') + '</span>' : '')
+          + '</td>'
+          + '<td style="padding:8px;font-size:11px">' + fmt(c.desde)
+            + (c.ate ? ' a ' + fmt(c.ate)
+                     : ' <span style="color:#0d7a3e;font-weight:700">· atual</span>') + '</td>'
+          + '<td style="padding:8px;text-align:right">'
+            + '<button class="icon-btn" onclick="condExcluir(' + i + ')" title="Excluir"'
+            + ' style="color:#c0392b;border-color:#c0392b">🗑</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+function condSalvar() {
+  var a = (db.ativos || []).filter(Boolean).filter(function (x) { return x.id === _condAtivoId; })[0];
+  if (!a) { toast('⚠️ Aluguel não encontrado', '#b45309'); return; }
+  var nome = _snGet2('cdNome');
+  var desde = _snGet2('cdDesde');
+  if (!nome)  { toast('⚠️ Informe o nome do condutor', '#b45309'); return; }
+  // 🔴 Sem data não há como saber qual multa é dele — e é o item (e) que o
+  //    órgão exige (período da posse). Por isso é obrigatória.
+  if (!desde) { toast('⚠️ Informe desde quando essa pessoa dirige o veículo', '#b45309'); return; }
+
+  var btn = document.getElementById('btnCondSalvar');
+  if (btn) btn.disabled = true;
+
+  var L = _condLista(a).slice();
+  // Fecha o período de quem estava aberto: o anterior vai até a véspera.
+  var vespera = new Date(desde + 'T12:00:00');
+  vespera.setDate(vespera.getDate() - 1);
+  var dVesp = vespera.getFullYear() + '-' + ('0'+(vespera.getMonth()+1)).slice(-2)
+            + '-' + ('0'+vespera.getDate()).slice(-2);
+  L.forEach(function (c) {
+    if (!c.ate && String(c.desde || '') < desde) c.ate = dVesp;
+  });
+
+  L.push({
+    nome: nome, cpf: _snGet2('cdCpf'), cnh: _snGet2('cdCnh'),
+    cnhCat: _snGet2('cdCat'), tel: _snGet2('cdTel'), obs: _snGet2('cdObs'),
+    desde: desde, ate: '',
+    registradoEm: new Date().toISOString(),
+    registradoPor: (_sessao() && _sessao().usuario) || ''
+  });
+  a.condutores = L;
+
+  saveDB();
+  if (btn) btn.disabled = false;
+  ['cdNome','cdCpf','cdCnh','cdCat','cdTel','cdObs'].forEach(function (k) {
+    var el = document.getElementById(k); if (el) el.value = '';
+  });
+  condRender();
+  renderAtivos();
+  toast('✅ Condutor registrado', '#0d7a3e');
+}
+
+function condExcluir(i) {
+  var a = (db.ativos || []).filter(Boolean).filter(function (x) { return x.id === _condAtivoId; })[0];
+  if (!a) return;
+  var L = _condLista(a).slice();
+  var c = L[i];
+  if (!c) return;
+  if (!confirm('Excluir o condutor "' + (c.nome || '') + '"?\n\n'
+    + 'Multas do período dele voltam a ser indicadas no nome do locatário.')) return;
+  L.splice(i, 1);
+  // Quem ficou por último volta a ser o atual: sem isso, apagar o condutor
+  // vigente deixaria o aluguel sem nenhum em aberto.
+  if (L.length && !L.some(function (x) { return !x.ate; })) {
+    L.slice().sort(function (x, y) {
+      return String(y.desde || '').localeCompare(String(x.desde || ''));
+    })[0].ate = '';
+  }
+  a.condutores = L;
+  saveDB();
+  condRender();
+  renderAtivos();
+  toast('Condutor excluído', '#b45309');
+}
+
+function _snGet2(id) {
+  var el = document.getElementById(id);
+  return el ? String(el.value == null ? '' : el.value).trim() : '';
+}
+function _sessao() {
+  try { return JSON.parse(sessionStorage.getItem('loka_session') || '{}'); }
+  catch (e) { return {}; }
+}
+
+function _condLista(a) {
+  if (!a) return [];
+  var c = a.condutores;
+  if (!c) return [];
+  if (!Array.isArray(c)) c = Object.keys(c).map(function (k) { return c[k]; });
+  return c.filter(Boolean);
+}
+
+// Quem dirigia na data indicada. Sem data, devolve o condutor atual.
+// 🔴 "desde" vazio conta como "desde sempre"; "ate" vazio, como "ate hoje" —
+//    senao um condutor cadastrado sem datas nunca seria encontrado.
+function _condNoDia(a, data) {
+  var L = _condLista(a);
+  if (!L.length) return null;
+  var d = String(data || '').slice(0, 10);
+  if (!d) return _condAtual(a);
+  var achados = L.filter(function (c) {
+    var ini = String(c.desde || '').slice(0, 10);
+    var fim = String(c.ate || '').slice(0, 10);
+    return (!ini || ini <= d) && (!fim || d <= fim);
+  });
+  // Havendo mais de um (periodos sobrepostos por engano), fica o que comecou
+  // mais tarde — e o mais especifico para aquela data.
+  achados.sort(function (x, y) {
+    return String(y.desde || '').localeCompare(String(x.desde || ''));
+  });
+  return achados[0] || null;
+}
+
+// O condutor em vigor: o que nao tem data de fim. Nenhum aberto, nenhum atual.
+function _condAtual(a) {
+  var L = _condLista(a).filter(function (c) { return !c.ate; });
+  L.sort(function (x, y) {
+    return String(y.desde || '').localeCompare(String(x.desde || ''));
+  });
+  return L[0] || null;
+}
+
+function _condNome(c) { return c ? String(c.nome || '').trim() : ''; }
+
 function salvarAluguel() {
   var cIdx = parseInt((document.getElementById('aCliente').value||''));
   var vIdx = parseInt((document.getElementById('aVeiculo').value||''));
@@ -4144,6 +4389,24 @@ function salvarAluguel() {
     obs:      document.getElementById('aObs').value,
     geradoEm: new Date().toISOString(), status: 'ativo'
   };
+
+  // Condutor informado no ato — o item (c) do art. 5 §1 II. Opcional: travar o
+  // aluguel por falta dele faria o carro sair sem registro nenhum, que e pior.
+  var cNome = (_snGet2('aCondNome') || '').trim();
+  if (cNome) {
+    a.condutores = [{
+      nome: cNome,
+      cpf:  _snGet2('aCondCpf'),
+      cnh:  _snGet2('aCondCnh'),
+      cnhCat: _snGet2('aCondCat'),
+      tel:  _snGet2('aCondTel'),
+      desde: ret,            // a posse comeca na retirada
+      ate: '',
+      registradoEm: new Date().toISOString(),
+      registradoPor: (_sessao() && _sessao().usuario) || ''
+    }];
+  }
+
   try {
     garantirArray('ativos');
     db.ativos.push(a);
@@ -12045,6 +12308,35 @@ function mltIndCliente(m){
   return (db.clients || []).filter(function(c){ return c.id === m.clienteId; })[0] || null;
 }
 
+// A locação que cobria a placa na data da infração — ativa ou já encerrada.
+// É dela que sai o condutor e o período da posse (art. 5 §1 II, alíneas c e e).
+function mltIndLocacao(m){
+  if (!m || !m.placa) return null;
+  var d = String(m.dataInfracao || '').slice(0, 10);
+  if (!d) return null;
+  var alvo = mltNormPlaca(m.placa);
+  var todas = (db.ativos || []).filter(Boolean).concat((db.historico || []).filter(Boolean));
+  var achadas = todas.filter(function (a) {
+    if (_placasDoAtivo(a).map(mltNormPlaca).indexOf(alvo) < 0) return false;
+    var ini = String(a.retirada || '').slice(0, 10);
+    var fim = String(a.devolucao || a.devolvidoEm || '').slice(0, 10);
+    return (!ini || ini <= d) && (!fim || d <= fim);
+  });
+  // Mais de uma cobrindo a mesma data (acontece: há contrato contínuo convivendo
+  // com diárias) — fica a que começou mais perto da infração.
+  achadas.sort(function (x, y) {
+    return String(y.retirada || '').localeCompare(String(x.retirada || ''));
+  });
+  return achadas[0] || null;
+}
+
+// O condutor registrado para aquela data. Null quando não há — e aí o
+// formulário sai exatamente como saía antes, no nome do locatário.
+function mltIndCondutor(m){
+  var a = mltIndLocacao(m);
+  return a ? _condNoDia(a, m.dataInfracao) : null;
+}
+
 // Dias restantes para indicar. Só existe quando o prazo veio do órgão —
 // não inventamos data: indicar fora do prazo não vale, e um prazo chutado
 // daria falsa segurança. Sem prazo, mostra "não informado".
@@ -12207,6 +12499,8 @@ function mltIndGerarFormulario(){
     var c = mltIndCliente(m) || {};
     var doc = mltIndDoc(c);
     var v = (db.veiculos || []).filter(function(x){ return mltNormPlaca(x.placa) === mltNormPlaca(m.placa); })[0] || {};
+    var loc  = mltIndLocacao(m);
+    var cond = loc ? _condNoDia(loc, m.dataInfracao) : null;
     return '<div class="pg">'
       + '<div class="hd"><div><div class="t1">FORMULÁRIO DE IDENTIFICAÇÃO DO CONDUTOR INFRATOR</div>'
       + '<div class="t2">Art. 257, §7º do Código de Trânsito Brasileiro</div></div>'
@@ -12230,19 +12524,46 @@ function mltIndGerarFormulario(){
       + linha('CNPJ', '39.911.638/0001-10')
       + linha('Município / UF', 'Feira de Santana / BA') + '</div>'
 
-      + '<div class="sec">4 · Condutor / responsável identificado</div>'
-      + '<div class="g">' + linha(doc && doc.pj ? 'Razão social' : 'Nome completo', esc(c.nome))
-      + linha(doc ? doc.rotulo : 'CPF / CNPJ', doc ? doc.fmt : '')
-      + (doc && doc.pj ? '' : linha('CNH nº', esc(c.cnh)) + linha('Categoria', esc(c.cnhCat)))
-      + linha('Telefone', esc(c.telefone)) + '</div>'
-      + '<div class="c full"><div class="r">Endereço</div><div class="v">' + esc(c.endereco) + '</div></div>'
+      + (cond
+          // Condutor registrado no contrato: é ELE o condutor infrator, e o
+          // locatário entra como quem respondia pelo veículo. É o que o órgão
+          // pede — o formulário identifica a PESSOA que dirigia.
+          ? '<div class="sec">4 · Condutor identificado</div>'
+            + '<div class="g">' + linha('Nome completo', esc(cond.nome))
+            + linha('CPF', esc(cond.cpf))
+            + linha('CNH nº', esc(cond.cnh)) + linha('Categoria', esc(cond.cnhCat))
+            + linha('Telefone', esc(cond.tel)) + '</div>'
+            + '<div class="c full"><div class="r">Locatário responsável pelo veículo</div><div class="v">'
+            + esc(c.nome) + (doc ? ' · ' + doc.rotulo + ' ' + doc.fmt : '') + '</div></div>'
+          : '<div class="sec">4 · Condutor / responsável identificado</div>'
+            + '<div class="g">' + linha(doc && doc.pj ? 'Razão social' : 'Nome completo', esc(c.nome))
+            + linha(doc ? doc.rotulo : 'CPF / CNPJ', doc ? doc.fmt : '')
+            + (doc && doc.pj ? '' : linha('CNH nº', esc(c.cnh)) + linha('Categoria', esc(c.cnhCat)))
+            + linha('Telefone', esc(c.telefone)) + '</div>'
+            + '<div class="c full"><div class="r">Endereço</div><div class="v">' + esc(c.endereco) + '</div></div>')
 
-      + (doc && doc.pj
+      // 🔴 Alínea (e) do art. 5 §1 II: o período em que o veículo esteve na
+      //    posse do condutor apresentado. Sem ele o anexo não serve.
+      + (loc
+          ? '<div class="sec">5 · Posse do veículo na data da infração</div>'
+            + '<div class="g">' + linha('Locação de', fmt(loc.retirada))
+            + linha('até', loc.devolucao ? fmt(loc.devolucao) : 'contrato em vigor')
+            + (cond ? linha('Condutor desde', fmt(cond.desde))
+                    + linha('até', cond.ate ? fmt(cond.ate) : 'em vigor') : '')
+            + '</div>'
+          : '')
+
+      + (doc && doc.pj && !cond
           ? '<p class="obs">Locatário pessoa jurídica: a responsabilidade pela infração é transferida à empresa acima, '
             + 'conforme contrato de locação vigente na data da autuação. Cabe à empresa, se for o caso, indicar o condutor.</p>'
           : '')
+      + (cond
+          ? '<p class="obs">Condutor identificado pelo contrato de locação, nos termos do art. 5º, § 1º, II '
+            + 'da Resolução CONTRAN nº 918/2022: o contrato identifica o veículo, o proprietário e o condutor, '
+            + 'contém cláusula de responsabilidade por infrações e comprova o período da posse.</p>'
+          : '')
 
-      + '<div class="sec">5 · Declaração e assinaturas</div>'
+      + '<div class="sec">6 · Declaração e assinaturas</div>'
       + '<p class="dec">Declaro, sob as penas da lei, que na data e hora da infração acima o veículo estava sob '
       + 'responsabilidade do condutor identificado no item 4, conforme contrato de locação firmado com a LOKÁ Aluguel de Veículos.</p>'
       + '<div class="ass"><div><div class="ln"></div>Proprietário (LOKÁ)</div>'
