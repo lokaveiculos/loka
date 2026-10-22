@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v134-20261020-1210** |
+| `gestao.html` | **v135-20261022-1150** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -5187,3 +5187,179 @@ pega o caso de o mensal sair carimbado como diária.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel gerar um contrato mensal e ler a Cláusula 7ª no
 documento impresso.
+
+---
+
+## ✅ Condutor do aluguel — 22/10/2026 (`07c190a`) · gestao v135
+
+Pedido: *"como podemos automatizar o processo de indicação de condutor?"* e, em
+seguida, *"indicar e dar baixa na indicação no ato do contrato de locação"* e
+*"como enviar a informação de forma manual quando o locatário não tiver acesso
+ao app CNH Brasil"*.
+
+### 🔴 A base legal, lida na fonte — e ela mudou tudo
+
+**Resolução CONTRAN nº 918/2022** (texto obtido no DOU em 22/10/2026).
+
+**Art. 5º, § 1º, II** — quando **não dá para colher a assinatura do condutor
+infrator** (exatamente o caso de quem não tem o app, ou simplesmente não
+assina), a locadora anexa ao formulário *"cópia de documento onde conste
+cláusula de responsabilidade por infrações cometidas pelo condutor e comprove a
+posse do veículo no momento do cometimento da infração"*, com no mínimo:
+
+| | O contrato da LOKÁ tinha? |
+|---|---|
+| a) identificação do veículo | ✅ |
+| b) identificação do proprietário | ✅ |
+| **c) identificação do condutor** | 🔴 **NÃO — é este campo** |
+| d) cláusula de responsabilidade pelas infrações | ✅ Cláusula 8ª |
+| e) **período em que o veículo esteve na posse do condutor** | ✅ parcialmente |
+
+**O campo que faltava era a peça (c).** Com ele, o contrato de locação passa a
+servir como o anexo que a resolução exige — e a indicação deixa de depender de o
+locatário ter aplicativo, conta gov.br ou assinar qualquer coisa.
+
+### 🔴 A Cláusula 8ª cita resolução REVOGADA
+Os dois contratos dizem *"nos termos da Resolução 619/16 do CONTRAN"*. O **Art.
+38 da 918/2022** diz, literalmente: *"Ficam revogadas as Resoluções CONTRAN: …
+**V - nº 619, de 6 de setembro de 2016**; …"* — em vigor desde **1º/04/2022**.
+
+A procuração inteira se apoia nessa citação. **Não corrigi** (é texto de contrato
+e não foi pedido); fica para o Rogel decidir com o advogado.
+
+### Outros achados do mesmo texto
+- **Art. 6º**: o proprietário responde se não identificar **até o fim do prazo**
+  da NA, **ou se identificar em desacordo com o art. 5º**.
+- **Art. 7º**: proprietário **PJ** que cai no art. 6º leva multa do **§ 8º do
+  art. 257 do CTB**.
+- **Art. 4º, § 2º**: o prazo da NA **não é inferior a 30 dias**.
+- **Art. 8º, parágrafo único**: a notificação só vai ao **possuidor** (locatário)
+  em contrato de **vigência ≥ 180 dias**, e desde que ele esteja registrado no
+  órgão.
+- **Art. 5º, § 6º**: as indicações são registradas no **RENACH**.
+
+### O custo medido de não indicar
+| | |
+|---|---|
+| multas **por não identificação do condutor** | **62 · R$ 26.315,17** |
+| em 2026 | **45** |
+| já pagas | 13 · R$ 7.232,34 |
+| multas a indicar hoje | **390**, em 8 locatários |
+| com prazo de indicação conhecido | 🔴 **1 de 390** |
+
+### 🔴 Por que o condutor é uma LISTA com período, e não um campo
+É a alínea (e). Num contrato mensal de um ano o motorista muda — e a indicação
+de uma multa de março **não pode sair com o condutor de outubro**.
+
+`ativo.condutores[]`, cada um com `desde` / `ate`. Trocar de condutor **fecha o
+período do anterior na véspera** e o mantém no histórico. `_condNoDia(a, data)`
+devolve quem dirigia naquele dia.
+
+⚠️ `desde` vazio conta como "desde sempre" e `ate` vazio como "até hoje" — senão
+um condutor cadastrado sem datas nunca seria encontrado. E **buraco entre dois
+condutores devolve ninguém**: carro devolvido e realugado meses depois não pode
+atribuir a multa ao condutor anterior.
+
+### Onde entrou
+| | |
+|---|---|
+| botão **👤** na linha do aluguel | modal com condutor atual + histórico — é por ele que se preenche os **107 aluguéis que já existem** |
+| campos no **Novo Aluguel** | o condutor começa na data da **retirada** (a posse começa ali) |
+| formulário de indicação | usa o condutor **daquela data**, varrendo `ativos` **e** `historico` |
+| seção nova no documento | **"5 · Posse do veículo na data da infração"** — a alínea (e) |
+
+🔴 **Sem condutor registrado, o formulário sai exatamente como antes**: no nome
+do locatário, com a nota de transferência para PJ e sem citar a 918/2022. Há
+teste e defeito injetado só para essa invariante.
+
+⚠️ **Uma mudança que vale para todas as 390**: a seção 5 (período da locação)
+passa a aparecer **mesmo sem condutor**, quando há locação cobrindo a data. É
+informação verdadeira e exigida pela resolução, mas é diferente do que saía
+antes.
+
+Aluguel **sem** condutor **não ganha o campo** — nada de lista vazia inventada.
+
+### 🔴 O defeito que o CRM já tinha ensinado, pego antes de publicar
+`condRender` chamava `esc(...)`. **Não existe `esc` global neste arquivo**: as 5
+são `var esc` **dentro** de outras funções, e **três delas escapam CSV**, não
+HTML. Chamar de fora mataria o bloco inteiro do condutor — é exatamente o que
+deixou o `crm.html` da Auto Mais em branco. Entrou `_condEsc`.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**812/812**; eram 788); os dois
+  carimbos batendo
+- **70 testes** com o código real: a lista (array, objeto do Firebase, nulo), o
+  condutor do dia em 12 situações, as bordas de período, o **buraco** entre
+  condutores, sobreposição, registrar/trocar/excluir, o aluguel novo com e sem
+  condutor, a locação da multa (ativos, histórico, placa de outro carro, sem
+  data), o documento com e sem condutor, e o fonte
+- **27 defeitos injetados — todos acusados**, entre eles apagar o condutor
+  anterior ao trocar, deixar dois em aberto, o formulário ignorar o condutor, a
+  locação não varrer o histórico, perder o período da posse, e o `esc()` global
+- **No ar, no arquivo publicado**, com os **107 aluguéis, 94 encerrados, 638
+  multas e 136 clientes reais**, sem firebase no ambiente: condutor registrado no
+  aluguel real da **RSC/SYO1G57**, troca de condutor fechando o anterior em
+  31/08, multa real **R003972165 (06/12/2025)** saindo com o condutor certo,
+  documento de 1 página com as 6 seções, CNH e categoria, o locatário como
+  responsável com CNPJ, e a citação do art. 5º § 1º II. **Nada gravado em
+  produção** — reconferido: 107 aluguéis, **0 com condutor**, 638 multas.
+- Regressão **medida**: **38 suítes, 1.897 testes**, nenhuma falha
+
+### ⚠️ Três testes meus passaram com defeito vivo
+| O que passou | Por quê |
+|---|---|
+| ignorar o **fim** do período | com períodos encostados, a ordenação "quem começou depois" compensa sozinha. Quem exercita o fim é o **buraco** entre locações |
+| ignorar a **placa** na busca da locação | eu só tinha aluguéis da mesma placa. Precisa de um aluguel de **outro carro** na mesma data |
+| a guarda de **multa sem data** | parecia inerte (`ini <= ''` nunca casa) — só age quando o **aluguel** não tem retirada. Hoje os 107 têm |
+
+### ⚠️ E o meu ambiente do navegador mentiu
+Reatribuir `sandbox.db` **não troca o banco que o código vê**: `db` entra como
+**parâmetro** da `new Function`, então o código continua lendo o objeto
+original. A "reinicialização" não reiniciava nada, e a invariante do "sem
+condutor" passou a dar verde com o condutor ainda lá. Para banco limpo de
+verdade, **reconstruir o sandbox inteiro**.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Aluguéis Ativos, clicar no 👤 de um contrato
+real, registrar o condutor e gerar o formulário daquela placa.
+
+---
+
+## 🔎 Automatizar a indicação no SENATRAN — o que foi apurado em 22/10/2026
+
+### O que NÃO foi possível confirmar
+**Não há API pública documentada** do SENATRAN/SNE para um sistema de terceiro
+*efetivar* uma indicação. ⚠️ Mas isso é **"não encontrei"**, não "não existe":
+as páginas do SNE no gov.br que tentamos **deram 404**, e sem elas não dá para
+afirmar a ausência.
+
+O que o documento técnico do e-Frotas já dizia continua valendo: os **eventos 38
+e 41** do webhook apenas **notificam** que alguém indicou — **não são o ato de
+indicar** —, e o item 17 manda não assumir endpoint de POST sem validar no
+Swagger habilitado para a empresa.
+
+### O que está documentado (DNIT, páginas de 15/12/2025)
+Para multas de **rodovia federal**, o fluxo pode ser eletrônico:
+- **FICI** (identificação do condutor) e **FIRI** (indicação do responsável),
+  pelo **Portal de Multas do DNIT**, com login **gov.br**;
+- exige conta **Bronze/Prata/Ouro** (FICI) ou **Prata/Ouro** (FIRI);
+- o formulário pode ser **assinado eletronicamente pelo gov.br**;
+- **só o proprietário protocola** pelo portal;
+- fora do prazo, só pelos **Correios**;
+- análise ~2 dias úteis pelo portal, ~30 dias pelos Correios;
+- 🔴 **para PJ, o FIRI exige documento que comprove a representação ou
+  procuração com poderes para assinar** — que é exatamente o desenho da
+  Cláusula 8ª.
+
+### 🔴 A resposta à pergunta do app CNH Brasil
+**Não precisa do app.** O Art. 5º § 1º, II é justamente o caminho para quando
+não se colhe a assinatura do condutor: anexa-se o contrato de locação com as 5
+alíneas. Por isso o campo de condutor era o passo certo — e por isso o
+formulário agora imprime o período da posse e cita o dispositivo.
+
+### Onde isso trava, e o que destravaria
+Enviar **sem sair do sistema** continua esbarrando em infraestrutura: GitHub
+Pages não recebe POST, e a Org Policy do projeto barra criar Cloud Function
+nova. **Próximo passo real, e barato:** pedir acesso à **homologação** do
+e-Frotas e importar o Swagger — usa token e **não custa consulta**. É só isso
+que responde se a indicação é automatizável de verdade.
