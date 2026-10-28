@@ -5363,3 +5363,97 @@ Pages não recebe POST, e a Org Policy do projeto barra criar Cloud Function
 nova. **Próximo passo real, e barato:** pedir acesso à **homologação** do
 e-Frotas e importar o Swagger — usa token e **não custa consulta**. É só isso
 que responde se a indicação é automatizável de verdade.
+
+---
+
+## ✅ Painel: o ano do veículo passa a ser o ANO MODELO — 28/10/2026 (`ada2dff`) · Auto Mais
+
+Pedido: *"preciso que a visualizacao do ano do veiculo na aba PAINEL seja feita
+mostrando o ano modelo"*.
+
+⚠️ **"Painel" é a Auto Mais** — a LOKÁ chama a mesma tela de **Dashboard**.
+Conferido antes de abrir arquivo: o item "Painel" do menu só existe no
+`automaiscar/sistema/`.
+
+### O tamanho do problema, medido antes de mexer
+Nos **43 veículos reais** do Firestore:
+
+| | |
+|---|---|
+| com `ano_modelo` preenchido | 42 |
+| **ano de modelo DIFERENTE do de fabricação** | **23** |
+| modelo = fabricação | 19 |
+
+Ou seja: **mais da metade do estoque aparecia no Painel com um ano menor do que
+o que se anuncia e se negocia.** Em estoque (não vendidos) são 9 desses casos.
+
+### 🔴 Dois veículos reais exigiam o fallback
+| Placa | Veículo | `ano` | `ano_modelo` | Sem tratar daria |
+|---|---|---|---|---|
+| JCP7C61 | JEEP RENEGADE | 2024 | **(ausente)** | campo **em branco** |
+| QTZ1I54 | CHEVROLET ONIX | **(vazio)** | 2020 | já aparecia vazio hoje |
+
+`anoModeloVeic(v)` devolve o ano de modelo, **cai no de fabricação** quando o
+modelo não está cadastrado, e devolve `''` quando não há nenhum dos dois —
+**nunca `"undefined"` na tela**. Entrou no `firebase-shared.js`, onde moram os
+utilitários entre páginas.
+
+### 🔴 Os DOIS pontos do Painel, não um
+`index.html` mostra o ano em dois lugares: o card **"Estoque Atual"** (linha 270)
+e o resultado da **busca global** (linha 382). Mudar só um deixaria **o mesmo
+carro com dois anos diferentes na mesma tela**.
+
+### O que NÃO foi tocado, de propósito
+| Fica como está | Por quê |
+|---|---|
+| tela de **Veículos** (`v.ano_modelo?v.ano+'/'+v.ano_modelo:v.ano`) | mostra o **par** "2016/2017" — é onde se confere o cadastro |
+| **relatório** de estoque (PDF e CSV, de 01/10) | tem as duas colunas de propósito |
+| Contratos e Vendas | não foi pedido (regra 3) |
+
+⚠️ **Não existe uma regra única de "qual ano mostrar"** neste sistema — a tela de
+Veículos tem três formatações diferentes só nela (par, coluna só do modelo no
+CSV, par que colapsa quando igual no PDF), e cada uma é deliberada. Por isso o
+helper se chama `anoModeloVeic`, explícito, e **não** `anoVeic`: assim não é
+confundido com "o par".
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **20 testes de runtime** com os 43 veículos reais, rodando o `renderDashboard`
+  e o `buscaGlobal` de verdade: cada veículo divergente conferido **linha a
+  linha** (tem de aparecer o modelo **e não pode** aparecer a fabricação), os
+  dois casos de campo faltando, ano como número, veículo nulo, e as invariantes
+  do que não podia mudar (o par da tela de Veículos, as colunas do relatório)
+- **7 defeitos injetados — todos acusados**: voltar para a fabricação, ordem
+  invertida, sem fallback, sem guarda de nulo, mostrar o par, **mudar só metade
+  da tela**, e ignorar espaço em branco
+- **No navegador, contra o arquivo publicado e com os veículos reais**: os 9 em
+  estoque conferidos um a um (PLF-0254 2018→2019, TEL-1A07 2025→2026,
+  LUK-6D78 2019→2020, …), as duas bordas saindo certas na busca (JCP7C61 → 2024,
+  QTZ1I54 → 2020) e **zero "undefined"** na tela
+
+### ⚠️ Três tropeços meus de verificação
+1. **O scratchpad foi limpo entre sessões** — o `ext.js` e as **11 suítes antigas
+   da Auto Mais não existem mais**. O `node --check` das páginas acusou "X" em
+   todas, e **não era erro de sintaxe**: era a ferramenta faltando. Recriei o
+   `ext.js` e refiz. ⚠️ **Não houve regressão a rodar** além da suíte nova — as
+   antigas se foram, e isso está dito aqui em vez de eu alegar um número.
+2. **O `&bull;` não existe no DOM.** Minha varredura final no navegador procurava
+   `&bull; 2019 &bull;`, mas o navegador converte a entidade no caractere `•` ao
+   parsear — então ela acusou "sem modelo" nos 9 carros **que estavam certos**, e
+   a outra metade da asserção (a que procurava a fabricação) era igualmente
+   vazia. No Node funciona porque lá o HTML nunca é parseado. Refeita com `\u2022`
+   e com contraprova de que pega o defeito.
+3. **O script do Painel estourava no meio** do meu iframe (`addEventListener` de
+   `null`, porque faltavam 9 elementos que ele procura por id). As funções
+   existiam (declaração é içada) e eu quase segui — é a armadilha já registrada.
+   Passei a **exigir que o script rode até o fim**, conferindo que o `var DB`
+   tardio existe com os 43 veículos.
+
+⚠️ Testar no navegador pelo `login.html` **não funciona**: a página redireciona e
+corta o script. O caminho é a página institucional da raiz (mesma origem,
+estática) + **iframe** com a `location` travada, para o portão de sessão do
+sistema não levar a aba embora.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o Painel com **Ctrl+Shift+R** e ver os anos.
+Eu não autentico.
