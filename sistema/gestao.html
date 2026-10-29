@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v138-20261029-1210 -->
+<!-- LOKA deploy: v139-20261029-1545 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -953,9 +953,9 @@ tr:hover td{background:#f8f9fe;}
           <input class="filter-input" id="qReceber" type="text" placeholder="🔍 Buscar cliente..." oninput="finRenderReceber()" style="min-width:150px">
           <div style="display:flex;align-items:center;gap:5px;background:#f0f2f9;padding:4px 8px;border-radius:8px">
             <span style="font-size:10px;font-weight:700;color:var(--muted)">📅</span>
-            <input class="filter-input" id="recDataIni" type="date" onchange="finRenderReceber()" style="width:130px;padding:5px">
+            <input class="filter-input" id="recDataIni" type="date" onchange="_finDataFiltro(this,finRenderReceber)" onblur="_finDataFiltroBlur(this,finRenderReceber)" style="width:130px;padding:5px">
             <span style="font-size:10px;color:var(--muted)">até</span>
-            <input class="filter-input" id="recDataFim" type="date" onchange="finRenderReceber()" style="width:130px;padding:5px">
+            <input class="filter-input" id="recDataFim" type="date" onchange="_finDataFiltro(this,finRenderReceber)" onblur="_finDataFiltroBlur(this,finRenderReceber)" style="width:130px;padding:5px">
             <button onclick="finLimparDataReceber()" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">✕</button>
           </div>
           <!-- Multi-seleção: com 4 situações, botões cabem na barra e mostram a
@@ -1735,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v138-20261029-1210';
+var LOKA_BUILD = 'v139-20261029-1545';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -9023,7 +9023,7 @@ function finRenderAcertos() {
   rows.forEach(function(r,i){
     var pos = (Number(r.valor)||0)>=0;
     html += '<tr style="border-bottom:1px solid #f0f2f8">'
-      + '<td style="padding:4px 6px"><input type="date" value="'+(r.data||'')+'" onchange="finEdit(\'acertos\','+i+',\'data\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:130px;color:#0E1B4D"></td>'
+      + '<td style="padding:4px 6px"><input type="date" id="acData-'+i+'" value="'+(r.data||'')+'" onchange="_finDataEdit(this,\'acertos\','+i+',\'data\')" onblur="_finDataBlur(this,\'acertos\','+i+',\'data\')" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:130px;color:#0E1B4D"></td>'
       + '<td style="padding:4px 6px"><input type="text" value="'+(r.valor||0)+'" onchange="finEdit(\'acertos\','+i+',\'valor\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:110px;text-align:right;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700"></td>'
       + '<td style="padding:4px 6px"><input type="text" value="'+(r.banco||'').replace(/"/g,'&quot;')+'" onchange="finEdit(\'acertos\','+i+',\'banco\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:100%;color:#0E1B4D"></td>'
       + '<td style="padding:4px 6px;font-size:10px;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700">'+(pos?'Entrada':'Saída')+'</td>'
@@ -9245,6 +9245,57 @@ function finRenderDivida() {
 }
 
 // ── EDIÇÃO / ADIÇÃO / EXCLUSÃO ───────────────────────────────
+// ══ CAMPO DE DATA: o ano chega em pedacos ═══════════════════════
+// 🔴 <input type="date"> dispara CHANGE a cada digito do ano, porque ano de 1
+//    digito ja e data valida. Medido no navegador (29/10/2026) digitando
+//    25/12/2026: 0002-12-25 → 0020-12-25 → 0202-12-25 → 2026-12-25.
+//    Como o finEdit grava e REDESENHA a tabela, o campo morria no primeiro
+//    digito — o operador nao conseguia terminar, e o ano 2 ia para o banco.
+//    O lancamento da ISS com `vencimento: "0025-07-25"` e essa cicatriz.
+function _finDataValida(v) {
+  v = String(v == null ? '' : v);
+  if (!v) return true;                       // limpar o campo e legitimo
+  var m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  var ano = parseInt(m[1], 10);
+  return ano >= 1900 && ano <= 2100;
+}
+
+// change do campo gravavel: enquanto o ano esta incompleto, NAO grava e NAO
+// redesenha — e so por isso que da para digitar os 4 digitos.
+function _finDataEdit(el, aba, idx, campo) {
+  if (!el || !_finDataValida(el.value)) return;
+  var id = el.id;
+  finEdit(aba, idx, campo, el.value);
+  // o finEdit redesenhou a tabela e destruiu este campo: devolve o foco ao
+  // elemento NOVO de mesmo id, para o operador seguir editando a linha.
+  if (id) { var novo = document.getElementById(id); if (novo) novo.focus(); }
+}
+
+// Ao SAIR do campo com ano incompleto: o change foi ignorado, entao a tela
+// estaria mostrando uma data que nao foi gravada. Restaura e avisa.
+function _finDataBlur(el, aba, idx, campo) {
+  if (!el || _finDataValida(el.value)) return;
+  finInit();
+  var reg = (db.financeiro[aba] || [])[idx] || {};
+  el.value = reg[campo] || '';
+  toast('⚠️ Data incompleta — digite o ano com 4 dígitos.', '#b45309');
+}
+
+// Mesma guarda nos filtros De/Ate. Aqui o campo nao e destruido (ele mora no
+// HTML estatico), mas sem a guarda a lista pisca VAZIA a cada digito, porque
+// o filtro passa a valer para o ano 2.
+function _finDataFiltro(el, fn) {
+  if (!el || !_finDataValida(el.value)) return;
+  if (typeof fn === 'function') fn();
+}
+function _finDataFiltroBlur(el, fn) {
+  if (!el || _finDataValida(el.value)) return;
+  el.value = '';
+  toast('⚠️ Data incompleta — digite o ano com 4 dígitos.', '#b45309');
+  if (typeof fn === 'function') fn();
+}
+
 function finEdit(aba, idx, campo, valor) {
   finInit();
   var numericos = ['valor','recebido','principal','amortizado','receita','totParcelas','cet','valorParcela','pago'];
@@ -9890,11 +9941,11 @@ function finRenderReceber() {
             : '')
         + '</td>'
       + '<td style="padding:4px 6px;text-align:right;font-family:monospace;font-weight:700;color:'+(saldo<=0?'#0d7a3e':'#c0392b')+'">'+brl(saldo)+'</td>'
-      + '<td style="padding:4px 6px"><input type="date" value="'+(r.vencimento||'')+'" onchange="finEdit(\'receber\','+i+',\'vencimento\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0E1B4D"></td>'
+      + '<td style="padding:4px 6px"><input type="date" id="recVenc-'+i+'" value="'+(r.vencimento||'')+'" onchange="_finDataEdit(this,\'receber\','+i+',\'vencimento\')" onblur="_finDataBlur(this,\'receber\','+i+',\'vencimento\')" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0E1B4D"></td>'
       + '<td style="padding:4px 6px">'+inp('historico','260px')+'</td>'
       + '<td style="padding:4px 6px">'+stBadge+'</td>'
       + '<td style="padding:4px 6px">'+(st!=='pendente'
-          ? '<input type="date" value="'+(r.recebidoEm||'')+'" onchange="finEdit(\'receber\','+i+',\'recebidoEm\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0d7a3e">'
+          ? '<input type="date" id="recRecEm-'+i+'" value="'+(r.recebidoEm||'')+'" onchange="_finDataEdit(this,\'receber\','+i+',\'recebidoEm\')" onblur="_finDataBlur(this,\'receber\','+i+',\'recebidoEm\')" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0d7a3e">'
           : '<span style="color:#ccc;font-size:10px">—</span>')+'</td>'
       + '<td style="padding:4px 6px;text-align:center;white-space:nowrap">'
         + (st==='recebido'
