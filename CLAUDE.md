@@ -5567,3 +5567,200 @@ que o modal oferece. Quem for gerar contrato hoje tem 3 carros para escolher.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel clicar em **Gerar Contrato** no menu, escolher cliente e
 veículo e gerar um contrato de verdade. Eu não autentico.
+
+---
+
+## ✅ Órgão autuador no relatório de multas — 29/10/2026 (`de2fe5e`) · gestao v137
+
+Pedido: *"gentileza incluir no relatorio de multas que geramos em PDF o orgao
+autuador"*.
+
+A coluna já existia na **tela** desde a v100; o **relatório impresso** (e o que se
+leva para reunião) não a tinha. Entrou entre *Infração* e *Situação*, nas 7
+colunas, e o CSV ganhou **duas** colunas (`Cód. Órgão` e `Órgão`).
+
+### 🔴 Agrupa pelo CÓDIGO, nunca pelo texto cru
+É a lição da v91: o mesmo órgão chega escrito de várias formas (`238490-BA` e
+`238490 - PREF. DE BA SALVADOR`). `_mltOrgaoRel()` passa por `mltOrgaoChave`, e
+por isso o PDF e o CSV concordam sobre o mesmo órgão — e no Excel o mesmo órgão
+não se espalha em várias linhas de tabela dinâmica.
+
+⚠️ O CSV **não foi pedido**, mas ele já trazia o órgão em **texto cru**. Deixar o
+PDF normalizado e o CSV cru faria os dois relatórios discordarem. Fica registrado
+para ser revertido se o Rogel não quiser.
+
+### 🔴 O que os dados mostraram: o nome quase nunca existe
+Medido nas 652 multas reais:
+
+| | |
+|---|---|
+| com órgão | 570 · **sem órgão: 82** |
+| códigos distintos | 20 |
+| 🔴 **códigos com NOME aprendido** | **3** (238490, 000100, 000300) |
+
+E o maior bloco — **105300, com 251 multas** — **não tem nome**. Então a maioria
+das linhas mostra **só o código**, e é por isso que o código é a linha principal
+da célula (monoespaço) e o nome entra em cima **quando houver**. Repetir "Órgão
+105300" por extenso em 251 linhas seria ruído.
+
+Multa sem órgão sai como **⚠ sem órgão**, não em branco: 82 linhas vazias
+pareceriam defeito do relatório.
+
+### 🔴 O colspan, que é onde esse tipo de mudança quebra
+6 colunas viraram 7. Foram **5** colspans a acertar: os dois cabeçalhos de grupo
+(`6→7`) e as **três** linhas do rodapé (`5→6`). Esquecer isso é o defeito da v78
+(rodapé com célula a menos) e o da v119 (totais saindo uma coluna à esquerda do
+título que prometiam).
+
+### Cabe no A4 — medido, não suposto
+O relatório manda `@page{size:A4;margin:14mm}` e `body{padding:28px}`, e a tabela
+é `width:100%`. Então a caixa de conteúdo impressa tem **688 − 56 = 632px**, e o
+que poderia transbordar é o **mínimo** de cada coluna.
+
+Medido no navegador, montando o relatório publicado num quadro de 688px com o
+**pior caso de cada coluna** (maior descrição, maior nome de locatário, o nome de
+órgão de 50 caracteres, o maior valor, sem órgão e sem locatário):
+
+| Placa | AIT | Data | Infração | Órgão | Situação | Valor | **soma** |
+|---|---|---|---|---|---|---|---|
+| 69px | 83px | 74px | 143px | **110px** | 75px | 61px | **616px** |
+
+**616 de 632px — sobram 16px, não transborda.** O pior caso por coluna é o que
+decide a largura mínima da tabela, então a medida vale para as 652 linhas.
+
+⚠️ Medir o documento inteiro de uma vez **travou a aba duas vezes**: um laço que
+lê `scrollWidth` de 652 linhas força 652 reflows. O pior caso por coluna dá o
+mesmo número em 9 linhas.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **38 testes** com as **652 multas reais**: a célula nos três casos (com nome,
+  só código, sem órgão), o agrupamento por código, as 7 colunas, os 5 colspans, o
+  CSV com as duas colunas, e o documento inteiro
+- **17 defeitos injetados — todos acusados**, entre eles ler o texto cru, a coluna
+  sumir do cabeçalho, a célula sumir das linhas, os colspans voltarem, e o CSV
+  discordar do PDF
+- **No ar, no arquivo publicado, com as 652 multas reais** (só leitura): 7 colunas,
+  **7 células em toda linha**, colspan 7 nos grupos e 6 no rodapé, 82 avisos de
+  "sem órgão", e os 3 nomes aprendidos
+- Regressão **medida**: **40 suítes, 1.984 testes**, nenhuma falha
+
+### ⚠️ Dois testes meus que o `injetar` reprovou antes de eu publicar
+O grupo "sem locatário" passava porque minha amostra de 3 multas **não tinha**
+multa sem cliente — entrou uma 4ª. E um defeito deu *ERRO DE MONTAGEM*: minha
+âncora tinha uma linha em branco que não existe no fonte. Âncora que não casa é
+defeito que nunca foi testado.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o painel Multas e gerar o PDF. Eu não autentico.
+
+---
+
+## 🔴 Locatário não identificado: SEV0J14 e a auditoria da frota — 29/10/2026
+
+Relato: *"verificar o veiculo SEV0J14 que não esta sendo identificado o
+locatario. auditar os demais veiculos ativos na frota e verificar se existe mais
+algum que esteja nessa situacao"*.
+
+### 🔴 O SEV0J14 TEM locatário — quem não o acha é o backend
+Ele está num aluguel ativo da **TRANSSOUZA TRANSPORTE E TURISMO LTDA**
+(`ativos[4]`, retirada 11/06/2026, contrato de 13 carros) — mas como **segunda
+placa**: o registro tem `placa: "EQQ2J61"` e `placas: ["EQQ2J61","SEV0J14"]`.
+
+É a **armadilha 2** do CLAUDE.md, e ela está no **backend**:
+
+```js
+// deploy/functions/multas-db.js:35 e :47 — cruzarLocatario
+_lista(db.ativos).forEach(function (a) {
+  if (normPlaca(a.placa) !== p) return;      // 🔴 nunca olha a.placas[]
+```
+
+Por isso as 8 multas da placa se dividem exatamente assim:
+
+| Origem | Locatário |
+|---|---|
+| 4 multas **de PDF** (10/2025 a 03/2026) | ✅ TRANSSOUZA |
+| 4 multas **do e-Frotas** (07 a 10/2026) | 🔴 vazio |
+
+**O frontend está certo** — `mltIndLocacao` (e `renderFrota`, e o filtro de
+multas) passam por `_placasDoAtivo`. Então na tela **Frota Ativa** o SEV0J14
+aparece com a TRANSSOUZA normalmente; onde ele aparece sem locatário é no painel
+**Multas**.
+
+### A auditoria: 3 placas na situação idêntica
+Dos **105 aluguéis ativos**, **4 são multi-veículo**, e neles há **4 placas** que
+não são a `a.placa` — invisíveis a qualquer código que leia `a.placa` direto:
+
+| Placa | Veículo | Contrato de | Multas sem locatário |
+|---|---|---|---|
+| **SEV0J14** | CHEVROLET Spin | TRANSSOUZA | **4** |
+| **GBW2B46** | VW Saveiro Baú | RSC | **2** |
+| **FCN9G63** | VW Saveiro Baú | RSC | **2** |
+| RTE3J91 | VW Saveiro Baú | G7 COMPANY | 0 (mesma exposição) |
+
+**8 multas** seriam identificadas na hora se o backend olhasse `placas[]`.
+
+### 🔴 Mas a maioria das 72 é OUTRO problema — e não é código
+São **72 multas sem locatário · R$ 15.952,88**, em 21 placas, **todas do
+e-Frotas** (as 341 de PDF têm locatário, quase todas por vínculo manual).
+Classificando cada uma contra `ativos` + `historico`:
+
+| Causa | Multas |
+|---|---|
+| 🔴 **infração ANTES de qualquer locação registrada da placa** | **58** |
+| armadilha 2 (2ª placa) — **se conserta no código** | **8** |
+| placa **nunca** alugada em registro nenhum (SJA7D59) | 4 |
+| buraco entre contratos | 2 |
+
+As 58 não são defeito: o sistema **realmente não tem registro** de quem estava
+com o carro. Exemplo medido — **RUI8I24**: aluguel ativo da RSC desde
+**01/06/2026**, `historico` **vazio**, e multas de abril e maio de 2026. As
+equivalentes que *têm* a RSC foram vinculadas **à mão** (`cruzamento: 'manual'`,
+origem PDF). O contrato anterior daquele carro nunca entrou no histórico — foi
+recadastrado em 01/06 em vez de prorrogado.
+
+⚠️ **Não dá para preencher essas 58 por código sem inventar dado.** Quem souber
+de quem era o carro é o Rogel; o caminho honesto é o vínculo manual que a tela
+já oferece.
+
+### 🔴 Achado MAIS CARO que o pedido: 2 carros alugados estão como "inativo"
+A auditoria da frota (119 veículos, 106 marcados `alugado`) encontrou **2
+veículos com aluguel ativo e status `inativo`**:
+
+| Placa | Veículo | Locatário | Retirada |
+|---|---|---|---|
+| **SJA7D13** | CHEVROLET Onix Plus AT | JOSE CLAUDEMIRO OLIVEIRA JUNIOR | 24/03/2026 → 23/04 |
+| **RTE3J91** | VW Saveiro Baú | G7 COMPANY LTDA | 12/06/2026 → **aberto** |
+
+🔴 **A varredura do e-Frotas pula veículo inativo** (trava da v13, 30/09). São
+109 placas enviadas e 10 de fora — e **essas duas são as únicas inativas com
+aluguel ativo**. Ou seja: **dois carros alugados não estão sendo consultados
+para multa nenhuma.** O RTE3J91 segue com contrato **aberto**.
+
+⚠️ Não confundir com as **6 placas que o Serpro recusa** (403, fora do contrato
+e-Frotas, 30/09): aquilo é contrato com o Serpro; isto é cadastro interno, e se
+resolve mudando o status.
+
+### Outros achados do mesmo levantamento (nenhum corrigido — não foi pedido)
+- **1 aluguel ativo com placa fora do cadastro**: `GDE1E83` (BRJ EXPRESSO) — já
+  conhecido desde 14/10, quando apareceu faturada e sem cadastro.
+- `excluirAtivo` (`gestao.html:4102`) libera **só a placa principal** ao excluir
+  um aluguel: num contrato multi-veículo os outros carros ficam `alugado` sem
+  aluguel. (`reconciliarStatusVeiculos` conserta no carregamento, porque usa
+  `_placasDoAtivo`.)
+- `excluirVeiculo` (`gestao.html:5363`) procura o aluguel por `a.placa` sem
+  `placas[]`: as 4 placas da tabela acima **poderiam ser excluídas estando
+  alugadas**.
+- 0 aluguéis ativos sem nome de locatário; 0 veículos `alugado` sem aluguel que a
+  tela ache.
+
+### ⏳ Nada foi alterado — o que fica para decisão do Rogel
+1. **Consertar `cruzarLocatario`** para varrer `placas[]`. ⚠️ O conserto só vale
+   **depois de `firebase deploy`**, que depende do login dele (a credencial do
+   `firebase-tools` expirou nesta máquina em 30/09). É a mesma lição da v13:
+   correção que mora só no backend fica viva no fonte e morta em produção.
+2. **Vincular as 8 multas** das 3 placas, que o conserto não alcança
+   retroativamente (ele só vale para multa nova).
+3. **Acertar o status de SJA7D13 e RTE3J91** — é o item mais urgente, porque
+   enquanto estiverem inativos esses dois carros não são consultados.
+4. As **58** sem locação registrada: vínculo manual, caso a caso.
