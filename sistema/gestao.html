@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v136-20261029-0920 -->
+<!-- LOKA deploy: v137-20261029-1030 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1735,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v136-20261029-0920';
+var LOKA_BUILD = 'v137-20261029-1030';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -14506,9 +14506,24 @@ function mltSitRel(m){
   return st.rot;
 }
 
+// Célula do órgão no relatório impresso. Mesma regra da tela (v100): agrupa
+// pelo CÓDIGO, porque o mesmo órgão chega escrito de várias formas.
+// 🔴 O código vem SEMPRE (é ele que identifica a multa perante o órgão, e é
+//    curto); o nome vem quando foi aprendido dos próprios dados — hoje só 3
+//    dos 20 códigos têm nome, então repetir "Órgão 105300" por extenso em 251
+//    linhas seria ruído, e por isso o código é a linha principal.
+function _mltOrgaoRel(m, nomes) {
+  var k = mltOrgaoChave(m);
+  if (!k) return '<span style="color:#b45309">⚠ sem órgão</span>';
+  var nome = nomes[k] || '';
+  return (nome ? '<div>' + nome + '</div>' : '')
+    + '<div style="font-family:monospace;font-size:10px;color:#666">' + k + '</div>';
+}
+
 function mltRelatorio(){
   var lista = mltFiltradas();
   if (!lista.length) { toast('Nenhuma multa no filtro atual','#b45309'); return; }
+  var _orgNomes = mltOrgaoNomes();
 
   var porCliente = {};
   var semCliente = [];
@@ -14523,18 +14538,20 @@ function mltRelatorio(){
   Object.keys(porCliente).sort().forEach(function(nome){
     var ms = porCliente[nome];
     var sub = ms.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
-    linhas += '<tr style="background:#EEF1FD"><td colspan="6"><strong>'+nome+'</strong> — '+ms.length+' multa(s) · '+brl(sub)+'</td></tr>';
+    linhas += '<tr style="background:#EEF1FD"><td colspan="7"><strong>'+nome+'</strong> — '+ms.length+' multa(s) · '+brl(sub)+'</td></tr>';
     ms.forEach(function(m){
       linhas += '<tr><td>'+mltFmtPlaca(m.placa)+'</td><td>'+(m.ait||'—')+'</td><td>'+mltBR(m.dataInfracao)
-        +'</td><td>'+(m.descricao||'—')+'</td><td>'+mltSitRel(m)+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
+        +'</td><td>'+(m.descricao||'—')+'</td><td style="font-size:11px">'+_mltOrgaoRel(m,_orgNomes)+'</td>'
+        +'<td>'+mltSitRel(m)+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
     });
   });
   if (semCliente.length) {
     var subS = semCliente.reduce(function(s,m){ return s + mltNum(m.valor); }, 0);
-    linhas += '<tr style="background:#fff4e5"><td colspan="6"><strong>Sem locatário identificado (responsabilidade Loká)</strong> — '+semCliente.length+' · '+brl(subS)+'</td></tr>';
+    linhas += '<tr style="background:#fff4e5"><td colspan="7"><strong>Sem locatário identificado (responsabilidade Loká)</strong> — '+semCliente.length+' · '+brl(subS)+'</td></tr>';
     semCliente.forEach(function(m){
       linhas += '<tr><td>'+mltFmtPlaca(m.placa)+'</td><td>'+(m.ait||'—')+'</td><td>'+mltBR(m.dataInfracao)
-        +'</td><td>'+(m.descricao||'—')+'</td><td>'+mltSitRel(m)+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
+        +'</td><td>'+(m.descricao||'—')+'</td><td style="font-size:11px">'+_mltOrgaoRel(m,_orgNomes)+'</td>'
+        +'<td>'+mltSitRel(m)+'</td><td style="text-align:right">'+brl(mltNum(m.valor))+'</td></tr>';
     });
   }
 
@@ -14552,12 +14569,13 @@ function mltRelatorio(){
     + '@media print{@page{size:A4;margin:14mm}}</style></head><body>'
     + '<h1>Relatório de Multas — LOKÁ Aluguel de Veículos</h1>'
     + '<div style="font-size:11px;color:#666">Emitido em '+new Date().toLocaleString('pt-BR')+' · '+lista.length+' registro(s)</div>'
-    + '<table><thead><tr><th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th><th>Situação</th><th style="text-align:right">Valor</th></tr></thead>'
+    + '<table><thead><tr><th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th>'
+    + '<th>Órgão autuador</th><th>Situação</th><th style="text-align:right">Valor</th></tr></thead>'
     + '<tbody>'+linhas+'</tbody>'
-    + '<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700;padding-top:10px">TOTAL</td>'
+    + '<tfoot><tr><td colspan="6" style="text-align:right;font-weight:700;padding-top:10px">TOTAL</td>'
     + '<td style="text-align:right;font-weight:700;padding-top:10px">'+brl(total)+'</td></tr>'
-    + '<tr><td colspan="5" style="text-align:right;color:#0d7a3e">Pago</td><td style="text-align:right;color:#0d7a3e">'+brl(totPago)+'</td></tr>'
-    + '<tr><td colspan="5" style="text-align:right;color:#c0392b;font-weight:700">Em aberto</td><td style="text-align:right;color:#c0392b;font-weight:700">'+brl(totAberto)+'</td></tr>'
+    + '<tr><td colspan="6" style="text-align:right;color:#0d7a3e">Pago</td><td style="text-align:right;color:#0d7a3e">'+brl(totPago)+'</td></tr>'
+    + '<tr><td colspan="6" style="text-align:right;color:#c0392b;font-weight:700">Em aberto</td><td style="text-align:right;color:#c0392b;font-weight:700">'+brl(totAberto)+'</td></tr>'
     + '</tfoot></table>'
     + '<script>window.onload=function(){window.print()}<\/script></body></html>');
   w.document.close();
@@ -14568,11 +14586,13 @@ function mltRelatorioCSV(){
   var lista = mltFiltradas();
   if (!lista.length) { toast('Nenhuma multa no filtro atual','#b45309'); return; }
   var esc = function(s){ s=(s==null?'':String(s)); return '"'+s.replace(/"/g,'""')+'"'; };
-  var linhas = [ ['Placa','Veículo','AIT','Data Infração','Infração','Órgão','Locatário','Status','Vencimento','Valor (R$)','Pago (R$)','Data Pgto'].map(esc).join(';') ];
+  var _orgNomes = mltOrgaoNomes();
+  var linhas = [ ['Placa','Veículo','AIT','Data Infração','Infração','Cód. Órgão','Órgão','Locatário','Status','Vencimento','Valor (R$)','Pago (R$)','Data Pgto'].map(esc).join(';') ];
   lista.forEach(function(m){
     linhas.push([
       mltFmtPlaca(m.placa), m.veiculoNome||'', m.ait||'', mltBR(m.dataInfracao), m.descricao||'',
-      m.orgao||'', m.clienteNome||'(sem locatário)', (MLT_STATUS[m.status]||{}).rot||m.status||'',
+      mltOrgaoChave(m), mltOrgaoRotulo(mltOrgaoChave(m), _orgNomes),
+      m.clienteNome||'(sem locatário)', (MLT_STATUS[m.status]||{}).rot||m.status||'',
       m.vencimento?mltBR(m.vencimento):'', mltNum(m.valor).toFixed(2).replace('.',','),
       m.dataPagamento?(mltNum(m.valorPago)||mltNum(m.valor)).toFixed(2).replace('.',','):'',
       m.dataPagamento?mltBR(m.dataPagamento):''
