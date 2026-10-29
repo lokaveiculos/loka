@@ -51,13 +51,13 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v136-20261029-0920** |
+| `gestao.html` | **v138-20261029-1210** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
-| `contrato-mensal.html` | **mensal-v5-20261020-1340** |
-| `contrato-diaria.html` | **diaria-v4-20261020-0910** |
+| `contrato-mensal.html` | **mensal-v6-20261029-1420** |
+| `contrato-diaria.html` | **diaria-v5-20261029-1420** |
 
 ## Modelo de dados — `loka_db`
 
@@ -5764,3 +5764,129 @@ resolve mudando o status.
 3. **Acertar o status de SJA7D13 e RTE3J91** — é o item mais urgente, porque
    enquanto estiverem inativos esses dois carros não são consultados.
 4. As **58** sem locação registrada: vínculo manual, caso a caso.
+
+---
+
+## ✅ Cláusula 8ª: reconhecimento da multa pelo condutor — 29/10/2026 (`b22bcc6`) · mensal v6 · diária v5
+
+Pedido: acrescentar à Cláusula 8ª dos contratos **mensal e por diária** que as
+multas devem ser reconhecidas pelo condutor, e que o não reconhecimento gera
+penalidade dobrada repassada ao cliente, com juros e multa por atraso.
+**"Gentileza melhorar o texto se achar conveniente."**
+
+⚠️ Aqui ele **nomeou os dois documentos** — diferente da Cláusula 7ª (20/10), em
+que ele disse "contrato mensal" e a diária ficou de fora de propósito.
+Conferido antes: a Cláusula 8ª tem redação **idêntica** nos dois arquivos.
+
+### O texto como ficou
+> […] durante o período de locação e eventuais prorrogações. **As multas deverão
+> ser reconhecidas pelo condutor do veículo dentro do prazo fixado pelo órgão
+> autuador. O não reconhecimento em tempo hábil sujeita o LOCADOR a nova
+> penalidade, de valor igual ao da multa original multiplicado pelo número de
+> infrações iguais cometidas nos doze meses anteriores, nos termos do art. 257,
+> § 8º, do Código de Trânsito Brasileiro, a qual será integralmente repassada ao
+> LOCATÁRIO, somando-se à multa original e acrescida de juros e multa em caso de
+> atraso no pagamento.**
+
+🔴 **Entrou DENTRO do parágrafo da Cláusula 8ª**, não como cláusula nova —
+cláusula nova renumeraria o contrato inteiro. O teste confere a numeração
+sequencial (1…13 no mensal, 1…15 na diária) e há defeito injetado que prova
+que ele pega.
+
+### 🔴 As 5 mudanças que eu fiz no texto dele, e por quê
+
+| Ele escreveu | Ficou | Por quê |
+|---|---|---|
+| "o **dobro** do valor da penalidade original" | valor igual ao da original **multiplicado pelo número de infrações iguais nos doze meses anteriores**, art. 257 § 8º do CTB | ⚠️ **"O dobro" CAPARIA o repasse.** A lei multiplica pelas infrações iguais do ano: com 3 iguais, a nova multa é 3× — e a cláusula dizendo "o dobro" limitaria a cobrança a 2×. A LOKÁ já tem **62 multas por não identificação de condutor (R$ 26.315,17)**, então infração igual repetida no ano é caso real, não hipótese |
+| "nova penalidade cobrada pelo **órgão autuador**" | "sujeita **o LOCADOR** a nova penalidade" | A penalidade recai sobre o **proprietário**, e é *por isso* que ela é repassada. Dizer isso explica o repasse em vez de só afirmá-lo — e é o que dá base para cobrar |
+| "repassada ao **cliente**" | "repassada ao **LOCATÁRIO**" | É o registro do próprio documento (Cláusula 3ª). "Cliente" não aparece em cláusula nenhuma |
+| "em tempo hábil" | "**dentro do prazo fixado pelo órgão autuador**" (mantendo "em tempo hábil" no gatilho) | Prazo de indicação não se estima: é o que a notificação traz. Mesma regra da aba de Indicação, que escreve "consultar no órgão" em vez de chutar data |
+| — | "**somando-se à multa original**" | O art. 257 § 8º diz "mantida a originada pela infração". Sem essa frase daria para ler que a nova penalidade **substitui** a multa, e aí a cobrança perderia metade |
+
+O resto da redação é a dele.
+
+### 🔴 Dois achados da mesma cláusula que eu NÃO toquei
+Os dois são decisão de advogado, e os dois já estavam registrados:
+
+1. **Ela cita a Resolução 619/16 do CONTRAN, que está REVOGADA** pelo art. 38 da
+   Resolução CONTRAN 918/2022, em vigor desde 01/04/2022 (lido no DOU em 22/10).
+   A procuração inteira se apoia nessa citação.
+2. 🔴 **Ela constitui a "Rodera Transportes LTDA" como procuradora — não a
+   LOKÁ.** Se é a LOKÁ que assina o termo de apresentação de condutor, a
+   procuração está no nome da empresa errada, e isso atinge exatamente o fluxo
+   de indicação construído na v135.
+
+⚠️ Mexer na empresa procuradora ou na norma citada muda a base jurídica da
+cláusula, não a redação — por isso ficou de fora mesmo com a autorização de
+"melhorar o texto". Trocar qualquer um dos dois é uma linha.
+
+### ⚠️ A diária não tem regra de mora para sustentar o "juros e multa"
+O acréscimo diz "acrescida de juros e multa em caso de atraso". No **mensal** a
+Cláusula 7ª define isso (2% + 6% ao mês, 20/10). Na **diária não há cláusula de
+mora nenhuma** — a frase fica sem percentual definido naquele contrato.
+
+Não escrevi número na diária porque o escopo da Cláusula 7ª foi explicitamente
+só o mensal. Fica a decisão: levar a mora para a diária também, ou deixar.
+
+### Cabe no A4 — medido nos arquivos reais das duas versões
+Buscados do **raw do GitHub nos dois commits** (`13da033` = antes, `b22bcc6` =
+agora), com as regras de `@media print` **extraídas e injetadas** no quadro de
+medição.
+
+| | altura do `.contract` | páginas | sobra na 1ª folha |
+|---|---|---|---|
+| mensal v5 (antes) | **937px** | 0,88 | 133px |
+| **mensal v6** | **960px** (+23) | **0,90** | **110px** |
+| diária v4 (antes) | **972px** | 0,91 | 98px |
+| **diária v5** | **995px** (+23) | **0,93** | **75px** |
+
+A4 útil = **726 × 1070px**. Os dois continuam em **uma folha**, sem transbordar a
+largura (726px exatos). A Cláusula 8ª passou de 323 para **821 caracteres**.
+
+⚠️ **A diária é a que tem menos folga: 75px.** Com muitas linhas de veículo o
+documento cresce, e ela é a próxima a passar para a segunda folha.
+
+### ⚠️ A medição em modo TELA deu 2.133px — 2,3× o valor certo
+Minha primeira rodada mediu sem aplicar o `@media print`, e deu `mensal v5 =
+2133px` quando o registro de 20/10 diz **937px**. O número só ficou confiável
+depois de extrair o bloco `@media print` **com balanceamento de chaves** (tem
+`@page{}` dentro, então regex simples corta no lugar errado) e injetá-lo como
+CSS comum.
+
+🔴 **O que salvou foi ter um número antigo para comparar.** Medida nova que não
+reproduz a medida registrada da mesma versão está errada — e aqui ela estaria
+errada por 2,3×, no sentido alarmista (eu teria concluído que o contrato já
+passava de 2 folhas).
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (mensal 45/45, diária 48/48 —
+  iguais ao registro da v124); os **três** carimbos de cada arquivo batendo
+- **99 testes** na suíte das cláusulas (eram 61): as 10 frases do acréscimo em
+  cada contrato, "o dobro" **ausente**, "cliente" ausente, a parte antiga da
+  cláusula intacta (a procuração), numeração sequencial, o acréscimo **uma vez
+  só**, sem vazar para a cláusula vizinha, **idêntico nos dois**, e as Cláusulas
+  7ª/10ª/11ª de 20/10 preservadas
+- **52 defeitos injetados — todos acusados** (eram 32): entre eles voltar a dizer
+  "o dobro", perder o multiplicador, a nova penalidade **substituir** a original,
+  o repasse deixar de ser integral, a penalidade recair no LOCATÁRIO em vez do
+  LOCADOR, citar o artigo errado do CTB, apagar a procuração, virar cláusula
+  nova, entrar duas vezes, e a diária divergir do mensal por uma palavra
+- **No ar, nos dois arquivos publicados**, parseados pelo navegador: carimbos
+  v6/v5, 13 e 15 cláusulas, o texto da Cláusula 8ª **idêntico nos dois**
+  (comparação de string, não de regex), e as Cláusulas 7ª, 10ª e 11ª intactas
+
+### ⚠️ Um teste de 20/10 falhou sem haver defeito
+`[o texto novo não aparece em nenhuma outra cláusula do mensal]` procurava o
+marcador **genérico** `atraso no pagamento` em tudo que vem depois da Cláusula
+8ª — e o acréscimo de hoje, que é *da* Cláusula 8ª e fala legitimamente de
+atraso, o fez falhar. É a armadilha do **teste estrutural ancorado no vizinho**,
+de novo. O marcador passou a ser o específico da Cláusula 7ª (`multa de 2%` /
+`juros de 6%`), que é o que de fato não pode vazar.
+
+E dois defeitos do injetor travavam o **número** da versão (`mensal-v5-…`):
+publicar a v6 fez um deles dar *ERRO DE MONTAGEM* sem defeito nenhum. Os dois
+passaram a montar a âncora a partir do próprio arquivo.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel gerar um contrato de cada tipo e ler a Cláusula 8ª no
+documento impresso.
