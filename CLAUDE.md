@@ -51,13 +51,13 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v138-20261029-1210** |
+| `gestao.html` | **v140-20261029-1640** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
 | `contrato-mensal.html` | **mensal-v6-20261029-1420** |
-| `contrato-diaria.html` | **diaria-v5-20261029-1420** |
+| `contrato-diaria.html` | **diaria-v6-20261029-1545** |
 
 ## Modelo de dados — `loka_db`
 
@@ -5890,3 +5890,191 @@ passaram a montar a âncora a partir do próprio arquivo.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel gerar um contrato de cada tipo e ler a Cláusula 8ª no
 documento impresso.
+
+---
+
+## ✅ LOKÁ é o nome fantasia da RODERA — 29/10/2026
+
+Informação do Rogel, que **encerra o achado de hoje de manhã**: a Cláusula 8ª
+constitui a **"Rodera Transportes LTDA"** como procuradora, e eu tinha marcado
+isso como 🔴 *"procuração no nome da empresa errada"*.
+
+**Não está errada.** Rodera Transportes LTDA é a **razão social**; LOKÁ é o
+**nome fantasia**. A procuração está no nome da pessoa jurídica de verdade, que
+é como tem de ser num contrato.
+
+⚠️ Bate com o que já estava registrado e eu não tinha ligado: a conta de
+faturamento do Google é da org **`rodlogtransportes.com`** (15/09).
+
+**Nada a corrigir na Cláusula 8ª quanto a isso.** Continua em aberto só o outro
+ponto dela: a citação da **Resolução 619/16 do CONTRAN**, revogada pela 918/2022
+desde 01/04/2022 — essa é decisão do advogado.
+
+---
+
+## ✅ Mora também no contrato de diária — 29/10/2026 (`88d738e`) · diária v6
+
+Pedido: *"levar juros e multa para diaria"*.
+
+Em 20/10 a regra de mora entrou **só no mensal**, porque ele nomeou aquele
+documento. A diária ficou de fora de propósito, e isso virou buraco quando a
+Cláusula 8ª (hoje de manhã) passou a dizer *"acrescida de juros e multa em caso
+de atraso"* — na diária não havia percentual nenhum para sustentar a frase.
+
+🔴 **Texto idêntico ao do mensal, palavra por palavra.** Dois contratos da mesma
+empresa com percentuais de mora diferentes seria pior do que não ter regra.
+
+⚠️ O resto da Cláusula 7ª **não** é igual nos dois: o mensal aceita *"boleto
+bancário ou transferência"*, a diária só *"transferência"*. Essa diferença é
+anterior e **não foi tocada** — o acréscimo entra depois do PIX, como no mensal.
+Há teste exigindo que a diária continue sem boleto e o mensal com.
+
+### A suíte de 20/10 travava o escopo ANTIGO
+Dois testes exigiam a diária **sem** a mora, e uma injeção se chamava *"o
+acréscimo vaza para a diária (não foi pedido)"*. Com o pedido de hoje a
+exigência **inverteu**. Os dois viraram a invariante nova, que é mais forte:
+
+- a mora está nos **dois** contratos;
+- o trecho é **idêntico** (comparação de string, não regex);
+- aparece **uma vez** em cada;
+- a forma de pagamento de cada contrato ficou como era.
+
+A injeção obsoleta virou **"a mora entra DUAS vezes na diária"** — contradição
+assinada é defeito de verdade. **102 testes · 56 defeitos injetados, todos
+acusados.**
+
+---
+
+## 🔴 Campo de data do Contas a Receber: dois bugs, não um — 29/10/2026 · gestao v139 → v140
+
+Relato: *"quando digitamos manualmente o campo correspondente ao ano apresenta
+falha e nao permite digitarmos os quatro campos de uma só vez"*.
+
+### 🔴 A prova veio do banco antes de vir da tela
+`financeiro/receber[35]` (ISS, R$ 3.000) tem **`vencimento: "0025-07-25"`**.
+Com ano 0025 esse lançamento **nunca aparece num filtro por data**. É a cicatriz
+exata do bug, e estava no banco desde antes — eu já a tinha anotado em 13/10 como
+"ano digitado errado", sem entender que era o sistema produzindo o erro.
+
+### Bug 1 — campo VAZIO: o ano chega em pedaços
+Medido no navegador, com **teclas de verdade** num `<input type="date">`:
+
+```
+digitar 2-5-1-2-2-0-2-6  →  change dispara QUATRO vezes
+   0002-12-25 → 0020-12-25 → 0202-12-25 → 2026-12-25
+```
+
+Ano de **1 dígito já é data completa e válida** para o navegador. E como o
+`finEdit` grava e **redesenha a tabela inteira**, o campo morria no primeiro
+dígito. Medido no caso real:
+
+| | |
+|---|---|
+| eventos recebidos | **1** (`0002-12-25`) |
+| redesenhos | **1** → o campo é destruído |
+| foco depois | **BODY** — os dígitos `0`, `2`, `6` não vão a lugar nenhum |
+| valor na tela | **vazio** |
+| 🔴 valor **gravado** | **`0002-12-25`** |
+
+### 🔴 Bug 2 — campo que JÁ TEM data: cada tecla é uma data completa
+A v139 guardou o ano (`_finDataValida`: 1900–2100) e resolveu o caso vazio.
+**Testando no navegador contra o arquivo da v139 apareceu o segundo caso, e a
+guarda de ano não o alcança:**
+
+```
+campo com 25/07/2026, digitando 25/12/2026 por cima:
+   9 gravações · 9 redesenhos
+   banco ficou 2026-07-06   ·   tela mostrou 25/07/2026
+```
+
+Com o ano **já completo**, cada tecla em **qualquer** segmento produz data
+completa e válida — o change dispara em todas. Pior: a devolução de foco que a
+v139 introduziu (um ganho no caso vazio) fazia o campo recriado **aceitar a
+tecla seguinte e gravar de novo**. De 1 gravação errada passou a **9**.
+
+🔴 **Nenhuma guarda de VALOR resolve isso:** `2026-07-02` é data legítima. O que
+está errado é o **momento** — o change dispara enquanto se digita.
+
+### O conserto (v140): a gravação sai do `change`
+`_finDataSalvar(el, aba, idx, campo, voltarFoco)` grava no **blur** e no
+**Enter** — uma vez por edição, e só quando o valor mudou de verdade.
+
+| Situação | O que acontece |
+|---|---|
+| digitando | **nada**: nem grava, nem redesenha, nem perde o foco |
+| ao sair com data completa | grava **uma** vez, redesenha, a tela mostra o que foi gravado |
+| ao sair com ano incompleto | **restaura o valor gravado** e avisa "digite o ano com 4 dígitos" |
+| só passar pelo campo | não grava nem redesenha (`el.value === atual`) |
+| apagar a data | **é gravado** — limpar é legítimo |
+
+⚠️ **No blur o foco NÃO é devolvido**: ele já está indo para onde a pessoa
+clicou, e puxá-lo de volta seria roubar o clique. No **Enter** é devolvido,
+porque ali ela continua no campo. Há defeito injetado para os dois lados.
+
+Vale para os **3 campos de data graváveis** do Financeiro: `vencimento` e
+`recebidoEm` do Contas a Receber, e `data` dos Acertos.
+
+### Os filtros De/Até receberam só a guarda de ano
+Eles **não** são destruídos (moram no HTML estático), então digitar sempre
+funcionou. O que havia era a lista **piscando vazia** a cada dígito, porque o
+filtro passava a valer para o ano 2. `_finDataFiltro` ignora enquanto o ano está
+incompleto; ao sair incompleto, limpa o campo e avisa.
+
+⚠️ **A `dívida` nunca teve o problema**: ela usa `<input type="text">` com
+`dd/mm/aaaa`, e em campo de texto o change só dispara ao sair. Não foi tocada.
+
+⚠️ **Os filtros de data dos outros painéis** (Aluguéis Ativos, Faturas,
+Manutenção, Multas, Agenda, Almoxarifado, Sinistros, Histórico) continuam com
+`onchange` + render. Lá **não há risco de dado**: nada é gravado, e o campo é
+estático. O custo é redesenhar a lista a cada tecla. Não foram tocados — não foi
+pedido, e a tabela do Contas a Receber era a única com gravação.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **50 testes** com o código real: a validação em 13 valores, as duas sequências
+  **medidas no navegador** (a do ano em pedaços e a das 9 teclas), uma gravação
+  por edição, só-passar-pelo-campo, foco no Enter e **não** no blur, restaurar e
+  avisar, limpar o campo, elemento nulo, registro inexistente, os 3 campos, os
+  filtros, e o `finEdit` continuando a registrar a baixa do recebido
+- **24 defeitos injetados — todos acusados**, entre eles **os dois bugs
+  relatados** (gravar no change nos 3 campos), a guarda do ano sumir, o blur
+  roubar o foco, gravar sem ter mudado, e o filtro parar de redesenhar
+- **No navegador, contra o arquivo do commit, com TECLAS DE VERDADE** e o
+  "render" montando o campo a partir do banco (como o `finRenderReceber` faz):
+
+| Caso | Durante | Ao sair |
+|---|---|---|
+| `25/12/2026` sobre `25/07/2026` | 0 gravações · 0 redesenhos · os 8 dígitos entraram | 1 gravação · banco e tela = `2026-12-25` |
+| `03/11/2027` | 0 · 0 | 1 gravação · banco e tela = `2027-11-03` |
+| ano só com `25` | campo mostrou `0025-06-15` | **0 gravações** · campo **restaurado** para `2027-11-03` · aviso certo |
+
+  Nada foi gravado em produção — o banco do teste foi um objeto em memória.
+- Regressão **medida**: **43 suítes, 2.137 testes**, nenhuma falha
+
+### ⚠️ Três suítes antigas quebraram sem haver defeito
+`t-condutor`, `t-sinistros` e `t-sinreparo` extraem funções **por nome** do
+`gestao.html`, e o `_placasDoAtivo` da v138 passou a chamar `_subLista`, que elas
+não extraíam → `ReferenceError`. Ganharam a dependência na lista.
+
+⚠️ E o meu **contador de regressão** mentiu primeiro: ele somava só as suítes
+cujo texto final casava com uma regex, e **pulou 20 em silêncio** (disse "23
+suítes, 1.136 testes"). Passou a conferir o **código de saída** de cada uma e a
+listar as que não produzem número. Sem isso eu teria registrado um total que não
+cobre metade do sistema.
+
+### ⚠️ A lição de método
+A v139 estava **testada** — 47 testes, 20 defeitos injetados, todos acusados — e
+mesmo assim **não consertava o bug inteiro**, porque todos os meus testes
+partiam do campo **vazio**. Foi o teclado de verdade, no caso que o operador vive
+(campo já preenchido), que mostrou o resto.
+
+🔴 **Teste de campo de formulário tem de partir do estado que o operador
+encontra, não do estado limpo.** E, quando o navegador é parte do mecanismo
+(e aqui ele é: quem decide quando o `change` dispara é ele), não há teste em
+Node que substitua apertar a tecla.
+
+### ⏳ Falta corrigir um dado, e agora dá
+O lançamento da **ISS, R$ 3.000, `vencimento: "0025-07-25"`** continua assim. Pela
+fatura ligada a ele o certo é **25/07/2026**. Agora que o campo aceita os quatro
+dígitos, o Rogel corrige na própria tela — **não mexi** porque é dado de
+produção e não foi pedido.
