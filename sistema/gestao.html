@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v135-20261022-1150 -->
+<!-- LOKA deploy: v136-20261029-0920 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -244,6 +244,7 @@ tr:hover td{background:#f8f9fe;}
     <div data-label="Aluguéis Ativos" class="nav-item" id="ni-ativos" onclick="showPanel('ativos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Aluguéis Ativos</div>
     <div data-label="Aluguéis Encerrados" class="nav-item" id="ni-historico" onclick="showPanel('historico')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Aluguéis Encerrados</div>
     <div data-label="Contratos Gerados" class="nav-item" id="ni-contratos" onclick="showPanel('contratos')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Contratos Gerados</div>
+    <div data-label="Gerar Contrato" class="nav-item" id="ni-gerarcontrato" onclick="abrirContratoDoMenu()"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>Gerar Contrato</span></div>
     <div class="nav-sec">Financeiro</div>
     <div data-label="Faturas" class="nav-item" id="ni-faturas" onclick="showPanel('faturas')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Faturas</div>
     <div data-label="Faturamento/Veículo" class="nav-item" id="ni-fatveiculo" onclick="showPanel('fatveiculo')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Faturamento/Veículo</div>
@@ -1617,6 +1618,11 @@ tr:hover td{background:#f8f9fe;}
       Cliente: <strong id="mContratoNome"></strong>
     </div>
 
+    <div class="fg" style="margin-bottom:14px">
+      <label class="fl">Cliente do contrato *</label>
+      <select class="fs" id="ctCliente" onchange="ctTrocarCliente()"></select>
+    </div>
+
     <!-- TIPO -->
     <div class="sec-label" style="margin-top:0">Tipo de Contrato</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
@@ -1729,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v135-20261022-1150';
+var LOKA_BUILD = 'v136-20261029-0920';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -2023,6 +2029,12 @@ function _aplicarPermissoesUI() {
   if (niME && _pain.indexOf('multasefrotas') < 0 && _pain.indexOf('multas') >= 0) {
     niME.style.display = 'flex';
   }
+  // "Gerar Contrato" é ação, não painel — como o Relatório, fica fora de
+  // _TODOS_PAINEIS. 🔴 A regra de acesso é a MESMA de hoje: quem gera contrato
+  // é quem consegue abrir o cadastro de Clientes, porque é lá dentro que o
+  // botão sempre morou. Assim o item novo não amplia acesso nenhum.
+  var niGC = document.getElementById('ni-gerarcontrato');
+  if (niGC) niGC.style.display = (_pain.indexOf('clientes') >= 0) ? 'flex' : 'none';
   // _podeAcao já entende o curinga "Todas as ações"
   var niRel = document.getElementById('ni-relatorio');
   if (niRel) niRel.style.display = _podeAcao('verRelatorio') ? 'flex' : 'none';
@@ -3698,7 +3710,11 @@ function calcValorContrato() {
 }
 
 function gerarERegistrarContrato() {
-  var cl   = _curCli >= 0 ? db.clients[_curCli] : {};
+  // 🔴 Sem cliente não se gera contrato: sairia um documento com o nome em
+  //    branco. Antes isso não acontecia porque o botão só existia dentro do
+  //    cadastro de Clientes; pelo menu, acontece.
+  var cl   = (_curCli >= 0) ? (db.clients || [])[_curCli] : null;
+  if (!cl) { toast('⚠️ Selecione o cliente do contrato','#b45309'); return; }
   var ret  = document.getElementById('ctRetirada')  && document.getElementById('ctRetirada').value  || '';
   var dev  = document.getElementById('ctDevolucao') && document.getElementById('ctDevolucao').value || '';
   var val  = document.getElementById('ctValor')     && document.getElementById('ctValor').value     || '';
@@ -3748,12 +3764,56 @@ function gerarERegistrarContrato() {
 }
 
 
+// Preenche o seletor de cliente do modal de contrato. Mesmo padrao do
+// `openAluguel` (índice como value), mas com escape: nome com "<" dentro
+// quebraria o <option> — o openAluguel não escapa, e isso é um defeito dele.
+function _ctPreencherClientes(idxSel) {
+  var sel = document.getElementById('ctCliente');
+  if (!sel) return;
+  var lista = (db.clients || []).filter(Boolean);
+  sel.innerHTML = '<option value="">— Selecione o cliente —</option>'
+    + lista.map(function (c) {
+        var i = db.clients.indexOf(c);
+        return '<option value="' + i + '">' + _condEsc(c.nome || '(sem nome)') + '</option>';
+      }).join('');
+  sel.value = (idxSel >= 0) ? String(idxSel) : '';
+  _ctMostrarNome();
+}
+
+// O rótulo em cima segue o seletor: eles não podem discordar.
+function _ctMostrarNome() {
+  var el = document.getElementById('mContratoNome');
+  if (!el) return;
+  var cl = (_curCli >= 0) ? (db.clients || [])[_curCli] : null;
+  el.textContent = cl ? (cl.nome || '(sem nome)') : '— nenhum selecionado —';
+}
+
+// 🔴 O seletor é a fonte da verdade de para QUEM é o contrato. Ele define o
+//    `_curCli`, que é o que o gerador (e os botões de reserva/checklist do
+//    mesmo modal) leem — por isso trocar aqui vale para tudo que está na tela.
+function ctTrocarCliente() {
+  var sel = document.getElementById('ctCliente');
+  var v = sel ? sel.value : '';
+  // Uma guarda so: parseInt('') e parseInt('abc') dao NaN, entao selecao
+  // vazia e lixo caem no mesmo caminho. Ter um ternario para o '' alem
+  // disto era ramo que nenhum teste conseguia distinguir.
+  _curCli = parseInt(v, 10);
+  if (isNaN(_curCli) || _curCli < 0) _curCli = -1;
+  _ctMostrarNome();
+}
+
+// Pelo MENU não há cliente escolhido: abre o mesmo modal, com o seletor vazio.
+// ⚠️ Não duplica o fluxo — é o mesmo `mContrato` e o mesmo gerador.
+function abrirContratoDoMenu() {
+  if (!db) return;
+  _curCli = -1;
+  abrirMContrato();
+}
+
 function abrirMContrato() {
   closeM('mCliente');
-  if (_curCli < 0) return;
-  var cl = db.clients[_curCli];
-  var el = document.getElementById('mContratoNome');
-  if (el) el.textContent = cl.nome;
+  var cl = (_curCli >= 0) ? db.clients[_curCli] : null;
+  _ctPreencherClientes(_curCli);
   // Popular lista de veículos disponíveis com checkboxes
   _ctVeicsSelecionados = new Set();
   renderVeicsModal('');
