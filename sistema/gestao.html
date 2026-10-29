@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v137-20261029-1030 -->
+<!-- LOKA deploy: v138-20261029-1210 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1735,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v137-20261029-1030';
+var LOKA_BUILD = 'v138-20261029-1210';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -3303,6 +3303,18 @@ function globalSearch(q) {
 // ── Casamento veículo ↔ aluguel ativo (cobre todos os formatos) ──────────────
 // Um aluguel pode referenciar o veículo por: placa (única OU várias juntas
 // "AAA1A11, BBB2B22"), placas[], veiculos[{placa}], veiculo.placa, ou veiculoId.
+// Lista ANINHADA de um registro: o Firebase devolve array com buraco como
+// objeto ({0:..,1:..}), e normalizarDB so normaliza as listas de RAIZ do
+// loka_db — nao as de dentro de cada aluguel. Mesma razao do _condLista.
+function _subLista(x) {
+  if (!x) return [];
+  if (Array.isArray(x)) return x.filter(function(i){ return i != null; });
+  if (typeof x === 'object') {
+    return Object.keys(x).map(function(k){ return x[k]; })
+      .filter(function(i){ return i != null; });
+  }
+  return [];
+}
 function _placasDoAtivo(a) {
   var out = [];
   if (!a) return out;
@@ -3311,17 +3323,24 @@ function _placasDoAtivo(a) {
     String(p).split(/[,;\/]/).forEach(function(x){ x = x.trim().toUpperCase(); if (x) out.push(x); });
   }
   add(a.placa); add(a.veiculoPlaca); add(a.placaVeiculo);
-  if (Array.isArray(a.placas)) a.placas.forEach(add);
-  if (Array.isArray(a.veiculos)) a.veiculos.forEach(function(vv){ if (vv) add(vv.placa != null ? vv.placa : vv); });
+  _subLista(a.placas).forEach(add);
+  _subLista(a.veiculos).forEach(function(vv){ if (vv) add(vv.placa != null ? vv.placa : vv); });
   if (a.veiculo && a.veiculo.placa) add(a.veiculo.placa);
   return out;
+}
+// Comparacao de placa entre CADASTRO e CONTRATO: tira hifen, espaco e caixa.
+// 🔴 _placasDoAtivo so poe em maiuscula. Sem isto, placa cadastrada como
+//    'sev-0j14' nao casa com a 'SEV0J14' do contrato — e a trava que impede
+//    excluir carro alugado deixaria passar.
+function _normPlacaCmp(p) {
+  return String(p == null ? '' : p).toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 function _idsDoAtivo(a) {
   var out = [];
   if (!a) return out;
   if (a.veiculoId) out.push(a.veiculoId);
-  if (Array.isArray(a.veiculoIds)) a.veiculoIds.forEach(function(x){ if (x) out.push(x); });
-  if (Array.isArray(a.veiculos)) a.veiculos.forEach(function(vv){ if (vv && vv.id) out.push(vv.id); if (vv && vv.veiculoId) out.push(vv.veiculoId); });
+  _subLista(a.veiculoIds).forEach(function(x){ if (x) out.push(x); });
+  _subLista(a.veiculos).forEach(function(vv){ if (vv && vv.id) out.push(vv.id); if (vv && vv.veiculoId) out.push(vv.veiculoId); });
   return out;
 }
 // Conjuntos de placas e ids com aluguel ativo
@@ -4098,9 +4117,17 @@ function excluirAtivo(idxOrId) {
   if (!a) { toast('Registro não encontrado','#c0392b'); return; }
   if (!confirm('Excluir: ' + a.clienteNome + ' / ' + (a.placa||a.veiculoNome||'') + '?')) return;
   db.ativos = (db.ativos||[]).filter(function(x){ return x!==a; });
-  if (a.placa && db.veiculos) {
-    var vi = db.veiculos.findIndex(function(v){ return v&&v.placa===a.placa; });
-    if (vi>=0) db.veiculos[vi].status='disponivel';
+  // 🔴 ARMADILHA 2: liberava só a placa principal. Num contrato multi-veículo
+  //    os outros carros ficavam 'alugado' sem aluguel nenhum — fantasma no
+  //    estoque até alguém recarregar a página (o reconciliarStatusVeiculos,
+  //    que já usa _placasDoAtivo, é quem consertava depois).
+  if (db.veiculos) {
+    var _placasLib = _placasDoAtivo(a).map(_normPlacaCmp), _idsLib = _idsDoAtivo(a);
+    _subLista(db.veiculos).forEach(function(v){
+      if (!v || v.status !== 'alugado') return;
+      if (_placasLib.indexOf(_normPlacaCmp(v.placa)) >= 0 || _idsLib.indexOf(v.id) >= 0)
+        v.status = 'disponivel';
+    });
   }
   saveDB(); renderAtivos(); renderFrota(); renderDashboard();
   toast('🗑 Aluguel excluído.','#7c3aed');
@@ -5360,8 +5387,19 @@ function excluirVeiculo() {
   var v = db.veiculos.find(function(x){return x.id===_curVeiculoId;});
   if (!v) return;
   // Verificar se está alugado
-  var ativo = db.ativos.find(function(a){return a.placa===v.placa||a.veiculoId===v.id;});
-  if (ativo) { toast('⚠️ Não é possível excluir: veículo com aluguel ativo', '#c0392b'); return; }
+  // 🔴 ARMADILHA 2: procurar por a.placa deixava a 2ª placa de um contrato
+  //    multi-veículo passar pela trava — o carro podia ser EXCLUÍDO estando
+  //    alugado. São 4 placas hoje (SEV0J14, GBW2B46, FCN9G63, RTE3J91).
+  var _pv = _normPlacaCmp(v.placa);
+  var ativo = _subLista(db.ativos).find(function(a){
+    return a && (_placasDoAtivo(a).map(_normPlacaCmp).indexOf(_pv) >= 0
+      || _idsDoAtivo(a).indexOf(v.id) >= 0);
+  });
+  if (ativo) {
+    toast('⚠️ Não é possível excluir: veículo com aluguel ativo de '
+      + (ativo.clienteNome||'cliente'), '#c0392b');
+    return;
+  }
   if (!confirm('Excluir o veículo ' + v.marca + ' ' + v.modelo + ' · ' + v.placa + '?\n\nEsta ação não pode ser desfeita.')) return;
   db.veiculos = db.veiculos.filter(function(x){return x.id !== _curVeiculoId;});
   saveDB();
