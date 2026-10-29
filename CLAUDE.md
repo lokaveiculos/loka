@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v135-20261022-1150** |
+| `gestao.html` | **v136-20261029-0920** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -5457,3 +5457,113 @@ sistema não levar a aba embora.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir o Painel com **Ctrl+Shift+R** e ver os anos.
 Eu não autentico.
+
+---
+
+## ✅ Gerar Contrato no menu Locação — 29/10/2026 (`61ac9ac`) · gestao v136
+
+Pedido: *"gentileza colocar um botão GERAR CONTRATO no menu Locação"*.
+
+### 🔴 Conferido antes de construir: o fluxo JÁ EXISTIA inteiro
+O modal **`mContrato`** tem tipo (diária/mensal), seleção de veículos com busca,
+datas, valor, caução, km e o gerador `gerarERegistrarContrato()`.
+
+O que não existia era **chegar nele**: o botão `btnContrato` mora **dentro do
+modal de Cliente**, com `display:none`, e só aparece quando um cliente está
+selecionado (`_curCli >= 0`). O caminho era:
+
+```
+Clientes → buscar o cliente → abrir → Gerar Contrato
+```
+
+🔴 **O item novo abre o MESMO modal.** Duplicar o gerador seria repetir o
+acidente da v119 (duas `statusReal`, uma aprendeu sobre `renegociado` e a outra
+não) — há teste exigindo que exista **um** `gerarERegistrarContrato` só.
+
+### O seletor de cliente era a peça que faltava
+Pelo cadastro de Clientes o `_curCli` já vinha definido. Pelo menu não vem.
+Entrou `<select id="ctCliente">` no topo do modal, no **mesmo padrão do Novo
+Aluguel** (`aCliente`: índice como `value`).
+
+🔴 **Ele é a fonte da verdade de para quem é o contrato** e define o `_curCli` —
+que é o que o gerador **e** os botões de reserva/checklist do mesmo modal leem.
+Trocar ali vale para tudo que está na tela.
+
+⚠️ O nome é **escapado** no `<option>`. O `openAluguel` não escapa, e isso é um
+defeito dele: `"José D'Avila <Zeca> & Cia"` quebraria o seletor. Conferido no ar:
+`ISS TRANSPORTES & LOGISTICA` sai como `&amp; LOGISTICA`, sem tag crua.
+
+### 🔴 A guarda que o menu obrigou a existir
+`gerarERegistrarContrato` fazia:
+
+```js
+var cl = _curCli >= 0 ? db.clients[_curCli] : {};
+```
+
+Com `{}` ele **geraria o contrato com o nome em branco** em vez de recusar. Pelo
+cadastro de Clientes isso nunca acontecia — o botão só existia lá dentro, com
+cliente obrigatoriamente escolhido. **Pelo menu aconteceria.**
+
+Agora recusa e avisa. Conferido no ar: 0 contratos criados, **nada passado ao
+documento** (`localStorage` intocado), 0 gravações.
+
+### Permissão: a mesma de hoje, nem mais nem menos
+O item aparece para quem tem o painel **`clientes`** — porque é lá dentro que o
+botão sempre morou. **Não amplia acesso**: Oficina (`['manutencao']`) e Clientes
+(`['manutencao','multas']`) continuam sem ver.
+
+⚠️ Não entra em `_TODOS_PAINEIS`: é **ação**, como o Relatório. E a permissão é
+decidida **antes** do `_ajustarSecoesMenu()`, pelo mesmo motivo registrado na
+v134 — decidir depois usaria o display velho para esconder o cabeçalho.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**; eram 812 — o item e o
+  campo do seletor); os dois carimbos batendo
+- **48 testes** com o código real: o seletor (lista, escape, cliente nulo, sem
+  nome), trocar de cliente nos dois sentidos, valor inválido e **índice negativo
+  forçado no DOM**, abrir pelo menu (não herda cliente, modal abre, tipo volta
+  para diária, seleção de veículos limpa, retirada = hoje, sem banco não estoura),
+  abrir pelo cadastro (cliente **preservado**), a guarda sem cliente e com índice
+  inexistente, gerar com cliente, as 3 validações que já existiam, e o fonte
+- **20 defeitos injetados — todos acusados**, entre eles voltar o `: {}`, abrir
+  pelo menu herdando cliente, abrir pelo cadastro perdendo o cliente, o seletor
+  não definir o `_curCli`, não escapar o nome, o item cair na seção errada, a
+  permissão liberar para todos, e o item entrar em `_TODOS_PAINEIS`
+- **No ar, no arquivo publicado**, com os **140 clientes e 119 veículos reais**,
+  sem firebase no ambiente: item na seção Locação, 141 opções no seletor,
+  retirada 29/10; **sem cliente → recusa**; com a **RSC TRANSPORTE 2016 LTDA**
+  (índice 69) → CNPJ `26.448.760/0001-50`, endereço real, placa **RUQ2J15
+  CHEVROLET Onix Plus AT**; pelo cadastro, **TRANSSOUZA preservado** e troca
+  dentro do modal funcionando. **Nada gravado em produção** — reconferido: 140
+  clientes, 151 contratos, 105 aluguéis.
+- Regressão **medida**: **39 suítes, 1.946 testes**, nenhuma falha
+
+### ⚠️ A suíte do menu acusou o item novo — e estava certa
+`t-menu.js` (v134) exigia que **todo item do menu fosse painel**, com o Relatório
+como única exceção escrita à mão. O item novo quebrou 3 testes: *item sem
+painel*, *são 21 itens* e *onclick errado*.
+
+Passou a ter uma **lista NOMEADA de ações** (`relatorio`, `gerarcontrato`) com o
+`onclick` esperado de cada uma. Item novo que não seja painel **nem esteja nessa
+lista continua sendo acusado** — a trava que importa (perder item do menu tira o
+painel do sistema) ficou intacta.
+
+### ⚠️ Um defeito injetado passou — e era ramo redundante meu
+`_curCli = (v === '') ? -1 : parseInt(v, 10)` seguido de `if (isNaN(...))`:
+`parseInt('')` **já dá NaN**, então o ternário era um segundo caminho para a
+mesma coisa, e nenhum teste conseguia distinguir os dois.
+
+Simplificado para **uma guarda só** (`isNaN || < 0`), e o índice negativo — que o
+seletor nunca emite, mas o DOM aceita — **ganhou teste próprio** em vez de ficar
+como ramo descoberto.
+
+⚠️ E o heredoc comeu os escapes **de novo** ao tentar atualizar as injeções por
+script (`\n` virou quebra de linha de verdade). Ferramenta de escrita, sempre.
+
+### ⚠️ Achado dos dados (não é defeito)
+Só **3 dos 119 veículos** estão com `status === 'disponivel'`, e é essa a lista
+que o modal oferece. Quem for gerar contrato hoje tem 3 carros para escolher.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel clicar em **Gerar Contrato** no menu, escolher cliente e
+veículo e gerar um contrato de verdade. Eu não autentico.
