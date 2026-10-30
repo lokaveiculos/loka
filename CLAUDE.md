@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v140-20261029-1640** |
+| `gestao.html` | **v141-20261030-0920** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -6078,3 +6078,153 @@ O lançamento da **ISS, R$ 3.000, `vencimento: "0025-07-25"`** continua assim. P
 fatura ligada a ele o certo é **25/07/2026**. Agora que o campo aceita os quatro
 dígitos, o Rogel corrige na própria tela — **não mexi** porque é dado de
 produção e não foi pedido.
+
+---
+
+## ✅ Coluna KM na aba Manutenção — 30/10/2026 (`4a5a794`) · gestao v141
+
+Pedido: *"preciso que no menu manutencao seja exibido a coluna KM"*.
+
+⚠️ **"Menu manutenção" é a LOKÁ.** Conferido pelos dados antes de abrir arquivo:
+nas 17 manutenções da Auto Mais o campo `km` **nem existe** (os 10 campos
+gravados lá são status, data, tipo, veiculo_id, valor, placa, descricao, oficina,
+id e importadoOficina) — a coluna nasceria vazia. A LOKÁ tem 761 registros,
+317 com km.
+
+### O campo já existia — faltava a coluna
+`manutKm` → `km` é gravado desde antes, e o valor **já aparecia na janela de
+consulta** (🔍). O que não havia era a coluna na lista. Entrou entre **Retorno** e
+**Custo**, nas **duas** tabelas (a normal e a `Restrito`, que o perfil
+Oficina/Clientes vê) e no CSV.
+
+🔴 **Nas duas, não em uma.** Deixar a coluna só na tabela normal faria a mesma
+tela ter conteúdo diferente por perfil — a lição da v118.
+
+### 🔴 Dois formatos convivem no banco, e o campo é TEXTO
+Medido nos 761 registros reais:
+
+| | |
+|---|---|
+| com km preenchido | **317** · vazios: 444 |
+| só dígitos (`106095`) | **190** |
+| com separador (`68.413`) | **127** |
+| 🔴 forma impossível (`81.30100`) | **1** — placa **RUP3D82**, 21/07 |
+| 2 dígitos (`96`, `52`, `87`) | 3 — saem como estão, sem aviso |
+
+Mostrar cru deixaria `106095` ao lado de `68.413` na mesma coluna. A coluna
+formata os dois igual — e isso é **apresentação, não invenção**: os dígitos são
+os mesmos.
+
+🔴 **O que NÃO se reformata é valor de forma inválida.** `81.30100` viraria
+**8.130.100 km**, e o erro de digitação **pareceria número de verdade**. Esse sai
+exatamente como está, com **⚠** e a explicação no `title`, para o operador
+corrigir no cadastro.
+
+⚠️ **A validação é de FORMA (`\d+` ou `\d{1,3}(.\d{3})+`), não de magnitude.**
+Inventar uma faixa de km "plausível" seria chute meu, e esconderia dado que
+talvez esteja certo — um guincho ou um caminhão quebram qualquer faixa que eu
+chutasse.
+
+Vazio e **zero** dão travessão: `"0"` e `"0.000"` não são quilometragem.
+
+### No CSV vai o NÚMERO, não o formatado
+No Excel pt-BR `106.095` com ponto é lido como separador de milhar, mas o
+inteiro **deixa somar e ordenar sem depender de interpretação**. Valor de forma
+estranha vai como está — o CSV não pode afirmar um número que o sistema recusou
+na tela.
+
+### A largura: MEDIDA depois de publicar, não escolhida de cabeça
+As duas tabelas têm `min-width` (640 na restrita, 700 na normal) e wrapper com
+`overflow-x:auto`. Escolher um piso novo "de cabeça" seria número inventado —
+então o patch **não mexeu nele** e a largura foi medida no arquivo publicado,
+com o pior caso de cada coluna tirado dos 761 registros (maior nome de veículo,
+maior oficina, descrição de 335 caracteres, maior custo, os dois casos de km).
+
+| Janela | Disponível | Tabela | Rola? | Coluna KM | `106.095` |
+|---|---|---|---|---|---|
+| 900px | 631px | 700px (piso) | **sim** | 73px | 1 linha |
+| 1024px | 755px | 755px | não | 74px | 1 linha |
+| 1366px | 1097px | 1097px | não | 85px | 1 linha |
+
+**O número nunca quebra**: ocupa 42px numa coluna de 73–85px, e o CSS global
+**não tem `word-break` nem `overflow-wrap`** — conferido —, então `106.095` não
+pode partir ao meio e virar outro número.
+
+**Antes e depois, nos arquivos reais das duas versões** (a v140 veio do raw do
+commit `258733a`, não de markup remendado — regra de 19/10), medido a 900px:
+
+| | v140 | v141 |
+|---|---|---|
+| colunas | 8 | 9 |
+| tabela **normal** | 700px (piso) | **700px — igual**; rolava antes e rola agora |
+| tabela **restrita** | 646px, **cabia** | **682px**, passou a **rolar** (+36px) |
+
+🔴 **O custo real é esse: 36px de rolagem na tabela restrita a 900px.** Não se
+conserta subindo o `min-width` — a restrita já passou do piso (682 > 640), então
+quem manda agora é o mínimo do conteúdo, e subir o piso só faria rolar mais. O
+wrapper cria a barra (a correção do `.shell` de 02/10 garante isso), então o
+comportamento está certo: **ou cabe, ou rola.**
+
+O único valor em duas linhas é o `81.30100 ⚠`: o ⚠ cai para baixo do número
+(28px em vez de 13px). É **1 registro em 761**, o número continua inteiro e
+legível, e é justamente o que o Rogel deve corrigir.
+
+### ⚠️ Achado pré-existente, não tocado
+`R$ 2.740,00` **já quebrava em duas linhas na v140** (coluna de 90px) — o `R$` e
+o número são separados por espaço. Conferido nas duas versões para não registrar
+como regressão minha.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **46 testes** com o código real e os 761 registros reais: a validação de forma
+  em 14 valores, os dois formatos ficando comparáveis, o valor estranho saindo
+  como está (e **não** virando 8.130.100), zero e vazio, nulo, a célula nos três
+  casos, o aviso só onde deve, as duas tabelas e o CSV
+- **20 defeitos injetados — todos acusados**, entre eles reformatar o valor
+  estranho, a coluna sumir de um dos dois cabeçalhos, a célula entrar antes do
+  Retorno, avisar em todas as linhas, a validação julgar magnitude, e o CSV
+  mandar o texto formatado
+- **No ar, no arquivo publicado**, rodando os dois `renderManutencao` reais com
+  o pior caso por coluna: as medições acima, mais a conferência visual da coluna
+- Regressão **medida**: **44 suítes, 2.186 testes**, nenhuma falha
+
+### ⚠️ Dois enganos de medição, os dois pegos por o número não bater
+1. **O CSS da página institucional contaminou a primeira medida.** Montei a
+   casca na própria origem (que dispensa login) e o `body{padding:24px}` e
+   `.content{max-width:520px}` **dela** deram "disponível = 486px" onde a conta
+   (janela − 220 do menu − 32 de padding) pedia 772. Só desligando todo
+   `<style>`/`<link>` que não fosse o do `gestao.html` a medida passou a bater.
+2. **O detector de quebra acusou quebra onde não havia.** Contar "tops distintos"
+   dos retângulos do texto marca duas linhas quando o número é **monospace** e o
+   ⚠ é **sans-serif negrito** — fontes diferentes têm baseline diferente **na
+   mesma linha**. Linha de verdade se conta por **sobreposição vertical**.
+
+⚠️ E a primeira versão media a **altura do `<td>`**, que é a altura da **linha**
+(75px, por causa da célula Veículo de duas linhas) — dava "quebrou" em todas as
+dez.
+
+### ⚠️ Dois "defeitos" injetados que passaram — e eram guardas inertes
+`if (!t) return ''` no `_mntKM` e o `m &&` no `_mntKMCel` **não mudam resultado
+nenhum** ao serem removidos: no primeiro, `parseInt('')` já dá `NaN` e o
+`if (!n) return ''` logo abaixo devolve vazio; no segundo, a linha só é
+alcançada depois do `if (!k) return <travessão>`, e `_mntKM(null)` já devolve
+`''`. As duas ficaram no código (custam nada e dizem a intenção), mas estão
+**sem cobertura**, e isso está dito aqui em vez de contado como teste.
+
+O terceiro que passou era **asserção fraca minha**: o teste procurava
+`parseInt(t.replace(/\D/g,''),10)` no arquivo inteiro, e o `_mntKM` tem a própria
+cópia dessa linha — então o defeito no CSV passava batido. Corrigido recortando
+o corpo do `kmCsv` antes de procurar.
+
+### O que ficou de fora, de propósito
+O **relatório PDF** de manutenção **não** ganhou a coluna. Ele já é apertado
+(o cabeçalho impresso tem largura fixa) e o pedido foi sobre a tela; o CSV
+cobre quem precisa do km em planilha. Vira coluna no PDF se for pedido.
+
+### ⏳ Não verificado · e um dado para o Rogel corrigir
+Falta **logado**: abrir Manutenção com **Ctrl+Shift+R** e ver a coluna. Eu não
+autentico.
+
+🔴 **A manutenção da placa RUP3D82 (21/07) está com `km = "81.30100"`.** Pelo
+formato, deve ser **81.301** com um dígito a mais por engano — mas carro nenhum
+tem 8.130.100 km, então quem sabe o número certo é quem lançou. A coluna mostra o valor com ⚠ justamente para isso aparecer.
