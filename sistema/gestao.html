@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v140-20261029-1640 -->
+<!-- LOKA deploy: v141-20261030-0920 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1735,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v140-20261029-1640';
+var LOKA_BUILD = 'v141-20261030-0920';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7234,11 +7234,17 @@ function relatorioManutencaoCSV() {
 
   var esc = function(s){ s = (s==null?'':String(s)); return '"'+s.replace(/"/g,'""')+'"'; };
   var dt = function(d){ return d ? (typeof fmtData==='function' ? fmtData(d) : d) : ''; };
-  var linhas = [ ['Veículo','Placa','Tipo','Descrição','Oficina','Entrada','Retorno','Custo (R$)','Status'].map(esc).join(';') ];
+  var linhas = [ ['Veículo','Placa','Tipo','Descrição','Oficina','Entrada','Retorno','KM','Custo (R$)','Status'].map(esc).join(';') ];
+  var kmCsv = function(m){
+    var t = String((m && m.km) == null ? '' : m.km).trim();
+    if (!t) return '';
+    if (!_mntKMValido(t)) return t;                       // estranho: como está
+    return String(parseInt(t.replace(/\D/g, ''), 10) || '');
+  };
   lista.forEach(function(m){
     linhas.push([
       m.veiculoNome||'', m.placa||'', m.tipo||'', m.descricao||'', m.oficina||'',
-      dt(m.data), dt(m.retorno||m.saida||''), (m.custo||''), m.status||''
+      dt(m.data), dt(m.retorno||m.saida||''), kmCsv(m), (m.custo||''), m.status||''
     ].map(esc).join(';'));
   });
   var csv = '\ufeff' + linhas.join('\r\n');
@@ -7375,6 +7381,41 @@ function relatorioManutencao(){
 }
 
 // Consulta de manutenção com ESCOPO (perfis oficina / clientes)
+// ══ KM DA MANUTENÇÃO ════════════════════════════════════════════
+// O campo `km` é TEXTO e chega em dois formatos (medido nos 761 registros em
+// 30/10/2026): 190 só com dígitos ("106095") e 127 com separador ("68.413").
+// Formatar os dois igual é PRESENTAÇÃO — os dígitos são os mesmos.
+// 🔴 O que NÃO se reformata é valor de forma inválida: "81.30100" viraria
+//    "8.130.100" e o erro de digitação pareceria número de verdade. Esse sai
+//    como está, com aviso, para o operador corrigir no cadastro.
+// ⚠️ A validação é de FORMA, não de magnitude: inventar uma faixa de km
+//    "plausível" seria chute meu, e esconderia dado que talvez esteja certo.
+function _mntKMValido(bruto) {
+  var t = String(bruto == null ? '' : bruto).trim();
+  if (!t) return false;
+  return /^\d+$/.test(t) || /^\d{1,3}(\.\d{3})+$/.test(t);
+}
+
+// Texto da coluna. Devolve '' quando não há quilometragem a mostrar.
+function _mntKM(m) {
+  var t = String((m && m.km) == null ? '' : m.km).trim();
+  if (!t) return '';
+  var n = parseInt(t.replace(/\D/g, ''), 10);
+  if (!n) return '';                     // "0" e "0.000" não são quilometragem
+  if (!_mntKMValido(t)) return t;        // forma estranha: mostra como está
+  return n.toLocaleString('pt-BR');
+}
+
+// A célula pronta, usada pelas DUAS tabelas — uma fonte só.
+function _mntKMCel(m) {
+  var k = _mntKM(m);
+  if (!k) return '<td style="padding:9px 12px;text-align:right;font-size:11px;color:var(--muted)">—</td>';
+  var ok = _mntKMValido(m && m.km);
+  return '<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:11px"'
+    + (ok ? '' : ' title="Quilometragem fora do padrão — confira no cadastro da manutenção"')
+    + '>' + k + (ok ? '' : ' <span style="color:#b45309;font-weight:700">⚠</span>') + '</td>';
+}
+
 function renderManutencaoRestrito(modo) {
   var stats = document.getElementById('manutStats');
   var grid  = document.getElementById('manutGrid');
@@ -7449,6 +7490,7 @@ function renderManutencaoRestrito(modo) {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase">Oficina</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:center">Entrada</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:center">Retorno</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:right">KM</th>'
     + (mostrarCusto ? '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:right">Custo</th>' : '')
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase">Status</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;text-transform:uppercase;text-align:center">Ver</th>'
@@ -7462,6 +7504,7 @@ function renderManutencaoRestrito(modo) {
         + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+(m.retorno ? fmt(m.retorno) : '—')+'</td>'
+        + _mntKMCel(m)
         + (mostrarCusto ? '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px">'+(m.custo?'R$ '+m.custo:'—')+'</td>' : '')
         + '<td style="padding:9px 12px"><span style="background:'+(stBg[st]||'#f0f2f9')+';color:'+(stCor[st]||'#555')+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+(stLbl[st]||st)+'</span></td>'
         + '<td style="padding:9px 12px;text-align:center"><button class="icon-btn manut-view-btn" data-mid="'+m.id+'" title="Consultar / Comprovantes" style="color:#0d7a3e;border-color:#0d7a3e">🔍</button></td>'
@@ -7539,6 +7582,7 @@ function renderManutencao() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Oficina</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Entrada</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Retorno</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">KM</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Custo</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Status</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
@@ -7552,6 +7596,7 @@ function renderManutencao() {
         + '<td style="padding:9px 12px;font-size:11px">'+(m.oficina||'—')+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmt(m.data)+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+(m.retorno ? fmt(m.retorno) : '—')+'</td>'
+        + _mntKMCel(m)
         + '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace;font-size:11px">'+(m.custo?'R$ '+m.custo:'—')+'</td>'
         + '<td style="padding:9px 12px"><span style="background:'+(stBg[st]||'#f0f2f9')+';color:'+(stCor[st]||'#555')+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+(stLbl[st]||st)+'</span></td>'
         + '<td style="padding:9px 12px;text-align:center">'
