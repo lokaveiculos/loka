@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v141-20261030-0920** |
+| `gestao.html` | **v142-20261031-0910** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -6228,3 +6228,147 @@ autentico.
 🔴 **A manutenção da placa RUP3D82 (21/07) está com `km = "81.30100"`.** Pelo
 formato, deve ser **81.301** com um dígito a mais por engano — mas carro nenhum
 tem 8.130.100 km, então quem sabe o número certo é quem lançou. A coluna mostra o valor com ⚠ justamente para isso aparecer.
+
+---
+
+## 🔴 O relatório de multas ignorava a seleção — 31/10/2026 (`9be05f8`) · gestao v142
+
+Relato: *"quando selecionamos as multas e geramos o relatorio o sistema
+apresenta o relatorio geral ao invez de apresentar apenas as multas
+selecionadas"*. Estava certo.
+
+### A causa, e ela estava à vista no fonte
+As duas funções começavam igual:
+
+```js
+function mltRelatorio()    { var lista = mltFiltradas(); … }
+function mltRelatorioCSV() { var lista = mltFiltradas(); … }
+```
+
+**Nenhuma das duas olhava `_mltBaixaSel`.** A marcação da tabela só alimentava a
+barra de ações (💰 Baixar como pagas · 🏷 Alterar situação). O relatório sempre
+imprimiu o filtro inteiro — não era intermitente nem cache.
+
+### A regra nova
+| | |
+|---|---|
+| há multa marcada | o documento é **só delas** |
+| nenhuma marcada | continua valendo o **filtro da tela**, como sempre foi |
+
+Quem não marca nada não vê diferença nenhuma.
+
+### 🔴 Uma fonte só para os dois relatórios
+A escolha saiu para **`mltRelatorioEscopo()`**, e o PDF e o Excel leem de lá.
+
+⚠️ Deixar cada um escolher a própria lista seria repetir o acidente da **v119**:
+havia **duas** `statusReal`, uma aprendeu sobre `renegociado` e a outra não — e o
+**relatório impresso**, justamente o que se leva para reunião, era o que errava.
+Há teste estrutural exigindo que nenhum dos dois volte a chamar `mltFiltradas()`
+por conta própria, e defeito injetado para cada um.
+
+### 🔴 O documento DIZ que é recorte
+```
+Seleção manual — 4 de 341 multa(s) do filtro. As demais não entram neste documento.
+```
+
+PDF de 4 linhas quando há 341 no filtro, **sem dizer que foi recorte**, é pior do
+que não recortar: quem olhar o papel depois não sabe se faltou multa. É o padrão
+dos cartões do Contas a Receber (v120–v122) — quando o número embute algo que o
+olho não vê, a tela **diz**.
+
+No Excel a marca vai no **nome do arquivo** (`multas_selecionadas_2026-10-31.csv`)
+e no aviso, porque planilha não tem cabeçalho para avisar.
+
+### A barra da seleção ganhou o botão
+Sem ele o operador marca as multas e precisa voltar à barra do topo, onde o botão
+não diz que vai respeitar a marcação. O botão do topo **continua valendo** — ele
+agora respeita a seleção também.
+
+### ⚠️ O limite é do CHECKBOX, não do relatório
+Medido em 31/10 nas **657 multas reais**:
+
+| | |
+|---|---|
+| paga | 227 · cobrada 155 · pendente 257 · recebida do cliente 18 |
+| **selecionáveis** (têm checkbox) | **430** |
+| 🔴 **sem checkbox** (pagas) | **227** |
+
+Multa **paga ou cancelada não tem checkbox**, de propósito, para não dar baixa
+duas vezes. Então *"selecionar e gerar"* só alcança multa **em aberto**. Para
+relatório de pagas o caminho continua sendo o **filtro**.
+
+🔴 **Não tornei a paga selecionável**, e isso é decisão a tomar, não esquecimento:
+`mltBaixaAbrir` e `mltStatusAbrir` **confiam na seleção sem filtrar**, então um
+checkbox em multa paga abriria risco de baixa em multa já paga em **dois fluxos
+que funcionam**. É mudança maior do que o pedido. Se o Rogel quiser escolher a
+dedo multas pagas e em aberto no mesmo documento, dá para fazer — mas mexendo
+nos dois fluxos junto.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **48 testes** com o código real e as 657 multas reais: a regra nos dois
+  sentidos, marcada que saiu do filtro, id marcado inexistente, o PDF (quantidade,
+  os AITs que entram, **nenhum AIT que não foi marcado vazando**, o total, o
+  agrupamento por locatário, o subtotal do grupo), o Excel (nome do arquivo e
+  aviso), PDF e Excel concordando, a barra, pop-up bloqueado, lista vindo como
+  objeto do Firebase, banco vazio
+- **18 defeitos injetados — todos acusados**, entre eles **o defeito relatado nos
+  dois relatórios**, o escopo ignorando a seleção, seleção vazia esvaziando o
+  documento, o escopo lendo todas as multas em vez das filtradas, o PDF parando
+  de dizer que foi recorte, e a multa paga ganhando checkbox
+- **os 38 testes da suíte do órgão (v137) continuam passando** — é o que prova
+  que a coluna de órgão não mudou de comportamento
+- **No ar, no arquivo publicado, com as 657 multas reais** (só leitura):
+  filtro pela **RSC TRANSPORTE 2016 LTDA** (341 multas, 224 em aberto) →
+  sem marcar: **341 registros**, sem aviso de seleção;
+  marcando 4: **4 registros**, os 4 AITs presentes, **0 não marcadas vazaram**,
+  total **R$ 520,64** (e não os R$ 68.914,82 do filtro), aviso *"4 de 341"*,
+  Excel `multas_selecionadas_2026-10-31.csv`
+- Regressão **medida**: **45 suítes, 2.234 testes**, nenhuma falha
+
+### A barra: medida, porque entrou um 4º botão
+Comparado com o arquivo **real da v141** (raw do commit `4a5a794`):
+
+| Janela | v141 (3 botões) | v142 (4 botões) |
+|---|---|---|
+| 1024px | 97px · **2 linhas** | 100px · 2 linhas |
+| 1366px | 53px · 1 linha | 55px · 1 linha |
+
+⚠️ **A quebra em duas linhas a 1024px já existia na v141** — eu quase a registrei
+como custo meu. O botão novo custa **3px**, não uma linha.
+
+### ⚠️ Dois tropeços de verificação, os dois pegos por o número não fechar
+1. A primeira medida da barra deu **28px de largura e 381px de altura** — a aba
+   estava estreita e o `.shell` espremeu tudo numa coluna. Número sem sentido é
+   ambiente errado, não resultado. Com a janela fixada: 772px = 1024 − 220 − 32,
+   que é a conta.
+2. **O `node --check` não chegou a rodar na primeira tentativa** e eu quase segui:
+   o `ext.js` recebe o destino como **argumento**, não por redirecionamento, então
+   a cadeia `&&` morreu em silêncio. O "OK" nunca foi impresso — foi o que
+   denunciou.
+
+### ⚠️ A suíte do órgão quebrou sem haver defeito
+`t-orgaorel.js` extrai funções **por nome**, e `mltRelatorio` passou a chamar
+`mltRelatorioEscopo` → `ReferenceError`. É a mesma armadilha do `_subLista` em
+29/10: **extrair por nome exige acompanhar a cadeia**. Ganhou as duas funções na
+lista e `var _mltBaixaSel = {}` no ambiente; sem seleção o escopo cai no
+`mltFiltradas()` que aquela suíte já stuba, então ela segue testando o mesmo.
+
+### ⚠️ O contador de regressão tinha sido perdido, e a primeira versão mentiu
+O scratchpad é limpo entre sessões e o `regressao.js` não existia mais. Refeito —
+e a **primeira versão somou 1 suíte de 45**, porque conhecia um só formato de
+saída. As suítes nasceram em dias diferentes e imprimem em **4 formatos**
+(`ok: N falhou: M`, `--- N ok, M falha(s) ---`, `N passaram, M falharam`,
+`N testes passaram`). Ele agora reconhece os quatro, julga cada suíte pelo
+**código de saída** e **lista as que não produzem número** — era exatamente o
+defeito registrado em 29/10, e ele voltou porque o arquivo se perdeu.
+
+### ℹ️ O Rogel já está na v142
+`loka_db/_writerBuild` ficou **`v142-20261031-0910`**, com escrita às 09:50 — o
+navegador dele já carregou a versão nova. **Não fui eu:** meu ambiente de
+verificação não tem `firebase` e relatório é só leitura. As multas seguem em
+**657**, com a mesma distribuição de antes.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel marcar algumas multas e clicar em **📋 Relatório das
+selecionadas** (ou no botão do topo). Eu não autentico.
