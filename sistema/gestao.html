@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v141-20261030-0920 -->
+<!-- LOKA deploy: v142-20261031-0910 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1735,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v141-20261030-0920';
+var LOKA_BUILD = 'v142-20261031-0910';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -14575,6 +14575,7 @@ function mltBarraBaixa(lista){
     + '<span style="font-size:12px;opacity:.85">Total ' + brl(soma) + '</span>'
     + '<button class="btn btn-green" style="font-size:11px;margin-left:auto" onclick="mltBaixaAbrir()">💰 Baixar como pagas</button>'
     + '<button class="btn btn-blue" style="font-size:11px" onclick="mltStatusAbrir()">\uD83C\uDFF7 Alterar situa\u00e7\u00e3o</button>'
+    + '<button class="btn btn-outline" style="font-size:11px" onclick="mltRelatorio()" title="Gera o PDF só das multas marcadas">\uD83D\uDCCB Relatório das selecionadas</button>'
     + '<button class="btn btn-outline" style="font-size:11px" onclick="mltBaixaLimpar()">Limpar seleção</button>'
     + '</div>';
 }
@@ -14662,8 +14663,25 @@ function _mltOrgaoRel(m, nomes) {
     + '<div style="font-family:monospace;font-size:10px;color:#666">' + k + '</div>';
 }
 
+// ══ ESCOPO DOS RELATÓRIOS ═══════════════════════════════════════
+// Marcou multas na tabela → o documento é SÓ delas. Nenhuma marcada → vale o
+// filtro da tela, que é o que sempre foi.
+// 🔴 Os DOIS relatórios (PDF e Excel) leem daqui. Se cada um escolhesse a
+//    própria lista voltaria o acidente da v119 — duas funções decidindo o
+//    mesmo, uma aprende a regra nova e a outra não, e o impresso é o que erra.
+// ⚠️ Multa paga ou cancelada NÃO tem checkbox (para não dar baixa duas vezes),
+//    então "selecionar e gerar" só alcança multa em aberto. Relatório de pagas
+//    se faz pelo FILTRO.
+function mltRelatorioEscopo(){
+  var sel = mltBaixaSelecionadas();
+  if (sel.length) return { lista: sel, selecao: true, noFiltro: mltFiltradas().length };
+  var f = mltFiltradas();
+  return { lista: f, selecao: false, noFiltro: f.length };
+}
+
 function mltRelatorio(){
-  var lista = mltFiltradas();
+  var _esc = mltRelatorioEscopo();
+  var lista = _esc.lista;
   if (!lista.length) { toast('Nenhuma multa no filtro atual','#b45309'); return; }
   var _orgNomes = mltOrgaoNomes();
 
@@ -14711,6 +14729,12 @@ function mltRelatorio(){
     + '@media print{@page{size:A4;margin:14mm}}</style></head><body>'
     + '<h1>Relatório de Multas — LOKÁ Aluguel de Veículos</h1>'
     + '<div style="font-size:11px;color:#666">Emitido em '+new Date().toLocaleString('pt-BR')+' · '+lista.length+' registro(s)</div>'
+    + (_esc.selecao
+        ? '<div style="margin-top:6px;padding:6px 10px;background:#EEF1FD;border-left:3px solid #2B4BF2;'
+          + 'font-size:11px;color:#0E1B4D"><strong>Seleção manual</strong> — '
+          + lista.length + ' de ' + _esc.noFiltro + ' multa(s) do filtro. '
+          + 'As demais não entram neste documento.</div>'
+        : '')
     + '<table><thead><tr><th>Placa</th><th>AIT</th><th>Data</th><th>Infração</th>'
     + '<th>Órgão autuador</th><th>Situação</th><th style="text-align:right">Valor</th></tr></thead>'
     + '<tbody>'+linhas+'</tbody>'
@@ -14723,9 +14747,10 @@ function mltRelatorio(){
   w.document.close();
 }
 
-// Exporta para Excel (CSV) as multas do filtro/escopo atual
+// Exporta para Excel (CSV) o MESMO escopo do PDF: seleção se houver, senão o filtro
 function mltRelatorioCSV(){
-  var lista = mltFiltradas();
+  var _esc = mltRelatorioEscopo();
+  var lista = _esc.lista;
   if (!lista.length) { toast('Nenhuma multa no filtro atual','#b45309'); return; }
   var esc = function(s){ s=(s==null?'':String(s)); return '"'+s.replace(/"/g,'""')+'"'; };
   var _orgNomes = mltOrgaoNomes();
@@ -14745,10 +14770,12 @@ function mltRelatorioCSV(){
     var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = 'multas_'+new Date().toISOString().slice(0,10)+'.csv';
+    a.href = url; a.download = 'multas_'+(_esc.selecao?'selecionadas_':'')
+      +new Date().toISOString().slice(0,10)+'.csv';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    toast('📊 Excel exportado ('+lista.length+' multas)','#0d7a3e');
+    toast('📊 Excel exportado ('+lista.length+' multa(s)'
+      +(_esc.selecao?' selecionada(s) de '+_esc.noFiltro+' no filtro':'')+')','#0d7a3e');
   } catch(e) { toast('❌ Erro ao exportar: '+e.message,'#c0392b'); }
 }
 // ═══════════════════════════════════════════════════════════════
