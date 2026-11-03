@@ -52,7 +52,7 @@ DNS via Cloudflare.
 | Arquivo | Build |
 |---|---|
 | `gestao.html` | **v145-20261103-1605** |
-| `fatura.html` | **v82-20261013-0910** |
+| `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
@@ -6708,3 +6708,36 @@ atrapalha o filtro (a locação ativa dela é de 11/06/2026). Fica registrado.
 ### ⏳ Não verificado
 Falta **logado**: abrir Manutenção com **Ctrl+Shift+R**, escolher um locatário e
 conferir a lista e o PDF. Eu não autentico.
+
+---
+
+## ⏳ A ESCREVER — fatura v83: reinício + salvamento automático (03/11/2026, `97cf276`)
+
+A entrega está **publicada e verificada no ar**, mas o registro completo ainda
+não foi escrito — a sessão atingiu o limite de uso. O essencial, para não se
+perder:
+
+🔴 **A causa do "o sistema reinicia"**: um auto-recarregador no fim da
+`fatura.html` comparava `etag`/`last-modified` do HTTP e chamava
+`location.replace` a cada 5 min **e a cada `visibilitychange`**. O gatilho era
+**falso**: o arquivo não mudava desde 13/10 (`095494c`) e o servidor respondia
+`Last-Modified: 03/11 14:11` — o **GitHub Pages reescreve esse cabeçalho de
+todos os arquivos a cada publicação**. Em 03/11 foram 5 pushes.
+
+**Conserto:** compara o carimbo do próprio arquivo e só **avisa** (faixa com
+"Atualizar agora" / "Depois") — é o que o `gestao.html` já fazia certo.
+
+**Salvamento automático:** `_fatMontarObjeto` extraído do `salvarFatura` (uma
+forma só), rascunho em `localStorage` com debounce de 1,5s, **oferecido** e
+nunca restaurado sozinho, por contexto (novo × `?edit=`), apagado ao gravar e
+ao Limpar. Entrou `_escH` — esta página **não tinha escape nenhum**.
+
+**Validado:** 49 testes, **34 defeitos injetados, todos acusados** (inclusive o
+bug relatado de volta). **No ar, com teclas de verdade e os dados reais** (141
+clientes, 119 veículos): digitar → rascunho salvo sozinho + indicador na tela;
+RSC + 3 veículos + R$ 4.500,00 capturados; faixa de versão **sem navegar**, com
+o trabalho intacto; recarregar → rascunho **oferecido**, não aplicado;
+Restaurar → tudo de volta. Nada gravado em produção.
+
+⏳ **Falta:** a seção completa (com as 4 vezes em que uma asserção minha julgou
+pelo **comentário** em vez do código) e a **regressão completa medida**.
