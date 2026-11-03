@@ -6711,33 +6711,152 @@ conferir a lista e o PDF. Eu não autentico.
 
 ---
 
-## ⏳ A ESCREVER — fatura v83: reinício + salvamento automático (03/11/2026, `97cf276`)
+## 🔴 A fatura reiniciava e apagava o trabalho — 03/11/2026 (`97cf276`) · fatura v83
 
-A entrega está **publicada e verificada no ar**, mas o registro completo ainda
-não foi escrito — a sessão atingiu o limite de uso. O essencial, para não se
-perder:
+Pedido: *"verificar o bug que acontece quando estamos gerando nova fatura onde o
+sistema reinicia e perdemos o trabalho. criar o salvamento automatico"*.
 
-🔴 **A causa do "o sistema reinicia"**: um auto-recarregador no fim da
-`fatura.html` comparava `etag`/`last-modified` do HTTP e chamava
-`location.replace` a cada 5 min **e a cada `visibilitychange`**. O gatilho era
-**falso**: o arquivo não mudava desde 13/10 (`095494c`) e o servidor respondia
-`Last-Modified: 03/11 14:11` — o **GitHub Pages reescreve esse cabeçalho de
-todos os arquivos a cada publicação**. Em 03/11 foram 5 pushes.
+### 🔴 A causa era um recarregador que EU tinha deixado na página
+No fim da `fatura.html` havia:
 
-**Conserto:** compara o carimbo do próprio arquivo e só **avisa** (faixa com
-"Atualizar agora" / "Depois") — é o que o `gestao.html` já fazia certo.
+```js
+// ── Detecta nova publicação e recarrega sozinho (evita ficar preso em cache) ──
+var c = r.headers.get('etag') || r.headers.get('last-modified') || '';
+if (c !== carimbo) { location.replace(location.pathname + '?v=' + Date.now() + …); }
+```
 
-**Salvamento automático:** `_fatMontarObjeto` extraído do `salvarFatura` (uma
-forma só), rascunho em `localStorage` com debounce de 1,5s, **oferecido** e
-nunca restaurado sozinho, por contexto (novo × `?edit=`), apagado ao gravar e
-ao Limpar. Entrou `_escH` — esta página **não tinha escape nenhum**.
+A cada **5 minutos** *e* a cada **`visibilitychange`** (trocar de aba e voltar),
+ele fazia `HEAD` na própria página e, se o cabeçalho tivesse mudado, recarregava
+**à força, sem aviso e sem salvar nada**.
 
-**Validado:** 49 testes, **34 defeitos injetados, todos acusados** (inclusive o
-bug relatado de volta). **No ar, com teclas de verdade e os dados reais** (141
-clientes, 119 veículos): digitar → rascunho salvo sozinho + indicador na tela;
-RSC + 3 veículos + R$ 4.500,00 capturados; faixa de versão **sem navegar**, com
-o trabalho intacto; recarregar → rascunho **oferecido**, não aplicado;
-Restaurar → tudo de volta. Nada gravado em produção.
+### 🔴 E o gatilho era FALSO — medido em produção
+| | |
+|---|---|
+| último commit que tocou `sistema/fatura.html` | **13/10/2026** (`095494c`) |
+| o que o servidor respondia em 03/11 | `Last-Modified: 03 Nov 2026 14:11` |
 
-⏳ **Falta:** a seção completa (com as 4 vezes em que uma asserção minha julgou
-pelo **comentário** em vez do código) e a **regressão completa medida**.
+**O GitHub Pages reescreve o `Last-Modified` — e o `ETag`, que o embute — de
+TODOS os arquivos a cada publicação, mesmo nos que não mudaram.** Então a fatura
+aberta recarregava a cada push meu em **qualquer** arquivo.
+
+Em 03/11 foram **5 pushes** (10:05, 10:13, 11:01, 11:06, 11:10) — cinco
+reinícios possíveis, **dois deles com 5 minutos de intervalo**. Preencher uma
+fatura de 13 veículos leva mais que isso.
+
+### O conserto não é invenção minha
+O **`gestao.html` já fazia o certo**: compara o **build** e apenas **avisa**
+(`mostrarAvisoAtualizacao`). A fatura passou a fazer igual:
+
+| | antes | agora |
+|---|---|---|
+| o que compara | `etag`/`last-modified` do HTTP | o **carimbo dentro do arquivo** |
+| quando dispara | a cada publicação de qualquer página | só quando **esta** página muda |
+| o que faz | `location.replace` à força | **faixa** com *Atualizar agora* / *Depois* |
+
+🔴 **Quem decide a hora de atualizar é quem está preenchendo.** E "Atualizar
+agora" **salva o rascunho antes de sair** — há teste e defeito injetado para a
+ordem das duas coisas.
+
+⚠️ O `ajuste.html`/`ajuda.html` também tem um recarregador; **não foi tocado**
+(não foi pedido, e lá não há formulário longo). Fica registrado.
+
+### O salvamento automático
+| Decisão | Por quê |
+|---|---|
+| **`_fatMontarObjeto()` extraído do `salvarFatura`** | o rascunho e o salvamento montam **a mesma forma**. Em duas montagens, o rascunho restauraria algo diferente do que seria gravado — o acidente da v119 |
+| essa função **não valida** | é rascunho justamente do incompleto; quem valida é o `salvarFatura`, antes de gravar |
+| restaura pelo **`preencherFaturaParaEdicao`** | é o caminho que a edição já usa — um restaurador só |
+| 🔴 **oferece, nunca restaura sozinho** | aplicar por cima do que o operador acabou de abrir é pior que perder o rascunho. O `localStorage` não manda no Firebase (armadilha 4) |
+| rascunho **por contexto** | o de uma fatura nova não é oferecido a quem abriu `?edit=`, e vice-versa |
+| **debounce de 1,5s** | gravar a cada tecla encheria o `localStorage` num formulário de dezenas de campos |
+| modo **consulta** não gera rascunho | `?view=` é leitura |
+| apagado ao **gravar** e ao **Limpar** | senão a próxima abertura ofereceria de volta o que já está no banco ou o que foi descartado de propósito |
+| `localStorage` bloqueado não atrapalha | aba privada e cota cheia caem no `catch` — quem está digitando não pode levar erro na cara |
+
+O indicador **💾 rascunho salvo 11:52** fica ao lado dos botões: "automático" sem
+sinal na tela não passa confiança.
+
+### 🔴 Esta página não tinha escape de HTML NENHUM
+Conferido antes de escrever as faixas: `grep` de escape = **0**. Entrou `_escH` —
+sem ele, nome de cliente com `<` ou aspas quebraria as duas faixas, que é
+exatamente o defeito que deixou o `crm.html` em branco.
+
+⚠️ Antes de aplicar o patch eu varri **toda função que o código novo chama**:
+`_escH` não existia (0 ocorrências). Se eu tivesse aplicado sem conferir, as duas
+faixas nasceriam quebradas.
+
+### Validado
+- `node --check`; `<div>` balanceadas (**73/73**, como no registro da v82); os
+  dois carimbos batendo
+- **49 testes de runtime** com o código real: o checador (não recarrega, não lê
+  cabeçalho, compara o carimbo, para quando a versão é igual, segue checando ao
+  voltar à aba), a faixa de versão (aparece, não navega, não duplica, fora da
+  impressão), a montagem única, o rascunho (grava, contexto, vazio não grava,
+  consulta não grava, debounce, indicador, `localStorage` quebrado), oferecer ×
+  restaurar, descartar com confirmação, apagar ao gravar e ao Limpar, e o escape
+- **34 defeitos injetados — todos acusados**, entre eles **o bug relatado de
+  volta** (o checador antigo inteiro), recarregar em vez de avisar, restaurar
+  sozinho, oferecer rascunho de outro contexto, e "Atualizar agora" sair sem
+  salvar
+- **No ar, na página publicada, com teclas de verdade e os dados reais**
+  (141 clientes, 119 veículos):
+
+| Passo | Resultado |
+|---|---|
+| digitei no nº da fatura | rascunho salvo sozinho · indicador *"💾 rascunho salvo 11:51"* |
+| escolhi RSC + 3 veículos a R$ 1.500 | rascunho com cliente, nº, 3 veículos e **R$ 4.500,00** |
+| 🔴 os dois sinais lado a lado | `Last-Modified` **de hoje** · carimbo **igual** → **o gatilho novo não dispara** |
+| faixa de versão nova | avisou, **não navegou**, trabalho **intacto** na tela |
+| recarreguei a página | rascunho **oferecido**, `restaurou sozinho: false` |
+| cliquei em Restaurar | RSC · nº 007001 · 3 veículos · R$ 4.500,00 **de volta** |
+
+  Nada foi gravado em produção — nunca cliquei em Salvar, e o rascunho de teste
+  foi removido do `localStorage` ao fim.
+- Regressão **medida**: **48 suítes, 2.382 testes**, nenhuma falha
+
+### ⚠️ QUATRO asserções minhas julgaram pelo COMENTÁRIO, não pelo código
+O comentário que eu escrevi para explicar o defeito antigo **cita os termos**
+(`etag`, `last-modified`, `location.replace`, `visibilitychange`). Quatro testes
+estruturais procuravam esses termos **no bloco inteiro** e, por isso:
+
+- dois **falhavam** com o código certo;
+- dois **absolviam** defeitos injetados de verdade.
+
+🔴 A regra para esta suíte passou a ser: teste estrutural olha `codigoChecador`
+(com as linhas de comentário filtradas), **nunca** o bloco cru. E há um teste
+`[2b]` que **exige que o comentário cite os termos** — se alguém reescrever o
+comentário, o filtro deixa de ser necessário e isso tem de aparecer.
+
+⚠️ **Comentário não é código.** Vale para qualquer asserção que procure uma
+string no fonte — e este arquivo tem comentários longos de propósito.
+
+### ⚠️ Outros tropeços da entrega
+1. **O recorte do bloco engolia a função do botão.** "2200 caracteres a partir do
+   comentário" incluía o `_fatAvisarVersao`, onde o `location.replace` é
+   **legítimo** (é o operador clicando). Passou a ser delimitado pelo fechamento
+   do próprio IIFE.
+2. **O ambiente de teste ficou meio carregado**: o `pega()` só extrai
+   `function X(){}`, então as `var` de módulo do bloco (`RASCUNHO_CHAVE`,
+   `_rascTimer`) ficaram de fora — o `_rascSalvar` gravava em
+   `store['undefined']` e **sete testes caíam em cascata**. Agora as `var` são
+   extraídas **do fonte**, então renomear a chave não quebra o teste em silêncio.
+3. **O meu próprio `preenche()` escondia um caso**: `o.cliente || padrao`
+   substituía um `null` proposital pelo padrão, e o teste do cliente ausente
+   nunca exercitava o caso.
+4. Uma asserção terminava em `&& r.em`, devolvendo a **string** da data em vez de
+   `true` — faltou o `!!`.
+5. O **heredoc comeu os escapes** mais uma vez ao tentar consertar a suíte por
+   script (`\n` virou quebra de linha, a âncora não casou e nada foi aplicado).
+   Refeito pela ferramenta de escrita. É a regra já registrada.
+
+### ⚠️ E a suíte `t-fat-baixa` travava o NÚMERO da versão
+Ela exigia literalmente `v82-`, então publicar a v83 a fez falhar **sem defeito
+nenhum** — é a quarta vez (v134, 20/10, 31/10 e agora). Passou a comparar **os
+dois carimbos entre si** mais o formato `vNN-AAAAMMDD-HHMM`, que é a regra de
+verdade do CLAUDE.md e ainda pega o caso de a fatura sair carimbada como outra
+página.
+
+### ⏳ Não verificado
+Falta **logado no fluxo real**: o Rogel montar uma fatura de verdade, deixar a
+aba aberta, e confirmar que não reinicia mais. O ciclo foi exercitado por mim na
+página publicada, mas com um preenchimento de teste.
