@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v143-20261103-0920 -->
+<!-- LOKA deploy: v144-20261103-1510 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -531,6 +531,9 @@ tr:hover td{background:#f8f9fe;}
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input class="filter-input" id="qManut" type="text" placeholder="Buscar veículo, placa, oficina..." oninput="renderManutencao()">
         </div>
+        <select class="filter-sel" id="fManutCliente" onchange="renderManutencao()" style="min-width:170px" title="De quem era o carro na data da manutenção">
+          <option value="">Todos os locatários</option>
+        </select>
         <select class="filter-sel" id="fManutStatus" onchange="renderManutencao()">
           <option value="">Todos os status</option>
           <option value="em_andamento">🔧 Em andamento</option>
@@ -1735,7 +1738,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v143-20261103-0920';
+var LOKA_BUILD = 'v144-20261103-1510';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -7263,6 +7266,7 @@ function _manutColetarSaida() {
   var modo = _modoManutencao();
   var q  = semAcento(((document.getElementById('qManut')||{}).value||''));
   var fs = ((document.getElementById('fManutStatus')||{}).value)||'';
+  var fcli = _manutClienteFiltro();
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
   var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
   // Curinga "Todas as oficinas" / "Todos os clientes": filtro nulo = vê tudo
@@ -7276,6 +7280,7 @@ function _manutColetarSaida() {
     if (setOficinas && !setOficinas.has((m.oficina||'').trim().toLowerCase())) return false;
     if (placasCliente && (!m.placa || !placasCliente.has(String(m.placa).toUpperCase()))) return false;
     if (fs && m.status !== fs) return false;
+    if (!_manutClienteOk(m, fcli)) return false;
     if (_manutFiltroVeiculo && m.veiculoId !== _manutFiltroVeiculo && m.placa !== _manutFiltroVeiculo) return false;
     if (dataIni && (!m.data || m.data < dataIni)) return false;
     if (dataFim && (!m.data || m.data > dataFim)) return false;
@@ -7298,6 +7303,11 @@ function _manutColetarSaida() {
   }
   if (q) filtros.push('Busca: "'+q+'"');
   if (fs) filtros.push('Status: '+fs);
+  if (fcli) {
+    var _cn = fcli === '__sem__' ? 'sem locatário na data'
+      : ((db.clients||[]).filter(function(c){ return c && c.id === fcli; })[0]||{}).nome || fcli;
+    filtros.push('Locatário: '+_cn);
+  }
   if (_manutFiltroVeiculo) {
     var vf = (db.veiculos||[]).find(function(v){ return v && (v.id===_manutFiltroVeiculo || v.placa===_manutFiltroVeiculo); });
     filtros.push('Veículo: '+(vf ? (vf.marca+' '+vf.modelo+' · '+vf.placa) : _manutFiltroVeiculo));
@@ -7500,6 +7510,7 @@ function _mntKMCel(m) {
 }
 
 function renderManutencaoRestrito(modo) {
+  _manutRenderSelectCliente();
   var stats = document.getElementById('manutStats');
   var grid  = document.getElementById('manutGrid');
   if (!grid) return;
@@ -7614,16 +7625,19 @@ function _wireManutGrid(grid) {
 function renderManutencao() {
   if (!db) return;
   if (!db.manutencoes) db.manutencoes = [];
+  _manutRenderSelectCliente();
   // Perfil de manutenção RESTRITO (oficina / clientes): consulta com escopo
   var _modo = _modoManutencao();
   if (_modo.restrito) { renderManutencaoRestrito(_modo); return; }
   var q  = semAcento((document.getElementById('qManut').value||''));
   var fs = document.getElementById('fManutStatus').value;
+  var fcli = _manutClienteFiltro();
   var dataIni = (document.getElementById('fManutDataIni')||{}).value || '';
   var dataFim = (document.getElementById('fManutDataFim')||{}).value || '';
   var list = db.manutencoes.filter(function(m) {
     if (!m) return false;
     if (fs && m.status !== fs) return false;
+    if (!_manutClienteOk(m, fcli)) return false;
     if (_manutFiltroVeiculo && m.veiculoId !== _manutFiltroVeiculo && m.placa !== _manutFiltroVeiculo) return false;
     // Filtro por intervalo de data (usa a data de entrada da manutenção)
     if (dataIni && (!m.data || m.data < dataIni)) return false;
@@ -7836,10 +7850,91 @@ function _atualizarLocatariaManut() {
 }
 
 // Empresa locatária de uma manutenção: usa a gravada; se não houver, a atual
+// ══ DE QUEM ERA O CARRO NA MANUTENÇÃO ═══════════════════════════
+// Manutenção é de VEÍCULO; "cliente" aqui só pode ser quem tinha o carro
+// QUANDO o serviço foi feito.
+//
+// 🔴 Por que NÃO o locatário atual: das 159 manutenções em que só ele responde,
+//    154 são anteriores à primeira locação do carro — preparação de frota,
+//    R$ 735.617,70 (44% do custo total). Atribuí-las a quem está com o carro
+//    hoje jogaria custo da LOKÁ na conta do cliente.
+//
+// Reusa o `mltIndLocacao` (v135) — ele já varre `ativos` + `historico` pela
+// data e respeita contrato multi-veículo (armadilha 2). Uma fonte só.
+function _locacaoDaManut(m){
+  if (!m || !m.placa || !m.data) return null;
+  return mltIndLocacao({ placa: m.placa, dataInfracao: String(m.data).slice(0,10) });
+}
+
+// { id, nome }. Vazio quando o carro não estava alugado na data — e isso é a
+// verdade, não falha: é manutenção por conta da locadora.
+function _clienteDaManut(m){
+  if (m && m.clienteId) return { id: m.clienteId, nome: m.clienteNome || '' };
+  var a = _locacaoDaManut(m);
+  if (a) return { id: a.clienteId || '', nome: a.clienteNome || '' };
+  return { id: '', nome: '' };
+}
+
+// ⚠️ O badge 🏢 passou a usar a MESMA regra do filtro. Antes ele caía no
+//    locatário atual, então mostrava cliente errado em 159 + 13 linhas — e um
+//    filtro que não concordasse com o badge pareceria quebrado.
 function _empresaDaManut(m) {
-  if (m && m.clienteNome) return m.clienteNome;
-  var loc = _locatariaAtual(m ? m.placa : '', m ? m.veiculoId : '');
-  return (loc && loc.clienteNome) ? loc.clienteNome : '';
+  return _clienteDaManut(m).nome;
+}
+
+// A regra do filtro, num lugar só: `_manutColetarSaida` e `renderManutencao`
+// chamam daqui. Em dois lugares, o relatório acabaria discordando da tela —
+// foi exatamente o acidente da v119.
+function _manutClienteFiltro(){
+  return ((document.getElementById('fManutCliente')||{}).value) || '';
+}
+
+function _manutClienteOk(m, filtro){
+  if (!filtro) return true;
+  var c = _clienteDaManut(m);
+  if (filtro === '__sem__') return !c.id;
+  return String(c.id || '') === filtro;
+}
+
+// Os clientes que TÊM manutenção, com a contagem. Opção que não filtra nada só
+// atrapalha — é o padrão dos filtros de Vendas (19/09) e de órgão (v91).
+function _manutClientesDoFiltro(){
+  garantirArray('manutencoes');
+  var porId = {}, semCliente = 0;
+  (db.manutencoes||[]).forEach(function(m){
+    if (!m) return;
+    var c = _clienteDaManut(m);
+    if (!c.id) { semCliente++; return; }
+    if (!porId[c.id]) porId[c.id] = { id: c.id, nome: c.nome || '(sem nome)', n: 0 };
+    porId[c.id].n++;
+  });
+  var lista = Object.keys(porId).map(function(k){ return porId[k]; });
+  lista.sort(function(a,b){ return semAcento(a.nome).localeCompare(semAcento(b.nome)); });
+  return { lista: lista, semCliente: semCliente };
+}
+
+// Redesenha o <select> preservando a escolha — a lição do filtro de placa da
+// tela de Despesas, que filtrava certo mas voltava para "Todas".
+function _manutRenderSelectCliente(){
+  var sel = document.getElementById('fManutCliente');
+  if (!sel) return;
+  var atual = sel.value || '';
+  var d = _manutClientesDoFiltro();
+  var h = '<option value="">Todos os locatários</option>';
+  d.lista.forEach(function(c){
+    h += '<option value="'+_condEsc(c.id)+'"'+(atual===c.id?' selected':'')+'>'
+      + _condEsc(c.nome) + ' (' + c.n + ')</option>';
+  });
+  if (d.semCliente) {
+    h += '<option value="__sem__"'+(atual==='__sem__'?' selected':'')+'>'
+      + '\u2014 Sem locat\u00e1rio na data (' + d.semCliente + ')</option>';
+  }
+  // ⚠️ Quem preserva a escolha e o atributo `selected` nas <option> acima.
+  //    Conferido no navegador em 03/11/2026: trocar o innerHTML de um <select>
+  //    NAO mantem o `.value` sozinho (nem quando a option continua existindo) —
+  //    e, se a option sumiu, o navegador ja zera. Por isso nao ha guarda aqui:
+  //    ela seria codigo que nao faz nada.
+  sel.innerHTML = h;
 }
 
 function selecionarVeiculoPorPlaca(placa) {
