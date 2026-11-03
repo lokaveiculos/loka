@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v144-20261103-1510 -->
+<!-- LOKA deploy: v145-20261103-1605 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -531,7 +531,7 @@ tr:hover td{background:#f8f9fe;}
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input class="filter-input" id="qManut" type="text" placeholder="Buscar veículo, placa, oficina..." oninput="renderManutencao()">
         </div>
-        <select class="filter-sel" id="fManutCliente" onchange="renderManutencao()" style="min-width:170px" title="De quem era o carro na data da manutenção">
+        <select class="filter-sel" id="fManutCliente" onchange="renderManutencao()" style="min-width:170px;max-width:230px" title="De quem era o carro na data da manutenção">
           <option value="">Todos os locatários</option>
         </select>
         <select class="filter-sel" id="fManutStatus" onchange="renderManutencao()">
@@ -1738,7 +1738,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v144-20261103-1510';
+var LOKA_BUILD = 'v145-20261103-1605';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
