@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v142-20261031-0910** |
+| `gestao.html` | **v143-20261103-0920** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -6372,3 +6372,182 @@ verificação não tem `firebase` e relatório é só leitura. As multas seguem 
 ### ⏳ Não verificado
 Falta **logado**: o Rogel marcar algumas multas e clicar em **📋 Relatório das
 selecionadas** (ou no botão do topo). Eu não autentico.
+
+---
+
+## ✅ Histórico de recebimentos na fatura + a baixa pela fatura registra — 03/11/2026 (`c5fca2f`) · gestao v143
+
+Pedido: *"exibir na fatura e em contas a receber o historico detalhado de
+recebimentos. verificar se as abas estao sincronizadas para quando baixarmos os
+valores em uma aba o sistema tambem baixar na outra"*.
+
+### O que já existia — conferido no fonte e nos dados, não suposto
+| | |
+|---|---|
+| histórico no **Contas a Receber** | ✅ existe desde a v108 (botão 📋 na coluna Recebido) |
+| e está **em uso de verdade** | **13 lançamentos · 19 baixas** registradas |
+| **baixa recíproca** nas duas direções | ✅ existe desde a v107 |
+
+Então metade do pedido já estava pronta. O trabalho foi achar onde faltava.
+
+### 🔴 Buraco 1 — o painel Faturas não mostrava NADA de recebimento
+Ele mostrava o total da fatura e a marca "◑ pago parcialmente", e só. **Quem
+olhava a fatura não sabia quanto já tinha sido pago** — nem tinha como chegar ao
+histórico.
+
+Entrou a coluna **Recebido**, entre Total e Status:
+
+| Situação | O que a coluna mostra |
+|---|---|
+| parcial | o recebido **e** `falta R$ …` em vermelho |
+| quitado | o recebido em verde, **sem** "falta" |
+| renegociado | 🤝 renegociado, **sem** "falta" (o saldo migrou para as parcelas) |
+| sem lançamento ligado | **⚠ sem lançamento · no Contas a Receber** |
+| com recebimento | botão **📋** que abre o histórico |
+
+🔴 **Fatura sem lançamento AVISA, não mostra R$ 0,00.** São **10 das 32** — um
+zero ali faria parecer "nada recebido" quando o certo é "não há onde olhar".
+
+### 🔴 Buraco 2 — a baixa pela FATURA não entrava no histórico
+`_sincRecebimentoDaFatura` gravava `recebido` e `status` e **nunca chamava
+`_finRegistrarBaixa`**. Ou seja: o histórico da v108 ia mentir por omissão a
+partir do primeiro uso do botão **✅ Dar Baixa** da fatura — o dinheiro entrava
+no acumulado sem linha nenhuma, e depois pareceria "registro anterior ao
+histórico".
+
+Agora registra. Com dois cuidados que não podem sair:
+
+1. **Pela DIFERENÇA**, não pelo valor cheio — senão contaria de novo o que já
+   havia entrado. Mesma regra do "✅ Quitar de uma vez" (v108).
+2. **ANTES de mexer no acumulado** — depois, a diferença seria zero.
+
+🔴 **A invariante que mantém isso honesto:** *soma das baixas + o que veio antes
+do histórico = `recebido`*. Há teste exigindo que ela feche nos dois caminhos, e
+defeito injetado para cada um dos dois cuidados.
+
+### 🔴 Um visualizador só
+A fatura abre o **MESMO `finVerBaixas`** do Contas a Receber, passando o índice
+do lançamento.
+
+⚠️ Escrever um segundo visualizador seria repetir o acidente da **v119**: havia
+duas `statusReal`, uma aprendeu a regra nova e a outra não, e o impresso era o
+que errava. Há teste estrutural exigindo que `_fatCelulaRecebido` **não desenhe
+histórico próprio** — só chame a janela.
+
+A janela passou a **dizer de qual fatura é** (`📄 Fatura 001 · 2026-08`), porque
+agora ela abre de duas telas e precisa se situar sozinha. Acha a fatura pelo
+**id E pela chave** — nos dados reais **20 dos 26 vínculos são por chave**, não
+por id (nasceram antes de o id existir).
+
+### A sincronização: auditada nos dados reais
+Rodando a mesma `_lancDaFat` do sistema contra as 32 faturas e os 104
+lançamentos:
+
+| | |
+|---|---|
+| faturas com lançamento ligado | **22** · sem: 10 |
+| **de acordo** com o lançamento | **20** |
+| 🔴 divergentes | **2** |
+
+**A sincronização em si está certa.** As 2 divergências são **dado**, não código
+— e são o próximo item.
+
+### 🔴 ACHADO: 4 faturas disputando 2 lançamentos
+A `faturaKey` é `cliente + número + período`. Dois pares produzem a **mesma
+chave**, então `_lancDaFat` devolve o **mesmo lançamento** para as duas:
+
+| Lançamento | Cliente | As duas faturas |
+|---|---|---|
+| 63 | **G7 COMPANY** | `001 · 2026-08 · R$ 37.300,00 · paga`<br>`001 · 2026-08 · R$ 38.460,09 · pendente` |
+| 77 | **ISS TRANSPORTES** | `001 · 2026-09 · R$ 1.750,00 · pendente`<br>`001 · 2026-09 · R$ 4.455,55 · pendente` |
+
+Dar baixa em qualquer uma do par baixa o **mesmo** registro, e a outra fica
+apontando para ele. É o mesmo problema de fundo já registrado na v81 (a
+numeração não é incrementada — todas nascem "001"), mas aqui as duas também
+dividem o **período**, que é o que fecha a colisão.
+
+🔴 **A coluna nova DIZ isso na linha** — `⚠ compartilhado com 1 fatura(s)`, com a
+explicação no `title`. Sem o aviso, a coluna repetiria R$ 25.863,00 nas duas
+linhas da G7 e pareceria que o sistema conta em dobro. O defeito está no dado;
+a tela só não pode esconder.
+
+⚠️ **Não corrigi** — é dado de produção e não foi pedido. O conserto é mudar o
+número de uma de cada par (ex.: `002`), e aí cada fatura passa a ter o seu
+lançamento. **Decisão do Rogel.**
+
+### O que NÃO mudou, de propósito
+A `fatura.html` (a tela que gera o documento) **não ganhou nada**: ela é pública
+e o recebimento é registro interno. "Na fatura" foi lido como o **painel
+Faturas**, que é onde a baixa acontece. Se ele quis o documento impresso, é
+outro trabalho.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **52 testes** com o código real, os **104 lançamentos e as 32 faturas reais**:
+  o que a fatura lê do lançamento (com e sem vínculo, quitado pelos dois
+  caminhos, renegociado, nulo), a detecção de chave duplicada, a célula nos 4
+  estados, a baixa registrando (valor, diferença, data, quem, obs), **a
+  invariante nos dois caminhos**, quitado e renegociado intocados, a janela
+  nomeando a fatura pelo id **e pela chave**, e o fonte (8 colunas, a ordem, um
+  visualizador só, registrar antes e pela diferença)
+- **27 defeitos injetados — todos acusados**, entre eles **o buraco 2 de volta**,
+  registrar o valor cheio, registrar depois do acumulado, a coluna sumir do
+  cabeçalho ou das linhas, o 📋 abrir o histórico de outro lançamento, o "falta"
+  aparecer no quitado, e parar de detectar a chave duplicada
+- **as suítes da v107 (101 testes) e da v108 (58) continuam passando** — é o que
+  prova que a baixa recíproca e o histórico não mudaram de comportamento
+- **No ar, no arquivo publicado, com os dados reais** (`saveDB` neutralizado,
+  banco em cópia de memória — **nada gravado em produção**, reconferido: 104
+  lançamentos, 13 com histórico, 19 linhas, igual ao início):
+  as 32 faturas produzem célula válida, 22 com lançamento / 10 avisando,
+  12 quitadas · 3 parciais, 15 com botão de histórico, **4 linhas marcadas como
+  compartilhadas**; e a baixa pela fatura da **RSC 001 · 2026-09**
+  (R$ 170.748,41, com R$ 90.000 em 2 baixas) registrou **R$ 80.748,41** — a
+  diferença exata —, virou 3 baixas, status `recebido`, e **a invariante fechou**
+- Regressão **medida**: **46 suítes, 2.286 testes**, nenhuma falha
+
+### A coluna: medida, não suposta
+Comparado com o arquivo **real da v142** (raw do commit `9be05f8`, confirmado com
+7 `<th>` e sem `_fatCelulaRecebido`):
+
+| Janela | v142 (7 colunas) | v143 (8 colunas) |
+|---|---|---|
+| 900px | 778px · **já rolava** | 879px · rola |
+| 1024px | 778px · **já rolava** | 879px · rola |
+| 1366px | 1097px · não rola | 1097px · **não rola** |
+
+⚠️ **A tabela já rolava a 900 e 1024 na v142** — o custo da coluna é **+101px**
+numa rolagem que já existia, e a 1366px ela cabe de graça. Todas as 32 linhas
+com **8 células**, nenhuma torta.
+
+### ⚠️ Três tropeços meus, os três pegos por o número não fazer sentido
+1. **O `v142_semColuna` deu `false`** — eu procurei `>Recebido</th>` no arquivo
+   inteiro, e essa string **já existia**: é a coluna da tabela do **Contas a
+   Receber**. A conferência tem de olhar dentro do `renderFaturas`.
+2. **"v143 ths: 0"** — passei `window.__JS` (o script já extraído) para uma
+   função que espera o **HTML**, então o regex de `<script>` não casou nada.
+3. **A primeira medida da coluna veio com `janela: 0`** — a aba estava sem
+   largura. Número que não bate com a conta (janela − 220 − 32) é ambiente
+   errado, não resultado.
+
+### ⚠️ A cadeia de dependências quebrou DUAS suítes, pela terceira vez em 5 dias
+`t-baixas` (v108) e `t-sincfat` (v107) extraem funções **por nome**:
+- `finVerBaixas` passou a ler `_todasFaturas` e chamar `_fatChave`;
+- `renderFaturas` passou a chamar `_fatIdxRepetido` / `_fatRecebimento` / `_fatCelulaRecebido`.
+
+Nenhum é defeito do sistema — em produção os dois são `var` global **antes** do
+uso (6311 e 6396), conferido. As duas suítes ganharam a cadeia.
+
+🔴 É a mesma armadilha do `_subLista` (29/10), do `mltRelatorioEscopo` (31/10) e
+do `mltISO` (hoje, na suíte nova). **Extrair por nome exige acompanhar quem a
+função passa a chamar** — e isso vai continuar acontecendo a cada mudança que
+some uma chamada nova. Vale extrair por cadeia automática, como o ambiente do
+navegador já faz.
+
+### ⏳ Não verificado · e uma decisão para o Rogel
+Falta **logado**: abrir o painel **Faturas** com **Ctrl+Shift+R**, ver a coluna
+Recebido e clicar num 📋. Eu não autentico.
+
+🔴 **Decidir os dois pares de faturas com chave repetida** (G7 `001/2026-08` e
+ISS `001/2026-09`): mudar o número de uma de cada par separa as cobranças. Sem
+isso, dar baixa numa delas mexe no lançamento da outra.
