@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v142-20261031-0910 -->
+<!-- LOKA deploy: v143-20261103-0920 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1735,7 +1735,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v142-20261031-0910';
+var LOKA_BUILD = 'v143-20261103-0920';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -6344,6 +6344,40 @@ function setFiltroFaturas(status) {
   renderFaturas();
 }
 
+// ══ O RECEBIMENTO VISTO PELA FATURA ═════════════════════════════
+// A fatura mora fora do `loka_db`; quem guarda o recebimento é o LANÇAMENTO do
+// Contas a Receber. Então a coluna Recebido da fatura lê de lá — não há (nem
+// deve haver) um segundo lugar guardando o mesmo dinheiro.
+// Devolve o índice para a janela do histórico poder ser a MESMA das duas telas.
+function _fatRecebimento(fat){
+  var idx = _lancDaFat(fat);
+  if (idx < 0) return { idx: -1, temLanc: false };
+  var r = (db.financeiro.receber || [])[idx];
+  if (!r) return { idx: -1, temLanc: false };
+  var val = Number(r.valor) || 0, rec = Number(r.recebido) || 0;
+  return {
+    idx: idx, temLanc: true, lanc: r,
+    valor: val, recebido: rec, saldo: Math.round((val - rec) * 100) / 100,
+    baixas: _finBaixas(r).length,
+    renegociado: r.status === 'renegociado',
+    quitado: r.status === 'recebido' || (val > 0 && rec >= val)
+  };
+}
+
+// ⚠️ Duas faturas com o MESMO número e período produzem a mesma `faturaKey` e
+//    caem no mesmo lançamento. Medido em 03/11/2026: as duas "001 / 2026-08" da
+//    G7. Sem dizer isso, a coluna repetiria o mesmo valor em duas linhas e
+//    pareceria contagem dobrada — o defeito está no DADO, não no cálculo.
+function _fatIdxRepetido(lista){
+  var cont = {}, rep = {};
+  (lista || []).forEach(function(f){
+    var i = _lancDaFat(f);
+    if (i >= 0) cont[i] = (cont[i] || 0) + 1;
+  });
+  Object.keys(cont).forEach(function(i){ if (cont[i] > 1) rep[i] = cont[i]; });
+  return rep;
+}
+
 function _statusFaturaReal(fat) {
   // Determina status real considerando vencimento
   if (fat.status === 'pago') return 'pago';
@@ -6355,6 +6389,43 @@ function _statusFaturaReal(fat) {
   }
   if (fat.status === 'vencido') return 'vencido';
   return 'pendente';
+}
+
+// Marca quais lançamentos são reivindicados por mais de uma fatura.
+// Preenchido pelo render, lido pela célula.
+var _fatRepetidos = {};
+
+function _fatCelulaRecebido(rc){
+  if (!rc.temLanc) {
+    return '<td style="padding:9px 12px;text-align:right">'
+      + '<span style="font-size:10px;color:var(--amber);font-weight:600">\u26A0 sem lan\u00e7amento</span>'
+      + '<div style="font-size:9px;color:var(--muted)">no Contas a Receber</div></td>';
+  }
+  var cor = rc.quitado ? '#0d7a3e' : rc.recebido > 0 ? '#1e40af' : 'var(--muted)';
+  var h = '<td style="padding:9px 12px;text-align:right">'
+    + '<div style="font-family:monospace;font-weight:700;font-size:11px;color:'+cor+'">'
+      + brl(rc.recebido) + '</div>';
+  if (!rc.quitado && !rc.renegociado) {
+    h += '<div style="font-size:9px;color:#c0392b;font-weight:700">falta '+brl(rc.saldo)+'</div>';
+  }
+  if (rc.renegociado) {
+    h += '<div style="font-size:9px;color:#9d174d;font-weight:700">\uD83E\uDD1D renegociado</div>';
+  }
+  // 📋 abre o MESMO histórico do Contas a Receber — um visualizador só.
+  if (rc.recebido > 0 || rc.baixas) {
+    h += '<div style="margin-top:3px"><button onclick="finVerBaixas('+rc.idx+')" '
+      + 'title="Ver o hist\u00f3rico de recebimentos desta fatura" '
+      + 'style="background:#eef7ff;color:#0e7490;border:none;border-radius:4px;padding:2px 6px;'
+      + 'cursor:pointer;font-weight:700;font-size:9px;white-space:nowrap">'
+      + '\u{1F4CB} ' + (rc.baixas ? rc.baixas + ' baixa(s)' : 'sem detalhe') + '</button></div>';
+  }
+  if (_fatRepetidos[rc.idx]) {
+    h += '<div style="font-size:9px;color:#c0392b;font-weight:700" '
+      + 'title="Duas faturas com o mesmo n\u00famero e per\u00edodo apontam para este mesmo lan\u00e7amento. '
+      + 'Corrija o n\u00famero de uma delas para separar as cobran\u00e7as.">'
+      + '\u26A0 compartilhado com ' + (_fatRepetidos[rc.idx] - 1) + ' fatura(s)</div>';
+  }
+  return h + '</td>';
 }
 
 function limparFiltroDataFaturas(){
@@ -6453,11 +6524,14 @@ function renderFaturas() {
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Emissão</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Vencimento</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Total</th>'
+    + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:right">Recebido</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase">Status</th>'
     + '<th style="padding:9px 12px;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center">Ações</th>'
     + '</tr></thead><tbody>'
+    + (function(){ _fatRepetidos = _fatIdxRepetido(list); return ''; })()
     + list.sort(function(a,b){ return new Date(b.emissao||0)-new Date(a.emissao||0); }).map(function(f) {
       var st = _statusFaturaReal(f);
+      var _rc = _fatRecebimento(f);
       // O status gravado pode ser mais específico do que os três que os filtros
       // conhecem. Mostramos a marca extra sem mexer no status do filtro —
       // senão a fatura cairia fora de Vencidas/A Vencer/Pagas e ficaria
@@ -6471,6 +6545,7 @@ function renderFaturas() {
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmtD(f.emissao)+'</td>'
         + '<td style="padding:9px 12px;text-align:center;font-size:11px">'+fmtD(f.vencimento)+'</td>'
         + '<td style="padding:9px 12px;text-align:right;font-weight:700;font-family:monospace">'+(f.total||'—')+'</td>'
+        + _fatCelulaRecebido(_rc)
         + '<td style="padding:9px 12px"><span style="background:'+stBg[st]+';color:'+stCor[st]+';padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">'+stLbl[st]+'</span>'+extra+'</td>'
         + '<td style="padding:9px 12px;text-align:center"><div style="display:flex;gap:4px;justify-content:center">'
           + '<button class="fatura-view-btn" data-fatid="'+(f.id||'')+'" data-cliid="'+(f.clienteId||'')+'" title="Consultar / imprimir fatura" style="padding:5px 9px;background:#eef7ff;color:#0e7490;border:1.5px solid #0e7490;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer">👁 Consultar</button>'
@@ -7071,9 +7146,17 @@ function _sincRecebimentoDaFatura(fat, idx){
   var val = Number(r.valor)||0;
   if (r.status === 'recebido' || (val > 0 && (Number(r.recebido)||0) >= val)) return;  // já quitado
 
+  // 🔴 Registra no histórico ANTES de mexer no acumulado, e pela DIFERENÇA:
+  //    somar o valor cheio contaria de novo o que já havia entrado, e a
+  //    invariante do histórico (soma das baixas + o que veio antes = recebido)
+  //    deixaria de fechar. É a mesma regra do "✅ Quitar de uma vez" (v108).
+  var _dataBx = String(fat.pagoEm||'').slice(0,10) || new Date().toISOString().split('T')[0];
+  _finRegistrarBaixa(r, val - (Number(r.recebido)||0), _dataBx,
+    'Baixa pela fatura ' + (fat.numero || '(sem número)'));
+
   r.recebido = val;
   r.status = 'recebido';
-  r.recebidoEm = String(fat.pagoEm||'').slice(0,10) || new Date().toISOString().split('T')[0];
+  r.recebidoEm = _dataBx;
   if (fat.id && r.faturaId !== fat.id) r.faturaId = fat.id;
   saveDB();
 
@@ -10246,6 +10329,16 @@ function finVerBaixas(idx){
   finInit();
   var r = db.financeiro.receber[idx];
   if (!r) return;
+  // Esta é a MESMA janela do painel Faturas. Abrindo de lá, ela precisa dizer
+  // de qual fatura é — senão o operador não sabe o que está vendo.
+  var _fatDoLanc = (_todasFaturas || []).filter(function(f){
+    return f && ((f.id && f.id === r.faturaId)
+      || (r.faturaKey && _fatChave(f) === r.faturaKey));
+  })[0];
+  var _refTopo = _fatDoLanc
+    ? '\uD83D\uDCC4 Fatura ' + (_fatDoLanc.numero || '(sem n\u00famero)')
+      + (_fatDoLanc.periodo ? ' \u00b7 ' + _fatDoLanc.periodo : '')
+    : (r.historico || '');
   var val = Number(r.valor)||0, rec = Number(r.recebido)||0;
   var lista = _finBaixas(r).slice().sort(function(a,b){
     return String(a.data||'').localeCompare(String(b.data||''))
@@ -10290,7 +10383,7 @@ function finVerBaixas(idx){
   p.innerHTML = '<div style="background:#fff;border-radius:12px;width:640px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);max-height:90vh;overflow:auto">'
     + '<div style="background:#0E1B4D;padding:14px 18px;color:#fff;font-weight:800;font-size:13px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">'
       + '<span>&#128203; Hist&oacute;rico de baixas &mdash; '+(r.cliente||'')+'</span>'
-      + '<span style="font-size:11px;font-weight:600;opacity:.8">'+(r.historico||'')+'</span></div>'
+      + '<span style="font-size:11px;font-weight:600;opacity:.8">'+_refTopo+'</span></div>'
     + '<div style="padding:16px 18px">'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
       + '<div style="flex:1;min-width:120px;background:#f0f2f9;border-radius:8px;padding:8px 12px">'
