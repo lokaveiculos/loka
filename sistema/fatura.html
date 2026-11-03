@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v82-20261013-0910 -->
+<!-- LOKA deploy: v83-20261103-1700 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LOKÁ – Fatura Mensal</title>
@@ -443,6 +443,7 @@ textarea.input {
   <button class="btn btn-outline" onclick="window.print()">🖨 Imprimir</button>
   <button class="btn btn-primary" id="btnSalvarFatura" onclick="salvarFatura()">💾 Salvar Fatura</button>
   <button class="btn btn-green" onclick="salvarContaReceber()">📥 Salvar no Contas a Receber</button>
+  <span id="rascAviso" class="no-print" style="font-size:11px;color:#b45309;font-weight:700;align-self:center"></span>
 </div>
 
 <div class="fatura">
@@ -730,6 +731,9 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('footerNum').textContent = 'Fatura #' + this.value;
   });
 
+  // Salvamento automático: a partir daqui, digitar agenda o rascunho.
+  _rascIniciar();
+
   // Fechar dropdown ao clicar fora
   document.addEventListener('click', function(e) {
     if (!document.getElementById('cliWrap').contains(e.target)) {
@@ -771,7 +775,7 @@ function carregarDados() {
   });
 }
 
-var LOKA_BUILD = 'v82-20261013-0910';
+var LOKA_BUILD = 'v83-20261103-1700';
 try { console.log('%cLOKÁ Fatura — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 
 // ── MODO EDIÇÃO: carregar fatura existente ──────────────────
@@ -784,7 +788,7 @@ function verificarModoEdicao() {
   var viewId = params.get('view');
   var cliId = params.get('cli');
   var alvo = editId || viewId;
-  if (!alvo) return;
+  if (!alvo) { _rascOferecer(); return; }     // fatura nova: contexto 'novo'
   _modoConsulta = !!viewId;
 
   // Buscar a fatura no Firebase
@@ -796,6 +800,10 @@ function verificarModoEdicao() {
     if (_modoConsulta) {
       // Modo consulta: aguardar preencher e abrir a impressão
       setTimeout(function(){ aplicarModoConsulta(fat); }, 1200);
+    } else {
+      // Só depois de a tela terminar de montar (o preencher usa 600+400ms para
+      // marcar os veículos) — senão a faixa apareceria sobre uma tela a meio.
+      setTimeout(_rascOferecer, 1200);
     }
   }).catch(function(e) {
     status('❌ Erro ao carregar fatura: '+e.message, '#c0392b');
@@ -1539,6 +1547,185 @@ function delFat(n) {
   }).catch(function(e) { status('❌ Erro: '+e.message, '#c0392b'); });
 }
 
+// ══ A FORMA DE UMA FATURA, NUM LUGAR SO ═════════════════════════
+// Extraido do `salvarFatura` para o RASCUNHO montar exatamente o mesmo objeto.
+// Em duas montagens, o rascunho restauraria algo diferente do que seria gravado
+// — foi o acidente da v119 (duas funções decidindo o mesmo).
+// ⚠️ Esta função NÃO valida: o rascunho é justamente de fatura incompleta.
+//    Quem valida é o `salvarFatura`, logo abaixo, antes de gravar.
+function _fatMontarObjeto() {
+  if (typeof calcTotal === 'function') calcTotal();
+
+  var num   = (document.getElementById('faturaNum')||{}).value || '';
+  var cli   = _clienteSelecionado;
+  var veics = Array.from(_veicSelecionados).map(function(i){return _veicExibidos[i];}).filter(Boolean);
+
+  var outros = [];
+  document.querySelectorAll('#finBody .fin-row-outro').forEach(function(row) {
+    var inputs = row.querySelectorAll('.fin-input');
+    if (inputs.length >= 3) {
+      var desc = inputs[0].value || '';
+      var ref  = inputs[1].value || '';
+      var val  = inputs[2].value || '';
+      if (desc || val) outros.push({ descricao: desc, referencia: ref, valor: val });
+    }
+  });
+
+  var totalNum = parseBRL((document.getElementById('totalDisplay')||{}).textContent || '');
+  if (totalNum <= 0 && typeof calcTotalVeic === 'function') totalNum = calcTotalVeic();
+
+  return {
+    id: _editandoFaturaId || ('fat_' + Date.now()),
+    numero: num,
+    cliente: cli ? cli.nome : '',
+    clienteId: cli ? cli.id : '',
+    periodo: (document.getElementById('periodoRef')||{}).value || '',
+    emissao: (document.getElementById('dataEmissao')||{}).value || '',
+    vencimento: (document.getElementById('dataVenc')||{}).value || '',
+    jurosMulta: {
+      ativo: !!(document.getElementById('jmAtivar') && document.getElementById('jmAtivar').checked),
+      multa: (document.getElementById('jmMulta')||{}).value || '',
+      jurosMes: (document.getElementById('jmJurosMes')||{}).value || '',
+      dias: (document.getElementById('jmDias')||{}).value || ''
+    },
+    status: (document.getElementById('fatStatus')||{}).value || '',
+    pgto: (document.getElementById('fatPgto')||{}).value || '',
+    veiculos: veics.map(function(v){return v.marca+' '+v.modelo+' '+v.placa;}),
+    veiculosDetalhado: Array.from(_veicSelecionados).map(function(i){
+      var v = _veicExibidos[i]; if(!v) return null;
+      return {
+        carro:    v.marca+' '+v.modelo,
+        placa:    v.placa,
+        qtd:      (document.getElementById('vqtd-'+i)||{}).value || '1',
+        aluguel:  (document.getElementById('vfin-'+i)||{}).value || '',
+        seguro:   (document.getElementById('vseg-'+i)||{}).value || '',
+        desconto: (document.getElementById('vdesc-'+i)||{}).value || '',
+        subtotal: (document.getElementById('vsub-'+i)||{}).textContent || ''
+      };
+    }).filter(Boolean),
+    vlMensal: (document.getElementById('vlMensal')||{}).value || '',
+    vlSeguro: (document.getElementById('vlSeguro')||{}).value || '',
+    vlDesconto: (document.getElementById('vlDesconto')||{}).value || '',
+    outros: outros,
+    total: fmtBRL(totalNum),
+    _totalNum: totalNum,
+    obs: (document.getElementById('fatObs')||{}).value || '',
+    criadoEm: new Date().toISOString()
+  };
+}
+
+// ══ SALVAMENTO AUTOMÁTICO (RASCUNHO) ════════════════════════════
+// 🔴 Por que existe: ver o conserto do reinício no fim do arquivo. Mesmo com o
+//    recarregamento à força removido, o navegador pode cair, a aba pode fechar
+//    e a luz pode faltar — e preencher uma fatura de 13 veículos leva tempo.
+var RASCUNHO_CHAVE = 'loka_fatura_rascunho';
+var _rascTimer = null, _rascLigado = false;
+
+// ⚠️ Esta página NÃO tinha nenhum escape de HTML — conferido antes de escrever.
+//    Nome de cliente com `<` ou `"` quebraria as faixas abaixo, que é o defeito
+//    que deixou o `crm.html` em branco (função/escape que não existe).
+function _escH(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// O rascunho é por CONTEXTO: o de uma fatura nova não serve para quem abriu
+// `?edit=fat_X`, e o de uma edição não serve para outra fatura.
+function _rascContexto(){ return _editandoFaturaId || 'novo'; }
+
+function _rascTemConteudo(f){
+  return !!(f && (f.numero || f.clienteId || (f.veiculosDetalhado||[]).length
+    || (f.outros||[]).length || f.obs));
+}
+
+function _rascSalvar(){
+  try {
+    if (_modoConsulta) return;                 // consulta não gera rascunho
+    var f = _fatMontarObjeto();
+    if (!_rascTemConteudo(f)) { _rascApagar(); return; }
+    localStorage.setItem(RASCUNHO_CHAVE, JSON.stringify({
+      contexto: _rascContexto(), em: new Date().toISOString(), fatura: f
+    }));
+    var el = document.getElementById('rascAviso');
+    if (el) el.textContent = '💾 rascunho salvo ' + new Date().toLocaleTimeString('pt-BR').slice(0,5);
+  } catch (e) { /* cota cheia / modo privado: não atrapalhar quem está digitando */ }
+}
+
+// Espera parar de digitar. Gravar a cada tecla encheria o localStorage de
+// escrita à toa num formulário com dezenas de campos.
+function _rascAgendar(){
+  if (!_rascLigado) return;
+  clearTimeout(_rascTimer);
+  _rascTimer = setTimeout(_rascSalvar, 1500);
+}
+
+function _rascApagar(){
+  try { localStorage.removeItem(RASCUNHO_CHAVE); } catch (e) {}
+  var el = document.getElementById('rascAviso'); if (el) el.textContent = '';
+}
+
+function _rascLer(){
+  try {
+    var r = JSON.parse(localStorage.getItem(RASCUNHO_CHAVE) || 'null');
+    return (r && r.fatura && _rascTemConteudo(r.fatura)) ? r : null;
+  } catch (e) { return null; }
+}
+
+// 🔴 OFERECE, não restaura sozinho. Aplicar por cima do que o operador acabou de
+//    abrir seria pior do que perder o rascunho — e o localStorage não manda no
+//    Firebase (armadilha 4).
+function _rascOferecer(){
+  if (_modoConsulta) return;
+  var r = _rascLer();
+  if (!r || r.contexto !== _rascContexto()) return;
+  if (document.getElementById('rascBarra')) return;
+
+  var quando = '';
+  try { quando = new Date(r.em).toLocaleString('pt-BR'); } catch (e) { quando = r.em || ''; }
+  var f = r.fatura || {};
+  var oque = [];
+  if (f.cliente) oque.push(f.cliente);
+  if (f.numero) oque.push('nº ' + f.numero);
+  if ((f.veiculosDetalhado||[]).length) oque.push(f.veiculosDetalhado.length + ' veículo(s)');
+  if (f.total) oque.push(f.total);
+
+  var bar = document.createElement('div');
+  bar.id = 'rascBarra';
+  bar.className = 'no-print';
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b45309;color:#fff;'
+    + 'padding:10px 14px;font-size:13px;font-weight:700;z-index:9999;display:flex;'
+    + 'align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.25)';
+  bar.innerHTML = '<span>💾 Há um rascunho não salvo de ' + _escH(quando)
+    + (oque.length ? ' — ' + _escH(oque.join(' · ')) : '') + '</span>'
+    + '<button id="rascRestaurar" style="margin-left:auto;background:#fff;color:#b45309;border:none;'
+    + 'border-radius:6px;padding:5px 14px;font-weight:700;cursor:pointer">Restaurar</button>'
+    + '<button id="rascDescartar" style="background:transparent;color:#fff;border:1.5px solid #fff;'
+    + 'border-radius:6px;padding:5px 14px;font-weight:700;cursor:pointer">Descartar</button>';
+  document.body.appendChild(bar);
+  document.body.style.paddingTop = '48px';
+
+  function fechar(){ bar.remove(); document.body.style.paddingTop = ''; }
+  bar.querySelector('#rascRestaurar').onclick = function(){
+    fechar();
+    // Mesmo caminho que a edição usa — um restaurador só.
+    preencherFaturaParaEdicao(r.fatura, r.contexto === 'novo' ? null : r.contexto);
+    status('💾 Rascunho restaurado — confira os valores antes de salvar', '#b45309');
+  };
+  bar.querySelector('#rascDescartar').onclick = function(){
+    if (!confirm('Descartar o rascunho não salvo?')) return;
+    _rascApagar(); fechar();
+  };
+}
+
+// Liga o salvamento automático: qualquer digitação ou troca de campo agenda.
+function _rascIniciar(){
+  if (_rascLigado) return;
+  _rascLigado = true;
+  document.addEventListener('input', _rascAgendar, true);
+  document.addEventListener('change', _rascAgendar, true);
+}
+
 function salvarFatura() {
   // Recalcular tudo antes de validar (garante total atualizado)
   if (typeof calcTotal === 'function') calcTotal();
@@ -1569,44 +1756,9 @@ function salvarFatura() {
   if (!veics.length) { status('⚠️ Selecione ao menos um veículo', '#b45309'); return; }
   if (totalNum <= 0) { status('⚠️ O total deve ser maior que zero. Verifique os valores dos veículos.', '#b45309'); return; }
 
-  var fatura = {
-    id: _editandoFaturaId || ('fat_' + Date.now()),
-    numero: num,
-    cliente: cli.nome,
-    clienteId: cli.id,
-    periodo: document.getElementById('periodoRef').value,
-    emissao: document.getElementById('dataEmissao').value,
-    vencimento: document.getElementById('dataVenc').value,
-    jurosMulta: {
-      ativo: !!(document.getElementById('jmAtivar') && document.getElementById('jmAtivar').checked),
-      multa: (document.getElementById('jmMulta')||{}).value || '',
-      jurosMes: (document.getElementById('jmJurosMes')||{}).value || '',
-      dias: (document.getElementById('jmDias')||{}).value || ''
-    },
-    status: document.getElementById('fatStatus').value,
-    pgto: document.getElementById('fatPgto').value,
-    veiculos: veics.map(function(v){return v.marca+' '+v.modelo+' '+v.placa;}),
-    // Detalhamento por veículo (formato G7 com desconto)
-    veiculosDetalhado: Array.from(_veicSelecionados).map(function(i){
-      var v = _veicExibidos[i]; if(!v) return null;
-      return {
-        carro:    v.marca+' '+v.modelo,
-        placa:    v.placa,
-        qtd:      (document.getElementById('vqtd-'+i)||{}).value || '1',
-        aluguel:  (document.getElementById('vfin-'+i)||{}).value || '',
-        seguro:   (document.getElementById('vseg-'+i)||{}).value || '',
-        desconto: (document.getElementById('vdesc-'+i)||{}).value || '',
-        subtotal: (document.getElementById('vsub-'+i)||{}).textContent || ''
-      };
-    }).filter(Boolean),
-    vlMensal: (document.getElementById('vlMensal')||{}).value || '',
-    vlSeguro: (document.getElementById('vlSeguro')||{}).value || '',
-    vlDesconto: (document.getElementById('vlDesconto')||{}).value || '',
-    outros: outros,
-    total: total,
-    obs: (document.getElementById('fatObs')||{}).value || '',
-    criadoEm: new Date().toISOString()
-  };
+  // A MESMA montagem do rascunho — uma forma só de "o que é uma fatura".
+  var fatura = _fatMontarObjeto();
+  delete fatura._totalNum;
 
   // Trava o botão durante a gravação: dois cliques criavam duas faturas,
   // porque o id só era sorteado na hora de montar o objeto.
@@ -1623,6 +1775,9 @@ function salvarFatura() {
         // era sorteado a cada chamada. A partir daqui a tela está editando ESTA
         // fatura, e o próximo salvamento sobrescreve em vez de duplicar.
         _editandoFaturaId = fatura.id;
+        // Gravou: o rascunho cumpriu o papel e sai de cena. Deixá-lo faria a
+        // próxima abertura oferecer de volta algo que já está no banco.
+        _rascApagar();
         _destravar();
         carregarFaturasCliente(fatura.clienteId);
         // Lança/atualiza automaticamente no Contas a Receber (mesma chave = sem duplicar)
@@ -1823,31 +1978,73 @@ function limparFatura() {
   calcTotal();
   document.getElementById('totalDisplay').textContent = 'R$ 0,00';
   document.getElementById('resumoBox').style.display = 'none';
+  // Limpar é uma decisão explícita de jogar fora — o rascunho vai junto, senão
+  // a próxima abertura ofereceria de volta o que acabou de ser descartado.
+  _rascApagar();
 }
 
-// ── Detecta nova publicação e recarrega sozinho (evita ficar preso em cache) ──
+// ── Detecta nova publicação e AVISA (nunca recarrega sozinho) ────────────────
+// 🔴 ESTE BLOCO ERA O BUG DO "o sistema reinicia e perdemos o trabalho".
+//
+// A versão anterior comparava o `etag`/`last-modified` do HTTP e, mudando,
+// chamava `location.replace(...)` — recarregando a página sem aviso, no meio do
+// preenchimento, a cada 5 min E a cada `visibilitychange` (trocar de aba e
+// voltar).
+//
+// E o gatilho era FALSO: medido em 03/11/2026, este arquivo não mudava desde
+// 13/10 e mesmo assim o servidor respondia `Last-Modified` daquele dia. O GitHub
+// Pages reescreve o Last-Modified (e o ETag, que o embute) de TODOS os arquivos
+// a cada publicação, mesmo nos que não mudaram. Ou seja: a fatura aberta
+// recarregava a cada publicação de QUALQUER página.
+//
+// Agora compara o CARIMBO do próprio arquivo — que só muda quando esta página
+// muda de verdade — e apenas AVISA. É o que o `gestao.html` já fazia certo.
 (function(){
   if (location.protocol === 'file:') return;
-  var carimbo = null, avisado = false;
+  var avisado = false;
   function checar(){
     if (avisado) return;
-    fetch(location.pathname + '?vchk=' + Date.now(), {method:'HEAD', cache:'no-store'})
-      .then(function(r){
-        if (!r.ok) return;
-        var c = r.headers.get('etag') || r.headers.get('last-modified') || '';
-        if (!c) return;
-        if (carimbo === null) { carimbo = c; return; }
-        if (c !== carimbo) {
-          avisado = true;
-          console.log('[FATURA] Nova versão publicada — recarregando.');
-          location.replace(location.pathname + '?v=' + Date.now() + location.hash);
-        }
+    fetch(location.pathname + '?vchk=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(txt){
+        if (!txt) return;
+        var m = txt.match(/LOKA deploy:\s*([\w.-]+)/);
+        if (!m || typeof LOKA_BUILD === 'undefined') return;
+        if (m[1] === LOKA_BUILD) return;              // mesma versão: nada a fazer
+        avisado = true;
+        console.log('[FATURA] Nova versão publicada: ' + m[1] + ' (estou em ' + LOKA_BUILD + ')');
+        _fatAvisarVersao(m[1]);
       }).catch(function(){});
   }
   checar();
   setInterval(checar, 5*60*1000);
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) checar(); });
 })();
+
+// 🔴 Faixa, não recarregamento. Quem decide a hora de atualizar é quem está
+//    preenchendo — perder meia hora de digitação por causa de uma publicação
+//    minha é exatamente o defeito que esta versão conserta.
+function _fatAvisarVersao(nova){
+  if (document.getElementById('fatVersaoBarra')) return;
+  var bar = document.createElement('div');
+  bar.id = 'fatVersaoBarra';
+  bar.className = 'no-print';
+  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#0E1B4D;color:#fff;'
+    + 'padding:10px 14px;font-size:13px;font-weight:700;z-index:9998;display:flex;'
+    + 'align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 -2px 10px rgba(0,0,0,.25)';
+  bar.innerHTML = '<span>🔄 Nova versão da fatura publicada ('
+    + _escH(nova) + '). O seu trabalho não foi perdido.</span>'
+    + '<button id="fatVerAtualizar" style="margin-left:auto;background:#fff;color:#0E1B4D;border:none;'
+    + 'border-radius:6px;padding:5px 14px;font-weight:700;cursor:pointer">Atualizar agora</button>'
+    + '<button id="fatVerDepois" style="background:transparent;color:#fff;border:1.5px solid #fff;'
+    + 'border-radius:6px;padding:5px 14px;font-weight:700;cursor:pointer">Depois</button>';
+  document.body.appendChild(bar);
+  bar.querySelector('#fatVerAtualizar').onclick = function(){
+    _rascSalvar();          // garante o rascunho antes de sair
+    location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+  };
+  bar.querySelector('#fatVerDepois').onclick = function(){ bar.remove(); };
+}
 
 </script>
 
