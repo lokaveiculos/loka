@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v143-20261103-0920** |
+| `gestao.html` | **v145-20261103-1605** |
 | `fatura.html` | **v82-20261013-0910** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -6551,3 +6551,160 @@ Recebido e clicar num 📋. Eu não autentico.
 🔴 **Decidir os dois pares de faturas com chave repetida** (G7 `001/2026-08` e
 ISS `001/2026-09`): mudar o número de uma de cada par separa as cobranças. Sem
 isso, dar baixa numa delas mexe no lançamento da outra.
+
+---
+
+## ✅ Filtro por locatário na aba Manutenção — 03/11/2026 (`875a84c`, `v145`) · gestao v144 → v145
+
+Pedido: *"na aba manutencao incluir o filtro por cliente"*.
+
+### 🔴 O trabalho não foi o filtro — foi decidir o que "cliente" significa aqui
+Manutenção é de **veículo**, não de cliente. Então "cliente" só pode ser *de quem
+era o carro*. Há três respostas possíveis, e elas discordam. Medido nas **771
+manutenções reais**:
+
+| Como responder | Alcança |
+|---|---|
+| cliente **gravado** na manutenção | 268 |
+| locatário **NA DATA** (ativos + histórico) | 573 |
+| locatário **ATUAL** (só ativos) | 733 |
+| 🔴 gravado **difere** do na-data | **0** — o gravado é confiável |
+| 🔴 atual **difere** do na-data | **13** — o atual nomeia o cliente errado |
+
+**E o número que decidiu:** das **159** manutenções em que só o locatário atual
+responde, **154 são anteriores à PRIMEIRA locação do carro** — preparação de
+frota, custo da própria LOKÁ. Elas somam **R$ 735.617,70**.
+
+⚠️ Filtrar pelo locatário atual jogaria esses R$ 735 mil **na conta de clientes
+que nem tinham o carro ainda**. Quem filtrasse por "RSC" para saber o gasto com a
+frota dela veria custo de antes de a RSC entrar no contrato.
+
+### A regra: gravado → locatário NA DATA → sem locatário
+`_clienteDaManut(m)` devolve `{id, nome}`; vazio quando o carro não estava
+alugado na data — e isso **é a verdade**, não falha: é manutenção por conta da
+locadora.
+
+🔴 **Reusa o `mltIndLocacao`** (v135, já coberto por 70 testes) em vez de
+duplicar a varredura de `ativos` + `historico`. Ele já respeita contrato
+multi-veículo (armadilha 2) e já ordena quando duas locações cobrem a data.
+
+### 🔴 O badge foi corrigido junto — e isso é mudança ALÉM do pedido literal
+`_empresaDaManut` usava gravado → **atual**, então o badge 🏢 já mostrava o
+cliente errado nessas 159 + 13 linhas.
+
+**Filtro e tela têm de concordar:** se eu deixasse o badge como estava, filtrar
+por "RSC" não traria linhas cujo badge diz "🏢 RSC", e isso pareceria filtro
+quebrado. Conferido antes de mexer: `_empresaDaManut` só é usado nos **2 badges**
+(tabela normal e restrita) e **nada grava** com base nele.
+
+⚠️ O `_locatariaAtual` dos **outros 7 lugares** (modal de manutenção, frota,
+veículos) ficou **intocado** — ali "quem está com o carro agora" é o certo, e é
+isso que a tela de registrar manutenção precisa.
+
+### 🔴 O filtro entra nos DOIS lugares, por uma função só
+A aba tem **duas** implementações do mesmo filtro: `_manutColetarSaida` (perfil
+restrito + relatório) e `renderManutencao` (tabela normal).
+
+A regra mora em **`_manutClienteOk`**, e os dois a chamam; a escolha vem de
+**`_manutClienteFiltro()`**, e nenhum dos dois lê o `<select>` por conta própria.
+Deixar em um faria o relatório discordar da tela — o acidente da **v119**. Há
+teste e defeito injetado para cada ponta, e o relatório **nomeia** o locatário
+escolhido no cabeçalho.
+
+### O menu
+Só os clientes que **têm** manutenção, em ordem alfabética sem acento, com a
+contagem — opção que não filtra nada só atrapalha (padrão dos filtros de Vendas
+e do órgão das multas). Mais a opção **"— Sem locatário na data"**, que é
+informação valiosa por si: é o custo que a LOKÁ absorve.
+
+### Medido no ar, com os dados reais e num `<select>` de verdade
+| | |
+|---|---|
+| clientes no menu | **16** (+ "Todos" + "sem locatário") |
+| 🔴 **INVARIANTE** | **771 = 771** — nenhuma manutenção perdida nem em dois baldes |
+| 🔴 **invariante do custo** | R$ 642.362,38 + R$ 1.012.612,70 = **R$ 1.654.975,08**, o total exato |
+
+| Locatário | Manutenções | Custo |
+|---|---|---|
+| RSC TRANSPORTE 2016 | 362 | R$ 204.787,08 |
+| G7 COMPANY | 103 | R$ 61.259,00 |
+| TRANSSOUZA | 46 | R$ 337.177,10 |
+| BRJ EXPRESSO | 37 | R$ 26.857,31 |
+| ISS TRANSPORTES | 13 | R$ 3.166,00 |
+| **— sem locatário na data** | **198** | **R$ 1.012.612,70** |
+
+🔴 **61,2% do custo de manutenção não tem locatário na data.** É o que a LOKÁ
+absorve — preparação de frota e carro parado. Antes isso estava diluído no badge
+como se fosse de cliente.
+
+### ⚠️ O custo da barra de filtros: 44px a 1024px, e o teto NÃO resolveu
+Medido contra o arquivo **real da v143** (raw de `875a84c~1`):
+
+| Janela | v143 | v144 (sem teto) | **v145 (teto 230px)** |
+|---|---|---|---|
+| 900px | 4 linhas · 123px | 4 · 123px | **4 · 123px** |
+| 1024px | **2 linhas · 79px** | 4 · 123px | 🔴 **4 · 123px** |
+| 1366px | 2 linhas · 79px | 2 · 79px | **2 · 79px** |
+
+Sem teto o `<select>` crescia até **356px** (a opção mais longa é "TRANSSOUZA
+TRANSPORTE E TURISMO LTDA (46)"). O teto o trouxe para **230px** — mas **a barra
+continua em 4 linhas a 1024px**.
+
+🔴 **Correção do que eu afirmei:** a mensagem do commit da v145 dá a entender que
+o teto resolveria a quebra a 1024px. **Não resolveu.** A caixa de datas sozinha
+tem **378px**, e a 1024px sobram 772px: busca + status + datas já ocupam quase
+tudo, então **qualquer** campo novo ali custa uma linha. Reduzir mais o seletor o
+deixaria ilegível, e mexer na caixa de datas seria alterar o que não foi pedido.
+
+O teto fica porque melhora a proporção (230 contra os 144 do status, em vez de
+356) e não custa nada — mas **o custo real é 44px de altura na faixa de 1024px**,
+e a 900 e 1366 não custa nada.
+
+⚠️ Com o seletor fechado o navegador trunca o nome; a **lista aberta** mostra o
+nome inteiro e a contagem — que é quando elas importam. Conferido no ar.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **47 testes** com o código real e os dados reais (771 manutenções, 107 ativos,
+  101 encerrados): a regra nas três fontes, manutenção antes da primeira locação,
+  **as 154 reais sem ganhar cliente**, placa com hífen, locação encerrada,
+  manutenção sem data contra contrato **em aberto**, badge = filtro, a invariante
+  da partição, as contagens do menu batendo com o filtro, ordem, escape, menu
+  vazio, lista vindo como objeto do Firebase, e o fonte (os dois filtros, uma
+  fonte só, o relatório nomeando, o `<select>` nas duas telas)
+- **25 defeitos injetados — todos acusados**, entre eles **voltar ao locatário
+  atual**, ignorar o gravado, inverter o "sem locatário", o relatório parar de
+  filtrar, o menu perder a escolha, e duplicar a varredura em vez de reusar
+- **No ar, no arquivo publicado**: as medições acima, num `<select>` de verdade,
+  com a escolha sobrevivendo ao redesenho nos 3 clientes testados
+- Regressão **medida**: **47 suítes, 2.333 testes**, nenhuma falha
+
+### ⚠️ Três tropeços meus
+1. **O teste [3] falhou e o código estava certo.** Eu testava a véspera de *uma*
+   locação, e a placa EQQ2J61 tem **outra** da mesma TRANSSOUZA cobrindo aquela
+   data (2025-06-28 → 2027-06-28). Amostra ruim, não defeito. Reescrito para a
+   véspera da locação **mais antiga** — que é o caso real das 154.
+2. **Dois defeitos injetados passaram.** Um era teste fraco meu (placa inventada
+   `ABC1234`, que não está em locação nenhuma, deixava a guarda `!m.data`
+   invisível — com placa real de contrato **em aberto** o defeito aparece). O
+   outro revelou **código morto meu**: ver abaixo.
+3. **Escrevi uma guarda que não faz nada.** `if (atual && sel.value !== atual)
+   sel.value = '';` — conferido no navegador em 03/11: trocar o `innerHTML` de um
+   `<select>` **não mantém o `.value` sozinho** (nem quando a option continua
+   existindo); quem preserva é o atributo **`selected`**, e option que sumiu já
+   deixa o value vazio. A linha saiu, e o teste [23] passou a medir **o resultado**
+   (o value do select) em vez da fiação (ter `selected` na string) — a lição de
+   28/09.
+
+⚠️ E o stub de `<select>` da suíte precisou simular o navegador de verdade
+(`innerHTML` recriando as options e zerando um value que sumiu). Sem isso um
+teste falhava por defeito do **ambiente**, não do código.
+
+### 🔴 Achado de dado, não corrigido
+A placa **EQQ2J61** tem uma locação marcada como **encerrada** com devolução em
+**2027-06-28** — no futuro. Provavelmente é a vigência contratada, e não
+atrapalha o filtro (a locação ativa dela é de 11/06/2026). Fica registrado.
+
+### ⏳ Não verificado
+Falta **logado**: abrir Manutenção com **Ctrl+Shift+R**, escolher um locatário e
+conferir a lista e o PDF. Eu não autentico.
