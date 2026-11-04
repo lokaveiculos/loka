@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v145-20261103-1605 -->
+<!-- LOKA deploy: v146-20261104-0940 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1738,7 +1738,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v145-20261103-1605';
+var LOKA_BUILD = 'v146-20261104-0940';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -15244,12 +15244,242 @@ function mltExtratoCartao(bloco, placa){
   };
 }
 
+// ── Formato D: NOTIFICAÇÃO DE AUTUAÇÃO (formulário padrão) ─────
+// Um documento = UMA multa. É o formulário que o órgão emite e manda pelo
+// correio / disponibiliza no portal; os rótulos são fixos e por extenso.
+//
+// 🔴 O pdf.js agrupa por ALTURA e o formulário tem DUAS COLUNAS, então
+// rótulo e valor quase nunca caem na mesma linha — e pedaços de colunas
+// diferentes se misturam na mesma linha:
+//
+//     ÓRGÃO AUTUADOR
+//     105300 ROD. BA524, KM 5,75 - SENTIDO DECRESCENTE  ← código + o LOCAL
+//     SEINFRA - SECRET DE                                ← nome, parte 1
+//     INFRAESTRUTURA DO ESTADO                           ← nome, parte 2
+//     BAHIA DATA                                         ← nome, parte 3 + rótulo
+//
+// 🔴 Por isso NÃO dá para ler por posição ("o valor está na linha seguinte").
+// O padrão aqui é: ANCORA NO RÓTULO e procura adiante o primeiro valor com a
+// FORMA certa (data, hora, dinheiro, placa, código), pulando os rótulos que
+// aparecerem pelo caminho. É o mesmo princípio do cartão do DETRAN-BA.
+var MLT_NA_ROTULOS = [
+  'IDENTIFICAÇÃO DO LOCAL, DATA E HORA DO COMETIMENTO DA INFRAÇÃO',
+  'DATA LIMITE PARA IDENTIFICAÇÃO DO CONDUTOR INFRATOR',
+  'NÚMERO DO EQUIPAMENTO OU INSTRUMENTO DE AFERIÇÃO',
+  'IDENTIFICAÇÃO DO AGENTE OU AUTORIDADE DE TRÂNSITO',
+  'DATA LIMITE PARA INTERPOSIÇÃO DE DEFESA PRÉVIA',
+  'IDENTIFICAÇÃO DO PROPRIETÁRIO/ARRENDATÁRIO',
+  'VALOR CONSIDERADO LIMITE REGULAMENTADO',
+  'DATA DA NOTIFICAÇÃO DA AUTUAÇÃO',
+  'NÚMERO RENAINF MULTA ORIGINAL',
+  'CÓDIGO DO ÓRGÃO COMPETENTE',
+  'EMBARCADOR/TRANSPORTADOR',
+  'CÓDIGO DO ÓRGÃO AUTUADOR',
+  'IDENTIFICAÇÃO DA AUTUAÇÃO',
+  'IDENTIFICAÇÃO DA INFRAÇÃO',
+  'IDENTIFICAÇÃO DO CONDUTOR',
+  'NOTIFICAÇÃO DE AUTUAÇÃO',
+  'IDENTIFICAÇÃO DO VEÍCULO',
+  'DESCRIÇÃO DA INFRAÇÃO',
+  'REGISTRO FOTOGRÁFICO',
+  'NOME DO PROPRIETÁRIO',
+  'MARCA/MODELO/VERSÃO',
+  'CÓDIGO DO MUNICÍPIO',
+  'NOME DO MUNICÍPIO',
+  'CÓDIGO DA INFRAÇÃO',
+  'MENSAGEM SENATRAN',
+  'MEDIÇÃO REALIZADA',
+  'LOCAL DA INFRAÇÃO',
+  'ÓRGÃO COMPETENTE',
+  'NÚMERO RENAINF',
+  'ÓRGÃO AUTUADOR',
+  'VALOR DA MULTA',
+  'DESDOBRAMENTO',
+  'OBSERVAÇÕES',
+  'CPF/CNPJ',
+  'UF/PAÍS',
+  'ESPÉCIE',
+  'PLACA',
+  'NOME',
+  'DATA',
+  'HORA',
+  'CNH',
+  'DOC',
+  'UF'
+];
+
+function _mltEsc(t){
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _naEscRe(s){ return s.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&'); }
+
+// Tira os rótulos do formulário que grudaram num pedaço de valor
+// ("BAHIA DATA" → "BAHIA"). Só como palavra inteira, nunca no meio.
+function _naSemRotulos(linha){
+  var s = String(linha || '');
+  for (var i = 0; i < MLT_NA_ROTULOS.length; i++) {
+    var re = new RegExp('(^|\\s)' + _naEscRe(MLT_NA_ROTULOS[i]) + '(?=\\s|$)', 'gi');
+    s = s.replace(re, ' ');
+  }
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+function _naEhRotulo(linha){ return !_naSemRotulos(linha); }
+
+// Linha que é só número/data/hora/medição — não é texto de valor
+function _naSoNumero(linha){
+  var s = String(linha || '').trim();
+  if (!s) return true;
+  return !/[A-Za-zÀ-ÿ]{3,}/.test(s);
+}
+
+function mltParseNotificacao(texto){
+  var t = mltNormalizar(texto);
+  var L = t.split('\n').map(function (x) { return x.trim(); });
+  var U = L.map(function (x) { return x.toUpperCase(); });
+
+  // índice da linha onde o rótulo aparece
+  function em(rot){
+    for (var i = 0; i < U.length; i++) if (U[i].indexOf(rot) >= 0) return i;
+    return -1;
+  }
+  // primeiro valor com a FORMA pedida, a partir da linha idx (inclusive)
+  function forma(idx, re){
+    if (idx < 0) return '';
+    for (var i = idx; i < L.length; i++) {
+      var m = L[i].match(re);
+      if (m) return m[1] !== undefined ? m[1] : m[0];
+    }
+    return '';
+  }
+
+  var iLocal  = em('LOCAL DA INFRAÇÃO');
+  var iOrgao  = em('ÓRGÃO AUTUADOR');
+  var iComp   = em('CÓDIGO DO ÓRGÃO COMPETENTE');
+  var iAit    = em('DO AIT');
+  var iCod    = em('CÓDIGO DA INFRAÇÃO');
+  var iVal    = em('VALOR DA MULTA');
+  var iDesc   = em('DESCRIÇÃO DA INFRAÇÃO');
+  var iVeic   = em('IDENTIFICAÇÃO DO VEÍCULO');
+  var iCometi = em('COMETIMENTO DA INFRAÇÃO');
+  var iPrazo  = em('IDENTIFICAÇÃO DO CONDUTOR INFRATOR');
+  var iDefesa = em('INTERPOSIÇÃO DE DEFESA');
+  var iNotif  = em('DATA DA NOTIFICAÇÃO DA AUTUAÇÃO');
+  var iMunic  = em('NOME DO MUNICÍPIO');
+  var iRena   = em('NÚMERO RENAINF');
+  var iProp   = em('NOME DO PROPRIETÁRIO');
+  var iMarca  = em('MARCA/MODELO/VERSÃO');
+
+  var DATA = /(\d{2}\/\d{2}\/\d{4})/;
+  var HORA = /\b(\d{2}:\d{2})\b/;
+
+  // ── código do órgão autuador ──
+  var codOrgao = forma(em('CÓDIGO DO ÓRGÃO AUTUADOR'), /^(\d{4,6})\b/);
+
+  // ── LOCAL: primeira linha de conteúdo depois de "LOCAL DA INFRAÇÃO",
+  //    tirando o código do órgão que divide a linha com ele.
+  var local = '', iLinhaLocal = -1;
+  if (iLocal >= 0) {
+    for (var i = iLocal + 1; i < L.length && i < iLocal + 8; i++) {
+      var c = _naSemRotulos(L[i]);
+      if (codOrgao) c = c.replace(new RegExp('^' + codOrgao + '\\s+'), '').trim();
+      if (c.length >= 8 && /[A-Za-zÀ-ÿ]{3,}/.test(c) && !DATA.test(c)) {
+        local = c; iLinhaLocal = i; break;
+      }
+    }
+  }
+
+  // ── NOME DO ÓRGÃO: os pedaços entre "ÓRGÃO AUTUADOR" e o bloco do
+  //    órgão competente, sem rótulos, sem a linha do local e sem números.
+  var nomeOrgao = '', pedacos = [];
+  if (iOrgao >= 0) {
+    var fim = iComp > iOrgao ? iComp : Math.min(L.length, iOrgao + 10);
+    for (var j = iOrgao + 1; j < fim; j++) {
+      if (j === iLinhaLocal) continue;
+      var p = _naSemRotulos(L[j]);
+      if (codOrgao) p = p.replace(new RegExp('^' + codOrgao + '\\b\\s*'), '').trim();
+      if (!p || _naSoNumero(p)) continue;
+      pedacos.push(p);
+    }
+    nomeOrgao = pedacos.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // ── MUNICÍPIO: a UF é uma linha sozinha e válida; o município é a
+  //    linha de texto logo antes dela. Sem UF válida, não inventa.
+  var municipio = '';
+  if (iMunic >= 0) {
+    for (var k = iMunic + 1; k < L.length && k < iMunic + 10; k++) {
+      if (L[k].length === 2 && MLT_UF.indexOf(L[k].toUpperCase()) >= 0) {
+        var cand = _naSemRotulos(L[k - 1]);
+        if (cand && !_naSoNumero(cand) && pedacos.indexOf(cand) < 0) municipio = cand;
+        break;
+      }
+    }
+  }
+
+  // ── DESCRIÇÃO: os pedaços de texto entre o rótulo e o bloco seguinte.
+  var desc = [];
+  if (iDesc >= 0) {
+    var fimD = iPrazo > iDesc ? iPrazo : Math.min(L.length, iDesc + 8);
+    for (var d = iDesc + 1; d < fimD; d++) {
+      var ld = _naSemRotulos(L[d]);
+      if (!ld || _naSoNumero(ld) || DATA.test(ld)) continue;
+      desc.push(ld);
+    }
+  }
+
+  // ── PLACA: dentro do bloco do veículo, o primeiro token com forma de placa
+  var placa = forma(iVeic, /\b([A-Z]{3}[ -]?\d[A-Z0-9]\d{2})\b/);
+
+  var reg = {
+    placa:          mltNormPlaca(placa),
+    ait:            forma(iAit, /^([A-Z]{0,3}\d{6,14})$/).toUpperCase(),
+    codigoInfracao: forma(iCod, /^(\d{3,6})$/),
+    codigoOrgao:    codOrgao,
+    valor:          mltNum(forma(iVal, /R\$\s*([\d.]+,\d{2})/)),
+    dataInfracao:   mltISO(forma(iCometi, DATA)),
+    horaInfracao:   forma(iCometi, HORA),
+    descricao:      desc.join(' ').slice(0, 180),
+    local:          (local + (municipio ? ' - ' + municipio : '')).slice(0, 160),
+    orgao:          codOrgao ? (codOrgao + (nomeOrgao ? ' - ' + nomeOrgao : '')) : nomeOrgao,
+    prazoIndicacao: mltISO(forma(iPrazo, DATA)),
+    vencimento:     '',   // 🔴 Notificação de AUTUAÇÃO não tem data de pagamento
+    vencida:        false
+  };
+
+  // Notas que o formulário traz e o sistema não tem campo próprio
+  var notas = ['Notificação de Autuação'];
+  var renainf = forma(iRena, /\b(\d{9,14})\b/);
+  if (renainf)            notas.push('RENAINF ' + renainf);
+  var dNotif = forma(iNotif, DATA);
+  if (dNotif)             notas.push('notificada em ' + dNotif);
+  var dDefesa = forma(iDefesa, DATA);
+  if (dDefesa)            notas.push('defesa prévia até ' + dDefesa);
+  if (reg.codigoInfracao) {
+    var desdo = forma(em('DESDOBRAMENTO'), /^(\d{1,2})\s+R\$/);
+    notas.push('cód. ' + reg.codigoInfracao + (desdo ? '-' + desdo : ''));
+  }
+  var marca = iMarca >= 0 ? _naSemRotulos(L[iMarca + 1] || '') : '';
+  if (marca && !/^N[ãa]o/i.test(marca)) notas.push(marca);
+  var prop = iProp >= 0 ? _naSemRotulos(L[iProp + 1] || '') : '';
+  if (prop && !/^N[ãa]o/i.test(prop))   notas.push('proprietário no DETRAN: ' + prop);
+  reg.obs = notas.join(' · ');
+
+  return (reg.placa && (reg.ait || reg.valor)) ? [reg] : [];
+}
+
 // ── Roteador ──
 function mltParseBruto(texto){
   if (!texto) return [];
   if (/CERTIFICADO DE REGISTRO E LICENCIAMENTO/i.test(texto)) return [];
   if (/Detalhes da Infra[çc][ãa]o/i.test(texto)) return mltParseDetalhe(texto);
   if (/EXTRATO DE MULTAS/i.test(texto))          return mltParseDetranBA(texto);
+  if (/NOTIFICA[ÇC][ÃA]O DE AUTUA[ÇC][ÃA]O/i.test(texto)
+   && /IDENTIFICA[ÇC][ÃA]O DA AUTUA[ÇC][ÃA]O/i.test(texto))
+                                                 return mltParseNotificacao(texto);
   return mltParseSenatranLista(texto);
 }
 
@@ -15314,6 +15544,10 @@ function mltParsePDF(texto){
       _naFrota: !!veic,
       ait: ait,
       placa: b.placa,
+      // Os parsers que conhecem o codigo do orgao e o da infracao os
+      // repassam. Quem nao conhece manda '' — e o que ja acontecia.
+      codigoInfracao: b.codigoInfracao || '',
+      codigoOrgao:    b.codigoOrgao || '',
       veiculoId:   veic ? veic.id : null,
       veiculoNome: veic ? ((veic.marca||'')+' '+(veic.modelo||'')).trim() : '',
       orgao: b.orgao || orgaoGlobal || '',
@@ -15426,11 +15660,29 @@ function mltLerArquivos(fila){
         return f.arrayBuffer()
           .then(mltExtrairTexto)
           .then(function(texto){
+            // 🔴 Zero texto = o PDF e um DESENHO: cada letra virou curva
+            // (padrao do "Microsoft Print to PDF") ou e um escaneado. Sem dizer
+            // COMO consertar na origem, o operador so ve "falhou" e desiste.
             if (!texto || texto.trim().length < 30) {
-              throw new Error('sem texto selecionável (digitalizado)');
+              throw new Error('o arquivo não tem texto dentro — as letras são '
+                + 'desenho. Se você salvou pela janela de impressão, repita '
+                + 'escolhendo em Destino "Salvar como PDF", e não '
+                + '"Microsoft Print to PDF". Se for digitalizado, baixe o '
+                + 'original no portal do órgão.');
             }
             var achadas = mltParsePDF(texto);
-            if (!achadas.length) throw new Error('nenhuma infração reconhecida');
+            if (!achadas.length) {
+              // O texto foi lido: o que falta e o LAYOUT. Dizer com o que o
+              // documento começa é o que permite reconhecer o formato depois,
+              // sem precisar do arquivo em mãos.
+              var _ini = texto.split('\n').map(function(x){ return x.trim(); })
+                             .filter(Boolean)[0] || '';
+              throw new Error('o texto foi lido (' + texto.trim().length
+                + ' caracteres), mas este layout não é conhecido. O documento '
+                + 'começa com: "' + _ini.slice(0, 60) + '". Conhecidos: '
+                + 'Notificação de Autuação, Detalhes da Infração, Extrato do '
+                + 'DETRAN-BA e a lista do SENATRAN.');
+            }
             var padrao = clientes[i] || '';
             achadas.forEach(function(r){
               r._arquivo = f.name;
@@ -15443,7 +15695,9 @@ function mltLerArquivos(fila){
             });
             ok++;
           })
-          .catch(function(e){ falhas.push(f.name + ' — ' + e.message); });
+          .catch(function(e){
+            falhas.push(_mltEsc(f.name) + ' — ' + _mltEsc(e.message));
+          });
       });
     });
     return seq;
