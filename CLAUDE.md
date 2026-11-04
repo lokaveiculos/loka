@@ -7070,3 +7070,144 @@ aluguel ativo da G7** (achado de 29/10) e `disponivel` na Auto Mais; a
 Falta **logado**: o Rogel abrir o painel Multas → aba **Importar** com
 **Ctrl+Shift+R**, escolher o `notificacaoAutuacao_….pdf` e conferir a multa na
 tela de conferência antes de gravar. Eu não autentico.
+
+---
+
+## ✅ Cliente pode ser cadastrado como fornecedor — 04/11/2026 (`0a520d5`) · Auto Mais
+
+Pedido: *"permitir que o cadastro de cliente tambem possa ser salvo como
+fornecedor pois muitas vezes compramos o carro do mesmo cliente o qual
+haviamos vendido"*.
+
+### 🔴 O Rogel viveu o caso 8 minutos antes de eu publicar
+Enquanto eu trabalhava, apareceu no banco a prova do problema:
+
+| | Horário (local) |
+|---|---|
+| cliente **CLESIVAN OLIVEIRA DA SILVA** (cli#30) criado | **17:21** |
+| **mesmo nome e mesmo CPF** criado como fornecedor (forn#15) | **17:34** — à mão |
+| meu commit | 17:42 |
+
+⚠️ **Não fui eu** — todas as minhas gravações passam por stub, e o registro é
+anterior à publicação. Ele redigitou os 9 campos, 13 minutos depois de
+cadastrar o cliente. É exatamente o que o pedido descreve.
+
+### O tamanho do problema, medido antes de construir
+| | |
+|---|---|
+| clientes | 28 · fornecedores: 14 (na medição) |
+| **clientes que já compraram carro** | **27 de 28** |
+| clientes que eram fornecedor | **0** |
+| campos em comum entre os dois cadastros | **9** |
+
+Comuns: nome, documento, RG, telefone, e-mail, endereço, cidade, UF e
+observações. Só do fornecedor: `tipo`, banco, agência, conta. Só do cliente:
+nascimento, CEP, estado civil, profissão.
+
+### Dois lugares, o mesmo caminho
+| Onde | Quando serve |
+|---|---|
+| botão na **linha do cliente** | é o caso real: o cliente já existe de uma venda antiga |
+| botão no rodapé do **formulário**, ao **editar** | quando já está com o cadastro aberto |
+
+🔴 **No cadastro novo o botão não aparece** — não se torna fornecedor quem
+ainda não existe. Há teste e defeito injetado para isso.
+
+### 🔴 Abre o formulário PREENCHIDO; não grava sozinho
+Dois motivos, e os dois vêm dos dados:
+
+1. **O `tipo` é derivado da contagem de dígitos**, e isso foi conferido nos 14
+   fornecedores reais: **todo documento de 11 dígitos está como pessoa física,
+   todo de 14 como jurídica — sem uma exceção**. Mas derivação é palpite, e
+   quem confere é quem está cadastrando.
+   ⚠️ Os **7 fornecedores marcados PJ sem CNPJ** são os de documento **vazio**
+   (vieram do cadastro rápido de 26/09) — não contradizem a regra.
+2. **Os dados bancários existem para repassar o pagamento do carro**, e o
+   cadastro de cliente não os tem. Nascem vazios — não se inventa conta de
+   ninguém. (Hoje estão vazios em **14 de 14**, mas inventar seria pior.)
+
+### 🔴 O `id` NÃO é copiado
+As duas sequências de id são **independentes** (clientes vão de 3 a 30;
+fornecedores de 1 a 15). Levar o id do cliente **sobrescreveria o fornecedor
+de mesmo número** — o cliente 7 apagaria o fornecedor 7. Há teste e defeito
+injetado só para isso.
+
+### As travas contra duplicata
+| Situação | O que acontece |
+|---|---|
+| cliente **já é** fornecedor (mesmo documento) | a linha mostra **selo 🏢✓** e o botão **abre o existente**; não oferece criar outro |
+| **mesmo nome**, documento diferente ou ausente | **avisa e deixa seguir** |
+| documento repetido ao salvar | o **`svForn` passou a perguntar** |
+
+🔴 **O `svForn` não conferia documento repetido** — o `svCli` confere desde
+sempre. O atalho novo deixaria duplicar fácil, então a guarda entrou junto.
+⚠️ É mudança além do pedido literal, e está registrada para ser revertida se
+ele não quiser.
+
+⚠️ O aviso por **nome** não bloqueia de propósito: nome se repete, e 7 dos 15
+fornecedores estão **sem documento nenhum** — esses nunca casariam por
+documento.
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **39 testes de runtime** com os dados reais (28 clientes, 14 fornecedores,
+  46 veículos, 28 vendas, 28 contratos): o mapeamento campo a campo, o que
+  **não** é copiado, a derivação do tipo **conferida contra os 7 fornecedores
+  reais que têm documento**, as três travas, o ciclo completo (abrir → salvar →
+  conferir o registro), e a invariante de que o **cliente não é alterado nem
+  apagado**
+- **25 defeitos injetados — todos acusados, nenhum cego**: não preencher, levar
+  o id, levar o CEP, inventar banco, errar o tipo (sempre PF, sempre PJ, e pelo
+  tamanho do *texto* em vez dos dígitos), não tirar máscara, ignorar quem já
+  existe, gravar sozinho, tirar a guarda do `svForn`, perder o botão da linha
+- **No ar, no arquivo publicado, com os dados reais** e `fsave`/`fdel`
+  substituídos: **CLESIVAN** (o par que o Rogel criou à mão) sai com **selo e
+  atalho para o forn#15**, os outros 27 com o botão de criar; ciclo completo na
+  **IZADORA DA CONCEIÇÃO SANTANA** (cli#10) → formulário com os 9 campos,
+  acento intacto, banco vazio, tipo PF, salvou como **forn#16** (não #10),
+  gravou **só** em `fornecedores`, cliente intacto, e na segunda vez a linha
+  **já reconhece**. **Nada gravado em produção** — reconferido: 28 clientes,
+  15 fornecedores, 46 veículos, e `fornecedores/16` responde **404**
+
+### ✨ Confirmação de brinde
+O cliente **"Tux net serviços de informatica ltda"** (cli#7) — aquele com CNPJ
+no campo `cpf`, pendência registrada em 15/09 — sai corretamente como
+**pessoa jurídica**. A derivação acerta justamente o caso torto.
+
+### ⚠️ Cinco tropeços meus, nenhum do sistema
+1. **O `$&` da minha string de substituição** foi interpretado como "o trecho
+   casado" e corrompeu o próprio arquivo de patch. Substituição que monta
+   código **não passa por `String.replace`** — fatiar com `slice` resolve.
+2. **Âncora com `\n` literal não casa em CRLF.** O patch recusou aplicar na
+   primeira tentativa, que é melhor do que trocar metade.
+3. 🔴 **O ambiente de teste ficou meio carregado:** meu `modal` falso não tinha
+   `addEventListener`, e a página faz
+   `document.getElementById("modal").addEventListener(...)` — o script estourava
+   ali e **todo `let` depois (`cSrch`, `fSrch`) nunca nascia**, derrubando 13
+   testes. **O teste [1] foi quem acusou.** É a armadilha já registrada.
+4. **`let` de topo não vira propriedade do global**, e em código de `eval`
+   nem para outro `eval` fica visível. No `vm` do Node a pergunta vai *dentro*
+   do contexto; no navegador a prova é **não ter havido exceção** mais o `var
+   DB` tardio estar populado.
+5. **O `om()` escreve em `#mdc`, não em `#modal`** — eu lia o elemento errado e
+   concluí que o título não avisava a origem. Avisava.
+
+⚠️ **E a entidade HTML de novo:** procurei `&#127970;&#10003;` no `innerHTML` e
+achei zero selos — o navegador já converteu para `🏢✓`. É a lição de 28/10,
+e foi a contraprova (`entidade_no_DOM: false`) que a confirmou.
+
+### ⚠️ Achados não corrigidos (não foram pedidos)
+- **A paginação das duas abas não pagina:** `renderCli` e `renderForn` calculam
+  `flCliP`/`flFornP` com `pagSlice` e depois desenham `fl.map(...)`, a lista
+  **inteira**. Com 28 e 15 registros não incomoda; incomodará.
+- `fmForn` tem um `<select id="ftcc">` (Corrente/Poupança) que o **`svForn`
+  nunca lê** — campo morto.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Cadastros com **Ctrl+Shift+R**, clicar no 🏢+ de
+um cliente e salvar o fornecedor de verdade. Eu não autentico.
+
+⚠️ **O scratchpad foi limpo entre sessões outra vez** (caminho novo), então as
+suítes anteriores da Auto Mais não existem mais. **Não houve regressão a rodar**
+além da suíte desta entrega — o `node --check` nas 10 páginas passou, mas isso
+só pega erro de sintaxe.
