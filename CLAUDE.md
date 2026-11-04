@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v145-20261103-1605** |
+| `gestao.html` | **v146-20261104-0940** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -6860,3 +6860,213 @@ página.
 Falta **logado no fluxo real**: o Rogel montar uma fatura de verdade, deixar a
 aba aberta, e confirmar que não reinicia mais. O ciclo foi exercitado por mim na
 página publicada, mas com um preenchimento de teste.
+
+---
+
+## ✅ Importação da Notificação de Autuação — 04/11/2026 (`4541245`) · gestao v146
+
+Pedido: *"⚠ 1 falhou(ram): notificacaoAutuacao_FIJ1F24_… — nenhuma infração
+reconhecida. verificar os arquivos acima e implantar um padrão para importação
+do pdf"*, com dois PDFs em anexo.
+
+### 🔴 Os dois arquivos são a MESMA multa e dois problemas diferentes
+| | |
+|---|---|
+| `notificacaoAutuacao_FIJ1F24_….pdf` | ✅ **tem texto dentro** (97 operadores `Tj`, fontes Helvetica) → faltava o **parser** |
+| `fij1f24.pdf` | 🔴 **14.568 curvas, 0 fontes, 0 caracteres extraídos** → é desenho |
+
+O segundo é a tela **"Detalhes da Infração"** — layout que o sistema **já
+conhece desde antes** — salva pelo **"Microsoft Print to PDF"**, que transforma
+cada letra em curva vetorial. ⚠️ **Não há nada a consertar no código para ele:**
+o conserto é na origem, escolhendo em *Destino* → **"Salvar como PDF"**.
+É o mesmo caso de 14/10, e voltou porque a mensagem de erro não ensinava.
+
+Os dois trazem o AIT **R004328370**, placa **FIJ1F24**, R$ 195,23, 27/09/2026.
+
+### O parser novo — e o padrão que ele implanta
+A **Notificação de Autuação** é formulário padronizado: rótulos fixos, por
+extenso. Mas ele tem **duas colunas**, e o `pdf.js` agrupa por **altura** —
+então rótulo e valor quase nunca caem na mesma linha, e pedaços de colunas
+diferentes se misturam:
+
+```
+ÓRGÃO AUTUADOR
+105300 ROD. BA524, KM 5,75 - SENTIDO DECRESCENTE   ← código + o LOCAL
+SEINFRA - SECRET DE                                 ← nome do órgão, parte 1
+INFRAESTRUTURA DO ESTADO                            ← parte 2
+BAHIA DATA                                          ← parte 3 + rótulo vizinho
+```
+
+🔴 **Por isso não dá para ler por posição.** O padrão é: **ancorar no RÓTULO e
+procurar adiante o primeiro valor com a FORMA certa** (data, hora, dinheiro,
+placa, código), pulando os rótulos do caminho. É o mesmo princípio do cartão do
+DETRAN-BA (v115), e é o que deve valer para qualquer formulário desta família.
+
+`MLT_NA_ROTULOS` lista os rótulos do formulário; `_naSemRotulos` os arranca
+**como palavra inteira** de um pedaço de valor (`BAHIA DATA` → `BAHIA`). Sem
+isso o nome do órgão sai com "DATA" grudado.
+
+### 🔴 O gabarito não foi inventado por mim
+Os **12 campos** foram conferidos contra a tela **"Detalhes da Infração" do
+próprio portal** — o segundo PDF, que mostra a MESMA multa. É renderização do
+órgão, não suposição minha:
+
+| campo | valor |
+|---|---|
+| placa · AIT | FIJ1F24 · R004328370 |
+| data · hora | 27/09/2026 · 00:06 |
+| valor | R$ 195,23 (grave, 5 pts, pelo valor do CTB) |
+| código da infração | 7463 |
+| órgão | `105300 - SEINFRA - SECRET DE INFRAESTRUTURA DO ESTADO BAHIA` |
+| local | `ROD. BA524, KM 5,75 - SENTIDO DECRESCENTE - SIMOES FILHO` |
+| 🔴 prazo de indicação | **2026-11-23** |
+
+### 🔴 O que este documento traz e o sistema não tinha
+| | |
+|---|---|
+| **`prazoIndicacao`** | hoje **1** das **587** multas a indicar tem esse dado. Buscá-lo no e-Frotas custaria **394 consultas cobradas** (decisão de 24/09: não buscar). Aqui vem **de graça** |
+| **`codigoInfracao` / `codigoOrgao`** | a **Auditoria** agrupa por eles (N2/N3) e a **Indicação** os exibe — e **nenhum parser de PDF os preenchia**. ⚠️ As 245 multas de PDF que os têm vieram de um preenchimento avulso anterior, não do código |
+| RENAINF, data da notificação, prazo de defesa, marca/modelo, proprietário | vão para a **observação** |
+
+`mltParsePDF` passou a repassar os dois códigos (`b.codigoInfracao || ''`).
+Quem não os conhece manda `''` — que é **exatamente o que já acontecia**
+(`undefined` → `''` na Auditoria), então nenhum parser existente muda de
+comportamento.
+
+### 🔴 O que o parser NÃO inventa: `vencimento` fica VAZIO
+O documento tem **três** datas — notificação (13/10), defesa prévia (23/11) e
+identificação do condutor (23/11) — e **nenhuma é data de pagamento**. Notificação
+de **AUTUAÇÃO** não cobra: a cobrança vem na Notificação de **Penalidade**.
+Pôr qualquer uma delas em `vencimento` faria a tela mostrar uma data de
+pagamento que não existe. Há teste e defeito injetado para isso.
+
+⚠️ **As duas datas-limite deste documento são iguais (23/11)**, então ele sozinho
+não distingue "defesa prévia" de "identificação do condutor" — trocar uma âncora
+pela outra passaria. Entrou um caso com as duas **diferentes**.
+
+### As mensagens de falha passam a dizer o que fazer
+*"sem texto selecionável"* e *"nenhuma infração reconhecida"* informavam que
+falhou e mais nada — foi por isso que o Rogel não teve como saber se o problema
+era o arquivo ou o sistema.
+
+| Situação | O que a tela diz agora |
+|---|---|
+| **zero texto** | que as letras são desenho, e **como consertar na origem** ("Salvar como PDF", não "Microsoft Print to PDF"); e o caso do digitalizado |
+| **layout desconhecido** | que o texto **foi lido** (quantos caracteres) e **com o que o documento começa** — que é o que permite reconhecer um formato novo **sem o arquivo em mãos** — mais a lista dos 4 formatos conhecidos |
+
+### 🔴 De quebra: o nome do arquivo já ia cru para o `innerHTML`
+`falhas.push(f.name + ' — ' + e.message)` desembocava em `innerHTML` **sem
+escape**, e acrescentar o início do PDF alargaria o buraco. Entrou **`_mltEsc`**
+(padrão da casa: `_condEsc`, `_agEsc`, `_axEsc`) e os dois passam a ser
+escapados. É o defeito que deixou o `crm.html` em branco, por outro ângulo.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**814/814**); os dois carimbos batendo
+- **86 testes** com o código real, o **texto real** do PDF (extraído com o
+  `mltExtrairTexto` do próprio sistema e **conferido byte a byte** contra o
+  navegador: 1714 caracteres, mesmo hash) e o **banco real** (662 multas):
+  roteamento, os 12 campos, o que não pode ser inventado, as notas, ponta a
+  ponta pelo `mltParsePDF`, duplicata pelo AIT, locatário na data, 14 bordas e
+  as mensagens
+- **29 defeitos injetados — todos acusados**, entre eles **o bug relatado**
+  (sem rota, cai no parser de lista), `vencimento` recebendo o prazo de defesa,
+  o nome do órgão engolindo o rótulo, o município pegando pedaço do nome do
+  órgão, a descrição engolindo a data que cai no meio dela, e o nome do arquivo
+  voltando a ir cru
+- **No ar, contra o arquivo PUBLICADO** (buscado na própria origem, que dispensa
+  login), com o texto real conferido por hash: **1 registro, os 12 campos
+  certos**, e o parser de lista — o que respondia antes — **continua devolvendo
+  zero**. Nada foi gravado em produção.
+- Regressão **medida**: **49 suítes, 2.468 testes**, nenhuma falha
+
+### ⚠️ Quatro defeitos injetados passaram, e os quatro ensinaram
+| O que passou | Por quê |
+|---|---|
+| a rota exigir **só um** marcador | meu teste só exigia resultado vazio — e ele é vazio dos dois jeitos. O que o 2º marcador protege é um documento de **lista** que cite a expressão; passou a ser esse o caso |
+| o município aceitar pedaço do nome do órgão | no documento real a linha antes da UF é **sempre** o município. Quem exercita a guarda é o documento **sem** município |
+| a data da infração ancorada no começo | aqui a data da infração **é a primeira** do documento. Só com uma data no **cabeçalho** o descuido aparece |
+| o código da infração com regex frouxa | era **injeção minha errada**: `7463` vem antes de `0 R$ 195,23`, então a ordem já protegia. Troquei pelo defeito de verdade — perder a âncora e pegar o código do **órgão** |
+
+⚠️ E o ambiente compartilhado (`amb-gestao.js`) **engolia o erro de carga** com
+`catch (e) { }` — a armadilha de 14/10. Agora ele guarda em `ctx.__erroCarga`, e
+o primeiro teste da suíte **exige que o sistema tenha carregado inteiro**
+(`MLT_GRAV` + `MLT_UF` + `MLT_NA_ROTULOS`, todas `var` tardias).
+
+⚠️ O contador de regressão **não lia o formato desta suíte** e pulou-a em
+silêncio (disse "48 com número" de 49) — era o defeito já registrado em 29/10,
+que voltou porque o arquivo se perdeu entre sessões. O `---` virou opcional.
+
+⚠️ E o heredoc comeu os escapes **mais uma vez** ao tentar corrigir uma asserção
+por script. Ferramenta de escrita, sempre.
+
+### ⚠️ Achado não corrigido: `mltDetectarOrgao` acha "DER" dentro de "CONSIDERADO"
+```js
+var lista = ['DETRAN','DNIT','PRF','SEMOB','SMTT','DER','PMBA',…];
+for (var i = 0; i < lista.length; i++) if (t.indexOf(lista[i]) >= 0) return lista[i];
+```
+É **substring sem fronteira de palavra**: neste documento ele devolve **`DER`**,
+achado em `VALOR CONSIDERADO`. Não atrapalha aqui porque o parser traz o órgão e
+`b.orgao || orgaoGlobal` dá preferência a ele — **e há teste e defeito injetado
+para essa ordem**. Mas `mltDetectarOrgao` é o **fallback de todo parser que não
+traz órgão**, e qualquer documento com "considerado", "liderado" ou "moderado"
+recebe órgão "DER". **Não corrigido** (é anterior e não foi pedido); consertar é
+uma fronteira de palavra, mas muda o órgão de importações futuras dos outros
+parsers.
+
+---
+
+## 🔴 O documento revelou por que o Serpro recusa a FIJ1F24 — 04/11/2026
+
+A Notificação de Autuação diz quem é o dono no DETRAN:
+
+> **NOME DO PROPRIETÁRIO: AUTO MAIS COMERCIO E C DE VEICULOS LTDA**
+> **CPF/CNPJ: 05.622.137/0001-00**
+
+🔴 **A FIJ1F24 é uma das 6 placas ATIVAS que o Serpro recusa com 403** ("Consulta
+não autorizada / Nenhum registro encontrado"), registradas em 30/09. E o contrato
+e-Frotas é da **LOKÁ — nome fantasia da Rodera Transportes LTDA**, outro CNPJ.
+
+**Uma placa cujo proprietário no DETRAN é a Auto Mais não está na frota e-Frotas
+da Rodera.** Daí o 403. É o *"não está no nome da locadora"* do pedido de 14/10,
+agora com documento.
+
+⚠️ **Provado para UMA placa, hipótese para as outras cinco** — só esta tem
+documento. Mas é a explicação mais provável, e é conferível: basta ver de quem é
+o CNPJ de cada uma no DETRAN.
+
+⚠️ E a FIJ1F24 **não está** na frota da Auto Mais no sistema (45 veículos no
+Firestore, conferido): ela roda na LOKÁ e está registrada no CNPJ da Auto Mais.
+É fato de registro, não defeito de sistema.
+
+### O que isso custa, medido em 04/11 (662 multas no banco)
+| Placa | Status | Multas no sistema | Alugada agora para |
+|---|---|---|---|
+| SKT3B92 | alugado | 5 *(as importadas à mão em 14/10)* | ISS TRANSPORTES |
+| TKQ7I29 | alugado | **0** | DANILO DA SILVA FERREIRA |
+| SUJ8F15 | alugado | **0** | Luciano Evangelista Brito |
+| EXI0G91 | alugado | **0** | BRJ EXPRESSO |
+| TMX5C27 | alugado | **0** | ATP Comercio de Alimentos |
+| FIJ1F24 | alugado | **0** | RSC TRANSPORTE 2016 LTDA |
+
+**As 6 estão alugadas.** A multa deste PDF (R004328370, R$ 195,23, locatário
+**RSC** na data) **não está no sistema** — e não entraria nunca pela varredura,
+porque a consulta daquela placa é recusada. Cada varredura ainda gasta 6
+consultas cobradas que sempre dão erro.
+
+🔴 **O conserto é fora do sistema:** incluir as placas na frota e-Frotas do CNPJ
+que de fato as possui, ou transferir a propriedade. Enquanto não for, o caminho
+é importar o PDF de cada notificação — que agora funciona.
+
+### 🔴 8 placas estão nas DUAS frotas (LOKÁ e Auto Mais)
+Conferido nos dois bancos: `SJC3A29`, `RVN9D70`, `RTE3J91`, `SCZ4A24`,
+`SHP2B83`, `SJA7D59`, `RVO7F21`, `RBV3F29`. Quase todas `inativo` na LOKÁ e
+`vendido` na Auto Mais — carros que passaram de uma empresa para a outra.
+
+⚠️ Duas delas já eram pendência: a **RTE3J91** está `inativo` na LOKÁ **com
+aluguel ativo da G7** (achado de 29/10) e `disponivel` na Auto Mais; a
+**SJA7D59** tem 4 multas sem locatário.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o painel Multas → aba **Importar** com
+**Ctrl+Shift+R**, escolher o `notificacaoAutuacao_….pdf` e conferir a multa na
+tela de conferência antes de gravar. Eu não autentico.
