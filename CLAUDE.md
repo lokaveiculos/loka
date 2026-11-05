@@ -7211,3 +7211,83 @@ um cliente e salvar o fornecedor de verdade. Eu não autentico.
 suítes anteriores da Auto Mais não existem mais. **Não houve regressão a rodar**
 além da suíte desta entrega — o `node --check` nas 10 páginas passou, mas isso
 só pega erro de sintaxe.
+
+---
+
+## ✅ Campo Corrente/Poupança eliminado — 05/11/2026 (`d252b0c`) · Auto Mais
+
+Pedido: *"elimina o campo corrente/poupança"* — o campo morto que eu registrei
+ontem no formulário de fornecedor.
+
+### Conferido antes de tirar
+| | |
+|---|---|
+| `ftcc` no repositório | só onde é **criado** — 2 lugares, nenhuma leitura |
+| `svForn` lê o campo? | **não** |
+| campo de tipo de conta nos bancos | **nenhum** (`tipo_conta`, `tipoConta` → 0) |
+
+⚠️ **Formulário que pede informação e joga fora faz a pessoa trabalhar de
+graça** — e ainda dá a impressão de que o dado está guardado.
+
+### 🔴 O layout era a parte que exigia decisão
+`.fr` é grid de **duas colunas fixas** (`1fr 1fr`), e o Tipo dividia a linha com
+o campo **Conta**. Tirar um deixaria o outro sozinho na metade esquerda, com
+buraco à direita.
+
+Medido no próprio arquivo: as **5 linhas de campo único** usam `.fg full`
+(`cn`, `cend`, `cobs`, `fend`, `fobs`) — **não há precedente de campo solto em
+meia largura**. O Conta seguiu a convenção do arquivo.
+
+**Medido no DOM real, com o CSS real:**
+
+| campo | largura |
+|---|---|
+| Banco | 291px |
+| Agência | 291px |
+| **Conta** | **598px** = 291 + 291 + 16 de gap |
+
+O bloco **Dados Bancários** ficou com 2 linhas: *Banco \| Agência* e *Conta*.
+
+### O que NÃO foi tocado
+| | Por quê |
+|---|---|
+| seletor **PF/PJ** (`ftp`) | é outro campo "Tipo", e esse **é lido** pelo `svForn` |
+| Banco, Agência e Conta | continuam gravados |
+| cópia velha de `cadastros.html` na **raiz** do repo | é de junho, ninguém aponta para ela, e limpar aquelas 7 páginas é a **pendência A3** |
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **16 testes de runtime** com os 14 fornecedores reais: o campo ausente nos
+  **três** caminhos de abertura (cadastro novo, edição, e o atalho do cliente
+  de ontem), os três campos bancários ainda gravados, **nenhum** campo de tipo
+  de conta no registro, o `.fg full` do Conta, nenhuma linha `.fr` com campo
+  solto em meia largura, e os 14 fornecedores abrindo sem erro
+- **7 defeitos injetados — todos acusados, nenhum cego**: o campo de volta,
+  Conta em meia largura, levar o Conta junto, passar a **gravar** tipo de conta,
+  **esconder** o seletor PF/PJ, perder o Banco, e o bloco inteiro sumir
+- **No ar, no arquivo publicado, com os dados reais** e `fsave` substituído:
+  `ftcc` e "Corrente/Poupança" **ausentes do arquivo publicado e do**
+  **formulário**; as larguras acima; gravação de ponta a ponta com
+  `Itau | 7314 | 98590-9` e **14 campos, nenhum de tipo de conta**; e o atalho
+  do cliente abrindo com banco e conta vazios. **Nada gravado em produção** —
+  reconferido: 28 clientes, 15 fornecedores
+
+### ⚠️ Dois testes meus falharam, e os dois eram do AMBIENTE
+1. **O stub de elemento não modela `<select>`.** `svForn` lê
+   `getElementById("ftp").value`; num select real o navegador já traz a 1ª
+   opção selecionada (`pessoa_fisica`), no stub o value nasce `''`. A asserção
+   media o defeito do ambiente — o PF/PJ passou a ser definido explicitamente.
+2. **O recorte do bloco bancário ia até `id="fobs"`**, mas o
+   `<div class="fr">` das Observações **abre antes** dele: eu contava a linha
+   vizinha e dava 3 em vez de 2. O limite passou a ser o início daquela linha.
+
+🔴 **E um teste meu era CEGO:** o defeito *"esconder o seletor PF/PJ com
+`display:none`"* **passou** na primeira rodada, porque a asserção só procurava
+a string `pessoa_juridica` — que continua no HTML mesmo escondida. Esconder é
+justamente uma das formas de errar este pedido. Agora o teste exige que a caixa
+do campo **não** tenha `display:none`.
+
+⚠️ E uma âncora do injetor deu **ERRO DE MONTAGEM** por escape escrito à mão.
+Ela passou a ser **recortada do próprio arquivo pelo id do campo** — e aí o
+erro seguinte foi meu: passei `banco` onde o id é **`fbco`**. Âncora que não
+casa é defeito que nunca foi testado, e o injetor acusa isso em vez de passar.
