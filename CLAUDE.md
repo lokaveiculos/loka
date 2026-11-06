@@ -7462,3 +7462,173 @@ arquivo publicado: 18/18.
 Falta **logado**: o Rogel abrir Contratos com **Ctrl+Shift+R**, gerar um
 contrato escolhendo "Troca por outro veiculo" e digitar uma placa na caixa nova.
 Eu não autentico.
+
+---
+
+## ✅ Usuários: editar de verdade — senha, perfil e funções — 06/11/2026 (`f54c928`, `6fadb11`) · Auto Mais
+
+Pedido: *"inserir em usuarios a opcao de editar o usuario para alteracao de
+senhas, alteracao de perfil, inserção de funcoes e etc, assim como já funciona
+no sistema Loka"*.
+
+⚠️ **"Como já funciona na LOKÁ" indica o alvo:** a tela a mexer é a da Auto
+Mais (`gestao.html`, aba Usuários), e o modelo é o `renderUsuarios` +
+`renderPerfis` da LOKÁ.
+
+### 🔴 O botão de editar JÁ existia — e três defeitos explicavam o relato
+
+**1. O usuário `daniel` tinha `id: NaN` no banco** (documento literalmente
+`usuarios/NaN`). A linha gerava `fmUsr(NaN)`, e `find(u => u.id == NaN)` nunca
+casa (**NaN != NaN**), então o botão caía no `if(!u) return` e **não fazia
+nada, em silêncio**. Agora as ações vão pelo **índice do array**, que é o
+padrão da LOKÁ (`editarUsuario(n)`) — e todo registro fica alcançável.
+
+**2. 🔴 A causa raiz disso — e ela ia se repetir.** Cada página declara o
+próprio
+
+```js
+function nid(a){return a.length?Math.max(...a.map(x=>x.id))+1:1;}
+```
+
+que **sombreia o do `firebase-shared.js`** — e o local não tem guarda. Medido
+com os ids reais de `usuarios` (`[2,3,4,NaN,"u1787759746817"]`):
+
+| | resultado |
+|---|---|
+| `nid` **local** | **NaN** — `Math.max` com um id de **texto** dá NaN |
+| `nid` do **shared** (`Number(x.id)||0`) | **5** |
+
+Foi assim que o daniel nasceu, e **o próximo usuário criado nasceria igual**.
+Corrigido nos **8 arquivos** que têm a cópia.
+
+**3. 🔴 O `+` UNÁRIO.** `'<editar>' + +(isAdmin()?'<excluir>':'')` aplica
+`Number()` na string e produz **NaN**: a célula imprimia `NaN` e o botão de
+excluir **nunca aparecia**. Medido no Node antes de corrigir. Estava em **4
+listas**: Usuários, Manutenção, **Despesas e Veículos**.
+
+⚠️ Despesas e Veículos não foram pedidos, mas é o mesmo caractere e o mesmo
+"NaN" na tela — registrado para ser revertido se ele não quiser.
+
+### 🔴 A senha forçou mexer no login
+A tela gravava **texto puro**, e o login publicado **só comparava texto puro**
+(`d.senha === p`). Medido: dos 5 usuários, **4 têm texto puro** e só o `rogel`
+tem `senhaHash`+`salt` — e **sem** o campo `senha`. Ou seja: pelo Firestore o
+rogel **não conseguia entrar**; ele só entrava pelo `USERS_FIXOS`.
+
+Então gravar hash sem mexer no login **trancaria** quem trocasse de senha.
+As duas pontas entraram juntas:
+
+| | |
+|---|---|
+| tela | botão **🔑** próprio, confirmação, mínimo 6, hash **SHA-256 + salt**, texto puro apagado |
+| login | aceita **hash primeiro**, texto puro como legado, e **converte no primeiro acerto** |
+
+⚠️ **O formato não foi escolhido por mim:** `SHA-256(salt + "|" + senha)` em
+hex é o do `login.html` do commit **`5352cff`** (26/08/2026), recuperado do
+histórico — é ele que gerou o hash que já estava no banco. Por construção, a
+senha atual do rogel continua valendo. **Trocar o separador invalidaria** a
+senha de quem já tem hash.
+
+🔴 Cuidados contra trancamento (3 dos 30 defeitos injetados são disso):
+hash **antes** do texto (registro com os dois **recusa a senha antiga**, senão
+trocar a senha não adiantaria nada) · falha ao migrar **não barra** o login ·
+navegador sem crypto cai no caminho antigo em vez de recusar · o
+**`USERS_FIXOS` fica onde está** (tirá-lo é decisão separada, e sem ele um
+banco fora do ar deixaria todos de fora).
+
+### As "funções": aba Perfis de Acesso
+Cada perfil tem **telas** (as 8 do menu) e **funções**, com curinga "Todas"
+que vale para o que for criado depois — o modelo do `loka_perfis`.
+
+⚠️ **As 5 funções não foram inventadas:** são exatamente as que o `isAdmin()`
+já controlava — excluir registros, exportar, ver Relatórios, gerenciar
+usuários, configurações. Função que não controla nada seria promessa falsa na
+tela.
+
+### 🔴 Coleção nova é RECUSADA pelas regras — por isso vive em `config/perfis`
+Medido antes de escolher onde guardar:
+
+| coleção | |
+|---|---|
+| veiculos, clientes, …, **config** | HTTP **200** |
+| **perfis**, **permissoes** | HTTP **403** |
+
+As regras do Firestore são **coleção por coleção** e não listam nenhuma das
+duas — é o mesmo que aconteceu com `leads` em 15/09. `config` já está liberada
+e já guarda `config/empresa`, então os perfis são **um documento ali**. Uma
+coleção nova teria dado "NÃO foi salvo" e exigido o Rogel no console.
+
+### 🔴 Os padrões reproduzem o acesso de ANTES
+admin alcança tudo; **atendimento vê as 8 telas** (nenhuma tinha
+`data-admin-only`) e **não tem função nenhuma**. Enquanto ninguém editar um
+perfil, **nada muda de acesso para ninguém** — e isso é teste, com defeito
+injetado nas duas direções (atendimento ganhando tudo, e perdendo as telas).
+
+🔴 **`isAdmin()` é PISO** em `podeTela`/`podeAcao`: quem é admin nunca se
+tranca para fora por ter salvo um perfil errado. E o perfil **Administrador
+não pode ser limitado**.
+
+### 🔴 A outra armadilha: cada página sombreia o `applyProfile` do shared
+A parte nova (esconder do menu a tela que o perfil não alcança) entrou no
+`applyProfile` do shared e era **código morto** — 7 das 10 páginas declaram o
+próprio `applyProfile`, idêntico, que vence o do shared. Extraída para
+`amAplicarTelas()`, chamada pelos 7 locais.
+
+⚠️ É a mesma família do `nid`: **a página redefine o helper do shared.** Vale
+conferir isso *antes* de mexer em qualquer função do shared.
+
+### Outras travas
+não dá para excluir o usuário com que se está logado · não dá para rebaixar,
+desativar ou excluir o **último administrador ativo** · falha de gravação diz
+**"NÃO foi salvo"** e mantém o modal aberto (lição do CRM) · o registro de id
+inválido ganha id novo **e o documento velho é apagado**, senão ficariam dois
+do mesmo usuário.
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **55 testes de runtime** com o código real dos três arquivos, os dados reais
+  do Firestore e o **`crypto.subtle` de verdade (o do Node)**: o formato do
+  hash conferido contra o SHA-256 do próprio Node, os 4 usuários de texto puro
+  continuando a entrar, o registro misto recusando a senha antiga, a migração
+  apagando o texto puro, falha de migração não barrando o login, o usuário de
+  id NaN abrindo para edição, as travas do último admin, os perfis padrão, o
+  curinga, e os estados de falha de gravação
+- **30 defeitos injetados — todos acusados, nenhum cego**
+- **No navegador, contra os arquivos PUBLICADOS, com os dados reais**
+  (`firebase` substituído — **0 gravações em produção**, cache do navegador
+  devolvido): o sistema carrega inteiro; a lista sem `NaN` com as 3 ações por
+  índice, o selo "você" e 1 senha protegida × 4 em texto puro; o cenário de id
+  NaN **abrindo** para edição; a aba Perfis com as 8 telas e 5 funções; as abas
+  de Gestão **4 para admin / 0 para atendimento** (igual a antes) e **só
+  Relatórios** ao conceder aquela função; o menu escondendo a tela não
+  permitida. E a prova contra trancamento: **o login publicado aceita o hash
+  que a tela publicada gera** (arquivos diferentes, formato casando).
+
+### ⚠️ Dois testes meus que passaram com defeito vivo
+| O que passou | Por quê |
+|---|---|
+| `_usrIdValido` aceitar **NaN** | 🔴 **o harness perdia o NaN**: o DB entra pelo `localStorage` (regra desta casa, porque a página declara o próprio `loadDB`) e **JSON não carrega NaN** — virava `null`, `typeof null` não é `number`, e o ramo quebrado nunca era alcançado. O `carregar()` passou a **repor o NaN** depois do `loadDB`, e entrou teste que pergunta `_usrIdValido(NaN)` direto |
+| tirar o piso do admin de dentro do `amAplicarTelas` | era **guarda inerte**: quem tem o piso é o `podeTela()`, que ela chama para cada item. Nenhum teste podia distinguir, então a linha **saiu** em vez de ficar como proteção que ninguém alcança (`6fadb11`) |
+
+### ⚠️ Tropeços de ferramenta
+O `python` com `io.open` em modo texto **converteu o arquivo de teste para
+CRLF**, e aí as âncoras de várias linhas do script seguinte não casaram —
+nada foi gravado, o que é o comportamento certo. Normalizar para LF antes de
+editar. E o heredoc comeu escape mais uma vez.
+
+### ✅ Confirmado em produção pelo próprio Rogel
+Ele usou a tela e disse *"ok, funcionou"*. Conferido no banco depois:
+o `daniel` agora tem **id 5** e o documento `usuarios/NaN` responde **404** —
+ou seja, ele abriu e salvou justamente o registro que estava quebrado, e o
+conserto de id rodou como desenhado (id novo + documento velho apagado).
+
+### ⏳ O que fica em aberto
+- **4 usuários ainda com senha em texto puro** (thaina, sandro, bruno,
+  daniel). Cada um migra sozinho no **próximo login certo** — ou o Rogel troca
+  a senha pelo 🔑, que já grava com hash.
+- A aba Perfis pode dar **"NÃO foi salvo"** se as regras do Firestore não
+  liberarem escrita em `config`. Leitura responde 200; escrita só se sabe
+  tentando. Se der, é adicionar a regra no console — como foi com `leads`.
+- O `USERS_FIXOS` do `login.html` continua com `rogel` / `daniel01` **em texto
+  puro num arquivo público** (a regressão de 11/09). Não foi tocado: tirá-lo
+  exige o Rogel presente, e a senha deve ser considerada **queimada**.
