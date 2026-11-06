@@ -7291,3 +7291,174 @@ do campo **não** tenha `display:none`.
 Ela passou a ser **recortada do próprio arquivo pelo id do campo** — e aí o
 erro seguinte foi meu: passei `banco` onde o id é **`fbco`**. Âncora que não
 casa é defeito que nunca foi testado, e o injetor acusa isso em vez de passar.
+
+---
+
+## ✅ Contrato: pagamento "Troca por outro veículo" + busca por placa — 06/11/2026 (`f36726b`, `4bdd596`) · Auto Mais
+
+Pedido: *"no menu contrato colocar a opção de pagamento 'troca por outro
+veiculo'"* e *"no campo seleção de veiculo inserir a opção de digitarmos a
+placa"*.
+
+⚠️ **"Menu contrato" é a Auto Mais.** Conferido antes de abrir arquivo: "troca
+por outro veículo" como **forma de pagamento** é coisa de revenda, e a lista de
+pagamento existe só em `automaiscar/sistema/contratos.html:338`. A LOKÁ aluga —
+lá não há forma de pagamento de contrato.
+
+### 🔴 O achado que mudou o pedido: a opção JÁ EXISTIA na tela de Vendas
+E com outro nome — **`Permuta`** (`vendas.html:355`). As duas telas discordavam:
+
+| Tela | Formas oferecidas |
+|---|---|
+| `contratos.html` | A vista · Financiamento · Consorcio · Entrada + Parcelas |
+| `vendas.html` | as mesmas **+ Permuta** |
+
+🔴 **E isso era perda silenciosa de dado.** As duas telas gravam o registro uma
+da outra: `svCt` grava a venda (`pagamento: obj.pagamento`) e `svVenda` grava o
+contrato. Então uma venda registrada como **Permuta** e depois reaberta no
+Contratos caía na **primeira** opção do `<select>` — porque nenhuma option
+recebia `selected` — e era gravada como **"A vista"**, no contrato **e** na
+venda, sem avisar.
+
+**Provado no navegador, com o mesmo valor:**
+
+| | o que o `svCt` gravaria |
+|---|---|
+| o `<select>` **antigo** | **A vista** 🔴 |
+| o `<select>` **novo** | **Permuta** ✅ |
+
+É a terceira vez nesta família — o select de **Fonte do CRM** (15/09) gravava
+"Outro" por cima do canal real pelo mesmo mecanismo.
+
+⚠️ **Nenhum registro usa "Permuta" hoje** (medido: 31 contratos e 30 vendas, só
+os 4 valores antigos), então nada foi perdido até aqui. Mas o buraco estava
+aberto justamente na opção que ele vai começar a usar.
+
+### A lista virou UMA, no `firebase-shared.js`
+`AM_PAGAMENTOS` + `pagamentoOpts(atual)`. As duas telas leem de lá; só o
+`login.html` não carrega o shared, e ele não tem campo de pagamento.
+
+🔴 **Valor que a lista não conhece é PRESERVADO como opção extra**, nunca
+descartado — é o que impede o select de trocar calado o pagamento de um
+registro antigo. Vale para "Permuta" e para qualquer coisa que entre por
+importação ou à mão.
+
+⚠️ **"Troca por outro veiculo" substitui "Permuta" nas DUAS telas.** Mexer na
+tela de Vendas é além do pedido literal, e está aqui para ser revertido se ele
+não quiser — mas duas opções para a mesma coisa dividiriam o dado em dois
+valores e os relatórios nunca mais fechariam (é a armadilha dos nomes de
+órgão e de oficina). Sem acento, como o resto do vocabulário gravado
+("Consorcio", "Veiculo").
+
+### Digitar a placa
+O **`<select id="ctv">` continua sendo a fonte da verdade** — o `svCt` lê o
+`veiculo_id` dele. A caixa é um **atalho de busca** ao lado, então a gravação
+não mudou e a lista segue disponível para quem prefere o mouse. Foi o que o
+pedido disse: *inserir a opção* de digitar, não trocar o campo.
+
+🔴 **Procura nas opções do PRÓPRIO seletor**, nunca numa lista paralela:
+buscando em `DB.veiculos` direto, uma placa visível na lista poderia "não
+existir" na busca — ou o contrário — e ninguém entenderia o porquê. Há teste
+da igualdade (candidatos = opções = 46) e defeito injetado.
+
+⚠️ **Ignora hífen e caixa de propósito:** das **46 placas**, **20 estão
+gravadas COM hífen** (`PLF-0254`) e **26 SEM** (`OLF1I86`). Comparar o texto
+cru deixaria metade da frota inalcançável pela digitação.
+
+| Situação | O que acontece |
+|---|---|
+| uma placa casa | seleciona e confirma **qual** veículo (`✓ FIAT ARGO PLF-0254`) |
+| várias casam | **não seleciona** e avisa quantas |
+| nenhuma casa | avisa, em vermelho |
+| caixa apagada | limpa só o aviso |
+| seletor mexido à mão | a caixa para de opinar |
+
+🔴 **Nos três últimos casos a escolha anterior NÃO é apagada:** um caractere
+errado no meio da digitação não pode descartar o veículo que já estava
+escolhido. Conferido no navegador caractere por caractere — digitando
+`OLF1I86`, o `O` ainda é ambíguo e mantém o veículo anterior, e o `OL` já
+resolve.
+
+⚠️ **O `oninput` não redesenha a tela.** Se redesenhasse, destruiria o próprio
+campo e só entraria 1 caractere — é o bug de 26/09 e 28/09. Medido: os 7
+caracteres entram, o foco fica no campo, **0 renders**.
+
+⚠️ `min-width:0` no `<select>` é obrigatório (lição de 02/10): flex item não
+encolhe abaixo do conteúdo, e as opções são longas. Medido a **375px**: caixa
+150 + seletor 217 + 8 de gap = 375, **sem estouro e sem rolagem lateral**.
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **31 testes de runtime** com o código real das duas e os dados reais
+  (46 veículos, 31 contratos, 30 vendas): as 5 formas e a ordem, a opção nova
+  no menu, reabrir com ela marcada, **"Permuta" preservada**, qualquer valor
+  desconhecido preservado, formulário novo sem nada inventado, espaço em volta,
+  as duas telas batendo, nenhuma lista embutida sobrando, **cada uma das 46
+  placas**, hífen nos dois sentidos, minúscula, prefixo, sufixo, ambígua,
+  inexistente, caixa vazia, veículo vendido, e a gravação inalterada
+- **22 defeitos injetados — todos acusados, nenhum cego**: entre eles o estado
+  anterior ao pedido nas duas telas, o valor desconhecido descartado, nenhuma
+  opção marcada, a busca numa lista paralela, normalizar um lado só, ambígua
+  escolhendo a primeira, apagar a escolha no erro de digitação, o `oninput`
+  redesenhando, e a caixa virando fonte do `veiculo_id`
+- **No navegador, nos arquivos publicados, com os dados reais** e o `firebase`
+  substituído: o sistema carrega inteiro (`DB` com os 46), as 5 opções, a prova
+  do bug lado a lado (antigo `A vista` × novo `Permuta`), as 46 placas com
+  **0 erros**, `G` (2 placas) não mexendo na escolha, `JC` escolhendo quem
+  **começa** com JC, as larguras em 900/620/480/375px, e **0 gravações em
+  produção** — reconferido: 31 contratos, 30 vendas, 46 veículos
+
+### ⚠️ O ramo "placa exata" está INERTE com os dados de hoje
+Medido: **nenhuma placa é substring de outra**, então tirar a preferência pela
+igualdade exata não muda resultado nenhum. Ficou no código (custa nada e
+protege o dia em que houver), **mas sem cobertura** — está dito aqui em vez de
+contado como teste.
+
+Já o ramo **"prefixo antes de contém" é distinguível**: `JC` é prefixo de 1
+placa e aparece no meio de 2. Ganhou teste próprio e defeito injetado.
+
+### ⚠️ Três resultados vermelhos meus que NÃO eram defeito
+No navegador eu testei "placa ambígua" digitando **`L`** — e a minha própria
+medição, minutos antes, já dizia que `L` é **prefixo de exatamente 1** placa
+(`LUK-6D78`). A busca acertou, e os dois passos seguintes, que comparavam com
+a escolha anterior, deram "não sobreviveu" porque a linha de base tinha
+mudado **legitimamente**.
+
+🔴 **A sonda do teste tem de sair da medição, não da cabeça** — e eu tinha a
+medição. A sonda certa (`G`, que casa com 2) passou a ser achada por uma
+varredura do alfabeto dentro do próprio teste. Mesmo erro de 03/11 (a véspera
+de uma locação que tinha outra locação cobrindo a data).
+
+### ⚠️ O que fez a suíte conseguir provar o bug
+O stub de `<select>` reproduz o navegador: **`selectedIndex = 0` quando nenhuma
+option tem `selected`**, e option sem atributo `value` vale pelo texto. Sem
+isso a suíte não distinguiria o conserto do defeito.
+
+E o **teste [1] fez o trabalho dele** duas vezes: o shared chama
+`firebase.initializeApp()` na **linha 10**, então sem o stub de `firebase` ele
+morre ali e nenhuma global dele existe — é exatamente o que deixou o
+`crm.html` em branco em agosto. Faltava também `window.addEventListener`.
+
+⚠️ E duas âncoras do injetor deram **ERRO DE MONTAGEM** por eu ter escrito
+`\"` onde o arquivo tem `"` simples. Âncora que não casa é defeito que nunca
+foi testado — o injetor acusa isso em vez de passar.
+
+### Corrigido depois de medir no publicado (`4bdd596`)
+O aviso da busca tinha **16px vazio e 18px com texto**, então a linha pulava
+2px a cada mensagem enquanto a pessoa digita. `min-height` e `line-height`
+passaram a **18px**, a altura que o texto de 12px ocupa de fato. Reconferido no
+arquivo publicado: 18/18.
+
+### O que ficou de fora, de propósito
+- **A busca por placa não entrou na tela de Vendas.** O pedido foi sobre o menu
+  Contrato, e lá a ausência dela é só falta de comodidade — não há perda de
+  dado como havia na lista de pagamento (que por isso foi unificada). É uma
+  linha, se ele quiser.
+- **O seletor continua oferecendo os 46 veículos**, não só os 14 disponíveis:
+  editar contrato antigo depende de alcançar carro já vendido. Há teste de que
+  a busca acha veículo `vendido`.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Contratos com **Ctrl+Shift+R**, gerar um
+contrato escolhendo "Troca por outro veiculo" e digitar uma placa na caixa nova.
+Eu não autentico.
