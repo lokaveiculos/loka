@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v146-20261104-0940 -->
+<!-- LOKA deploy: v147-20261107-0930 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1600,9 +1600,16 @@ tr:hover td{background:#f8f9fe;}
     <div class="g2">
       <div class="fg"><label class="fl">Data Devolução Real *</label><input class="fi" id="encData" type="date" oninput="calcEnc()"></div>
       <div class="fg"><label class="fl">KM Devolução</label><input class="fi" id="encKm" type="number" placeholder="000000"></div>
-      <div class="fg"><label class="fl">Valor Total (R$)</label><input class="fi" id="encValor" placeholder="0,00"></div>
+      <div class="fg"><label class="fl">Valor Total (R$)</label><input class="fi" id="encValor" placeholder="0,00" oninput="_encRenderAcerto()"></div>
       <div class="fg"><label class="fl">Desconto / Multa (R$)</label><input class="fi" id="encDesconto" placeholder="0,00" oninput="calcEnc()"></div>
-      <div class="fg" style="grid-column:1/-1"><label class="fl">Condição na Devolução</label><select class="fs" id="encCondicao"><option value="ok">✅ Normal</option><option value="avaria_leve">⚠️ Avaria leve</option><option value="avaria_grave">🔴 Avaria grave</option><option value="multa">🚨 Multa de trânsito</option></select></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Condição na Devolução</label><select class="fs" id="encCondicao"><option value="ok">✅ Normal</option><option value="sujo">🧽 Veículo sujo</option><option value="avaria_leve">⚠️ Avaria leve</option><option value="avaria_grave">🔴 Avaria grave</option><option value="multa">🚨 Multa de trânsito</option></select></div>
+      <div class="sec-label" style="grid-column:1/-1">Cobranças na devolução</div>
+      <div class="fg"><label class="fl">Lavagem (R$)</label><input class="fi" id="encLavagem" placeholder="0,00" oninput="_encRenderAcerto()"></div>
+      <div class="fg"><label class="fl">Avaria (R$)</label><input class="fi" id="encAvaria" placeholder="0,00" oninput="_encRenderAcerto()"></div>
+      <div class="fg"><label class="fl">Outros (R$)</label><input class="fi" id="encOutros" placeholder="0,00" oninput="_encRenderAcerto()"></div>
+      <div class="fg"><label class="fl">Do que se trata &quot;Outros&quot;</label><input class="fi" id="encOutrosDesc" placeholder="Ex: combustível, pedágio..."></div>
+      <div class="fg"><label class="fl">Caução retida (R$)</label><input class="fi" id="encCaucao" placeholder="0,00" oninput="_encRenderAcerto()"></div>
+      <div class="fg"><label class="fl">Forma de Pagamento</label><select class="fs" id="encForma"><option value="pix">PIX</option><option value="transferencia">Transferência</option><option value="dinheiro">Dinheiro</option><option value="cartao_deb">Cartão Débito</option><option value="cartao_cred">Cartão Crédito</option></select></div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="encObs" placeholder="Observações..."></div>
     </div>
     <div id="encResult" style="display:none;margin-top:12px;background:#EEF1FD;border-radius:8px;padding:12px;font-size:12px"></div>
@@ -1738,7 +1745,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v146-20261104-0940';
+var LOKA_BUILD = 'v147-20261107-0930';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4841,6 +4848,115 @@ function abrirReciboPagamento(comCliente) {
   window.open('recibo.html', '_blank');
 }
 
+// ── ACERTO DO ENCERRAMENTO ───────────────────────────────────
+// Cobranças de devolução (lavagem, avaria, outros) e a caução a devolver.
+//
+// 🔴 O que se devolve é DERIVADO, nunca digitado: caução retida menos o que
+// foi cobrado. Campo de "a devolver" editável criaria dois números para a
+// mesma conta, e um deles ficaria velho — é a regra do saldo do Almoxarifado
+// e do total do recibo.
+//
+// 🔴 E é UMA função só, lida pelo modal E pelo histórico. Duplicar a conta
+// foi o acidente da v119 (duas `statusReal`, e o relatório impresso errava).
+//
+// A conta segue a Cláusula 10ª do contrato: a caução volta depois da
+// avaliação física do veículo. Cobrança maior que a caução não vira "a
+// devolver negativo" — vira saldo que o locatário ainda deve.
+// Resumo do acerto na linha do histórico. Lê o MESMO _encAcerto do modal.
+function _encResumoHist(h) {
+  var a = _encAcerto(h);
+  if (!a.cobrancas && !a.devolver) return '';
+  var p = [];
+  if (a.cobrancas) p.push('cobrado ' + brl(a.cobrancas));
+  if (a.temCaucao && a.devolver) p.push('devolvido ' + brl(a.devolver));
+  if (a.saldoDevedor) p.push('<span style="color:#c0392b">deve ' + brl(a.saldoDevedor) + '</span>');
+  var t = (h.encOutrosDesc && mltNum(h.encOutros)) ? String(h.encOutrosDesc) : '';
+  return '<div style="font-size:9px;font-weight:400;color:var(--muted)">' + p.join(' · ')
+       + (t ? ' · ' + _mltEsc(t) : '') + '</div>';
+}
+
+function _encAcerto(o) {
+  o = o || {};
+  var lav = mltNum(o.encLavagem), ava = mltNum(o.encAvaria), out = mltNum(o.encOutros);
+  var cobr = Math.round((lav + ava + out) * 100) / 100;
+  // caução pode nem existir no registro: 96 dos 107 alugéis não têm
+  var temCaucao = o.caucao !== undefined && o.caucao !== null && String(o.caucao).trim() !== '';
+  var cau = temCaucao ? mltNum(o.caucao) : 0;
+  var dev = Math.max(0, Math.round((cau - cobr) * 100) / 100);
+  var deve = Math.max(0, Math.round((cobr - cau) * 100) / 100);
+  return {
+    lavagem: lav, avaria: ava, outros: out,
+    cobrancas: cobr,
+    temCaucao: temCaucao, caucao: cau,
+    devolver: dev,          // o que volta para o locatário
+    saldoDevedor: deve      // o que a caução não cobriu
+  };
+}
+
+var ENC_FORMAS = {
+  pix: 'PIX', transferencia: 'Transferência', dinheiro: 'Dinheiro',
+  cartao_deb: 'Cartão Débito', cartao_cred: 'Cartão Crédito'
+};
+
+// Desenha a caixa de resultado: locação + acerto. Não recalcula a locação —
+// quem faz isso é o calcEnc. Assim digitar uma cobrança não apaga um valor
+// de locação que o operador tenha ajustado à mão.
+function _encRenderAcerto() {
+  var er = document.getElementById('encResult');
+  if (!er) return;
+  var a = _encAcertoDosCampos();
+  var loc = mltNum((document.getElementById('encValor') || {}).value);
+  var h = '<div style="display:flex;justify-content:space-between"><span>Locação</span>'
+        + '<strong>' + brl(loc) + '</strong></div>';
+
+  if (a.cobrancas > 0) {
+    h += '<div style="border-top:1px solid #c7d0f0;margin:6px 0 4px;padding-top:4px;font-weight:700">Cobranças na devolução</div>';
+    if (a.lavagem) h += '<div style="display:flex;justify-content:space-between"><span>&nbsp;&nbsp;Lavagem</span><span>' + brl(a.lavagem) + '</span></div>';
+    if (a.avaria)  h += '<div style="display:flex;justify-content:space-between"><span>&nbsp;&nbsp;Avaria</span><span>' + brl(a.avaria) + '</span></div>';
+    if (a.outros)  h += '<div style="display:flex;justify-content:space-between"><span>&nbsp;&nbsp;Outros</span><span>' + brl(a.outros) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between"><span>&nbsp;&nbsp;<em>Total cobrado</em></span><strong>' + brl(a.cobrancas) + '</strong></div>';
+  }
+
+  h += '<div style="border-top:1px solid #c7d0f0;margin:6px 0 4px;padding-top:4px"></div>';
+  if (!a.temCaucao) {
+    // 🔴 Sem caução registrada NÃO é "R$ 0,00 a devolver": são coisas
+    // diferentes, e um zero ali faria parecer que já foi devolvida.
+    h += '<div style="color:var(--muted)">Sem caução registrada neste aluguel</div>';
+    if (a.cobrancas > 0) {
+      h += '<div style="display:flex;justify-content:space-between;color:#c0392b;font-weight:700">'
+         + '<span>Locatário deve</span><span>' + brl(a.cobrancas) + '</span></div>';
+    }
+  } else {
+    h += '<div style="display:flex;justify-content:space-between"><span>Caução retida</span><span>' + brl(a.caucao) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;color:#0d7a3e;font-weight:700">'
+       + '<span>A DEVOLVER</span><span>' + brl(a.devolver) + '</span></div>';
+    if (a.saldoDevedor > 0) {
+      h += '<div style="display:flex;justify-content:space-between;color:#c0392b;font-weight:700">'
+         + '<span>A caução não cobriu — ainda deve</span><span>' + brl(a.saldoDevedor) + '</span></div>';
+    }
+  }
+  er.innerHTML = h;
+  er.style.display = 'block';
+}
+
+// Lê os campos do modal no mesmo formato que o _encAcerto espera
+function _encAcertoDosCampos() {
+  function v(id) { var e = document.getElementById(id); return e ? e.value : ''; }
+  return _encAcerto({
+    encLavagem: v('encLavagem'), encAvaria: v('encAvaria'),
+    encOutros: v('encOutros'), caucao: v('encCaucao')
+  });
+}
+
+// Texto com dígito? `mltNum('abc')` devolve 0, e 0 é valor legítimo numa
+// cobrança — sem esta guarda um erro de digitação cobraria R$ 0,00 calado.
+// É a lição da baixa em lote (v94), da franquia (v99) e do recibo (v128).
+function _encValorOk(s) {
+  s = String(s === null || s === undefined ? '' : s).trim();
+  if (!s) return true;              // vazio é legítimo: não houve cobrança
+  return /\d/.test(s) && mltNum(s) >= 0;
+}
+
 function openEncerramento(id) {
   garantirArray('ativos'); garantirArray('veiculos'); 
   _encId = id;
@@ -4852,16 +4968,22 @@ function openEncerramento(id) {
     '<br><span style="color:var(--muted)">Retirada: '+fmt(a.retirada)+' · Dev. prevista: '+fmt(a.devolucao)+'</span>';
   var hoje = new Date().toISOString().split('T')[0];
   var ed = document.getElementById('encData'); if(ed) ed.value=hoje;
-  ['encKm','encDesconto','encObs'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  ['encKm','encDesconto','encObs','encLavagem','encAvaria','encOutros','encOutrosDesc']
+    .forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   var ec = document.getElementById('encCondicao'); if(ec) ec.value='ok';
+  // A caução vem do próprio aluguel, mas fica editável: 96 dos 107 alugéis
+  // não a têm registrada, e nesses o operador precisa informar.
+  var ecc = document.getElementById('encCaucao'); if(ecc) ecc.value = a.caucao||'';
+  // Mesma forma com que o aluguel vinha sendo pago, quando se sabe.
+  var ef = document.getElementById('encForma');
+  if(ef) ef.value = ((a.pagamento||{}).forma) || 'pix';
   // Auto-calcular valor
   var tp = a.tipo||'diaria';
   var ret = a.retirada ? new Date(a.retirada+'T00:00') : new Date();
   var d = Math.max(1, Math.ceil((new Date(hoje+'T00:00')-ret)/86400000));
   var val = tp==='mensal' ? (v.mensal||0)*Math.ceil(d/30) : (v.diaria||0)*d;
   var ev = document.getElementById('encValor'); if(ev) ev.value = val.toLocaleString('pt-BR',{minimumFractionDigits:2});
-  var er = document.getElementById('encResult');
-  if(er){er.textContent=d+'d × R$'+((tp==='mensal'?v.mensal:v.diaria)||0).toLocaleString('pt-BR')+' = R$'+val.toLocaleString('pt-BR',{minimumFractionDigits:2}); er.style.display='block';}
+  _encRenderAcerto();
   openM('mEncerramento');
 }
 function calcEnc() {
@@ -4876,12 +4998,28 @@ function calcEnc() {
   var bruto = tp==='mensal'?(v.mensal||0)*Math.ceil(d/30):(v.diaria||0)*d;
   var final = Math.max(0, bruto-desc);
   var ev = document.getElementById('encValor'); if(ev) ev.value=final.toLocaleString('pt-BR',{minimumFractionDigits:2});
-  var er = document.getElementById('encResult');
-  if(er){er.textContent=d+'d'+(desc?' - desconto R$'+desc.toLocaleString('pt-BR'):'')+' = R$'+final.toLocaleString('pt-BR',{minimumFractionDigits:2});er.style.display='block';}
+  _encRenderAcerto();
 }
 function confirmarEnc() {
   var devDate = (document.getElementById('encData').value||'');
   if (!devDate) { toast('⚠️ Informe a data de devolução','#b45309'); return; }
+  // Valor sem dígito vira 0 no mltNum e passaria calado
+  var _campos = [['encLavagem','Lavagem'],['encAvaria','Avaria'],
+                 ['encOutros','Outros'],['encCaucao','Caução retida']];
+  for (var _i = 0; _i < _campos.length; _i++) {
+    var _el = document.getElementById(_campos[_i][0]);
+    if (_el && !_encValorOk(_el.value)) {
+      toast('⚠️ ' + _campos[_i][1] + ': informe um valor em números','#b45309');
+      return;
+    }
+  }
+  // Cobrança em "Outros" sem dizer do que é não se confere depois
+  var _elOut = document.getElementById('encOutros');
+  var _elOutD = document.getElementById('encOutrosDesc');
+  if (_elOut && mltNum(_elOut.value) > 0 && _elOutD && !String(_elOutD.value||'').trim()) {
+    toast('⚠️ Diga do que se trata a cobrança em "Outros"','#b45309');
+    return;
+  }
   try {
     // Garante arrays (Firebase pode devolver como objeto após exclusões)
     garantirArray('ativos');
@@ -4899,6 +5037,15 @@ function confirmarEnc() {
       valorFinal: 'R$ '+parseFloat(valStr||0).toLocaleString('pt-BR',{minimumFractionDigits:2}),
       condicao: document.getElementById('encCondicao').value,
       obs: document.getElementById('encObs').value,
+      // Cobranças da devolução e a caução confirmada. Só as ENTRADAS
+      // são gravadas: o total e o quanto volta são derivados pelo
+      // _encAcerto, para não haver dois números para a mesma conta.
+      caucao:        document.getElementById('encCaucao').value,
+      encLavagem:    document.getElementById('encLavagem').value,
+      encAvaria:     document.getElementById('encAvaria').value,
+      encOutros:     document.getElementById('encOutros').value,
+      encOutrosDesc: document.getElementById('encOutrosDesc').value,
+      encForma:      document.getElementById('encForma').value,
       encerradoEm: new Date().toISOString()
     }));
     var _npl = function(p){ return String(p||'').toUpperCase().replace(/[^A-Z0-9]/g,''); };
@@ -11259,13 +11406,14 @@ function renderHistorico() {
   }
 
   var p = paginar(list, _pgHist); _pgHist=p.pg;
-  var conds = {ok:'✅ Normal',avaria_leve:'⚠️ Leve',avaria_grave:'🔴 Grave',multa:'🚨 Multa'};
+  var conds = {ok:'✅ Normal',sujo:'🧽 Sujo',avaria_leve:'⚠️ Leve',avaria_grave:'🔴 Grave',multa:'🚨 Multa'};
   var tb = document.getElementById('histTable'); if(!tb) return;
   tb.innerHTML = p.items.length ? p.items.map(function(h){
     return '<tr><td><strong>'+(h.clienteNome||'—')+'</strong></td>'+
       '<td>'+(h.veiculoNome||'—')+'</td><td>'+(h.placa||'—')+'</td>'+
       '<td>'+fmt(h.retirada)+'</td><td>'+fmt(h.devolvido||h.devolucao)+'</td>'+
-      '<td style="font-weight:700;color:var(--green)">'+(h.valorFinal||'—')+'</td>'+
+      '<td style="font-weight:700;color:var(--green)">'+(h.valorFinal||'—')+
+        _encResumoHist(h)+'</td>'+
       '<td>'+(conds[h.condicao]||'—')+'</td></tr>';
   }).join('') : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Nenhum aluguel encerrado com esses filtros.</td></tr>';
   renderPag('histPag', p.pg, p.pages, p.total, 'function(n){_pgHist=n;renderHistorico()}');
