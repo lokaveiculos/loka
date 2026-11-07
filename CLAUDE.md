@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v146-20261104-0940** |
+| `gestao.html` | **v147-20261107-0930** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -7632,3 +7632,196 @@ conserto de id rodou como desenhado (id novo + documento velho apagado).
 - O `USERS_FIXOS` do `login.html` continua com `rogel` / `daniel01` **em texto
   puro num arquivo público** (a regressão de 11/09). Não foi tocado: tirá-lo
   exige o Rogel presente, e a senha deve ser considerada **queimada**.
+
+---
+
+## ✅ Acerto do encerramento: veículo sujo, cobranças e caução a devolver — 07/11/2026 (`96ab56b`) · gestao v147
+
+Pedido: *"no encerramento da locação, na condição na devolução adicionar as
+opções Veículo Sujo e adicionar o campo para adicionarmos a cobrança de
+lavagem, avaria e outros. incluir também a forma de pagamento e o campo valor
+da franquia a devolver."*
+
+### 🔴 Os dados decidiram duas coisas antes de eu escrever uma linha
+
+**1. "Franquia a devolver" já tem nome no sistema: é a CAUÇÃO.** Ela existe no
+próprio aluguel e já é levada ao histórico:
+
+| | com o campo `caucao` |
+|---|---|
+| `ativos` | **11 de 107** (9 com valor > 0) |
+| `historico` | **89 de 102** (79 com valor > 0) |
+| `contratos` | 58 de 153 |
+
+Valores reais: `"500,00"` ×52 · `"750,00"` ×18 · `"0,00"` ×10 · `"1.000,00"` ×6.
+E a **Cláusula 10ª** do contrato diz o que fazer com ela: volta ao locatário
+depois da avaliação física do veículo. Então **o que se devolve é o que sobra
+dela depois das cobranças** — não é um campo novo, é a conta que faltava.
+
+**2. A forma de pagamento já tem vocabulário.** 68 encerramentos gravam
+`pagamento.forma`: **pix (45) · cartao_cred (19) · dinheiro (2) · cartao_deb (2)**.
+O seletor novo usa exatamente essas, mais `transferencia` (que a prorrogação já
+oferece). ⚠️ Inventar nome dividiria o dado em dois valores e os filtros nunca
+mais fechariam — é a armadilha dos nomes de órgão e de oficina.
+
+### 🔴 O que se devolve é DERIVADO, nunca digitado
+```
+caução retida − (lavagem + avaria + outros) = a devolver
+```
+Campo editável de "a devolver" criaria **dois números para a mesma conta**, e um
+ficaria velho. É a regra do saldo do Almoxarifado (v126) e do total do recibo
+(v128). **Só as ENTRADAS são gravadas** (`caucao`, `encLavagem`, `encAvaria`,
+`encOutros`, `encOutrosDesc`, `encForma`); o total e o a-devolver são calculados
+na hora de mostrar. Há teste e defeito injetado exigindo que não sejam gravados.
+
+🔴 **E é UMA função só — `_encAcerto(o)` — lida pelo modal E pelo histórico.**
+Duplicar a conta foi o acidente da **v119**: havia duas `statusReal`, uma
+aprendeu a regra nova e a outra não, e o relatório impresso era o que errava.
+
+### Os dois casos que a tela não pode confundir
+| Situação | O que a tela diz |
+|---|---|
+| cobrança **maior** que a caução | `A DEVOLVER R$ 0,00` **e** *"A caução não cobriu — ainda deve R$ X"* |
+| **sem caução registrada** no aluguel | *"Sem caução registrada neste aluguel"* — nunca `R$ 0,00 a devolver` |
+
+🔴 A segunda importa: zero e ausência são coisas diferentes, e um zero ali faria
+parecer que a caução **já foi devolvida**. É o mesmo padrão da fatura sem
+lançamento (v143) e dos cartões do Contas a Receber (v120–v122): quando o número
+embute algo que o olho não vê, a tela **diz**.
+
+A caixa de resultado mostra a conta inteira, parte por parte:
+```
+Locação                      R$ 7.800,00
+Cobranças na devolução
+   Lavagem                      R$ 80,00
+   Avaria                      R$ 150,00
+   Outros                       R$ 45,50
+   Total cobrado               R$ 275,50
+Caução retida                  R$ 500,00
+A DEVOLVER                     R$ 224,50
+```
+
+### As travas
+| Recusa | Por quê |
+|---|---|
+| valor **sem dígito** (`abc`) em qualquer cobrança ou na caução | `mltNum('abc')` devolve **0**, e 0 é cobrança legítima — passaria calado. Lição da baixa em lote (v94), da franquia (v99) e do recibo (v128) |
+| **negativo** | cobrança não é desconto |
+| cobrança em **"Outros" sem dizer do que é** | ninguém confere depois uma cobrança sem nome |
+
+Campo vazio **não** é erro: é o caso normal (não houve cobrança).
+
+### 🔴 Onde "sujo" teve de ser registrado
+No `<select>` **e** no mapa `conds` do histórico. Sem o segundo, a coluna
+Condição mostraria **"—"** para todo encerramento marcado como sujo — e isso só
+apareceria dias depois de publicado. É a família da armadilha do
+`multasefrotas` e do `normalizarDB`.
+
+⚠️ Conferido antes: `condicao` é lido em **um único lugar** no sistema inteiro
+(`renderHistorico`), e em nenhuma outra página. A opção entra **entre Normal e
+Avaria leve** — gravidade crescente.
+
+### Outros cuidados
+- A caução é **pré-preenchida do aluguel mas fica editável**: 96 dos 107 não a
+  têm registrada, e nesses o operador precisa informar. O que ele confirmar
+  substitui o valor no registro do histórico.
+- A forma vem de `a.pagamento.forma` quando o aluguel tem; senão, PIX.
+- 🔴 **Digitar uma cobrança NÃO recalcula a locação.** O `_encRenderAcerto` só
+  desenha; quem recalcula é o `calcEnc`. Senão, um valor de locação ajustado à
+  mão seria apagado ao digitar a lavagem. Há defeito injetado para isso.
+- A descrição de "Outros" é **escapada** antes de ir ao `innerHTML` do histórico.
+- O resumo aparece na linha do histórico, sob o valor:
+  `cobrado R$ 275,50 · devolvido R$ 224,50 · combustível`.
+
+### O modal passou a rolar — medido, e é o padrão da casa
+Comparado com o arquivo **real da v146** (raw do commit anterior), a 1024×768:
+
+| | conteúdo | rola? |
+|---|---|---|
+| v146 | **441px** | não |
+| **v147**, caixa vazia | **720px** | **sim** |
+| v147, caixa com a conta | 930px | sim |
+
+O teto é `max-height:90vh` = 691px. Então **o custo real é +279px e a rolagem**.
+Medindo **os 28 modais do arquivo publicado** no mesmo viewport, **6 já
+rolavam**: Sinistro 984 · Multa 919 · Aluguel 831 · Veículo 804 · Contrato 738 ·
+Manutenção 733. O encerramento a 720 entra **no meio dessa faixa** — é o padrão
+da casa, e o `overflow-y:auto` existe para isso. Não estoura de lado em nenhuma
+largura (1366 / 1024 / 900 / 420).
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**821/821**; eram 814, +7 dos
+  blocos novos); os dois carimbos batendo
+- **78 testes** com o código real e os dados reais (107 ativos, 102
+  encerramentos): a conta em 13 entradas, **a invariante varrida** (caução =
+  devolver + o que ela cobriu · nunca negativo · nunca os dois positivos ao mesmo
+  tempo), **os 102 encerramentos antigos continuando válidos**, as recusas, o
+  modal, abrir/confirmar, e o resumo do histórico
+- **27 defeitos injetados — todos acusados**, entre eles **o estado antes do
+  pedido** (sem a opção sujo), `sujo` fora do mapa `conds`, devolver negativo,
+  "sem caução" virando zero, o histórico refazendo a conta por conta própria, o
+  render apagando a locação, e a descrição indo crua para o `innerHTML`
+- **No ar, no arquivo publicado, com os dados reais**: encerramento de ponta a
+  ponta no aluguel real da **GM ELETRODIESEL · RENAULT KWID · caução 500,00** —
+  condição sujo, R$ 80 + R$ 150 + R$ 45,50 → **R$ 275,50 cobrado, R$ 224,50 a
+  devolver**, conferido contra a conta feita por fora; os 6 campos gravados, os
+  derivados **ausentes** do registro, e a linha do histórico montada
+- Regressão **medida**: **50 suítes, 2.546 testes**, nenhuma falha
+
+### ⚠️ Dois erros meus de sonda, os dois pegos por medição
+1. **A asserção dos 102 encerramentos dizia 89, e o certo é 79.** Dos 89 que têm
+   o campo `caucao`, **10 valem `"0,00"`** — caução zero não tem o que devolver,
+   então não ganha linha de resumo. O código estava certo; a conta de cabeça é
+   que não.
+2. **O defeito "não arredondar" PASSOU** na primeira rodada: minha sonda era
+   `33,33 × 3`, e em ponto flutuante isso dá **exatamente 99,99**. A sonda nova
+   saiu de uma varredura dos valores realistas de cobrança —
+   `10,05 + 10,15 = 20.200000000000003`. É a lição de 06/11 de novo: **a entrada
+   do teste sai dos dados por código, não de cabeça.**
+
+### 🔴 Duas armadilhas do ambiente, uma delas séria
+**`amb.carregar(DB, …)` faz `ctx.db = DB` — é o MESMO objeto.** Os testes do
+`confirmarEnc` fazem `ctx.db.historico = []`, e isso **esvaziava o `DB` que as
+asserções sobre os dados reais leem**. Dois testes falhavam sem haver defeito. A
+suíte passou a tirar cópia (`HIST_REAL`, `ATIVOS_REAL`, `VEIC_REAL`) **antes** de
+qualquer teste. É o espelho da armadilha de 22/10, em que reatribuir o `db` do
+sandbox *não* trocava o banco que o código via.
+
+🔴 **E a séria, no navegador:** a `multas.html` carrega o SDK do Firebase na
+mesma origem, e o `eval` do script do `gestao.html` roda no **escopo global** —
+então `confirmarEnc` teria gravado **em produção**. Substituí `window.firebase`
+e `saveDB` antes de chamar, e a interceptação provou que as duas gravações
+(`loka_encerrados/<id>` e o `update` do `loka_db`) **foram barradas**.
+
+⚠️ **Mas o stub veio DEPOIS do `eval`**, e o script faz reconciliação na carga
+(`aplicarEncerrados`, `reconciliarStatusVeiculos`), que pode chamar `saveDB`. O
+banco registra uma escrita às **11:48 com `_writerBuild: v147`** que **não
+consigo atribuir com certeza** — ou foi o navegador do Rogel (ele já estava na
+v147), ou foi a minha carga regravando os mesmos dados.
+
+**O que está conferido, e isso é o que importa:** o aluguel que usei continua
+**ativo e intacto** (GM ELETRODIESEL, caução 500,00), a lápide do id de teste
+responde **null**, o histórico tem **0** registros com os campos novos, e as
+contagens não mudaram (107 ativos · 102 encerramentos · 680 multas · 119
+veículos).
+
+🔴 **Regra daqui em diante:** ao avaliar o script de uma página num navegador que
+já tem o Firebase de produção carregado, **trocar `firebase` e `saveDB` ANTES do
+`eval`**, não depois.
+
+### ⚠️ O que NÃO foi feito, de propósito
+- **Nenhum lançamento automático** em Contas a Receber ou a Pagar. Dois motivos
+  medidos: a cobrança é **abatida da caução que a empresa já tem em mãos**, e
+  criar um "a receber" de dinheiro já retido duplicaria o saldo — o erro das
+  renegociadas (v119); e o **Contas a Pagar é uma estrutura de parcelas mensais**
+  (`mesInicial`, `parcelas`, `pagamentos` por mês, 24 registros, todos
+  financiamento), em que uma devolução avulsa de caução não cabe.
+  Só o **excedente** (quando a cobrança passa a caução) seria recebível de
+  verdade. É uma linha de decisão do Rogel, não um esquecimento.
+- **O `valorFinal` não mudou de significado**: continua sendo a locação. As
+  cobranças são acertadas contra a caução, então somá-las ali mudaria o cartão
+  "Valor total" do histórico sem aviso.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Aluguéis Ativos, encerrar uma locação de verdade
+marcando "Veículo sujo", lançar uma lavagem e conferir o valor a devolver.
+Eu não autentico.
