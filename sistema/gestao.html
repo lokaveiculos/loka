@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v149-20261111-1430 -->
+<!-- LOKA deploy: v150-20261111-1545 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1778,7 +1778,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v149-20261111-1430';
+var LOKA_BUILD = 'v150-20261111-1545';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -10209,6 +10209,17 @@ function divUsarAuto(i) {
   divEditPagas(i, String(p.auto));
 }
 
+// 🔴 Arredonda ANTES de formatar. O brl() global so exige o MINIMO de
+// 2 casas (minimumFractionDigits), e sem maximumFractionDigits o
+// toLocaleString deixa passar 3: medido em 11/11/2026, a planilha mostrava
+// 60 valores assim (R$ 1.641,538), porque Encargos = Saldo x CET e Parcela
+// Base = Parcela - Encargos produzem fracao de centavo.
+// ⚠️ Conferido no arquivo publicado da v148: os mesmos 60 -- o defeito e
+// anterior. O brl() global NAO foi tocado (ele serve todas as telas, e
+// mexer nele seria alterar o que nao foi pedido) -- e o mesmo caminho do
+// _fvBRL do painel Faturamento/Veiculo (v110).
+function _divBRL(n){ return brl(Math.round((Number(n) || 0) * 100) / 100); }
+
 function finRenderDivida() {
   var grid = document.getElementById('finGridDivida');
   if (!grid) return;
@@ -10260,10 +10271,10 @@ function finRenderDivida() {
       + '<td style="padding:3px 4px">'+inp(i,'cet','55px','text-align:center')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'sistema','70px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'valorParcela','80px','text-align:right')+'</td>'
-      + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+brl(encargos)+'</td>'
-      + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+brl(base)+'</td>'
-      + '<td style="padding:3px 4px">'+'<span style="color:#0d7a3e;font-weight:600" title="Soma da parcela base das '+pago+' parcela(s) paga(s)">'+brl(amort)+'</span>'+'</td>'
-      + '<td style="padding:3px 4px;text-align:right;font-weight:700;font-family:monospace;color:#c0392b">'+brl(saldo)+'</td>'
+      + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+_divBRL(encargos)+'</td>'
+      + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+_divBRL(base)+'</td>'
+      + '<td style="padding:3px 4px">'+'<span style="color:#0d7a3e;font-weight:600" title="Soma da parcela base das '+pago+' parcela(s) paga(s)">'+_divBRL(amort)+'</span>'+'</td>'
+      + '<td style="padding:3px 4px;text-align:right;font-weight:700;font-family:monospace;color:#c0392b">'+_divBRL(saldo)+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'garantia','110px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'receita','75px','text-align:right')+'</td>'
       + '<td style="padding:3px 4px;text-align:center"><button onclick="finDel(\'divida\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 7px;cursor:pointer;font-weight:700">🗑</button></td>'
@@ -10271,15 +10282,15 @@ function finRenderDivida() {
   });
   html += '</tbody><tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D">'
     + '<td colspan="2" style="padding:8px 6px">TOTAIS ('+rows.length+')</td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+brl(tPrinc)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+_divBRL(tPrinc)+'</td>'
     + '<td colspan="7"></td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+brl(tParcela)+'</td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+brl(tEncargos)+'</td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+brl(tBase)+'</td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+brl(tAmort)+'</td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace;color:#c0392b">'+brl(tSaldo)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+_divBRL(tParcela)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+_divBRL(tEncargos)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+_divBRL(tBase)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace">'+_divBRL(tAmort)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace;color:#c0392b">'+_divBRL(tSaldo)+'</td>'
     + '<td></td>'
-    + '<td style="padding:8px 4px;text-align:right;font-family:monospace;color:#0d7a3e">'+brl(tReceita)+'</td>'
+    + '<td style="padding:8px 4px;text-align:right;font-family:monospace;color:#0d7a3e">'+_divBRL(tReceita)+'</td>'
     + '<td></td></tr></tfoot>';
   html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px"><strong>Parcelas Pagas</strong> é o único campo que você informa aqui — o resto sai dele: · <strong>Já Amortizado</strong> = soma da parte de principal (parcela base) das parcelas já pagas, pela tabela Price · <strong>Saldo Devedor</strong> = Valor Principal − Já Amortizado · Encargos = Saldo × CET · Parcela Base = Parcela − Encargos · ⚠ quando o Contas a Pagar tem outra contagem, ela aparece ao lado para você decidir</div>';
   grid.innerHTML = html;
