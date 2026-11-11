@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v148-20261111-0940 -->
+<!-- LOKA deploy: v149-20261111-1430 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1778,7 +1778,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v148-20261111-0940';
+var LOKA_BUILD = 'v149-20261111-1430';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -10112,27 +10112,123 @@ function divAmortizadoPrincipal(principal, parcela, cetMensal, nPagas){
   return amortAcum;
 }
 
+// ── PARCELAS PAGAS DO FINANCIAMENTO ─────────────────────────
+// 🔴 Quem manda é o que o operador INFORMA; o Contas a Pagar entra como
+// conferência, não como dono do número.
+//
+// Medido em 11/11/2026, nos 19 financiamentos: os 17 que têm contrato
+// vinculado trazem do Contas a Pagar um contador IDÊNTICO ao informado à mão,
+// então inverter a precedência não muda número nenhum hoje (diferença
+// R$ 0,00 no amortizado e no saldo). Os outros 2 são cartão, sem número de
+// contrato — nunca tiveram vínculo, e eram justamente os que não tinham como
+// ser corrigidos.
+//
+// ⚠️ "informado" só manda quando é > 0: num financiamento novo o campo nasce
+// zerado, e mostrar 0 tendo pagamento lançado no Contas a Pagar esconderia
+// informação real. A consequência é que "zero pagas" não se distingue de
+// "não informei" — mas o aviso de divergência deixa o número do Contas a
+// Pagar à vista nesse caso.
+function divPagas(r) {
+  if (!r) return { pagas: 0, informado: 0, auto: 0, divergem: false, limitado: false };
+  var tot = Number(r.totParcelas) || 0;
+  var informado = Math.floor(Number(r.pago) || 0);
+  if (informado < 0) informado = 0;
+  var limitado = false;
+  // não se paga mais parcela do que o contrato tem
+  if (tot > 0 && informado > tot) { informado = tot; limitado = true; }
+  var auto = divPagamentosDoContrato(r.contrato).pagas;
+  return {
+    pagas: informado > 0 ? informado : auto,
+    informado: informado, auto: auto,
+    divergem: auto > 0 && informado > 0 && auto !== informado,
+    limitado: limitado
+  };
+}
+
+// 🔴 O amortizado é a soma da parte de PRINCIPAL das parcelas já pagas — a
+// "parcela base" de cada uma, que na tabela Price muda mês a mês. Conferido:
+// 17 dos 19 valores gravados batem AO CENTAVO com essa conta, e nenhum bate
+// com `parcela base × nº de parcelas`.
+//
+// ⚠️ A leitura literal de "base × nº pagas" é CIRCULAR: a base depende do
+// saldo (parcela − saldo × CET) e o saldo depende do amortizado. Resolvendo,
+// o denominador é (1 − pagas × CET) — com 48 parcelas a 1,48% ele vai a
+// 0,29 e o amortizado explodiria. Por isso a conta é a do cronograma.
+function divAmortizadoDe(r) {
+  if (!r) return 0;
+  return divAmortizadoPrincipal(Number(r.principal) || 0, Number(r.valorParcela) || 0,
+                                Number(r.cet) || 0, divPagas(r).pagas);
+}
+
+// Mantém o campo GRAVADO em sincronia com a conta. Ele não é mais lido para
+// desenhar a tela (a coluna é calculada), mas deixá-lo defasado no banco
+// seria guardar um número errado para quem o ler de fora.
+function _divSincAmortizado(r) {
+  if (!r) return;
+  r.amortizado = Math.round(divAmortizadoDe(r) * 100) / 100;
+}
+
+function divEditPagas(i, valor) {
+  finInit();
+  var rows = (db.financeiro && db.financeiro.divida) || [];
+  var r = rows[i];
+  if (!r) { toast('⚠️ Financiamento não encontrado. Recarregue a página.', '#c0392b'); return; }
+  var txt = String(valor == null ? '' : valor).trim();
+  // 🔴 texto sem dígito viraria 0 calado, e 0 é "nenhuma paga" legítimo —
+  // mesma lição do mltNum('abc') na baixa em lote (v94) e na franquia (v99).
+  if (txt !== '' && !/\d/.test(txt)) {
+    toast('⚠️ Parcelas pagas: informe um número', '#b45309');
+    finRenderDivida(); return;
+  }
+  var n = (txt === '') ? 0 : Math.floor(mltNum(txt));
+  if (n < 0) {
+    toast('⚠️ Parcelas pagas não pode ser negativo', '#b45309');
+    finRenderDivida(); return;
+  }
+  var tot = Number(r.totParcelas) || 0;
+  if (tot > 0 && n > tot) {
+    toast('⚠️ O contrato tem ' + tot + ' parcelas — ajustei para ' + tot, '#b45309');
+    n = tot;
+  }
+  r.pago = n;
+  _divSincAmortizado(r);
+  saveDB();
+  finRenderDivida();
+  var p = divPagas(r);
+  toast('✅ ' + p.pagas + ' de ' + (tot || '?') + ' parcela(s) paga(s) · amortizado '
+        + brl(divAmortizadoDe(r)), '#0d7a3e');
+}
+
+// Adota o contador do Contas a Pagar quando eles divergem.
+function divUsarAuto(i) {
+  finInit();
+  var r = ((db.financeiro && db.financeiro.divida) || [])[i];
+  if (!r) { toast('⚠️ Financiamento não encontrado', '#c0392b'); return; }
+  var p = divPagas(r);
+  if (!p.auto) { toast('⚠️ O Contas a Pagar não tem pagamento lançado para este contrato', '#b45309'); return; }
+  divEditPagas(i, String(p.auto));
+}
+
 function finRenderDivida() {
   var grid = document.getElementById('finGridDivida');
   if (!grid) return;
   var rows = db.financeiro.divida;
   var tPrinc=0, tPago=0, tParcela=0, tEncargos=0, tBase=0, tAmort=0, tSaldo=0, tReceita=0;
   function inp(i,campo,w,extra){ var r=rows[i]; return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'divida\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
-  var cols = ['Banco','Contrato','Valor Principal','Data Liberação','1ª Parcela','Parcela Final','Pago ⚙️','Nº Parcelas','CET','Sist. Amort.','Valor Parcela','Vlr Encargos','Parcela Base','Já Amortizado ⚙️','Saldo Devedor','Garantia','Receita',''];
+  var cols = ['Banco','Contrato','Valor Principal','Data Liberação','1ª Parcela','Parcela Final','Parcelas Pagas','Nº Parcelas','CET','Sist. Amort.','Valor Parcela','Vlr Encargos','Parcela Base','Já Amortizado','Saldo Devedor','Garantia','Receita',''];
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:10px;min-width:1700px">'
     + '<thead><tr>' + cols.map(finTH).join('') + '</tr></thead><tbody>';
   rows.forEach(function(r,i){
     var princ = Number(r.principal)||0;
     var cet = Number(r.cet)||0;
     var parcela = Number(r.valorParcela)||0;
-    // AUTOMÁTICO: puxa as parcelas pagas do Contas a Pagar (casa pelo contrato)
-    var _sinc = divPagamentosDoContrato(r.contrato);
-    var pagoAuto = _sinc.pagas;
-    // Se não há vínculo no Contas a Pagar, usa o valor manual (compatibilidade)
-    var pago = pagoAuto > 0 ? pagoAuto : (Number(r.pago)||0);
-    // Amortizado calculado pela tabela Price (só principal)
-    var amort = pagoAuto > 0 ? divAmortizadoPrincipal(princ, parcela, cet, pago) : (Number(r.amortizado)||0);
-    var saldo = princ - amort;            // O = C - N
+    // Quantas parcelas pagas: o INFORMADO manda, o Contas a Pagar confere
+    var _pg = divPagas(r);
+    var pago = _pg.pagas;
+    // 🔴 O amortizado e SEMPRE calculado da quantidade paga -- nunca o
+    // campo gravado, que congelaria o numero e nao acompanharia a edicao.
+    var amort = divAmortizadoPrincipal(princ, parcela, cet, pago);
+    var saldo = princ - amort;            // valor financiado - ja amortizado
     var encargos = saldo * cet;           // L = O * I
     var base = parcela - encargos;        // M = K - L
     tPrinc+=princ; tPago+=pago; tParcela+=parcela; tEncargos+=encargos;
@@ -10144,14 +10240,29 @@ function finRenderDivida() {
       + '<td style="padding:3px 4px">'+divDataInput(i,'liberacao')+'</td>'
       + '<td style="padding:3px 4px">'+divDataInput(i,'primParcela')+'</td>'
       + '<td style="padding:3px 4px">'+divDataInput(i,'ultParcela')+'</td>'
-      + '<td style="padding:3px 4px">'+'<span style="font-weight:700;color:#2B4BF2" title="Automático do Contas a Pagar">'+pago+'/'+(Number(r.totParcelas)||0)+'</span>'+'</td>'
+      + '<td style="padding:3px 4px;white-space:nowrap">'
+        + '<input type="text" value="'+pago+'" onchange="divEditPagas('+i+',this.value)" '
+        + 'title="Quantas parcelas já foram pagas — o Amortizado e o Saldo saem daqui" '
+        + 'style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:38px;'
+        + 'text-align:center;font-weight:700;color:#2B4BF2">'
+        + '<span style="color:var(--muted)"> /'+(Number(r.totParcelas)||0)+'</span>'
+        // 🔴 Divergencia com o Contas a Pagar e DITA, nao resolvida por
+        // conta propria: so o operador sabe qual dos dois esta certo.
+        + (_pg.divergem
+            ? '<div style="font-size:9px;color:#b45309;margin-top:2px;line-height:1.3">'
+              + '⚠ Contas a Pagar: '+_pg.auto
+              + ' <button type="button" onclick="divUsarAuto('+i+')" '
+              + 'style="border:1px solid #e2e5f0;background:#fff;border-radius:4px;'
+              + 'padding:1px 4px;font-size:9px;cursor:pointer">usar</button></div>'
+            : '')
+        + '</td>'
       + '<td style="padding:3px 4px">'+inp(i,'totParcelas','45px','text-align:center')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'cet','55px','text-align:center')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'sistema','70px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'valorParcela','80px','text-align:right')+'</td>'
       + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+brl(encargos)+'</td>'
       + '<td style="padding:3px 4px;text-align:right;font-family:monospace;color:#666">'+brl(base)+'</td>'
-      + '<td style="padding:3px 4px">'+'<span style="color:#0d7a3e;font-weight:600" title="Calculado (Price)">'+brl(amort)+'</span>'+'</td>'
+      + '<td style="padding:3px 4px">'+'<span style="color:#0d7a3e;font-weight:600" title="Soma da parcela base das '+pago+' parcela(s) paga(s)">'+brl(amort)+'</span>'+'</td>'
       + '<td style="padding:3px 4px;text-align:right;font-weight:700;font-family:monospace;color:#c0392b">'+brl(saldo)+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'garantia','110px')+'</td>'
       + '<td style="padding:3px 4px">'+inp(i,'receita','75px','text-align:right')+'</td>'
@@ -10170,7 +10281,7 @@ function finRenderDivida() {
     + '<td></td>'
     + '<td style="padding:8px 4px;text-align:right;font-family:monospace;color:#0d7a3e">'+brl(tReceita)+'</td>'
     + '<td></td></tr></tfoot>';
-  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">⚙️ Pago e Amortizado são automáticos (sincronizados com o Contas a Pagar) · Encargos = Saldo × CET · Parcela Base = Parcela − Encargos · Saldo Devedor = Principal − Amortizado · Data base 31/01/2026</div>';
+  html += '</table></div><div style="font-size:10px;color:var(--muted);margin-top:6px"><strong>Parcelas Pagas</strong> é o único campo que você informa aqui — o resto sai dele: · <strong>Já Amortizado</strong> = soma da parte de principal (parcela base) das parcelas já pagas, pela tabela Price · <strong>Saldo Devedor</strong> = Valor Principal − Já Amortizado · Encargos = Saldo × CET · Parcela Base = Parcela − Encargos · ⚠ quando o Contas a Pagar tem outra contagem, ela aparece ao lado para você decidir</div>';
   grid.innerHTML = html;
 }
 
@@ -10248,6 +10359,10 @@ function finEdit(aba, idx, campo, valor) {
         _dif > 0 ? 'ajuste na tabela' : 'estorno na tabela');
     }
   }
+  // 🔴 Mexer em principal/parcela/CET/total muda a conta do amortizado.
+  // Sem isto o campo GRAVADO ficaria defasado -- a tela estaria certa (ela
+  // calcula) e o banco guardaria outro numero.
+  if (aba === 'divida') _divSincAmortizado(db.financeiro[aba][idx]);
   saveDB();
   finRender(aba);
   // Mexer no recebido/valor/status na propria tabela tambem e dar baixa.
