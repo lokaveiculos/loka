@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v147-20261107-0930** |
+| `gestao.html` | **v148-20261111-0940** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -7897,3 +7897,282 @@ que cria obrigação nova para quem já tem contrato mensal assinado.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel gerar um contrato por diária e ler a Cláusula 14ª no
 documento impresso.
+
+---
+
+## 🔴 O encerramento calculava pela tabela, não pelo contrato — 11/11/2026 (`a4ac8f8`) · gestao v148
+
+Duas demandas: *"na aba aluguéis encerrados permitir que o ADM/master possa
+editar os valores pois muitas vezes no momento do encerramento do contrato o
+sistema calcula o valor aleatoriamente quando deveria calcular com base no valor
+em que o contrato foi firmado"*, e *"na aba manutenções preciso de um relatório
+da frota constando o km da última manutenção de cada carro"*.
+
+### 🔴 Não era aleatório: era a TABELA DO VEÍCULO
+```js
+// o calculo antigo, no openEncerramento e no calcEnc:
+var v = db.veiculos.find(...);
+var taxa = (a.tipo === 'mensal') ? mltNum(v.mensal) : mltNum(v.diaria);
+```
+O valor vinha do **cadastro do carro**, nunca do contrato. Então todo aluguel com
+valor negociado fechava pelo preço de tabela — e, como a tabela é por carro e o
+contrato não, o número não tinha como ser conferido na tela.
+
+Medido nos 105 aluguéis ativos: **40 mudam de valor** com a correção.
+
+| Placa | Tipo | Contrato | ANTIGO (tabela) | NOVO (contrato) |
+|---|---|---|---|---|
+| RUI8I24 | mensal | 3.350,00 | R$ 22.400,00 | **R$ 23.450,00** |
+| SJA7D13 | diária | 4.500,00 | R$ 5.400,00 | **R$ 4.500,00** |
+
+### 🔴 `a.valor` quer dizer TRÊS coisas — e a troca ingênua estouraria
+| Tipo | O que `a.valor` é |
+|---|---|
+| **mensal** | a **mensalidade** → é a taxa, direto |
+| **diária** | o **TOTAL do período**, não a diária |
+| sem valor | nada → cai na tabela |
+
+⚠️ **Usar `a.valor` como diária daria R$ 4.500/DIA** na SJA7D13 — R$ 135.000 num
+mês. A diária sai **rateada**: `contrato ÷ dias contratados` (retirada →
+devolução prevista), e o teste exige que `taxa × dias contratados` volte a fechar
+com o valor do contrato.
+
+### 🔴 `_placasDoAtivo` NÃO deduplica — a tabela dobrava
+Ela junta `a.placa`, `a.veiculoPlaca`, `a.placaVeiculo` e `a.placas[]`, e **nesta
+base `a.placas[]` já contém `a.placa`**. Medido: **17 dos 105 aluguéis devolvem a
+mesma placa duas vezes.**
+
+Para quem só pergunta *"esta placa está no contrato?"* (`indexOf`) a repetição é
+inofensiva — e é assim que os outros 8 pontos do sistema a usam. Aqui a lista é
+**somada**, e repetida **dobrava a tabela do veículo**. Entrou
+`_encPlacasUnicas`, que normaliza pelo `_normPlacaCmp` do próprio sistema.
+
+⚠️ **`_placasDoAtivo` não foi alterada** — mexer nela atingiria 8 chamadas que
+não foram pedidas. Mas fica registrado: **qualquer código futuro que CONTE ou
+SOME sobre ela precisa deduplicar primeiro.** Há teste exigindo que ela continue
+devolvendo a lista crua.
+
+### 🔴 O multi-veículo: minha primeira versão descartava o contrato
+Eu havia escrito `if (!multi && contrato > 0)`, tratando contrato multi-veículo
+como caso em que a tabela manda. **Medido, era errado nas duas pontas:**
+
+- com a repetição corrigida, os contratos multi-veículo de verdade são **4**, não
+  17 — e **todos têm valor ZERO**, então a guarda era **inerte**;
+- o `confirmarEnc` leva o registro **inteiro** (com as suas placas) para o
+  histórico: o encerramento fecha o **contrato**, não uma placa. Então o valor
+  firmado é a taxa do contrato, e descartá-lo jogaria fora um valor registrado
+  no dia em que houver.
+
+A guarda saiu: **o valor do contrato vale sempre que existir.** O texto da fonte
+diz *"(os N carros do contrato)"* quando é mais de um, senão o número se leria
+como se fosse por carro.
+
+### A tela DIZ de onde vem o número
+`_encFonteTexto` escreve a composição por extenso, e **mostra a tabela ao lado
+quando ela difere do contrato**:
+
+```
+R$ 3.350,00/mês — valor do contrato (tabela do veículo: R$ 3.200,00/mês)
+R$ 150,00/dia — do contrato: R$ 4.500,00 ÷ 30 dia(s) contratado(s)
+R$ 6.600,00/mês — soma da tabela dos 2 veículos (o contrato não registra valor)
+```
+
+Digitando outro valor por cima, a caixa avisa **"valor ajustado à mão (a conta
+daria R$ …)"** em vez de ficar muda. Era exatamente o relato: o operador não
+tinha como saber por que o número era aquele.
+
+🔴 **Sem limite inventado.** Dois registros da **BRJ** (SWH3A72 e SWO4I55) têm
+`a.valor = R$ 43.550,00` numa placa cuja tabela é R$ 3.200 — é o total de um
+contrato de 13 carros gravado em cada registro. Com a correção, a tela
+pré-preenche **R$ 391.950,00** e põe a tabela ao lado, à vista. Antes mostrava
+R$ 28.800 — errado também, mas plausível, e **escondia o registro torto**.
+Escolher um fator a partir do qual "desconfiar" seria número meu; os dois ficam
+confrontados e quem decide é o operador. **Corrigir esses dois registros é
+decisão do Rogel** (já estava em aberto).
+
+### Uma conta só, três leitores
+`_encTaxaLocacao` → `_encLocacao` → `_encFonteTexto`. O `openEncerramento`, o
+`calcEnc` e a caixa de resultado leem **a mesma função**.
+
+⚠️ Duplicar foi o acidente da **v119**: havia duas `statusReal`, uma aprendeu
+sobre `renegociado` e a outra não — e o relatório impresso era o que errava. Há
+teste exigindo que o `calcEnc` não refaça a conta da tabela, e defeito injetado.
+
+---
+
+### Editar e excluir aluguel encerrado (master e admin)
+
+A regra de quem pode mora em **`_ehMasterAdmin`**, e o `_ctPodeEditar` (v124)
+passou a delegar para ela — duas cópias da mesma regra envelhecem em ritmos
+diferentes. A permissão é conferida **ao abrir, ao salvar e ao excluir**:
+esconder botão não é controle de acesso.
+
+#### 🔴 A sugestão do contrato é OFERECIDA, nunca aplicada
+O campo traz o **valor gravado**; ao lado, a caixa mostra o que a conta do
+contrato daria, com um botão **"usar R$ …"**. Medido: **82 dos 106 encerrados**
+têm `valorFinal` diferente do valor do contrato — aplicar sozinho apagaria uma
+negociação real em 82 registros de uma vez.
+
+Quando o gravado já é o do contrato, a caixa confirma (`✓ o valor gravado é
+esse`) e **não oferece botão**.
+
+#### O que a edição preserva e o que ela grava
+| | |
+|---|---|
+| 🔴 `encerradoEm` | **não muda** — ele diz quando a locação foi encerrada, não quando alguém corrigiu o registro |
+| `editadoEm` / `editadoPor` | gravados, pelo `mltIndQuemSou()` que o sistema já tem |
+| as 4 recusas | valor **sem dígito** (`mltNum('abc')` = 0 passaria calado), "Outros" sem descrição, sem data de devolução, e campo vazio **não** é erro |
+| o `valorFinal` | gravado no formato do sistema (`R$ 1.234,56`) — número cru quebraria o `histValorNum` |
+
+As cobranças da devolução (v147) são lidas pela **mesma** `_encAcertoDosCampos`,
+agora parametrizada por tela (`'enc'` | `'ee'`).
+
+#### 🔴 A exclusão mede o estrago antes de perguntar
+O banco não tem lixeira. Medido em 11/11: **45 multas apontam para 11
+encerramentos** (um deles com 30) e **25 encerramentos guardam 39 prorrogações**
+— a 2ª via daqueles termos (v128) morre com o registro.
+
+O `confirm` nomeia as duas coisas, diz que **não há lixeira**, que não pode ser
+desfeito e que a locação **não volta para os ativos**. Há um botão de **cópia em
+JSON** antes de mexer.
+
+| Cuidado | Por quê |
+|---|---|
+| 🔴 reconfere `db.historico[i] === h` antes do `splice` | entre abrir a tela e confirmar, outra aba pode ter mexido na lista — senão excluiria o registro errado |
+| 🔴 a **lápide** em `loka_encerrados` **fica** | é ela que impede a locação de ressuscitar nos ativos (armadilha 5) |
+| o índice vem de `db.historico.indexOf(h)` | a lista é filtrada, invertida e paginada: o índice da página não serve (lição da v103) |
+| a célula de Ações existe mesmo sem permissão | linha mais curta que o cabeçalho é a família de defeito dos colspans (v78/v119/v137) — o colspan do vazio foi para 8 |
+
+---
+
+### Relatório: KM da frota
+
+Botão **🛣️ KM da Frota** na barra do painel Manutenção. O campo `km` já era
+gravado e já aparecia na janela de consulta; faltava o retrato da frota.
+
+#### 🔴 A decisão: 33 carros têm KM, mas não na última manutenção
+Medido nos 119 veículos e 811 manutenções:
+
+| | |
+|---|---|
+| a última manutenção **tem** KM | **75** |
+| a última **não** tem, mas uma anterior tem | **33** |
+| tem manutenção, KM em nenhuma | 4 |
+| sem manutenção nenhuma | 7 |
+
+Deixar os 33 em branco jogaria fora quilometragem que existe; chamar de *"km da
+última manutenção"* um número que veio de outra seria mentir. O relatório mostra
+o **KM mais recente disponível**, a coluna **Medido em** diz quando, e a
+observação **avisa** quando não é o da última — citando a data da última, que não
+registrou KM:
+
+```
+EBL7E41 | VW Saveiro Baú | alugado | 73.206 | 23/09/2026 | preventiva |
+   KM de uma manutenção anterior — a última (13/10/2026) não registrou KM
+```
+
+É o padrão dos cartões do Contas a Receber (v120–v122): quando o número embute
+algo que o olho não vê, a tela **diz**. E a nota *"Como ler"* no pé do documento
+explica a procedência, com **108 de 119** veículos tendo alguma quilometragem.
+
+#### 🔴 O escopo restrito continua restrito
+Perfil com `manutencaoEscopoOficina` / `manutencaoEscopoCliente` vê só as placas
+dele — essas ações **limitam** a visão, e por isso nem entram no curinga "Todas
+as ações" (v89). Um relatório da frota inteira ali burlaria exatamente esse
+limite, então ele é **recusado**, e o botão **não** entra na barra daquele
+perfil.
+
+#### Outros cuidados
+- reusa o **`_mntKM`/`_mntKMValido` do sistema** (v141), sem conta própria
+- KM de **formato impossível não é reformatado** (`81.30100` não vira 8.130.100)
+  e ganha ⚠ — ⚠️ **inerte com os dados de hoje**: o único registro torto
+  (RUP3D82, 21/07) foi superado por um de 84.749, então **nenhum carro** aciona
+  esse ramo. Exercitado na suíte com registro sintético, e isso está dito aqui em
+  vez de contado como se a frota o cobrisse.
+- manutenção **sem data** não é tratada como a mais recente
+- placa casa ignorando hífen e caixa; nome do veículo escapado; pop-up bloqueado
+  avisa; frota vazia não gera documento em branco
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**843/843**; eram 821, +22 do
+  modal de edição); os dois carimbos batendo
+- **104 testes** com o código real e os dados reais (105 aluguéis, 106
+  encerrados, 119 veículos, 811 manutenções, 683 multas): o cálculo nas 3 fontes,
+  o rateio da diária fechando com o contrato, o dedup das placas, a varredura dos
+  105 sem estouro, a composição **desenhada na tela**, a permissão nas três
+  pontas, a sugestão oferecida e não aplicada, os 11 campos gravados, o
+  `encerradoEm` preservado, as 4 recusas, as dependências medidas, o `confirm`
+  recusado, a lista mudando no meio, as 4 situações do KM com a **invariante da
+  partição**, o documento inteiro e o escopo restrito
+- **59 defeitos injetados — todos acusados**, entre eles **o cálculo antigo de
+  volta** (o defeito relatado), a diária usando o total como diária, a tabela
+  somando a placa repetida, o multi descartando o contrato, qualquer perfil
+  editando, a sugestão aplicada sozinha, o `encerradoEm` sobrescrito, excluir sem
+  confirmação, excluir sem reconferir o índice, apagar a lápide, o KM vindo da
+  última sem quilometragem, o KM anterior deixando de ser marcado, e o escopo
+  restrito vendo a frota inteira
+- **No ar, no arquivo publicado, com o banco real** e o `firebase`/`saveDB`
+  substituídos **ANTES do eval**: o script carrega inteiro; os 3 casos de cálculo
+  acima; 17 aluguéis com placa repetida e **0 dobraram a tabela**; 40 de 105
+  mudam de valor, 0 estouros; edição de ponta a ponta no encerrado real da
+  **SIA6F77** (R$ 165,00 pelo contrato, cobranças R$ 275,50, a devolver
+  R$ 224,50, conferido contra a conta feita por fora), `encerradoEm` preservado,
+  as duas recusas; exclusão com o `confirm` nomeando 1 multa, recusado não
+  excluindo, confirmado excluindo **só** o alvo com os vizinhos intactos, e a
+  lista mudando no meio sendo barrada; o relatório de KM com 119 linhas, 833
+  células, 33 avisos e os 4 cartões em 75/33/4/7. **Nada foi gravado em
+  produção** — reconferido: 105 ativos, 106 encerrados, 683 multas,
+  `_writerBuild` ainda `v147`, e o registro que editei em memória segue
+  `R$ 300,00 · ok · sem editadoPor`.
+- Regressão **medida**: **51 suítes, 2.660 testes**, nenhuma falha
+
+### ⚠️ Três tropeços meus, os três pegos por medição
+1. **A sonda do [A6] era "contrato com mais de 3 carros"** — o maior real tem
+   **3**. Sonda chutada; o teste passou a achar o caso **por código**.
+2. **O [A25] era cego.** Ele conferia o *fonte* (`/ajustado/` existe no código) e
+   **absolveu** o defeito que deixa a caixa muda. Entraram o [A26]/[A27], que
+   chamam a função e leem o `innerHTML`.
+3. **Duas âncoras do injetor eram ambíguas** (`_encLocInfo = _encLocacao(a,` em 2
+   lugares, `if (!confirm(msg)) return;` em 3). O injetor ganhou um campo `fn`
+   que recorta a troca **dentro daquela função**, em vez de eu escrever âncora
+   maior à mão.
+
+⚠️ E o **heredoc comeu os escapes mais uma vez** ao tentar consertar a âncora por
+script (`\n` virou quebra de linha de verdade dentro da string do injetor).
+Refeito pela ferramenta de escrita. É a regra já registrada, e ela voltou a ser
+cobrada.
+
+### 🔴 A `t-encerra` (v147) quebrou sem defeito — e o meu conserto nasceu CEGO
+Dois testes dela travavam a **assinatura** das funções:
+`/function _encAcertoDosCampos\(\) \{/` e `/function _encRenderAcerto\(\) \{/`.
+A v148 parametrizou as duas por tela (`'enc'` | `'ee'`), o recorte passou a
+devolver vazio e elas falharam **sem haver defeito** — a armadilha do teste
+estrutural ancorado no vizinho, pela quinta vez em duas semanas.
+
+🔴 **Mas o conserto foi pior:** reescrevi as duas devolvendo **mensagem de erro**
+(`return 'recalcula a locacao'`), como na suíte nova. **O `t()` desta suíte é
+`!!(cond)`** — então string não vazia é **aprovação**, e os dois testes passaram
+a absolver o próprio defeito que vigiam. Só descobri injetando os defeitos de
+propósito; antes disso a suíte dizia **78 ok**.
+
+⚠️ **Regra:** antes de reescrever asserção em suíte antiga, conferir o `t()`
+daquela suíte. As deste projeto não são iguais — umas exigem `=== true` e
+imprimem a mensagem, outras avaliam `!!(cond)`.
+
+E o sinal do [9d] também tinha mudado de nome: ele procurava `encValor`, que na
+v148 virou `pre + 'Valor'`. O teste passou a aceitar os dois — o que ele promete
+é que o render **leia o valor da tela**, não o nome do id. Provado com 4 defeitos
+injetados, todos acusados.
+
+### ⏳ Não verificado · e decisões para o Rogel
+Falta **logado**: encerrar uma locação e ver a composição do valor; abrir o ✏️ de
+um encerrado e conferir a sugestão do contrato; gerar o **KM da Frota**. Eu não
+autentico.
+
+🔴 **Dois registros da BRJ com `a.valor = R$ 43.550,00`** (SWH3A72, SWO4I55): é o
+total do contrato de 13 carros gravado em cada placa. Agora isso aparece na tela
+em vez de ficar escondido — e enquanto não for corrigido, encerrar um deles
+pré-preenche R$ 391.950,00.
+
+🔴 **A manutenção da RUP3D82 (21/07) com `km = "81.30100"`** segue lá, agora
+também visível no relatório da frota.
