@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v150-20261111-1545 -->
+<!-- LOKA deploy: v151-20261111-1710 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1778,7 +1778,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v150-20261111-1545';
+var LOKA_BUILD = 'v151-20261111-1710';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -10195,8 +10195,10 @@ function divEditPagas(i, valor) {
   saveDB();
   finRenderDivida();
   var p = divPagas(r);
+  // ⚠️ _divBRL, nao brl: o aviso tambem e dinheiro na tela, e o brl()
+  // global deixa passar 3 casas decimais (ver o _divBRL abaixo).
   toast('✅ ' + p.pagas + ' de ' + (tot || '?') + ' parcela(s) paga(s) · amortizado '
-        + brl(divAmortizadoDe(r)), '#0d7a3e');
+        + _divBRL(divAmortizadoDe(r)), '#0d7a3e');
 }
 
 // Adota o contador do Contas a Pagar quando eles divergem.
@@ -10263,8 +10265,14 @@ function finRenderDivida() {
             ? '<div style="font-size:9px;color:#b45309;margin-top:2px;line-height:1.3">'
               + '⚠ Contas a Pagar: '+_pg.auto
               + ' <button type="button" onclick="divUsarAuto('+i+')" '
+              // 🔴 o rotulo sozinho nao diz o que se perde. Medido em
+              // 11/11/2026: em 17 dos 19 o informado esta CERTO e o Contas a
+              // Pagar e que esta 6 meses atras nas baixas -- clicar aqui
+              // desfaria a atualizacao. O titulo diz isso antes do clique.
+              + 'title="Troca as '+_pg.informado+' parcela(s) que você informou pelas '
+              + _pg.auto+' que o Contas a Pagar tem baixadas" '
               + 'style="border:1px solid #e2e5f0;background:#fff;border-radius:4px;'
-              + 'padding:1px 4px;font-size:9px;cursor:pointer">usar</button></div>'
+              + 'padding:1px 4px;font-size:9px;cursor:pointer">usar as '+_pg.auto+'</button></div>'
             : '')
         + '</td>'
       + '<td style="padding:3px 4px">'+inp(i,'totParcelas','45px','text-align:center')+'</td>'
