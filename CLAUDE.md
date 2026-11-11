@@ -57,7 +57,7 @@ DNS via Cloudflare.
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
 | `contrato-mensal.html` | **mensal-v6-20261029-1420** |
-| `contrato-diaria.html` | **diaria-v6-20261029-1545** |
+| `contrato-diaria.html` | **diaria-v7-20261109-0930** |
 
 ## Modelo de dados — `loka_db`
 
@@ -7825,3 +7825,75 @@ já tem o Firebase de produção carregado, **trocar `firebase` e `saveDB` ANTES
 Falta **logado**: o Rogel abrir Aluguéis Ativos, encerrar uma locação de verdade
 marcando "Veículo sujo", lançar uma lavagem e conferir o valor a devolver.
 Eu não autentico.
+
+---
+
+## ✅ Taxa de lavagem simples: R$ 40,00 → R$ 50,00 — 09/11/2026 (`ab2c5a1`) · diária v7
+
+Pedido: *"alterar o valor da taxa de lavagem simples que consta nos contratos
+por diária e mensal para R$ 50,00."*
+
+### 🔴 A tarifa existe SÓ na diária — e isso muda o pedido
+| | Cláusula "Demais Custos" | tem lavagem? |
+|---|---|---|
+| **diária** | **14ª** | ✅ *"Caso o veículo seja devolvido sujo, será cobrada tarifa de lavagem simples de **R$ 40,00** ou R$ 150,00 para lavagem severa."* |
+| **mensal** | **12ª** | 🔴 **não** — manutenção preventiva por conta do LOCADOR, 01 jogo de pneus a cada 40.000 km, e avarias por mau uso |
+
+As duas cláusulas têm o **mesmo nome** e conteúdo completamente diferente. A
+palavra "lavagem" **não aparece** no contrato mensal — nem na Cláusula 10ª dele,
+que (ao contrário da diária) não tem a frase do veículo devolvido sujo. Isso já
+estava registrado em 20/10.
+
+🔴 **Acrescentar a tarifa ao mensal seria CRIAR cobrança contratual nova**, não
+"alterar um valor". Vale para todo locatário mensal e tem peso jurídico — por
+isso **não foi feito por conta própria** — fica como decisão dele.
+
+### Conferido antes de trocar
+`R$ 40,00` existia em **um lugar no sistema inteiro**. As outras citações de
+"lavagem" são:
+
+| Onde | O quê |
+|---|---|
+| `gestao.html` | o campo `encLavagem` do acerto de encerramento (v147) — **sem valor fixo** |
+| `recibo.html` | *"Lavagem / limpeza"* na lista de origens — **rótulo** |
+
+Nada a mudar nelas.
+
+⚠️ A **lavagem severa (R$ 150,00) não foi tocada**: o pedido falou de lavagem
+simples. Há teste e defeito injetado para quem trocar as duas juntas.
+
+### ⚠️ A armadilha dos dígitos: `40,00` × `40.000 km`
+A Cláusula 12ª do **mensal** garante *"01 jogo de pneus a cada **40.000 km**"* —
+os mesmos dígitos da tarifa, com outro separador. **Um `sed` cego em "40" teria
+mexido na franquia de pneus de todos os contratos mensais.** Há teste exigindo
+que os 40.000 km continuem lá, e defeito injetado que os troca por 50.000.
+
+### Validado
+- `node --check`; `<div>` balanceadas (**48/48**, como no registro da v124); os
+  **três** carimbos da diária batendo
+- 🔴 **O arquivo tem exatamente o mesmo tamanho de antes** (`len == len`):
+  `R$ 40,00` e `R$ 50,00` têm o mesmo número de caracteres, então **nada além
+  da troca mudou** — e o A4 não pode ter mudado, sem precisar medir
+- **112 testes** na suíte das cláusulas (eram 102): o valor novo, nenhum
+  `R$ 40,00` sobrando, a severa intacta, o gatilho "devolvido sujo", a tarifa
+  uma vez só, a Cláusula 10ª da diária intacta, e **as invariantes do mensal**
+  (sem lavagem, Cláusula 12ª inteira, pneus em 40.000 km)
+- **12 defeitos injetados — todos acusados**: o estado antes do pedido, a severa
+  trocada junto, zero a mais e zero a menos no valor, a cláusula sumindo, o
+  gatilho sumindo, a tarifa em dobro, a Cláusula 10ª atropelada, **a tarifa
+  inventada no mensal**, o sed cego nos pneus, e os carimbos desencontrados
+- Regressão **medida**: **50 suítes, 2.556 testes**, nenhuma falha
+
+⚠️ **O injetor das cláusulas tinha se perdido** com a limpeza do scratchpad
+entre sessões (o registro de 29/10 fala de 56 defeitos, e o arquivo não existia
+mais). Refeito, agora com 12 — os antigos cobriam as Cláusulas 7ª/8ª/10ª/11ª e
+teriam de ser reescritos para voltar ao número de lá.
+
+### ⏳ Pendente de decisão do Rogel
+**O contrato mensal deve passar a cobrar lavagem?** Hoje não cobra. Se ele
+quiser, é acrescentar à Cláusula 12ª a mesma frase da diária — uma linha, mas
+que cria obrigação nova para quem já tem contrato mensal assinado.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel gerar um contrato por diária e ler a Cláusula 14ª no
+documento impresso.
