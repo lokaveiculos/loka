@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v147-20261107-0930 -->
+<!-- LOKA deploy: v148-20261111-0940 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -551,6 +551,7 @@ tr:hover td{background:#f8f9fe;}
         <button class="btn btn-outline" id="btnImportManut" onclick="abrirImportarManutencao()" style="white-space:nowrap">📥 Importar</button>
         <button class="btn btn-outline" id="btnFormOficina" onclick="window.open('manutencao-oficina.html','_blank')" style="white-space:nowrap" title="Formulário para enviar às oficinas">📋 Form. Oficina</button>
         <button class="btn" id="btnRelManut" style="background:#0d7a3e;color:#fff;white-space:nowrap" onclick="relatorioManutencao()" title="Gerar relatório por placa para imprimir ou salvar em PDF">📄 Relatório PDF</button>
+        <button class="btn btn-outline" id="btnRelKmFrota" style="white-space:nowrap" onclick="relatorioKmFrota()" title="KM da última manutenção de cada carro da frota">🛣️ KM da Frota</button>
       </div>
 
       <!-- Resumo -->
@@ -1100,7 +1101,7 @@ tr:hover td{background:#f8f9fe;}
       <div class="table-card">
         <div class="table-head"><h3>Aluguéis Encerrados</h3><span id="histCount"></span></div>
         <div class="table-scroll"><table><thead><tr>
-          <th>Cliente</th><th>Veículo</th><th>Placa</th><th>Retirada</th><th>Devolvido</th><th>Valor</th><th>Condição</th>
+          <th>Cliente</th><th>Veículo</th><th>Placa</th><th>Retirada</th><th>Devolvido</th><th>Valor</th><th>Condição</th><th style="width:80px">Ações</th>
         </tr></thead><tbody id="histTable"></tbody></table></div>
         <div id="histPag"></div>
       </div>
@@ -1620,6 +1621,38 @@ tr:hover td{background:#f8f9fe;}
   </div>
 </div></div>
 
+<!-- MODAL: EDITAR ALUGUEL ENCERRADO (master/admin) -->
+<div class="modal-bg" id="mEditarEncerrado"><div class="modal" style="max-width:520px">
+  <div class="modal-head" style="background:#0E1B4D"><h3>✏️ Editar Encerramento</h3><button class="modal-close" onclick="closeM('mEditarEncerrado')">✕</button></div>
+  <div class="modal-body">
+    <div id="eeInfo" style="background:#EEF1FD;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px"></div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Data Devolução *</label><input class="fi" id="eeData" type="date" onchange="_eeRenderSugestao()"></div>
+      <div class="fg"><label class="fl">KM Devolução</label><input class="fi" id="eeKm" type="number" placeholder="000000"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Valor da Locação (R$)</label><input class="fi" id="eeValor" placeholder="0,00" oninput="_eeRenderSugestao();_encRenderAcerto('ee')"></div>
+      <div class="fg" style="grid-column:1/-1">
+        <div id="eeSugestao" style="background:#fff8e1;border-radius:8px;padding:9px 11px;font-size:11px;line-height:1.5"></div>
+      </div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Condição na Devolução</label><select class="fs" id="eeCondicao"><option value="ok">✅ Normal</option><option value="sujo">🧽 Veículo sujo</option><option value="avaria_leve">⚠️ Avaria leve</option><option value="avaria_grave">🔴 Avaria grave</option><option value="multa">🚨 Multa de trânsito</option></select></div>
+      <div class="sec-label" style="grid-column:1/-1">Cobranças na devolução</div>
+      <div class="fg"><label class="fl">Lavagem (R$)</label><input class="fi" id="eeLavagem" placeholder="0,00" oninput="_encRenderAcerto('ee')"></div>
+      <div class="fg"><label class="fl">Avaria (R$)</label><input class="fi" id="eeAvaria" placeholder="0,00" oninput="_encRenderAcerto('ee')"></div>
+      <div class="fg"><label class="fl">Outros (R$)</label><input class="fi" id="eeOutros" placeholder="0,00" oninput="_encRenderAcerto('ee')"></div>
+      <div class="fg"><label class="fl">Do que se trata &quot;Outros&quot;</label><input class="fi" id="eeOutrosDesc" placeholder="Ex: combustível, pedágio..."></div>
+      <div class="fg"><label class="fl">Caução retida (R$)</label><input class="fi" id="eeCaucao" placeholder="0,00" oninput="_encRenderAcerto('ee')"></div>
+      <div class="fg"><label class="fl">Forma de Pagamento</label><select class="fs" id="eeForma"><option value="pix">PIX</option><option value="transferencia">Transferência</option><option value="dinheiro">Dinheiro</option><option value="cartao_deb">Cartão Débito</option><option value="cartao_cred">Cartão Crédito</option></select></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Observações</label><input class="fi" id="eeObs" placeholder="Observações..."></div>
+    </div>
+    <div id="eeResult" style="display:none;margin-top:12px;background:#EEF1FD;border-radius:8px;padding:12px;font-size:12px"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mEditarEncerrado')">Cancelar</button>
+    <button class="btn btn-outline" style="font-size:11px" onclick="_eeBaixarCopia(_eeIdx)" title="Baixa uma cópia em JSON antes de mexer — o banco não tem lixeira">💾 Cópia</button>
+    <button class="btn btn-outline" style="color:var(--red)" onclick="excluirEncerrado(_eeIdx)">🗑️ Excluir</button>
+    <button class="btn btn-blue" style="flex:1" onclick="salvarEncerrado()">Salvar alterações</button>
+  </div>
+</div></div>
+
 <!-- MODAL: CONTRATO COM PRÉ-REGISTRO -->
 <div class="modal-bg" id="mContrato"><div class="modal" style="max-width:520px">
   <div class="modal-head"><h3>📄 Gerar Contrato</h3><button class="modal-close" onclick="closeM('mContrato')">✕</button></div>
@@ -1745,7 +1778,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v147-20261107-0930';
+var LOKA_BUILD = 'v148-20261111-0940';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4848,6 +4881,144 @@ function abrirReciboPagamento(comCliente) {
   window.open('recibo.html', '_blank');
 }
 
+// ── VALOR DA LOCAÇÃO NO ENCERRAMENTO ─────────────────────────
+// 🔴 O cálculo antigo usava a TABELA do veículo (v.diaria / v.mensal) e
+// ignorava o valor em que o contrato foi firmado. Medido em 11/11/2026 nos 96
+// aluguéis com valor: 33 divergiam. A BRJ EXPRESSO tem contrato de R$ 3.350 e
+// tabela de R$ 3.200 — o encerramento fechava pelo número da tabela sem dizer
+// de onde ele vinha, e era isso que parecia "aleatório".
+//
+// 🔴 Mas `a.valor` NÃO significa a mesma coisa nos dois tipos, e isso foi
+// medido antes de escrever uma linha:
+//   mensal, 1 carro → é a MENSALIDADE. 63 dos 89 batem com a tabela; os
+//                     outros 26 são preço negociado, e aí o contrato manda.
+//   diária          → é o TOTAL do período contratado, NÃO a diária.
+//                     R$ 4.500,00 em 30 dias = R$ 150,00/dia. Multiplicar
+//                     `a.valor` por dias daria R$ 135.000,00.
+//   multi-veículo   → vem ZERO nos 4 contratos; só a soma das tabelas serve.
+//
+// Por isso devolve também a FONTE: a caixa de resultado diz de onde saiu a
+// taxa, e o operador enxerga na hora quando o número não faz sentido. É o
+// padrão dos cartões do Contas a Receber (v120–v122) — quando o total embute
+// algo que o olho não vê, a tela diz.
+// 🔴 _placasDoAtivo NAO deduplica: ela junta a.placa, a.veiculoPlaca,
+// a.placaVeiculo e a.placas[], e nesta base a.placas[] JA contem a.placa.
+// Medido em 11/11/2026: 17 dos 105 alugueis devolvem a mesma placa duas
+// vezes. Para quem so pergunta "esta placa esta no contrato?" (indexOf) a
+// repeticao e inofensiva, e e assim que o resto do sistema a usa. Aqui a
+// lista e SOMADA, e repetida dobraria a tabela do veiculo.
+function _encPlacasUnicas(a) {
+  var visto = {}, out = [];
+  _placasDoAtivo(a).forEach(function (p) {
+    var k = _normPlacaCmp(p);          // o comparador do proprio sistema
+    if (k && !visto[k]) { visto[k] = 1; out.push(k); }
+  });
+  return out;
+}
+
+function _encTaxaLocacao(a) {
+  a = a || {};
+  var tp = (a.tipo === 'mensal') ? 'mensal' : 'diaria';
+  var ps = _encPlacasUnicas(a);
+  var multi = ps.length > 1;
+  var contrato = mltNum(a.valor);
+
+  // dias CONTRATADOS (retirada → devolução prevista), que é o divisor da diária
+  var diasCt = 0;
+  if (a.retirada && a.devolucao) {
+    diasCt = Math.max(1, Math.ceil(
+      (new Date(a.devolucao + 'T00:00') - new Date(a.retirada + 'T00:00')) / 86400000));
+  }
+
+  // tabela: do veículo; num contrato multi-veículo, a SOMA dos carros
+  var tabela = 0;
+  if (ps.length) {
+    ps.forEach(function (p) {
+      var vv = (db.veiculos || []).filter(function (x) {
+        return x && _normPlacaCmp(x.placa) === p;   // p ja vem normalizado
+      })[0] || {};
+      tabela += (tp === 'mensal') ? mltNum(vv.mensal) : mltNum(vv.diaria);
+    });
+  } else {
+    var v1 = (db.veiculos || []).filter(function (x) { return x && x.id === a.veiculoId; })[0] || {};
+    tabela = (tp === 'mensal') ? mltNum(v1.mensal) : mltNum(v1.diaria);
+  }
+  tabela = Math.round(tabela * 100) / 100;
+
+  // 🔴 O valor do contrato vale MULTI-VEICULO INCLUSIVE. O encerramento
+  // fecha o CONTRATO inteiro (o confirmarEnc leva o registro todo para o
+  // historico, com as suas placas), entao o valor firmado e a taxa do
+  // contrato, nao de um carro. Medido: os 4 contratos multi-veiculo reais
+  // tem valor ZERO, ou seja, excluir o multi aqui seria inerte hoje -- e
+  // jogaria fora um valor registrado no dia em que houver.
+  if (tp === 'mensal') {
+    if (contrato > 0) {
+      return { tipo: tp, taxa: contrato, fonte: 'contrato', tabela: tabela,
+               qtdCarros: ps.length };
+    }
+    return { tipo: tp, taxa: tabela, tabela: tabela, qtdCarros: ps.length,
+             fonte: multi ? 'tabela_multi' : 'tabela' };
+  }
+  // diária: o valor do contrato é o TOTAL — a diária sai dele, rateada
+  if (contrato > 0 && diasCt > 0) {
+    return { tipo: tp, taxa: Math.round((contrato / diasCt) * 100) / 100,
+             fonte: 'contrato_rateado', tabela: tabela, qtdCarros: ps.length,
+             totalCt: contrato, diasCt: diasCt };
+  }
+  return { tipo: tp, taxa: tabela, tabela: tabela, qtdCarros: ps.length,
+           fonte: multi ? 'tabela_multi' : 'tabela' };
+}
+
+// A conta inteira da locação. UMA função, lida pelo openEncerramento, pelo
+// calcEnc e pela caixa de resultado — duplicar foi o acidente da v119.
+function _encLocacao(a, devDate, desconto) {
+  var t = _encTaxaLocacao(a);
+  var ret = (a && a.retirada) ? new Date(a.retirada + 'T00:00') : null;
+  var dev = devDate ? new Date(devDate + 'T00:00') : null;
+  var dias = (ret && dev) ? Math.max(1, Math.ceil((dev - ret) / 86400000)) : 0;
+  var periodos = (t.tipo === 'mensal') ? Math.max(1, Math.ceil(dias / 30)) : dias;
+  var bruto = Math.round(t.taxa * periodos * 100) / 100;
+  var desc = mltNum(desconto);
+  return {
+    tipo: t.tipo, taxa: t.taxa, fonte: t.fonte, tabela: t.tabela,
+    totalCt: t.totalCt, diasCt: t.diasCt, qtdCarros: t.qtdCarros,
+    dias: dias, periodos: periodos,
+    bruto: bruto, desconto: desc,
+    final: Math.max(0, Math.round((bruto - desc) * 100) / 100)
+  };
+}
+
+// De onde veio a taxa, por extenso. 🔴 Sem isso o operador volta a não saber
+// por que o número é aquele — que é exatamente o relato que originou a v148.
+function _encFonteTexto(L) {
+  if (!L) return '';
+  var un = (L.tipo === 'mensal') ? '/mês' : '/dia';
+  if (L.fonte === 'contrato') {
+    // 🔴 Mostra a tabela AO LADO quando diferem. Medido: dos 105
+    // aluguéis, 2 têm contrato 13,6× a tabela (R$ 43.550 contra R$ 3.200 —
+    // é o total de um contrato de 13 carros gravado em cada placa). Sem o
+    // confronto o operador aceitaria o número sem ter como desconfiar.
+    // Sem limite inventado: os dois ficam à vista e ele compara.
+    return brl(L.taxa) + un + ' — <strong>valor do contrato</strong>'
+         // 🔴 Num contrato de mais de um carro o valor cobre TODOS: o
+         // encerramento fecha o contrato inteiro. Sem dizer isso, o numero se
+         // le como se fosse por carro.
+         + ((L.qtdCarros > 1) ? ' <em>(os ' + L.qtdCarros + ' carros do contrato)</em>' : '')
+         + ((L.tabela && Math.abs(L.tabela - L.taxa) > 0.005)
+             ? ' <em>(tabela do veículo' + (L.qtdCarros > 1 ? 's' : '') + ': '
+               + brl(L.tabela) + un + ')</em>' : '');
+  }
+  if (L.fonte === 'contrato_rateado') {
+    return brl(L.taxa) + un + ' — <strong>do contrato</strong>: ' + brl(L.totalCt)
+         + ' ÷ ' + L.diasCt + ' dia(s) contratado(s)';
+  }
+  if (L.fonte === 'tabela_multi') {
+    return brl(L.taxa) + un + ' — soma da tabela dos ' + (L.qtdCarros || 0)
+         + ' veículos <em>(o contrato não registra valor)</em>';
+  }
+  return brl(L.taxa) + un + ' — <em>tabela do veículo: o contrato não registra valor</em>';
+}
+
 // ── ACERTO DO ENCERRAMENTO ───────────────────────────────────
 // Cobranças de devolução (lavagem, avaria, outros) e a caução a devolver.
 //
@@ -4875,6 +5046,10 @@ function _encResumoHist(h) {
        + (t ? ' · ' + _mltEsc(t) : '') + '</div>';
 }
 
+// Guarda a ultima conta da locacao, para a caixa dizer de onde veio o
+// numero. Se o operador digitar outro valor, a caixa avisa que foi a mao.
+var _encLocInfo = null;
+
 function _encAcerto(o) {
   o = o || {};
   var lav = mltNum(o.encLavagem), ava = mltNum(o.encAvaria), out = mltNum(o.encOutros);
@@ -4901,13 +5076,28 @@ var ENC_FORMAS = {
 // Desenha a caixa de resultado: locação + acerto. Não recalcula a locação —
 // quem faz isso é o calcEnc. Assim digitar uma cobrança não apaga um valor
 // de locação que o operador tenha ajustado à mão.
-function _encRenderAcerto() {
-  var er = document.getElementById('encResult');
+// `pre` diz de qual tela sao os campos: 'enc' (encerrar) ou 'ee' (editar
+// encerrado). UMA funcao para as duas — duplicar foi o acidente da v119.
+function _encRenderAcerto(pre) {
+  pre = pre || 'enc';
+  var er = document.getElementById(pre + 'Result');
   if (!er) return;
-  var a = _encAcertoDosCampos();
-  var loc = mltNum((document.getElementById('encValor') || {}).value);
+  var a = _encAcertoDosCampos(pre);
+  var loc = mltNum((document.getElementById(pre + 'Valor') || {}).value);
   var h = '<div style="display:flex;justify-content:space-between"><span>Locação</span>'
         + '<strong>' + brl(loc) + '</strong></div>';
+  // 🔴 De onde saiu o numero. Se o operador digitou outro valor, a
+  // composicao deixa de descreve-lo — e a caixa diz isso em vez de mentir.
+  if (pre === 'enc' && _encLocInfo) {
+    var _bate = Math.abs(loc - _encLocInfo.final) < 0.005;
+    h += '<div style="font-size:10px;color:var(--muted);margin-top:-2px">'
+       + (_bate
+           ? (_encFonteTexto(_encLocInfo) + ' × ' + _encLocInfo.periodos + ' '
+              + (_encLocInfo.tipo === 'mensal' ? 'mês(es)' : 'diária(s)')
+              + (_encLocInfo.desconto ? ' − ' + brl(_encLocInfo.desconto) + ' de desconto' : ''))
+           : 'valor ajustado à mão (a conta daria ' + brl(_encLocInfo.final) + ')')
+       + '</div>';
+  }
 
   if (a.cobrancas > 0) {
     h += '<div style="border-top:1px solid #c7d0f0;margin:6px 0 4px;padding-top:4px;font-weight:700">Cobranças na devolução</div>';
@@ -4940,11 +5130,12 @@ function _encRenderAcerto() {
 }
 
 // Lê os campos do modal no mesmo formato que o _encAcerto espera
-function _encAcertoDosCampos() {
-  function v(id) { var e = document.getElementById(id); return e ? e.value : ''; }
+function _encAcertoDosCampos(pre) {
+  pre = pre || 'enc';
+  function v(id) { var e = document.getElementById(pre + id); return e ? e.value : ''; }
   return _encAcerto({
-    encLavagem: v('encLavagem'), encAvaria: v('encAvaria'),
-    encOutros: v('encOutros'), caucao: v('encCaucao')
+    encLavagem: v('Lavagem'), encAvaria: v('Avaria'),
+    encOutros: v('Outros'), caucao: v('Caucao')
   });
 }
 
@@ -4977,27 +5168,21 @@ function openEncerramento(id) {
   // Mesma forma com que o aluguel vinha sendo pago, quando se sabe.
   var ef = document.getElementById('encForma');
   if(ef) ef.value = ((a.pagamento||{}).forma) || 'pix';
-  // Auto-calcular valor
-  var tp = a.tipo||'diaria';
-  var ret = a.retirada ? new Date(a.retirada+'T00:00') : new Date();
-  var d = Math.max(1, Math.ceil((new Date(hoje+'T00:00')-ret)/86400000));
-  var val = tp==='mensal' ? (v.mensal||0)*Math.ceil(d/30) : (v.diaria||0)*d;
-  var ev = document.getElementById('encValor'); if(ev) ev.value = val.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  // Valor pelo CONTRATO (ver _encTaxaLocacao), nao pela tabela do veiculo
+  _encLocInfo = _encLocacao(a, hoje, 0);
+  var ev = document.getElementById('encValor');
+  if (ev) ev.value = _encLocInfo.final.toLocaleString('pt-BR', {minimumFractionDigits: 2});
   _encRenderAcerto();
   openM('mEncerramento');
 }
 function calcEnc() {
   var a = db.ativos.find(function(x){return x.id===_encId;});
   if (!a) return;
-  var v = db.veiculos.find(function(x){return x.id===a.veiculoId;})||{};
   var devDate = (document.getElementById('encData').value||'');
-  var desc = parseFloat(((document.getElementById('encDesconto').value||'0').replace(/\./g,'').replace(',','.'))) || 0;
-  if (!devDate||!a.retirada) return;
-  var d = Math.max(1, Math.ceil((new Date(devDate+'T00:00')-new Date(a.retirada+'T00:00'))/86400000));
-  var tp = a.tipo||'diaria';
-  var bruto = tp==='mensal'?(v.mensal||0)*Math.ceil(d/30):(v.diaria||0)*d;
-  var final = Math.max(0, bruto-desc);
-  var ev = document.getElementById('encValor'); if(ev) ev.value=final.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  if (!devDate || !a.retirada) return;
+  _encLocInfo = _encLocacao(a, devDate, (document.getElementById('encDesconto')||{}).value);
+  var ev = document.getElementById('encValor');
+  if (ev) ev.value = _encLocInfo.final.toLocaleString('pt-BR', {minimumFractionDigits: 2});
   _encRenderAcerto();
 }
 function confirmarEnc() {
@@ -5122,6 +5307,219 @@ function confirmarEnc() {
 }
 
 
+
+// ── EDITAR / EXCLUIR ALUGUEL ENCERRADO (master e admin) ──────
+// 🔴 A regra de quem pode mora em UM lugar. O `_ctPodeEditar` passou a
+// delegar aqui — duas cópias da mesma regra envelhecem em ritmos diferentes,
+// que foi o acidente da v119.
+function _ehMasterAdmin() {
+  var p = _perfilAtual();
+  return p === 'master' || p === 'admin';
+}
+
+var _eeIdx = -1;   // índice REAL em db.historico (não o da página)
+
+// O registro pelo índice real, com as defesas de sempre.
+function _eeReg(i) {
+  garantirArray('historico');
+  var h = (db.historico || [])[i];
+  return (h && typeof h === 'object') ? h : null;
+}
+
+// 🔴 O que a conta do CONTRATO daria para este encerramento. É o que permite
+// consertar os já fechados pelo número errado: medido em 11/11/2026, 82 dos
+// 106 encerrados têm valorFinal diferente do valor do contrato.
+function _eeSugestao(h) {
+  if (!h) return null;
+  var dev = h.devolvido || h.devolucao || '';
+  if (!h.retirada || !dev) return null;
+  return _encLocacao(h, dev, 0);
+}
+
+function editarEncerrado(i) {
+  if (!_ehMasterAdmin()) {
+    toast('⚠️ Só master ou administrador edita aluguel encerrado', '#b45309'); return;
+  }
+  var h = _eeReg(i);
+  if (!h) { toast('⚠️ Registro não encontrado. Recarregue a página.', '#c0392b'); return; }
+  _eeIdx = i;
+
+  var el = document.getElementById('eeInfo');
+  if (el) el.innerHTML = '<strong>' + _condEsc(h.clienteNome || '—') + '</strong> · '
+    + _condEsc(h.veiculoNome || '—') + ' · ' + _condEsc(mltFmtPlaca(h.placa))
+    + '<br><span style="color:var(--muted)">Retirada: ' + fmt(h.retirada)
+    + ' · Encerrado em ' + fmt(h.devolvido || h.devolucao) + '</span>';
+
+  function pv(id, valor) { var e = document.getElementById(id); if (e) e.value = valor; }
+  pv('eeData',      h.devolvido || h.devolucao || '');
+  pv('eeKm',        h.kmDev || '');
+  // o valorFinal e gravado como texto ("R$ 1.234,56"); o campo edita o numero
+  pv('eeValor',     histValorNum(h) ? histValorNum(h).toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '');
+  pv('eeCondicao',  h.condicao || 'ok');
+  pv('eeLavagem',   h.encLavagem || '');
+  pv('eeAvaria',    h.encAvaria || '');
+  pv('eeOutros',    h.encOutros || '');
+  pv('eeOutrosDesc', h.encOutrosDesc || '');
+  pv('eeCaucao',    h.caucao || '');
+  pv('eeForma',     h.encForma || ((h.pagamento || {}).forma) || 'pix');
+  pv('eeObs',       h.obs || '');
+
+  _eeRenderSugestao();
+  _encRenderAcerto('ee');
+  openM('mEditarEncerrado');
+}
+
+// A sugestao do contrato, com o botao de usar. 🔴 Nao preenche sozinho: o
+// valor gravado pode ter sido acertado com o cliente, e sobrescrever por
+// conta propria apagaria uma negociacao real.
+function _eeRenderSugestao() {
+  var box = document.getElementById('eeSugestao');
+  if (!box) return;
+  var h = _eeReg(_eeIdx);
+  var dev = (document.getElementById('eeData') || {}).value || '';
+  var L = h ? _encLocacao(h, dev, 0) : null;
+  if (!L || !L.dias) {
+    box.innerHTML = '<span style="color:var(--muted)">Sem data de retirada ou devolução — '
+      + 'não dá para refazer a conta do contrato.</span>';
+    return;
+  }
+  var atual = mltNum((document.getElementById('eeValor') || {}).value);
+  var bate = Math.abs(atual - L.final) < 0.005;
+  box.innerHTML =
+    '<div><strong>Pelo contrato:</strong> ' + _encFonteTexto(L) + ' × ' + L.periodos + ' '
+    + (L.tipo === 'mensal' ? 'mês(es)' : 'diária(s)') + ' = <strong>' + brl(L.final) + '</strong></div>'
+    + (bate
+        ? '<div style="color:var(--green);font-size:10px">✓ o valor gravado é esse</div>'
+        : '<div style="margin-top:4px"><button type="button" class="btn btn-outline" '
+          + 'style="font-size:10px;padding:3px 8px" onclick="_eeUsarSugestao()">'
+          + 'usar ' + brl(L.final) + '</button>'
+          + '<span style="font-size:10px;color:var(--muted)"> &nbsp;o gravado é ' + brl(atual) + '</span></div>');
+}
+
+function _eeUsarSugestao() {
+  var h = _eeReg(_eeIdx);
+  var dev = (document.getElementById('eeData') || {}).value || '';
+  var L = h ? _encLocacao(h, dev, 0) : null;
+  if (!L) return;
+  var e = document.getElementById('eeValor');
+  if (e) e.value = L.final.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+  _eeRenderSugestao();
+  _encRenderAcerto('ee');
+}
+
+function salvarEncerrado() {
+  if (!_ehMasterAdmin()) {
+    toast('⚠️ Só master ou administrador edita aluguel encerrado', '#b45309'); return;
+  }
+  var h = _eeReg(_eeIdx);
+  if (!h) { toast('⚠️ Registro não encontrado. Recarregue a página.', '#c0392b'); return; }
+
+  function val(id) { var e = document.getElementById(id); return e ? e.value : ''; }
+  var dev = val('eeData');
+  if (!dev) { toast('⚠️ Informe a data de devolução', '#b45309'); return; }
+
+  // Mesmas recusas do encerramento: valor sem digito viraria 0 calado
+  var campos = [['eeValor', 'Valor'], ['eeLavagem', 'Lavagem'], ['eeAvaria', 'Avaria'],
+                ['eeOutros', 'Outros'], ['eeCaucao', 'Caução retida']];
+  for (var i = 0; i < campos.length; i++) {
+    if (!_encValorOk(val(campos[i][0]))) {
+      toast('⚠️ ' + campos[i][1] + ': informe um valor em números', '#b45309'); return;
+    }
+  }
+  if (mltNum(val('eeOutros')) > 0 && !String(val('eeOutrosDesc')).trim()) {
+    toast('⚠️ Diga do que se trata a cobrança em "Outros"', '#b45309'); return;
+  }
+
+  h.devolvido     = dev;
+  h.kmDev         = val('eeKm');
+  h.valorFinal    = 'R$ ' + mltNum(val('eeValor')).toLocaleString('pt-BR', {minimumFractionDigits: 2});
+  h.condicao      = val('eeCondicao');
+  h.caucao        = val('eeCaucao');
+  h.encLavagem    = val('eeLavagem');
+  h.encAvaria     = val('eeAvaria');
+  h.encOutros     = val('eeOutros');
+  h.encOutrosDesc = val('eeOutrosDesc');
+  h.encForma      = val('eeForma');
+  h.obs           = val('eeObs');
+  // 🔴 Quem editou e quando. O encerradoEm original NAO muda: ele diz quando
+  // a locacao foi encerrada, nao quando alguem corrigiu o registro.
+  h.editadoEm     = new Date().toISOString();
+  h.editadoPor    = mltIndQuemSou();   // o helper que o sistema ja tem
+
+  saveDB();
+  closeM('mEditarEncerrado');
+  renderHistorico();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  toast('✅ Encerramento atualizado', '#0d7a3e');
+}
+
+// ── Excluir ──────────────────────────────────────────────────
+// 🔴 O banco nao tem lixeira. Antes de excluir, o sistema mede o que vai
+// junto: multas vinculadas e prorrogacoes (a 2a via do termo morre com o
+// registro). Medido em 11/11/2026: 45 multas apontam para 11 encerramentos,
+// um deles com 30 — e 25 encerramentos guardam 39 prorrogacoes.
+function _eeDependencias(h) {
+  var multas = 0, pror = 0;
+  if (h && h.id) {
+    multas = (mltMultas() || []).filter(function (m) { return m && m.locacaoId === h.id; }).length;
+  }
+  pror = _subLista(h && h.prorrogacoes).filter(Boolean).length;
+  return { multas: multas, prorrogacoes: pror };
+}
+
+function _eeBaixarCopia(i) {
+  var h = _eeReg(i);
+  if (!h) { toast('⚠️ Registro não encontrado', '#c0392b'); return; }
+  try {
+    var txt = JSON.stringify(h, null, 2);
+    var a = document.createElement('a');
+    a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(txt);
+    a.download = 'encerrado-' + (mltNormPlaca(h.placa) || 'sem-placa') + '-'
+      + String(h.devolvido || h.devolucao || '').slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('💾 Cópia baixada', '#0d7a3e');
+  } catch (e) {
+    toast('⚠️ Não consegui gerar a cópia: ' + e.message, '#c0392b');
+  }
+}
+
+function excluirEncerrado(i) {
+  if (!_ehMasterAdmin()) {
+    toast('⚠️ Só master ou administrador exclui aluguel encerrado', '#b45309'); return;
+  }
+  var h = _eeReg(i);
+  if (!h) { toast('⚠️ Registro não encontrado. Recarregue a página.', '#c0392b'); return; }
+  var d = _eeDependencias(h);
+
+  var msg = 'EXCLUIR o aluguel encerrado?\n\n'
+    + (h.clienteNome || '—') + '\n' + (h.veiculoNome || '—') + ' · ' + mltFmtPlaca(h.placa) + '\n'
+    + 'Retirada ' + fmt(h.retirada) + ' · devolvido ' + fmt(h.devolvido || h.devolucao) + '\n'
+    + 'Valor: ' + (h.valorFinal || '—') + '\n\n';
+  if (d.multas)       msg += '🔴 ' + d.multas + ' multa(s) estão vinculadas a esta locação e ficarão sem o vínculo.\n';
+  if (d.prorrogacoes) msg += '🔴 ' + d.prorrogacoes + ' prorrogação(ões) somem junto — a 2ª via desses termos deixa de existir.\n';
+  msg += '\nO banco NÃO tem lixeira: isto não pode ser desfeito.\n'
+       + 'A locação também não volta para os ativos.\n\n'
+       + 'Confirma a exclusão?';
+
+  if (!confirm(msg)) return;
+
+  garantirArray('historico');
+  var atual = db.historico[i];
+  // 🔴 confere que o indice ainda aponta para o MESMO registro: entre abrir a
+  // tela e confirmar, outra aba pode ter mexido na lista.
+  if (!atual || atual !== h) {
+    toast('⚠️ A lista mudou enquanto você confirmava. Recarregue e tente de novo.', '#b45309');
+    renderHistorico(); return;
+  }
+  db.historico.splice(i, 1);
+  // ⚠️ A lápide em loka_encerrados FICA de propósito: ela é o que impede a
+  // locação de ressuscitar nos ativos (armadilha 5). Apagá-la reabriria isso.
+  saveDB();
+  closeM('mEditarEncerrado');
+  renderHistorico();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  toast('🗑️ Aluguel encerrado excluído', '#0d7a3e');
+}
 
 // ── PAINÉIS PÚBLICOS (Reserva e Cadastro) ────────────────────────────────────
 function initCadastroPanel() {
@@ -7504,6 +7902,168 @@ function relatorioMenu() {
   var modo = _modoManutencao();
   if (modo.restrito && modo.mostraLista) return relatorioManutencao();
   return gerarRelatorioMensal();
+}
+
+// ── RELATÓRIO: KM DA ÚLTIMA MANUTENÇÃO DE CADA CARRO ─────────
+// 🔴 Medido em 11/11/2026, nos 119 veículos e 811 manutenções:
+//     75 → a última manutenção TEM km
+//     33 → a última NÃO tem, mas uma anterior tem
+//      4 → tem manutenção e km em nenhuma
+//      7 → sem manutenção nenhuma
+//
+// Deixar os 33 em branco jogaria fora quilometragem que existe; chamar de
+// "km da última manutenção" um número que veio de outra seria mentir. Então o
+// relatório mostra o km mais recente DISPONÍVEL, com a data em que foi
+// medido, e MARCA quando não é o da última manutenção. É o padrão dos cartões
+// do Contas a Receber (v120–v122): quando o número embute algo que o olho não
+// vê, a tela diz.
+function _kmUltimaManut(placa) {
+  var p = mltNormPlaca(placa);
+  var out = { temManut: false, km: '', kmData: '', kmServico: '',
+              daUltima: false, ultimaData: '', ultimaServico: '', total: 0 };
+  if (!p) return out;
+
+  var ms = (db.manutencoes || []).filter(function (m) {
+    return m && mltNormPlaca(m.placa) === p;
+  }).slice();
+  if (!ms.length) return out;
+
+  out.temManut = true;
+  out.total = ms.length;
+  // mais antiga → mais recente. Sem data vai para o começo: não dá para
+  // afirmar que é recente, e chutar posição aqui mudaria qual é "a última".
+  ms.sort(function (a, b) {
+    return String(a.data || '').localeCompare(String(b.data || ''));
+  });
+
+  var ult = ms[ms.length - 1];
+  out.ultimaData = ult.data || '';
+  out.ultimaServico = ult.tipo || '';
+
+  // a mais recente que TEM quilometragem legível
+  var comKm = ms.filter(function (m) { return _mntKM(m); });
+  if (!comKm.length) return out;
+  var k = comKm[comKm.length - 1];
+  out.km = _mntKM(k);
+  out.kmBruto = k.km;
+  out.kmData = k.data || '';
+  out.kmServico = k.tipo || '';
+  out.daUltima = (k === ult);
+  return out;
+}
+
+// A lista do relatório: um registro por veículo da frota.
+function _kmFrotaLista() {
+  garantirArray('veiculos'); garantirArray('manutencoes');
+  return (db.veiculos || []).filter(function (v) { return v && v.placa; })
+    .map(function (v) {
+      var k = _kmUltimaManut(v.placa);
+      return {
+        placa: v.placa,
+        veiculo: ((v.marca || '') + ' ' + (v.modelo || '')).trim() || (v.veiculoNome || ''),
+        status: v.status || '',
+        km: k.km, kmData: k.kmData, kmServico: k.kmServico,
+        daUltima: k.daUltima, ultimaData: k.ultimaData,
+        temManut: k.temManut, total: k.total,
+        kmBruto: k.kmBruto
+      };
+    })
+    .sort(function (a, b) {
+      return mltNormPlaca(a.placa).localeCompare(mltNormPlaca(b.placa));
+    });
+}
+
+function relatorioKmFrota() {
+  // 🔴 O relatorio varre a FROTA INTEIRA. Perfil com escopo restrito
+  // (manutencaoEscopoOficina / manutencaoEscopoCliente) ve so as placas dele --
+  // essas acoes LIMITAM a visao, e por isso nem entram no curinga "Todas as
+  // acoes" (v89). Um relatorio da frota aqui burlaria exatamente esse limite.
+  if (_modoManutencao().restrito) {
+    toast('⚠️ Seu perfil ve apenas as placas associadas a voce', '#b45309'); return;
+  }
+  var lista = _kmFrotaLista();
+  if (!lista.length) { toast('Nenhum veículo com placa cadastrada', '#b45309'); return; }
+
+  var comKm = lista.filter(function (r) { return r.km; }).length;
+  var naUltima = lista.filter(function (r) { return r.km && r.daUltima; }).length;
+  var anterior = lista.filter(function (r) { return r.km && !r.daUltima; }).length;
+  var semKm = lista.filter(function (r) { return r.temManut && !r.km; }).length;
+  var semManut = lista.filter(function (r) { return !r.temManut; }).length;
+
+  function dt(d) {
+    if (!d) return '—';
+    var m = String(d).match(/(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : d;
+  }
+  var e = _mltEsc;
+
+  var linhas = lista.map(function (r) {
+    var obs = '';
+    if (!r.temManut)      obs = '<span class="av">sem manutenção registrada</span>';
+    else if (!r.km)       obs = '<span class="av">' + r.total + ' manutenção(ões), nenhuma com KM</span>';
+    else if (!r.daUltima) obs = '<span class="av">KM de uma manutenção anterior — a última ('
+                              + dt(r.ultimaData) + ') não registrou KM</span>';
+    return '<tr>'
+      + '<td class="pl">' + e(mltFmtPlaca(r.placa)) + '</td>'
+      + '<td>' + e(r.veiculo || '—') + '</td>'
+      + '<td>' + e(r.status || '—') + '</td>'
+      + '<td class="km">' + (r.km ? e(r.km)
+          + (_mntKMValido(r.kmBruto) ? '' : ' <span class="av">⚠</span>') : '—') + '</td>'
+      + '<td>' + dt(r.kmData) + '</td>'
+      + '<td>' + e(r.kmServico || '—') + '</td>'
+      + '<td class="obs">' + obs + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var hoje = new Date().toLocaleDateString('pt-BR');
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>KM da frota — última manutenção</title><style>'
+    + '@page{size:A4 landscape;margin:12mm}'
+    + 'body{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;padding:22px;color:#111827;font-size:11px}'
+    + '.cab{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0E1B4D;padding-bottom:10px;margin-bottom:14px}'
+    + 'h1{font-size:17px;margin:0;color:#0E1B4D}.sub{font-size:11px;color:#5a607a;margin-top:3px}'
+    + '.meta{font-size:10px;color:#5a607a;text-align:right}'
+    + '.resumo{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}'
+    + '.card{border:1px solid #d7dcea;border-radius:6px;padding:7px 11px;font-size:10px}'
+    + '.card b{display:block;font-size:15px;color:#0E1B4D}'
+    + 'table{width:100%;border-collapse:collapse}'
+    + 'th{background:#0E1B4D;color:#fff;text-align:left;padding:6px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.4px}'
+    + 'td{padding:5px 8px;border-bottom:1px solid #eef0f6}'
+    + '.pl{font-family:monospace;font-weight:700}'
+    + '.km{font-family:monospace;text-align:right;font-weight:700}'
+    + '.obs{font-size:9.5px;color:#5a607a}.av{color:#b45309;font-weight:600}'
+    + '.nota{margin-top:12px;font-size:9.5px;color:#5a607a;line-height:1.5}'
+    + '.btns{margin-bottom:14px}.btns button{padding:8px 14px;margin-right:8px;border:0;border-radius:6px;background:#0E1B4D;color:#fff;cursor:pointer;font-size:12px}'
+    + '@media print{.no-print{display:none}}'
+    + '</style></head><body>'
+    + '<div class="btns no-print"><button onclick="window.print()">🖨 Imprimir / Salvar PDF</button>'
+    + '<button onclick="window.close()" style="background:#5a607a">Fechar</button></div>'
+    + '<div class="cab"><div><h1>KM da frota — última manutenção</h1>'
+    + '<div class="sub">' + lista.length + ' veículo(s) com placa cadastrada</div></div>'
+    + '<div class="meta">LOKÁ Aluguel de Veículos<br>Emitido em ' + hoje + '</div></div>'
+    + '<div class="resumo">'
+    + '<div class="card"><b>' + naUltima + '</b>KM da última manutenção</div>'
+    + '<div class="card"><b>' + anterior + '</b>KM de manutenção anterior</div>'
+    + '<div class="card"><b>' + semKm + '</b>com manutenção, sem KM</div>'
+    + '<div class="card"><b>' + semManut + '</b>sem manutenção registrada</div>'
+    + '</div>'
+    + '<table><thead><tr><th>Placa</th><th>Veículo</th><th>Situação</th>'
+    + '<th style="text-align:right">KM</th><th>Medido em</th><th>Serviço</th><th>Observação</th>'
+    + '</tr></thead><tbody>' + linhas + '</tbody></table>'
+    // 🔴 O documento diz de onde vem cada número e o que ele NÃO afirma.
+    + '<div class="nota"><strong>Como ler:</strong> o KM é o da manutenção mais '
+    + 'recente que registrou quilometragem — a coluna <em>Medido em</em> diz quando. '
+    + 'Quando a última manutenção do carro não anotou KM, a observação avisa e o número '
+    + 'mostrado é de uma anterior. <strong>' + comKm + ' de ' + lista.length + '</strong> '
+    + 'veículos têm alguma quilometragem registrada. O símbolo ⚠ marca KM com formato '
+    + 'fora do padrão, que vale conferir no cadastro da manutenção.</div>'
+    + '<div class="nota">LOKÁ Aluguel de Veículos · CNPJ 39.911.638/0001-10 · Feira de Santana — BA</div>'
+    + '</body></html>';
+
+  var win = window.open('', '_blank');
+  if (!win) { toast('⚠️ O navegador bloqueou a janela. Libere o pop-up e tente de novo.', '#b45309'); return; }
+  win.document.write(html);
+  win.document.close();
 }
 
 function relatorioManutencao(){
@@ -11279,10 +11839,8 @@ function renderContratos() {
 
 // Quem pode editar contrato: master e admin. Os demais perfis continuam
 // podendo abrir e imprimir — só não alteram o documento salvo.
-function _ctPodeEditar() {
-  var p = _perfilAtual();
-  return p === 'master' || p === 'admin';
-}
+// A regra de master/admin mora no _ehMasterAdmin — uma so, dois leitores.
+function _ctPodeEditar() { return _ehMasterAdmin(); }
 
 // Abre a página do contrato já preenchida com o que foi salvo.
 // ⚠️ Contrato antigo (sem `campos`) abre com o aviso da própria página:
@@ -11373,6 +11931,17 @@ function histPreencherPlacas(){
   sel.innerHTML = h; sel.value = atual;
 }
 
+// Os botoes da linha. Perfil sem permissao nao ve nada — e a coluna
+// continua existindo, para a tabela nao ficar com linha mais curta que o
+// cabecalho (a familia de defeito dos colspans da v78/v119/v137).
+function _histAcoes(i) {
+  if (i < 0 || !_ehMasterAdmin()) return '';
+  return '<button class="btn btn-outline" style="font-size:10px;padding:4px 7px" '
+       + 'onclick="editarEncerrado(' + i + ')" title="Editar este encerramento">✏️</button> '
+       + '<button class="btn btn-outline" style="font-size:10px;padding:4px 7px;color:var(--red)" '
+       + 'onclick="excluirEncerrado(' + i + ')" title="Excluir este encerramento">✕</button>';
+}
+
 function renderHistorico() {
   if (!db) return;
   garantirArray('historico');
@@ -11414,8 +11983,11 @@ function renderHistorico() {
       '<td>'+fmt(h.retirada)+'</td><td>'+fmt(h.devolvido||h.devolucao)+'</td>'+
       '<td style="font-weight:700;color:var(--green)">'+(h.valorFinal||'—')+
         _encResumoHist(h)+'</td>'+
-      '<td>'+(conds[h.condicao]||'—')+'</td></tr>';
-  }).join('') : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Nenhum aluguel encerrado com esses filtros.</td></tr>';
+      '<td>'+(conds[h.condicao]||'—')+'</td>'+
+      // 🔴 indice REAL em db.historico: a lista e filtrada, invertida e
+      // paginada, entao o indice da pagina nao serve (licao da v103).
+      '<td class="td-actions">'+_histAcoes(db.historico.indexOf(h))+'</td></tr>';
+  }).join('') : '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">Nenhum aluguel encerrado com esses filtros.</td></tr>';
   renderPag('histPag', p.pg, p.pages, p.total, 'function(n){_pgHist=n;renderHistorico()}');
 }
 
