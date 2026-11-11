@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v148-20261111-0940** |
+| `gestao.html` | **v151-20261111-1710** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -8176,3 +8176,302 @@ pré-preenche R$ 391.950,00.
 
 🔴 **A manutenção da RUP3D82 (21/07) com `km = "81.30100"`** segue lá, agora
 também visível no relatório da frota.
+
+---
+
+## ✅ Endividamento: parcelas pagas editável — 11/11/2026 (`45a8631`) · gestao v149
+
+Pedido: *"a coluna parcelas pagas precisa ser editável onde informaremos a
+quantidade já paga (exemplo 18 parcelas pagas). A coluna JÁ AMORTIZADO é a soma
+das parcelas base já pagas e a coluna saldo devedor é o resultado do valor
+financiado menos o valor já amortizado"*.
+
+### 🔴 "Soma das parcelas base" ao pé da letra é CIRCULAR
+A coluna **Parcela Base** da tela é `parcela − encargos`, e `encargos = saldo ×
+CET`, e `saldo = principal − amortizado`. Definir `amortizado = base × pagas`
+fecha um círculo. Resolvendo:
+
+```
+amortizado = pagas × (parcela − CET × principal) / (1 − pagas × CET)
+```
+
+⚠️ Com 48 parcelas a 1,48% o denominador vai a **0,29** — o amortizado
+explodiria. Não dava para implementar a leitura literal.
+
+### 🔴 A medição decidiu o significado
+Nos 19 financiamentos reais, comparando o `amortizado` que o Rogel já usa com as
+duas interpretações:
+
+| | |
+|---|---|
+| batem com a **tabela Price** dentro de 0,01% | **16 de 18** (o 19º está gravado como 0) |
+| batem com **`base × nº pagas`** | 🔴 **nenhum** com CET > 0 |
+
+Então "soma das parcelas base já pagas" quer dizer a **soma da parte de
+principal de cada parcela paga** — que na tabela Price é a base *daquela*
+parcela, e muda mês a mês. É exatamente o que o `divAmortizadoPrincipal` já
+calculava.
+
+⚠️ Os 2 cartões têm **CET = 0**, e aí as duas contas coincidem (base = parcela).
+Não são contraexemplo — eles não distinguem os métodos, e há teste que os exclui
+da comparação de propósito.
+
+### Os 2 fora da conta (não corrigidos)
+| Contrato | Gravado | Pela conta | Diferença |
+|---|---|---|---|
+| **920312070** (BV) | R$ 47.594,14 | R$ 42.210,58 | **11,3%** — pagamento extra? CET diferente? |
+| 2918912281 | R$ 105.110,88 | R$ 105.405,24 | 0,28% (R$ 294,36, arredondamento) |
+| **J Carlos** | **R$ 0,00** | R$ 120.352,92 | nunca foi preenchido |
+
+🔴 **Nenhum dos três era LIDO pela tela** — os três têm vínculo no Contas a
+Pagar, e por ali a tela já calculava. Então o campo gravado estava errado sem
+afetar número nenhum. Agora ele é mantido em sincronia.
+
+### 🔴 O que estava faltando era só o campo ser editável
+O que não dava era **informar**: a coluna era um `<span>` de leitura, alimentado
+por `divPagamentosDoContrato` (o contador do Contas a Pagar), com o manual só
+como reserva. E o amortizado, **sem vínculo no Contas a Pagar**, vinha do campo
+**gravado** — congelado, sem acompanhar nada.
+
+| | antes | agora |
+|---|---|---|
+| Parcelas Pagas | `<span>` 18/48 | **campo editável** |
+| quem manda na contagem | o Contas a Pagar | **o que você informa** |
+| Já Amortizado | Price **se** houvesse vínculo; senão o campo gravado | **sempre** calculado da contagem |
+| Saldo Devedor | principal − amortizado | igual (agora seguindo a contagem) |
+
+### 🔴 A mudança não altera NENHUM número de hoje
+Medido: nos **17** financiamentos com contrato vinculado, o contador do Contas a
+Pagar é **idêntico** ao informado à mão. Então inverter a precedência muda
+**R$ 0,00** no amortizado (R$ 1.370.535,80) e no saldo (R$ 5.402.460,21).
+
+Quem passa a ser atendido são os **2 cartões Itaú**, que não têm número de
+contrato — nunca tiveram vínculo, e eram justamente os que não havia como
+corrigir.
+
+É teste, e é o primeiro do bloco: *o amortizado de cada um dos 19 é o mesmo de
+antes*.
+
+### O Contas a Pagar passa a conferir, não a mandar
+Divergindo os dois, a tela **diz** o número do Contas a Pagar embaixo do campo,
+com um botão **usar** — não resolve por conta própria, porque só o operador sabe
+qual dos dois está certo. É o padrão dos cartões do Contas a Receber
+(v120–v122).
+
+⚠️ **"Informado" só manda quando é > 0.** Num financiamento novo o campo nasce
+zerado, e mostrar 0 havendo pagamento lançado esconderia informação real. A
+consequência é que *"zero pagas"* não se distingue de *"não informei"* — mas
+nesse caso o número do Contas a Pagar fica à vista no campo.
+
+### As recusas
+| Entrada | O que acontece |
+|---|---|
+| texto sem dígito (`abc`) | **recusa** — `mltNum('abc')` devolve 0, e 0 é "nenhuma paga" legítimo (lição da v94, v99, v127, v147) |
+| negativo | **recusa**, sem adivinhar que era positivo |
+| mais que o total de parcelas | **limita ao total** e avisa |
+| `18,7` | vira **18** — não há meia parcela |
+| em branco | vira 0, sem erro |
+
+### O campo gravado não pode defasar
+`_divSincAmortizado` regrava o `amortizado` do registro. 🔴 Entrou também um
+gancho no **`finEdit`** para a aba `divida`: mexer em principal, valor da
+parcela, CET ou total de parcelas muda a conta, e sem o gancho a tela ficaria
+certa (ela calcula) e **o banco guardaria outro número**.
+
+⚠️ O gancho é **só** da aba `divida` — há defeito injetado que o aplica a todas
+e um teste que exige que uma conta a receber **não** ganhe um campo
+`amortizado` que não é dela.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**843/843**, sem mudança — a
+  célula nova é string de JS); os dois carimbos batendo
+- **48 testes** com o código real e os **19 financiamentos reais**: a invariante
+  de que nada mudou de valor, a conta conferida contra uma tabela Price
+  reimplementada por fora, os 16 que batem com o gravado, os 2 fora nomeados, as
+  5 recusas, a precedência nos dois sentidos, a divergência dita e adotada, o
+  campo gravado acompanhando pelos dois caminhos, o saldo **desenhado** em cada
+  linha, o teto do amortizado varrido em **todas** as contagens possíveis dos 19,
+  e a lista vindo como objeto do Firebase
+- **32 defeitos injetados — todos acusados**, entre eles **o estado antes do
+  pedido** (célula não editável), o amortizado voltando ao campo gravado, o
+  Contas a Pagar atropelando o informado, a leitura circular `base × N`, a
+  parcela cheia em vez da base, o cronograma sem abater o saldo, amortização
+  negativa, o saldo ignorando o amortizado, aceitar mais parcelas que o contrato,
+  e o gancho sujando as outras abas
+
+### ⚠️ Sete defeitos passaram na primeira rodada — os sete eram teste fraco meu
+| O que passou | Por quê |
+|---|---|
+| o amortizado voltar ao campo gravado | eu testava a **linha 0**, que TEM vínculo — o ramo do campo gravado só é alcançado **sem** vínculo. Agora o teste varre as duas |
+| o saldo da tela virar `parcela × pagas`, e ignorar o amortizado | eu conferia a **função**; **nenhuma asserção olhava o saldo desenhado**. Entrou o bloco G |
+| a amortização passar do saldo na última parcela | a tolerância de 2% do meu teste de "zera no fim" absolvia. Agora a invariante é *o amortizado nunca passa do financiado*, varrida em todas as contagens |
+| limitar sem avisar | o aviso de **sucesso** diz "48 de 48", então procurar o número `48` nos avisos passava. Passou a exigir a frase do limite |
+| o gancho valer para todas as abas | não quebra nada visível — suja a linha com um campo alheio. Virou asserção própria |
+| o input nascer com o informado em vez da contagem efetiva | nos 19 reais os dois são **iguais**: nada distinguia. Zerando o informado numa linha com vínculo, o campo tem de mostrar os 18 |
+
+⚠️ E uma asserção minha procurava `value="0"` solto no HTML — que aparece na
+coluna **Receita** (0 em 3 linhas) e aprovaria o defeito. Teve de ser ancorada
+no `onchange` do próprio campo.
+
+### ⏳ Não verificado · e uma pendência de dado
+Falta **logado**: o Rogel abrir Financeiro → **Endividamento**, digitar a
+quantidade de parcelas pagas de um financiamento e conferir o Já Amortizado e o
+Saldo Devedor. Eu não autentico.
+
+🔴 **O contrato 920312070 (BV)** tem `amortizado` gravado R$ 47.594,14 enquanto a
+conta dá R$ 42.210,58 — **R$ 5.383,56** de diferença. A tela sempre mostrou o
+calculado, então nenhum total está errado; mas vale ele dizer se houve
+**pagamento extra** (amortização antecipada) nesse contrato, porque aí a conta
+pela contagem de parcelas é que fica incompleta.
+
+---
+
+## 🔴 A planilha de Endividamento mostrava 3 casas decimais — 11/11/2026 (`45a8631`+) · gestao v150
+
+Achado **olhando a tela publicada** da v149, logo depois de entregar: a planilha
+tinha **60 valores** como `R$ 1.641,538`, `R$ 110.914,707`, `R$ 47.129,923`.
+
+### A causa é a mesma da v110
+```js
+function brl(v){ … minimumFractionDigits: 2 … }   // sem maximumFractionDigits
+```
+O `brl()` global só exige o **mínimo** de 2 casas; sem `maximumFractionDigits`,
+o `toLocaleString` deixa chegar a 3. Aparece onde há **divisão ou produto com
+fração de centavo** — e aqui `Encargos = Saldo × CET` e
+`Parcela Base = Parcela − Encargos` produzem exatamente isso.
+
+### 🔴 Conferido: é ANTERIOR, não da v149
+Medido buscando o **arquivo real da v148** no raw do GitHub (`45a8631~1`) e
+refazendo a conta daquela versão: **os mesmos 60 valores**. A v149 não
+introduziu nada — ela só não consertou.
+
+⚠️ É a regra de 19/10 sendo cobrada de novo: *o antes tem de ser o arquivo real
+daquela versão*. Sem isso eu teria registrado como regressão minha.
+
+### O conserto já existia no sistema
+`_divBRL`, nas 11 chamadas do `finRenderDivida` — o mesmo caminho do **`_fvBRL`**
+do painel Faturamento/Veículo (v110), que nasceu do mesmo defeito.
+
+🔴 **O `brl()` global não foi tocado.** Ele serve todas as telas, e mexer nele
+seria alterar o que não foi pedido. Então **o defeito segue latente fora desta
+planilha**, em qualquer lugar que venha a dividir — e há um teste exigindo que
+ele continue como está, para a decisão ficar explícita em vez de virar
+esquecimento.
+
+### Validado
+- `node --check`; `<div>` 843/843; os dois carimbos batendo
+- **52 testes** (os 48 da v149 + 4): nenhum valor da planilha com 3 casas, o
+  `_divBRL` arredondando e não truncando (nos dois sentidos), zero e nulo, os
+  totais do rodapé, e o `brl()` global **intacto**
+- **37 defeitos injetados — todos acusados** (os 32 da v149 + 5): o estado antes
+  do arredondamento, truncar em vez de arredondar, arredondar para o real
+  inteiro, **alterar o `brl()` global**, e o rodapé voltando ao `brl()` cru
+- Regressão **medida**: ver abaixo
+
+### ⚠️ Duas asserções minhas tiveram de acompanhar
+As [G1]/[G2] — que eu havia escrito *nesta mesma entrega* para conferir o saldo
+desenhado — comparavam com `brl(...)` sem arredondar, e falharam quando a tela
+passou a arredondar. Não era defeito: era a asserção seguindo o comportamento
+antigo. Passaram a usar o `_divBRL`.
+
+⚠️ E o **heredoc comeu os escapes** ao tentar acrescentar o bloco de testes por
+script (`\d`, `\$`). Refeito pela ferramenta de escrita, agora com asserção
+exigindo que os escapes estejam como **texto** no arquivo.
+
+---
+
+## ✅ CONFIRMADO EM PRODUÇÃO: o Rogel atualizou os 19 financiamentos — 11/11/2026 · gestao v151
+
+Enquanto eu verificava a v150, o banco mudou: `_writerBuild` passou a
+`v150-20261111-1545`, escrita às **17:34**. Conferido que **só o `divEditPagas`
+escreve `r.pago`** no sistema inteiro (nada automático), então foi ele usando a
+tela nova.
+
+### O que ele fez, medido antes e depois
+**Todas as 19 linhas** foram atualizadas — `pago` subiu **+6** em 17 delas (ele
+trouxe os financiamentos para a data de hoje; a base era de ~6 meses atrás) e
+**+4** no J Carlos.
+
+| | antes | depois |
+|---|---|---|
+| principal total | R$ 6.772.996,01 | — |
+| **já amortizado** | R$ 1.370.535,80 | **R$ 2.251.230,83** |
+| **saldo devedor** | R$ 5.402.460,21 | **R$ 4.521.765,18** |
+
+🔴 **A conta fecha ao centavo nos 19**, reconferida com uma tabela Price
+reimplementada por fora. E o campo `amortizado` gravado acompanhou em todos —
+inclusive o **J Carlos**, que estava gravado como **R$ 0,00** desde sempre e
+passou a R$ 129.980,00.
+
+### 🔴 Dois achados que isso revelou
+
+**1. O Contas a Pagar está 6 meses atrás, em 17 dos 19 financiamentos.**
+As divergências que a tela agora mostra não são erro dela — são o retrato certo:
+
+```
+2916787056: informado 24  ·  Contas a Pagar 18
+29418875  : informado 12  ·  Contas a Pagar  6
+J Carlos  : informado 46  ·  Contas a Pagar 42
+```
+
+⚠️ **O botão "usar" ali desfaria o trabalho dele.** O certo é dar baixa dos
+meses faltantes no **Contas a Pagar**, não adotar o número atrasado. Por isso o
+botão deixou de dizer só *"usar"*: agora diz **"usar as 18"** e o título explica
+*"Troca as 24 parcela(s) que você informou pelas 18 que o Contas a Pagar tem
+baixadas"*. A consequência fica dita **antes** do clique.
+
+**2. O J Carlos quitou — com 46 de 48 parcelas.**
+Saldo **R$ 0,00** com 2 parcelas ainda por vencer. O amortizado bateu o teto do
+principal, o que significa que **a parcela registrada (R$ 3.985,82) amortiza mais
+rápido que o CET registrado (1,45%)** — pelo cronograma Price, R$ 129.980 em 48
+meses a 1,45% daria parcela de ~R$ 3.777.
+
+⚠️ **Não é defeito da conta** (o teto existe justamente para o saldo não ficar
+negativo — testado em todas as contagens dos 19), mas é sinal de que o CET ou o
+valor da parcela daquele contrato estão registrados fora do real. **Decisão do
+Rogel**: conferir o contrato. Se a parcela estiver certa, o CET é menor que
+1,45%.
+
+### 🔴 O defeito que a verificação pegou: o AVISO saía com 3 casas
+`✅ 18 de 48 parcela(s) paga(s) · amortizado R$ 47.129,923`
+
+O `toast` do `divEditPagas` é desenhado **fora** do `finRenderDivida`, então as
+11 trocas da v150 não o alcançaram — e o teste [H1] olhava **só a grade**.
+
+⚠️ É a lição de sempre por um ângulo novo: **o conserto cobriu o lugar onde eu
+tinha olhado o defeito**, não todos os lugares onde ele podia estar. O teste
+novo varre os avisos de **quatro** edições diferentes, e há defeito injetado que
+reproduz exatamente o estado da v150.
+
+### Validado
+- `node --check`; `<div>` 843/843; os dois carimbos batendo
+- **56 testes** (os 52 da v150 + 4): o aviso com 2 casas, nenhum aviso com 3 em
+  nenhuma das 4 edições, o botão nomeando o número que adota, e o título citando
+  os dois
+- **41 defeitos injetados** (os 37 + 4): o aviso voltando ao `brl()` cru, o aviso
+  parando de dizer o amortizado, o botão voltando a dizer só "usar", e o título
+  não citando o informado
+- **No ar, no arquivo publicado da v150, com o banco real** e `firebase`/`saveDB`
+  substituídos **antes do eval** (5 gravações interceptadas, **nada em
+  produção**): 19 linhas, 247 campos, **0 valores com 3 casas** na grade;
+  informar 18 → amortizado **R$ 47.129,92** e saldo **R$ 110.914,71**, os dois
+  conferidos contra a conta feita por fora; informar 30 → saldo R$ 71.811,72;
+  `abc` e `-5` recusados com a mensagem certa; `99` limitado a 48 com o aviso, e
+  aí o amortizado = **R$ 158.044,63**, exatamente o principal (o teto); a
+  divergência aparecendo e o botão adotando as 18
+
+⚠️ **Uma medição minha quase passou vazia:** a primeira leitura da linha deu
+`inputs: []` e `monospace: []` — e eu estava a um passo de registrar
+*"0 valores com 3 casas"* a partir de uma tabela que eu não tinha provado que
+renderizou. Era o meu recorte, não o render: a grade tinha **90 KB, 21 `<tr>` e
+247 campos**. **Zero só vale depois de provar que havia o que contar.**
+- Regressão **medida**: **52 suítes, 2.716 testes**, nenhuma falha
+
+### ⏳ Decisões para o Rogel
+1. **Dar baixa dos 6 meses faltantes no Contas a Pagar** nos 17 financiamentos
+   — e **não** clicar em "usar as N", que desfaria a atualização de hoje.
+2. **Conferir o contrato J Carlos**: parcela R$ 3.985,82 com CET 1,45% quita em
+   46 de 48 parcelas. Um dos dois está registrado fora do real.
+3. **O contrato 920312070 (BV)** tinha `amortizado` gravado R$ 5.383,56 acima da
+   conta antes de hoje — vale dizer se houve **amortização antecipada** nele,
+   porque aí a conta pela contagem de parcelas fica incompleta.
