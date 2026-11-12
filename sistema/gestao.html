@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v152-20261112-0845 -->
+<!-- LOKA deploy: v153-20261112-1020 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1302,6 +1302,43 @@ tr:hover td{background:#f8f9fe;}
   <div class="modal-foot"><button class="btn btn-outline" onclick="closeM('mProrNova')">Cancelar</button></div>
 </div></div>
 
+<!-- MODAL: OCORRÊNCIAS DO ENCERRAMENTO -->
+<!-- 🔴 z-index acima do padrão (500): este modal abre POR CIMA do de
+     encerramento, e com z-index igual quem fica na frente depende da ordem
+     no documento — frágil demais para uma tela que guarda dinheiro. -->
+<div class="modal-bg" id="mOcorrencias" style="z-index:600"><div class="modal" style="max-width:560px">
+  <div class="modal-head" style="background:#0E1B4D"><h3>📋 Ocorrências da devolução</h3><button class="modal-close" onclick="closeM('mOcorrencias')">&#10005;</button></div>
+  <div class="modal-body">
+    <div id="ocoInfo" style="background:#EEF1FD;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px"></div>
+
+    <div class="sec-label" style="margin-top:0">Adicionar ocorrência</div>
+    <div class="fg"><label class="fl">Tipo *</label>
+      <select class="fs" id="ocoTipo" onchange="_ocoAvisoClausula()"></select></div>
+    <div id="ocoAvisoCl" style="display:none;border-left:3px solid #2B4BF2;border-radius:6px;padding:8px 10px;font-size:10.5px;line-height:1.5;margin-bottom:10px"></div>
+    <div class="fg"><label class="fl">O que aconteceu *</label>
+      <input class="fi" id="ocoDesc" maxlength="180" placeholder="Ex: amassado na porta traseira esquerda"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label class="fl">Valor a cobrar (R$)</label><input class="fi" id="ocoValor" placeholder="0,00"></div>
+      <div class="fg"><label class="fl">Situação</label>
+        <select class="fs" id="ocoSituacao">
+          <option value="a_cobrar">💰 A cobrar</option>
+          <option value="averiguar">🔎 Em averiguação (valor ainda não se sabe)</option>
+          <option value="cobrada">✅ Já comunicada ao cliente</option>
+          <option value="sem_cobranca">⊘ Sem cobrança (só registro)</option>
+        </select></div>
+    </div>
+    <button type="button" class="btn btn-blue" onclick="ocoAdicionar()" style="width:100%;justify-content:center;margin-bottom:14px">+ Adicionar ocorrência</button>
+
+    <div class="sec-label">Ocorrências registradas</div>
+    <div id="ocoLista"></div>
+    <div id="ocoResumo" style="font-size:11px;color:var(--dark);background:#f4f6fb;border-radius:7px;padding:9px 11px;margin-top:8px"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mOcorrencias')">Cancelar</button>
+    <button class="btn btn-outline" onclick="ocoComunicado(_ocoCtx)">📄 Comunicado de cobrança</button>
+    <button class="btn btn-blue" onclick="ocoSalvar()">Salvar ocorrências</button>
+  </div>
+</div></div>
 <div class="modal-bg" id="mAxItem"><div class="modal" style="max-width:500px">
   <div class="modal-head"><h3 id="axItemTitulo">Nova pe&ccedil;a</h3><button class="modal-close" onclick="closeM('mAxItem')">&#10005;</button></div>
   <div class="modal-body">
@@ -1608,6 +1645,11 @@ tr:hover td{background:#f8f9fe;}
       <div class="fg"><label class="fl">Valor Total (R$)</label><input class="fi" id="encValor" placeholder="0,00" oninput="_encRenderAcerto()"></div>
       <div class="fg"><label class="fl">Desconto / Multa (R$)</label><input class="fi" id="encDesconto" placeholder="0,00" oninput="calcEnc()"></div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Condição na Devolução</label><select class="fs" id="encCondicao"><option value="ok">✅ Normal</option><option value="sujo">🧽 Veículo sujo</option><option value="avaria_leve">⚠️ Avaria leve</option><option value="avaria_grave">🔴 Avaria grave</option><option value="multa">🚨 Multa de trânsito</option></select></div>
+      <div class="fg" style="grid-column:1/-1;margin-top:4px">
+        <button type="button" class="btn btn-outline" id="btnEncOco" onclick="ocoAbrir('enc')" style="width:100%;justify-content:center;font-weight:800">📋 OCORRÊNCIAS?</button>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.45">Avaria, multa a averiguar e demais situações — classificadas por tipo, cada uma com a cláusula do contrato a que se refere.</div>
+      </div>
+      <div id="encOcoAviso" style="grid-column:1/-1;display:none;background:#eef1fd;border-left:3px solid #2B4BF2;border-radius:6px;padding:9px 11px;font-size:11px;color:#1e3a8a;line-height:1.5"></div>
       <div class="sec-label" style="grid-column:1/-1">Cobranças na devolução</div>
       <div class="fg"><label class="fl">Lavagem (R$)</label><input class="fi" id="encLavagem" placeholder="0,00" oninput="_encRenderAcerto()"></div>
       <div class="fg"><label class="fl">Avaria (R$)</label><input class="fi" id="encAvaria" placeholder="0,00" oninput="_encRenderAcerto()"></div>
@@ -1638,6 +1680,10 @@ tr:hover td{background:#f8f9fe;}
         <div id="eeSugestao" style="background:#fff8e1;border-radius:8px;padding:9px 11px;font-size:11px;line-height:1.5"></div>
       </div>
       <div class="fg" style="grid-column:1/-1"><label class="fl">Condição na Devolução</label><select class="fs" id="eeCondicao"><option value="ok">✅ Normal</option><option value="sujo">🧽 Veículo sujo</option><option value="avaria_leve">⚠️ Avaria leve</option><option value="avaria_grave">🔴 Avaria grave</option><option value="multa">🚨 Multa de trânsito</option></select></div>
+      <div class="fg" style="grid-column:1/-1;margin-top:4px;display:flex;gap:6px">
+        <button type="button" class="btn btn-outline" id="btnEeOco" onclick="ocoAbrir('ee')" style="flex:1;justify-content:center;font-weight:800">📋 OCORRÊNCIAS?</button>
+        <button type="button" class="btn btn-outline" onclick="ocoComunicado('ee')" style="flex:1;justify-content:center">📄 Comunicado</button>
+      </div>
       <div class="sec-label" style="grid-column:1/-1">Cobranças na devolução</div>
       <div class="fg"><label class="fl">Lavagem (R$)</label><input class="fi" id="eeLavagem" placeholder="0,00" oninput="_encRenderAcerto('ee')"></div>
       <div class="fg"><label class="fl">Avaria (R$)</label><input class="fi" id="eeAvaria" placeholder="0,00" oninput="_encRenderAcerto('ee')"></div>
@@ -1782,7 +1828,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v152-20261112-0845';
+var LOKA_BUILD = 'v153-20261112-1020';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -5163,6 +5209,10 @@ function openEncerramento(id) {
     '<br><span style="color:var(--muted)">Retirada: '+fmt(a.retirada)+' · Dev. prevista: '+fmt(a.devolucao)+'</span>';
   var hoje = new Date().toISOString().split('T')[0];
   var ed = document.getElementById('encData'); if(ed) ed.value=hoje;
+  _ocoAtualizarBotao('enc', a);
+  var _ocoAv = document.getElementById('encOcoAviso');
+  if (_ocoAv) { _ocoAv.style.display = 'none'; _ocoAv.innerHTML = ''; }
+  if (_ocoLista(a).length) _ocoOferecerAcertoDe(a);
   ['encKm','encDesconto','encObs','encLavagem','encAvaria','encOutros','encOutrosDesc']
     .forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   var ec = document.getElementById('encCondicao'); if(ec) ec.value='ok';
@@ -5360,6 +5410,7 @@ function editarEncerrado(i) {
   // o valorFinal e gravado como texto ("R$ 1.234,56"); o campo edita o numero
   pv('eeValor',     histValorNum(h) ? histValorNum(h).toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '');
   pv('eeCondicao',  h.condicao || 'ok');
+  _ocoAtualizarBotao('ee', h);
   pv('eeLavagem',   h.encLavagem || '');
   pv('eeAvaria',    h.encAvaria || '');
   pv('eeOutros',    h.encOutros || '');
@@ -12072,6 +12123,18 @@ function histPreencherPlacas(){
 // Os botoes da linha. Perfil sem permissao nao ve nada — e a coluna
 // continua existindo, para a tabela nao ficar com linha mais curta que o
 // cabecalho (a familia de defeito dos colspans da v78/v119/v137).
+/* Selo discreto na linha do histórico: diz que aquele encerramento tem
+   ocorrência registrada, e quanto há a cobrar. */
+function _histSeloOco(h) {
+  var lista = _ocoLista(h);
+  if (!lista.length) return '';
+  var c = _ocoContagem(lista), soma = _ocoSoma(lista);
+  return '<div style="margin-top:3px"><span style="background:#eef1fd;color:#1e3a8a;padding:2px 6px;'
+    + 'border-radius:20px;font-size:9px;font-weight:700" title="' + c.total + ' ocorrência(s)'
+    + (c.averiguar ? ' · ' + c.averiguar + ' em averiguação' : '') + '">📋 ' + c.total
+    + (soma > 0 ? ' · ' + brl(soma) : '') + '</span></div>';
+}
+
 function _histAcoes(i) {
   if (i < 0 || !_ehMasterAdmin()) return '';
   return '<button class="btn btn-outline" style="font-size:10px;padding:4px 7px" '
@@ -12121,7 +12184,7 @@ function renderHistorico() {
       '<td>'+fmt(h.retirada)+'</td><td>'+fmt(h.devolvido||h.devolucao)+'</td>'+
       '<td style="font-weight:700;color:var(--green)">'+(h.valorFinal||'—')+
         _encResumoHist(h)+'</td>'+
-      '<td>'+(conds[h.condicao]||'—')+'</td>'+
+      '<td>'+(conds[h.condicao]||'—')+_histSeloOco(h)+'</td>'+
       // 🔴 indice REAL em db.historico: a lista e filtrada, invertida e
       // paginada, entao o indice da pagina nao serve (licao da v103).
       '<td class="td-actions">'+_histAcoes(db.historico.indexOf(h))+'</td></tr>';
@@ -12787,6 +12850,609 @@ function agTextoAlerta() {
 setTimeout(function () { try { agVerificar(false); } catch (e) {} }, 4000);
 setInterval(function () { try { agVerificar(false); } catch (e) {} }, 1800000);
 
+
+
+/* ═══════════════════════════════════════════════════════════════
+   OCORRÊNCIAS DO ENCERRAMENTO + COMUNICADO DE COBRANÇA
+   ═══════════════════════════════════════════════════════════════
+   Guardadas em `ocorrencias[]` dentro do próprio registro do aluguel
+   (vai para `historico` junto com o encerramento, sem gravação extra).
+
+   { id, tipo, descricao, valor, situacao, criadoEm, criadoPor }
+
+   🔴 A CLÁUSULA DEPENDE DO TIPO DE CONTRATO. "Demais Custos" é a
+   Cláusula 12ª no contrato MENSAL e a 14ª no de DIÁRIA; a 12ª da diária
+   é outra coisa (uso em desacordo com o CTB). Citar sem olhar o tipo do
+   contrato aponta o locatário para a cláusula errada — num documento de
+   cobrança isso é pior do que não citar nada.
+
+   🔴 ONDE NÃO HÁ CLÁUSULA, O SISTEMA DIZ QUE NÃO HÁ. Medido em
+   12/11/2026: o contrato mensal NÃO prevê cobrança de lavagem (só o de
+   diária, Cláusula 14ª), e combustível não aparece em nenhum dos dois.
+   E 98 dos 105 aluguéis ativos são mensais. Inventar amparo seria
+   entregar ao cliente um documento que ele desmonta abrindo o contrato.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Transcrição dos trechos, retirada dos próprios contratos publicados
+   (contrato-mensal.html mensal-v6 · contrato-diaria.html diaria-v7).
+   Não é paráfrase minha: é o texto que o locatário vai conferir. */
+var OCO_CLAUSULAS = {
+  devolucao: { ref: '3ª', titulo: 'Da Devolução', texto:
+    'O LOCATÁRIO deverá devolver o automóvel ao LOCADOR nas mesmas condições em que estava quando o recebeu, '
+    + 'ou seja, em perfeitas condições de uso, conforme laudo de vistoria anexo, responsabilizando-se pelos danos '
+    + 'e prejuízos causados, inclusive avarias mecânicas decorrentes de mau uso, imprudência ou imperícia no '
+    + 'período de locação.' },
+  atraso: { ref: '5ª', titulo: 'Do atraso na restituição', texto:
+    'Se o LOCATÁRIO não restituir o automóvel na data estipulada, será devido o aluguel que o LOCADOR arbitrar, '
+    + 'e responderá pelo dano que o automóvel venha a sofrer, mesmo proveniente de caso fortuito, podendo '
+    + 'responder por CRIME DE APROPRIAÇÃO INDÉBITA , conforme artigo 168 do Código Penal Brasileiro.' },
+  multas: { ref: '8ª', titulo: 'Das Multas', texto:
+    'O LOCATÁRIO é responsável pelas multas de trânsito que eventualmente cometer, nos termos da Resolução '
+    + '619/16 do CONTRAN, constituindo a Rodera Transportes LTDA como sua procuradora para assinatura do termo '
+    + 'de apresentação de condutor/infrator durante o período de locação e eventuais prorrogações. As multas '
+    + 'deverão ser reconhecidas pelo condutor do veículo dentro do prazo fixado pelo órgão autuador. O não '
+    + 'reconhecimento em tempo hábil sujeita o LOCADOR a nova penalidade, de valor igual ao da multa original '
+    + 'multiplicado pelo número de infrações iguais cometidas nos doze meses anteriores, nos termos do art. '
+    + '257, § 8º, do Código de Trânsito Brasileiro, a qual será integralmente repassada ao LOCATÁRIO, '
+    + 'somando-se à multa original e acrescida de juros e multa em caso de atraso no pagamento.' },
+  caucao: { ref: '10ª', titulo: 'Da Caução', texto:
+    'A caução deverá ser paga via Cartão de Crédito (pré-autorização) ou PIX. A restituição será realizada '
+    + 'em até 10 (dez) dias após devolução e avaliação física do veículo, incluindo verificação de multas, '
+    + 'pedágios etc.' },
+  seguro: { ref: '11ª', titulo: 'Do Seguro', texto:
+    '[...] Caso o veículo seja devolvido avariado e o valor do conserto não atinja o valor da franquia do seguro, o '
+    + 'reparo será realizado em oficina credenciada e o respectivo orçamento será cobrado do LOCATÁRIO, incluindo '
+    + 'o valor referente às diárias em que o veículo necessitar permanecer parado para a realização dos serviços.' },
+  custos_m: { ref: '12ª', titulo: 'Demais Custos', texto:
+    'A manutenção preventiva do veículo será por conta do LOCADOR, mediante apresentação de orçamento '
+    + 'prévio. O LOCATÁRIO terá direito a 01 jogo de pneus a cada 40.000 km. Defeitos provenientes de mau '
+    + 'uso ou avarias são de responsabilidade do LOCATÁRIO.' },
+  custos_d: { ref: '14ª', titulo: 'Demais Custos', texto:
+    'Caso o veículo seja devolvido sujo, será cobrada tarifa de lavagem simples de R$ 50,00 ou R$ 150,00 para '
+    + 'lavagem severa.' },
+  sujo_d: { ref: '10ª', titulo: 'Da Caução', texto:
+    'Caso o veículo seja devolvido sujo, a caução somente será devolvida após lavagem para averiguação de '
+    + 'possíveis avarias.' },
+  uso_d: { ref: '12ª', titulo: 'Do uso em desacordo', texto:
+    'O locatário será responsabilizado em caso de utilização do veículo em desacordo com o CTB, bem como se '
+    + 'dirigir sob efeito de álcool ou de forma a colocar em risco a integridade do veículo e de terceiros.' },
+  rastreador_d: { ref: '13ª', titulo: 'Do rastreador', texto:
+    'O veículo alugado possui rastreador instalado. Qualquer manutenção no equipamento deverá ser feita '
+    + 'exclusivamente pela locadora, não sendo permitida a manipulação ou desativação do equipamento.' },
+  km_m: { ref: '13ª', titulo: 'Da franquia de KM', texto:
+    'O locatário fica ciente da franquia de KM contratada, estando sujeito à cobrança de R$ 1,00 por KM excedido.' },
+  km_d: { ref: '15ª', titulo: 'Da franquia de KM', texto:
+    'O locatário fica ciente da franquia de KM contratada, estando sujeito à cobrança de R$ 1,00 por KM excedido.' },
+  mora_m: { ref: '7ª', titulo: 'Do Pagamento', texto:
+    'Em caso de atraso no pagamento, fica reservado ao LOCADOR o direito de cobrar multa de 2% (dois por cento) e '
+    + 'juros de 6% (seis por cento) ao mês, calculados sobre o valor devido.' },
+  mora_d: { ref: '7ª', titulo: 'Do Pagamento', texto:
+    'Em caso de atraso no pagamento, fica reservado ao LOCADOR o direito de cobrar multa de 2% (dois por cento) e '
+    + 'juros de 6% (seis por cento) ao mês, calculados sobre o valor devido.' }
+};
+
+/* Os tipos de ocorrência. `cl` lista as chaves de OCO_CLAUSULAS por tipo de
+   contrato — lista VAZIA quer dizer "este contrato não prevê", e a tela/o
+   documento dizem isso em vez de citar outra coisa.
+   `cat` liga o valor ao campo de cobrança do acerto da devolução (v147). */
+var OCO_TIPOS = [
+  { id: 'avaria',       rot: '🔧 Avaria / dano no veículo', cat: 'avaria',
+    mensal: ['devolucao', 'seguro', 'custos_m'], diaria: ['devolucao', 'seguro'] },
+  { id: 'lavagem',      rot: '🧽 Devolvido sujo (lavagem)', cat: 'lavagem',
+    mensal: [], diaria: ['custos_d', 'sujo_d'] },
+  { id: 'multa',        rot: '🚨 Multa de trânsito', cat: 'outros',
+    mensal: ['multas'], diaria: ['multas'] },
+  { id: 'km_excedido',  rot: '🛣️ KM acima da franquia contratada', cat: 'outros',
+    mensal: ['km_m'], diaria: ['km_d'] },
+  { id: 'atraso',       rot: '⏰ Atraso na devolução', cat: 'outros',
+    mensal: ['atraso'], diaria: ['atraso'] },
+  { id: 'franquia',     rot: '🛡️ Franquia do seguro (sinistro)', cat: 'avaria',
+    mensal: ['seguro'], diaria: ['seguro'] },
+  { id: 'pedagio',      rot: '🛂 Pedágio', cat: 'outros',
+    mensal: ['caucao'], diaria: ['caucao'] },
+  { id: 'pneu',         rot: '🛞 Pneu além do direito contratual', cat: 'outros',
+    mensal: ['custos_m'], diaria: [] },
+  { id: 'uso_indevido', rot: '⚠️ Uso indevido do veículo', cat: 'outros',
+    mensal: [], diaria: ['uso_d'] },
+  { id: 'rastreador',   rot: '📡 Rastreador manipulado', cat: 'outros',
+    mensal: [], diaria: ['rastreador_d'] },
+  { id: 'combustivel',  rot: '⛽ Combustível', cat: 'outros',
+    mensal: [], diaria: [] },
+  { id: 'outro',        rot: '📄 Outro', cat: 'outros',
+    mensal: [], diaria: [] }
+];
+
+var OCO_SITUACOES = {
+  a_cobrar:     { rot: '💰 A cobrar',             cor: '#b45309', bg: '#fff4e5' },
+  averiguar:    { rot: '🔎 Em averiguação',       cor: '#2B4BF2', bg: '#eef1fd' },
+  cobrada:      { rot: '✅ Já comunicada',        cor: '#0d7a3e', bg: '#e6f5ec' },
+  sem_cobranca: { rot: '⊘ Sem cobrança',          cor: '#5a607a', bg: '#f0f2f8' }
+};
+
+function _ocoTipo(id) {
+  for (var i = 0; i < OCO_TIPOS.length; i++) if (OCO_TIPOS[i].id === id) return OCO_TIPOS[i];
+  return OCO_TIPOS[OCO_TIPOS.length - 1];   // 'outro' — nunca devolve nada
+}
+
+/* 'mensal' para qualquer coisa que não seja diária: os registros usam
+   'mensal' e 'diaria', e contrato sem tipo na LOKÁ é mensal (98 de 105). */
+function _ocoContrato(reg) {
+  return (reg && String(reg.tipo || '').toLowerCase() === 'diaria') ? 'diaria' : 'mensal';
+}
+
+/* As cláusulas que amparam um tipo NAQUELE contrato. Lista vazia = o
+   contrato não prevê — quem chama tem de dizer isso, não inventar. */
+function _ocoClausulas(tipoId, tipoContrato) {
+  var t = _ocoTipo(tipoId);
+  var chaves = (tipoContrato === 'diaria') ? t.diaria : t.mensal;
+  var out = [];
+  (chaves || []).forEach(function (k) {
+    var c = OCO_CLAUSULAS[k];
+    if (c) out.push({ ref: c.ref, titulo: c.titulo, texto: c.texto });
+  });
+  return out;
+}
+function _ocoRefs(tipoId, tipoContrato) {
+  return _ocoClausulas(tipoId, tipoContrato).map(function (c) { return 'Cláusula ' + c.ref; }).join(' e ');
+}
+
+function _ocoEsc(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* Normaliza a lista (armadilha 1: o Firebase devolve array como objeto). */
+function _ocoLista(reg) {
+  if (!reg) return [];
+  if (!Array.isArray(reg.ocorrencias)) {
+    reg.ocorrencias = (reg.ocorrencias && typeof reg.ocorrencias === 'object')
+      ? Object.keys(reg.ocorrencias).map(function (k) { return reg.ocorrencias[k]; }).filter(Boolean)
+      : [];
+  }
+  return reg.ocorrencias;
+}
+
+/* 🔴 Só o que está A COBRAR entra na soma. 'Em averiguação' é justamente o
+   que ainda não se sabe quanto é — somar daria um total que o documento não
+   pode afirmar. 'Já comunicada' também soma: é cobrança viva. */
+function _ocoSoma(lista) {
+  var t = 0;
+  (lista || []).forEach(function (o) {
+    if (!o) return;
+    if (o.situacao === 'a_cobrar' || o.situacao === 'cobrada') t += mltNum(o.valor);
+  });
+  return Math.round(t * 100) / 100;
+}
+function _ocoSomaPorCat(lista) {
+  var s = { lavagem: 0, avaria: 0, outros: 0 };
+  (lista || []).forEach(function (o) {
+    if (!o) return;
+    if (o.situacao !== 'a_cobrar' && o.situacao !== 'cobrada') return;
+    var cat = _ocoTipo(o.tipo).cat;
+    s[cat] = Math.round((s[cat] + mltNum(o.valor)) * 100) / 100;
+  });
+  return s;
+}
+function _ocoContagem(lista) {
+  var c = { total: 0, a_cobrar: 0, averiguar: 0, cobrada: 0, sem_cobranca: 0 };
+  (lista || []).forEach(function (o) {
+    if (!o) return;
+    c.total++;
+    var s = OCO_SITUACOES[o.situacao] ? o.situacao : 'a_cobrar';
+    c[s]++;
+  });
+  return c;
+}
+
+/* ── O modal ─────────────────────────────────────────────────── */
+var _ocoCtx = 'enc', _ocoReg = null, _ocoRascunho = [];
+
+/* `ctx` diz de qual tela veio: 'enc' (encerramento em andamento, o registro
+   ainda está em db.ativos) ou 'ee' (encerrado, já em db.historico). */
+/* O rótulo do botão diz quantas há: ocorrência registrada atrás de um botão
+   sem número é informação escondida — ninguém abre o que não sabe que tem. */
+function _ocoAtualizarBotao(ctx, reg) {
+  var b = document.getElementById(ctx === 'ee' ? 'btnEeOco' : 'btnEncOco');
+  if (!b) return;
+  var n = _ocoLista(reg).length;
+  b.textContent = '\uD83D\uDCCB OCORRÊNCIAS?' + (n ? ' (' + n + ')' : '');
+}
+
+function ocoAbrir(ctx) {
+  _ocoCtx = (ctx === 'ee') ? 'ee' : 'enc';
+  var reg = null;
+  if (_ocoCtx === 'enc') {
+    reg = (db && db.ativos || []).filter(function (x) { return x && x.id === _encId; })[0];
+  } else {
+    reg = (typeof _eeReg === 'function') ? _eeReg(_eeIdx) : null;
+  }
+  if (!reg) { toast('⚠️ Locação não encontrada. Recarregue a página.', '#b45309'); return; }
+  _ocoReg = reg;
+  // 🔴 trabalha numa CÓPIA: cancelar não pode deixar meia ocorrência gravada
+  _ocoRascunho = JSON.parse(JSON.stringify(_ocoLista(reg)));
+
+  var tc = _ocoContrato(reg);
+  var cx = document.getElementById('ocoInfo');
+  if (cx) {
+    cx.innerHTML = '<strong>' + _ocoEsc(reg.clienteNome || '—') + '</strong>'
+      + '<br>' + _ocoEsc(_placasDoAtivo(reg).join(', ') || reg.placa || '—')
+      + ' · contrato <strong>' + (tc === 'diaria' ? 'por diária' : 'mensal') + '</strong>'
+      + '<div style="font-size:10px;color:var(--muted);margin-top:5px">As cláusulas citadas são as do '
+      + 'contrato ' + (tc === 'diaria' ? 'por diária' : 'mensal') + ' — a numeração é diferente entre os dois.</div>';
+  }
+  ocoRender();
+  openM('mOcorrencias');
+}
+
+function ocoRender() {
+  var tc = _ocoContrato(_ocoReg);
+  var lista = _ocoRascunho || [];
+  var c = _ocoContagem(lista);
+
+  var tb = document.getElementById('ocoLista');
+  if (tb) {
+    tb.innerHTML = !lista.length
+      ? '<div style="text-align:center;padding:22px;color:var(--muted);font-size:12px">'
+        + 'Nenhuma ocorrência registrada. Use “+ Adicionar ocorrência”.</div>'
+      : lista.map(function (o, i) {
+          var t = _ocoTipo(o.tipo);
+          var sit = OCO_SITUACOES[o.situacao] || OCO_SITUACOES.a_cobrar;
+          var cls = _ocoClausulas(o.tipo, tc);
+          var v = mltNum(o.valor);
+          return '<div style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px">'
+            + '<div style="display:flex;gap:8px;align-items:flex-start">'
+            + '<div style="flex:1">'
+              + '<strong style="font-size:12px">' + _ocoEsc(t.rot) + '</strong>'
+              + ' <span style="background:' + sit.bg + ';color:' + sit.cor
+                + ';padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700">' + sit.rot + '</span>'
+              + (o.descricao ? '<div style="font-size:11px;color:var(--dark);margin-top:4px">' + _ocoEsc(o.descricao) + '</div>' : '')
+              + '<div style="font-size:10px;color:var(--muted);margin-top:4px">'
+                + (cls.length
+                    ? '📜 ' + _ocoEsc(_ocoRefs(o.tipo, tc))
+                    : '<span style="color:#b45309">⚠ o contrato ' + (tc === 'diaria' ? 'por diária' : 'mensal')
+                      + ' não prevê cobrança para este item</span>')
+              + '</div>'
+            + '</div>'
+            + '<div style="text-align:right;white-space:nowrap">'
+              + '<div style="font-weight:700;font-size:12px">'
+                + (v > 0 ? brl(v) : '<span style="color:var(--muted);font-weight:400">sem valor</span>') + '</div>'
+              + '<button class="icon-btn" onclick="ocoRemover(' + i + ')" title="Remover" '
+                + 'style="color:#c0392b;border-color:#f5c6cb;margin-top:5px">🗑</button>'
+            + '</div></div></div>';
+        }).join('');
+  }
+
+  var res = document.getElementById('ocoResumo');
+  if (res) {
+    var soma = _ocoSoma(lista);
+    res.innerHTML = !c.total ? '' :
+      '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">'
+      + '<span><strong>' + c.total + '</strong> ocorrência(s)</span>'
+      + (c.a_cobrar ? '<span style="color:#b45309">' + c.a_cobrar + ' a cobrar</span>' : '')
+      + (c.averiguar ? '<span style="color:#2B4BF2">' + c.averiguar + ' em averiguação</span>' : '')
+      + (c.cobrada ? '<span style="color:#0d7a3e">' + c.cobrada + ' já comunicada(s)</span>' : '')
+      + '<span style="margin-left:auto;font-weight:700">Total a cobrar: ' + brl(soma) + '</span>'
+      + '</div>'
+      + (c.averiguar
+          ? '<div style="font-size:10px;color:var(--muted);margin-top:5px">⚠ o que está em averiguação '
+            + '<strong>não</strong> entra no total: ainda não se sabe o valor.</div>'
+          : '');
+  }
+
+  // o seletor de tipo mostra, ao lado de cada opção, se há amparo no contrato
+  var sel = document.getElementById('ocoTipo');
+  if (sel) {
+    var atual = sel.value;
+    sel.innerHTML = OCO_TIPOS.map(function (t) {
+      var tem = _ocoClausulas(t.id, tc).length;
+      return '<option value="' + t.id + '"' + (t.id === atual ? ' selected' : '') + '>'
+        + _ocoEsc(t.rot) + (tem ? '' : ' — sem cláusula neste contrato') + '</option>';
+    }).join('');
+  }
+  _ocoAvisoClausula();
+}
+
+/* Ao escolher o tipo, a tela mostra a cláusula que vai ser citada — ou diz
+   que não há. 🔴 É o momento de descobrir isso: depois de o comunicado estar
+   impresso e enviado, já é tarde. */
+function _ocoAvisoClausula() {
+  var av = document.getElementById('ocoAvisoCl');
+  if (!av) return;
+  var tipo = (document.getElementById('ocoTipo') || {}).value || '';
+  var tc = _ocoContrato(_ocoReg);
+  var cls = _ocoClausulas(tipo, tc);
+  if (cls.length) {
+    av.style.display = 'block';
+    av.style.background = '#eef1fd'; av.style.borderLeftColor = '#2B4BF2'; av.style.color = '#1e3a8a';
+    av.innerHTML = '📜 Será citada: <strong>' + _ocoEsc(_ocoRefs(tipo, tc)) + '</strong> — '
+      + _ocoEsc(cls.map(function (c) { return c.titulo; }).join(' · '));
+  } else {
+    av.style.display = 'block';
+    av.style.background = '#fff8e6'; av.style.borderLeftColor = '#b45309'; av.style.color = '#7c5010';
+    av.innerHTML = '⚠ <strong>O contrato ' + (tc === 'diaria' ? 'por diária' : 'mensal')
+      + ' não prevê cobrança para este item.</strong> A ocorrência pode ser registrada, mas o comunicado '
+      + 'sairá <strong>sem citação de cláusula</strong> — não inventamos amparo que o contrato não dá.';
+  }
+}
+
+function ocoAdicionar() {
+  var tipo = (document.getElementById('ocoTipo') || {}).value || '';
+  var desc = ((document.getElementById('ocoDesc') || {}).value || '').trim();
+  var valTxt = ((document.getElementById('ocoValor') || {}).value || '').trim();
+  var sit = (document.getElementById('ocoSituacao') || {}).value || 'a_cobrar';
+
+  if (!tipo) { toast('⚠️ Escolha o tipo da ocorrência', '#b45309'); return; }
+  if (!desc) { toast('⚠️ Descreva a ocorrência — é o que o cliente vai ler no comunicado', '#b45309'); return; }
+
+  // 🔴 Exige dígito: mltNum('abc') devolve 0, e 0 é valor legítimo ("sem
+  //    valor ainda"). Sem conferir, um erro de digitação viraria cobrança
+  //    de R$ 0,00 sem ninguém notar.
+  if (valTxt && !/\d/.test(valTxt)) { toast('⚠️ O valor não parece um número', '#b45309'); return; }
+  var val = valTxt ? mltNum(valTxt) : 0;
+  if (val < 0) { toast('⚠️ O valor não pode ser negativo', '#c0392b'); return; }
+
+  // 🔴 "A cobrar" sem valor seria um comunicado que cobra nada. Quem ainda
+  //    não sabe o valor usa "Em averiguação" — que é justamente o caso das
+  //    multas que podem chegar depois.
+  if ((sit === 'a_cobrar' || sit === 'cobrada') && val <= 0) {
+    toast('⚠️ Para cobrar é preciso informar o valor. Sem valor ainda, use “Em averiguação”.', '#b45309');
+    return;
+  }
+
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
+  _ocoRascunho.push({
+    id: 'oco' + Date.now() + '_' + _ocoRascunho.length,
+    tipo: tipo, descricao: desc, valor: val, situacao: sit,
+    criadoEm: new Date().toISOString(),
+    criadoPor: sess.nome || sess.usuario || ''
+  });
+
+  ['ocoDesc', 'ocoValor'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+  ocoRender();
+  toast('✅ Ocorrência adicionada', '#0d7a3e');
+}
+
+function ocoRemover(i) {
+  var o = _ocoRascunho[i];
+  if (!o) { toast('⚠️ Ocorrência não encontrada', '#c0392b'); return; }
+  if (!confirm('Remover esta ocorrência?\n\n' + _ocoTipo(o.tipo).rot + '\n' + (o.descricao || ''))) return;
+  _ocoRascunho.splice(i, 1);
+  ocoRender();
+}
+
+/* Guarda no registro. No encerramento em andamento o registro ainda é o
+   ativo — o confirmarEnc leva o objeto inteiro para o histórico, então as
+   ocorrências vão junto sem gravação separada. No encerrado, grava. */
+function ocoSalvar() {
+  if (!_ocoReg) { toast('⚠️ Locação não encontrada', '#c0392b'); return; }
+  _ocoReg.ocorrencias = JSON.parse(JSON.stringify(_ocoRascunho));
+  var n = _ocoRascunho.length;
+
+  if (_ocoCtx === 'ee') {
+    // 🔴 grava só o nó do histórico, por caminho — nunca o loka_db inteiro
+    try {
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+        firebase.database().ref('loka_db/historico').set(db.historico);
+        firebase.database().ref('loka_db/_writerBuild')
+          .set(typeof LOKA_BUILD !== 'undefined' ? LOKA_BUILD : '');
+      } else { toast('⚠️ Sem conexão: as ocorrências NÃO foram gravadas', '#c0392b'); return; }
+    } catch (e) {
+      toast('⚠️ As ocorrências NÃO foram gravadas: ' + (e && e.message || 'erro'), '#c0392b');
+      return;
+    }
+    if (typeof renderHistorico === 'function') renderHistorico();
+  } else {
+    _ocoOferecerAcerto();
+  }
+  _ocoAtualizarBotao(_ocoCtx, _ocoReg);
+  closeM('mOcorrencias');
+  toast(n ? '✅ ' + n + ' ocorrência(s) registrada(s)' : '✅ Ocorrências limpas', '#0d7a3e');
+}
+
+/* 🔴 OFERECE levar os valores para as cobranças da devolução — não aplica.
+   O acerto da devolução (v147) abate da caução; as ocorrências podem ser
+   cobradas por fora. Escrever sozinho nos campos criaria dois números para
+   a mesma dívida, e aplicar em cima do que o operador digitou apagaria o
+   trabalho dele. Mesma regra do botão "usar as N" do Endividamento. */
+function _ocoOferecerAcertoDe(reg) { var g = _ocoReg; _ocoReg = reg; try { _ocoOferecerAcerto(); } finally { _ocoReg = g; } }
+function _ocoOferecerAcerto() {
+  var box = document.getElementById('encOcoAviso');
+  if (!box) return;
+  var lista = _ocoLista(_ocoReg);
+  var s = _ocoSomaPorCat(lista);
+  var total = _ocoSoma(lista);
+  var c = _ocoContagem(lista);
+  if (!c.total) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  var atual = {
+    lavagem: mltNum((document.getElementById('encLavagem') || {}).value || ''),
+    avaria:  mltNum((document.getElementById('encAvaria')  || {}).value || ''),
+    outros:  mltNum((document.getElementById('encOutros')  || {}).value || '')
+  };
+  var difere = (s.lavagem !== atual.lavagem) || (s.avaria !== atual.avaria) || (s.outros !== atual.outros);
+
+  box.style.display = 'block';
+  box.innerHTML = '<strong>' + c.total + ' ocorrência(s)</strong> registrada(s)'
+    + (total > 0 ? ' · a cobrar <strong>' + brl(total) + '</strong>' : '')
+    + (c.averiguar ? ' · ' + c.averiguar + ' em averiguação' : '')
+    + (difere && total > 0
+        ? '<div style="margin-top:6px;font-size:10px;line-height:1.5">As cobranças desta tela estão em '
+          + 'lavagem ' + brl(atual.lavagem) + ' · avaria ' + brl(atual.avaria) + ' · outros ' + brl(atual.outros)
+          + '. <button type="button" onclick="ocoUsarNoAcerto()" style="border:1px solid #e2e5f0;'
+          + 'background:#fff;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer" '
+          + 'title="Substitui os três campos de cobrança pela soma das ocorrências, por categoria">'
+          + 'usar ' + brl(s.lavagem) + ' / ' + brl(s.avaria) + ' / ' + brl(s.outros) + '</button></div>'
+        : '')
+    + '<div style="margin-top:5px"><button type="button" onclick="ocoComunicado(\'enc\')" '
+      + 'style="border:1px solid #2B4BF2;color:#2B4BF2;background:#fff;border-radius:5px;padding:3px 8px;'
+      + 'font-size:10px;cursor:pointer;font-weight:700">📄 Comunicado de cobrança</button></div>';
+}
+
+function ocoUsarNoAcerto() {
+  var s = _ocoSomaPorCat(_ocoLista(_ocoReg));
+  var fmt = function (n) { return n > 0 ? n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
+  var v = function (id, val) { var e = document.getElementById(id); if (e) e.value = val; };
+  v('encLavagem', fmt(s.lavagem)); v('encAvaria', fmt(s.avaria)); v('encOutros', fmt(s.outros));
+  if (!mltNum((document.getElementById('encOutrosDesc') || {}).value || '') && s.outros > 0) {
+    var e = document.getElementById('encOutrosDesc');
+    if (e && !e.value) e.value = 'Ocorrências na devolução';
+  }
+  if (typeof _encRenderAcerto === 'function') _encRenderAcerto('enc');
+  _ocoOferecerAcerto();
+  toast('✅ Valores das ocorrências levados para as cobranças', '#0d7a3e');
+}
+
+/* ── O comunicado de cobrança ────────────────────────────────── */
+function ocoComunicado(ctx) {
+  var reg = null;
+  if (ctx === 'ee') reg = (typeof _eeReg === 'function') ? _eeReg(_eeIdx) : null;
+  else reg = (db && db.ativos || []).filter(function (x) { return x && x.id === _encId; })[0] || _ocoReg;
+  if (!reg) { toast('⚠️ Locação não encontrada', '#c0392b'); return; }
+
+  var lista = _ocoLista(reg);
+  // 🔴 Comunicado sem ocorrência seria um documento que não comunica nada.
+  var cobraveis = lista.filter(function (o) {
+    return o && (o.situacao === 'a_cobrar' || o.situacao === 'cobrada') && mltNum(o.valor) > 0;
+  });
+  var averiguar = lista.filter(function (o) { return o && o.situacao === 'averiguar'; });
+  if (!cobraveis.length && !averiguar.length) {
+    toast('⚠️ Não há ocorrência a cobrar nem em averiguação para comunicar', '#b45309');
+    return;
+  }
+
+  var tc = _ocoContrato(reg);
+  var cli = (db.clients || []).filter(function (c) { return c && reg.clienteId && c.id === reg.clienteId; })[0] || {};
+  var total = cobraveis.reduce(function (s, o) { return s + mltNum(o.valor); }, 0);
+  total = Math.round(total * 100) / 100;
+
+  // as cláusulas citadas, sem repetir
+  var vistas = {}, citadas = [];
+  cobraveis.concat(averiguar).forEach(function (o) {
+    _ocoClausulas(o.tipo, tc).forEach(function (c) {
+      if (!vistas[c.ref + c.titulo]) { vistas[c.ref + c.titulo] = 1; citadas.push(c); }
+    });
+  });
+  // a mora entra só quando há valor a cobrar
+  if (total > 0) {
+    var m = OCO_CLAUSULAS[tc === 'diaria' ? 'mora_d' : 'mora_m'];
+    if (m && !vistas[m.ref + m.titulo]) { vistas[m.ref + m.titulo] = 1; citadas.push(m); }
+  }
+  citadas.sort(function (a, b) { return parseInt(a.ref, 10) - parseInt(b.ref, 10); });
+
+  var semAmparo = cobraveis.filter(function (o) { return !_ocoClausulas(o.tipo, tc).length; });
+
+  var dt = function (s) { return s ? String(s).split('-').reverse().join('/') : '—'; };
+  var hoje = new Date();
+  var hojeTxt = ('0' + hoje.getDate()).slice(-2) + '/' + ('0' + (hoje.getMonth() + 1)).slice(-2) + '/' + hoje.getFullYear();
+  var num = 'CC-' + hoje.getFullYear() + ('0' + (hoje.getMonth() + 1)).slice(-2)
+    + ('0' + hoje.getDate()).slice(-2) + '-' + ('0' + hoje.getHours()).slice(-2) + ('0' + hoje.getMinutes()).slice(-2);
+
+  var linha = function (o) {
+    var refs = _ocoRefs(o.tipo, tc);
+    return '<tr>'
+      + '<td>' + _ocoEsc(_ocoTipo(o.tipo).rot.replace(/^[^\wÀ-ÿ]+\s*/, '')) + '</td>'
+      + '<td>' + _ocoEsc(o.descricao || '—') + '</td>'
+      + '<td style="white-space:nowrap">' + (refs ? _ocoEsc(refs)
+          : '<span style="color:#7c5010">não prevista no contrato</span>') + '</td>'
+      + '<td class="r">' + (mltNum(o.valor) > 0 ? brl(mltNum(o.valor)) : '—') + '</td>'
+      + '</tr>';
+  };
+
+  var h = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    + '<title>Comunicado de Cobrança ' + num + '</title><style>'
+    + '@page{size:A4;margin:14mm}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;font-size:11.5px;color:#111827;padding:24px;line-height:1.55}'
+    + '.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0E1B4D;padding-bottom:10px;margin-bottom:14px}'
+    + '.hd h1{font-size:17px;margin:0 0 3px;color:#0E1B4D}'
+    + '.hd .emp{font-size:10px;color:#444;line-height:1.5}'
+    + '.num{font-size:10px;text-align:right;color:#444}'
+    + '.bx{background:#f4f6fb;border-radius:7px;padding:10px 12px;margin-bottom:12px;font-size:11px}'
+    + 'table{width:100%;border-collapse:collapse;margin:10px 0;font-size:10.5px}'
+    + 'th{background:#0E1B4D;color:#fff;text-align:left;padding:6px 7px;font-size:10px}'
+    + 'td{padding:6px 7px;border-bottom:1px solid #e5e7eb;vertical-align:top}'
+    + '.r{text-align:right;white-space:nowrap}'
+    + 'tfoot td{font-weight:700;background:#f4f6fb;border-top:2px solid #0E1B4D}'
+    + '.cl{font-size:9.5px;color:#333;background:#fafbfe;border-left:3px solid #0E1B4D;padding:8px 10px;margin:6px 0}'
+    + '.av{font-size:10px;background:#fff8e6;border-left:3px solid #b45309;padding:8px 10px;margin:8px 0;color:#7c5010}'
+    + '.as{margin-top:30px;display:flex;gap:30px}'
+    + '.as div{flex:1;border-top:1px solid #111827;padding-top:5px;font-size:9.5px;text-align:center}'
+    + '.ft{margin-top:16px;border-top:1px solid #e5e7eb;padding-top:8px;font-size:9px;color:#666;text-align:center}'
+    + '</style></head><body>'
+    + '<div class="hd"><div>'
+      + '<h1>Comunicado de Cobrança</h1>'
+      + '<div class="emp"><strong>LOKÁ Aluguel de Veículos</strong> — Rodera Transportes LTDA'
+      + '<br>CNPJ 39.911.638/0001-10 · Feira de Santana/BA</div>'
+    + '</div><div class="num">Nº <strong>' + num + '</strong><br>' + hojeTxt + '</div></div>'
+
+    + '<div class="bx">'
+      + '<strong>' + _ocoEsc(reg.clienteNome || cli.nome || '—') + '</strong>'
+      + (cli.cpf || cli.cnpj ? '<br>CPF/CNPJ: ' + _ocoEsc(cli.cpf || cli.cnpj) : '')
+      + (cli.endereco ? '<br>' + _ocoEsc(cli.endereco) : '')
+      + '<br>Veículo: <strong>' + _ocoEsc(_placasDoAtivo(reg).join(', ') || reg.placa || '—') + '</strong>'
+        + (reg.veiculoNome ? ' — ' + _ocoEsc(reg.veiculoNome) : '')
+      + '<br>Locação: ' + dt(reg.retirada) + ' a ' + dt(reg.devolvido || reg.devolucao)
+        + ' · contrato <strong>' + (tc === 'diaria' ? 'por diária' : 'mensal') + '</strong>'
+    + '</div>'
+
+    + '<p>Prezado(a) Cliente,</p>'
+    + '<p>Comunicamos que, na devolução do veículo acima, foram constatadas as situações relacionadas a seguir, '
+    + 'cuja responsabilidade é do LOCATÁRIO nos termos do contrato de locação firmado entre as partes.</p>';
+
+  if (cobraveis.length) {
+    h += '<table><thead><tr><th>Situação</th><th>Descrição</th><th>Amparo contratual</th><th class="r">Valor</th></tr></thead>'
+      + '<tbody>' + cobraveis.map(linha).join('') + '</tbody>'
+      + '<tfoot><tr><td colspan="3">TOTAL A PAGAR</td><td class="r">' + brl(total) + '</td></tr></tfoot></table>';
+  }
+
+  if (averiguar.length) {
+    h += '<div class="av"><strong>Em averiguação</strong> — as situações a seguir ainda estão sendo apuradas e '
+      + '<strong>não</strong> estão incluídas no total acima. Serão comunicadas em separado, se devidas:'
+      + '<ul style="margin:6px 0 0;padding-left:18px">'
+      + averiguar.map(function (o) {
+          var r = _ocoRefs(o.tipo, tc);
+          return '<li>' + _ocoEsc(_ocoTipo(o.tipo).rot.replace(/^[^\wÀ-ÿ]+\s*/, ''))
+            + (o.descricao ? ': ' + _ocoEsc(o.descricao) : '')
+            + (r ? ' (' + _ocoEsc(r) + ')' : '') + '</li>';
+        }).join('')
+      + '</ul></div>';
+  }
+
+  // 🔴 Diz na cara quando um item cobrado não tem cláusula naquele contrato.
+  //    Quem assina o documento tem de saber disso ANTES de enviar.
+  if (semAmparo.length) {
+    h += '<div class="av"><strong>Atenção:</strong> '
+      + semAmparo.map(function (o) { return _ocoEsc(_ocoTipo(o.tipo).rot.replace(/^[^\wÀ-ÿ]+\s*/, '')); }).join(', ')
+      + ' — o contrato ' + (tc === 'diaria' ? 'por diária' : 'mensal')
+      + ' não traz cláusula específica para este item, por isso ele aparece sem citação. '
+      + 'A cobrança se apoia no acerto entre as partes.</div>';
+  }
+
+  if (citadas.length) {
+    h += '<p style="margin-top:14px"><strong>Cláusulas do contrato ' + (tc === 'diaria' ? 'por diária' : 'mensal')
+      + ' a que se referem as cobranças:</strong></p>';
+    citadas.forEach(function (c) {
+      h += '<div class="cl"><strong>Cláusula ' + c.ref + ' — ' + _ocoEsc(c.titulo) + '.</strong> ' + _ocoEsc(c.texto) + '</div>';
+    });
+  }
+
+  if (total > 0) {
+    h += '<p style="margin-top:14px">Solicitamos o pagamento do valor total de <strong>' + brl(total)
+      + '</strong>. Em caso de dúvida quanto a qualquer item, permanecemos à disposição para esclarecimento e '
+      + 'apresentação dos comprovantes correspondentes.</p>';
+  }
+
+  h += '<div class="as"><div>LOKÁ Aluguel de Veículos<br>Rodera Transportes LTDA</div>'
+    + '<div>Ciente — ' + _ocoEsc(reg.clienteNome || '') + '</div></div>'
+    + '<div class="ft">LOKÁ Aluguel de Veículos — Rodera Transportes LTDA · CNPJ 39.911.638/0001-10 · '
+    + 'Feira de Santana/BA · Documento gerado em ' + hojeTxt + '</div>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { toast('⚠️ O navegador bloqueou a janela. Libere o pop-up e tente de novo.', '#b45309'); return; }
+  w.document.write(h);
+  w.document.close();
+  setTimeout(function () { try { w.print(); } catch (e) {} }, 400);
+}
 
 /* ═══════════════════════════════════════════════════════════════
    ALMOXARIFADO — estoque de peças e componentes
