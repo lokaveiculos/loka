@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v153-20261112-1020 -->
+<!-- LOKA deploy: v154-20261112-1430 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1306,6 +1306,33 @@ tr:hover td{background:#f8f9fe;}
 <!-- 🔴 z-index acima do padrão (500): este modal abre POR CIMA do de
      encerramento, e com z-index igual quem fica na frente depende da ordem
      no documento — frágil demais para uma tela que guarda dinheiro. -->
+<!-- MODAL: O QUE FAZER COM O ALUGUEL ENCERRADO -->
+<!-- z-index acima do padrão: pode abrir por cima do modal de edição. -->
+<div class="modal-bg" id="mEeDestino" style="z-index:600"><div class="modal" style="max-width:480px">
+  <div class="modal-head" style="background:#c0392b"><h3>Aluguel encerrado — o que fazer?</h3><button class="modal-close" onclick="closeM('mEeDestino')">&#10005;</button></div>
+  <div class="modal-body">
+    <div id="eeDestinoInfo" style="background:#fdecea;border-radius:8px;padding:11px 13px;font-size:12px;margin-bottom:12px"></div>
+    <div id="eeDestinoAviso" style="display:none;background:#fdecea;border-left:3px solid #c0392b;border-radius:6px;padding:9px 11px;font-size:11px;color:#8a2318;line-height:1.5;margin-bottom:12px"></div>
+
+    <button type="button" class="btn btn-blue" id="btnEeReativar" onclick="reativarEncerrado()"
+            style="width:100%;justify-content:center;font-weight:800">
+      ↩ Voltar para Aluguéis Ativos</button>
+    <div style="font-size:10px;color:var(--muted);margin:5px 0 16px;line-height:1.45">
+      Desfaz o encerramento: o veículo volta a constar como alugado e a locação reaparece nos ativos. A data de devolução real, o valor final, a condição e as cobranças lançadas no encerramento são apagados.
+    </div>
+
+    <button type="button" class="btn" onclick="_eeExcluirDefinitivo()"
+            style="width:100%;justify-content:center;background:#c0392b;color:#fff;font-weight:800">
+      🗑 Excluir permanentemente</button>
+    <div style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.45">
+      O registro sai do sistema de vez. O banco <strong>não tem lixeira</strong> e a locação <strong>não</strong> volta para os ativos depois disso.
+    </div>
+    <div id="eeDestinoPerdas" style="font-size:11px;color:#7c5010;background:#fff8e6;border-radius:6px;padding:8px 10px;margin-top:8px"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeM('mEeDestino')" style="flex:1;justify-content:center">Cancelar</button>
+  </div>
+</div></div>
 <div class="modal-bg" id="mOcorrencias" style="z-index:600"><div class="modal" style="max-width:560px">
   <div class="modal-head" style="background:#0E1B4D"><h3>📋 Ocorrências da devolução</h3><button class="modal-close" onclick="closeM('mOcorrencias')">&#10005;</button></div>
   <div class="modal-body">
@@ -1698,7 +1725,7 @@ tr:hover td{background:#f8f9fe;}
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeM('mEditarEncerrado')">Cancelar</button>
     <button class="btn btn-outline" style="font-size:11px" onclick="_eeBaixarCopia(_eeIdx)" title="Baixa uma cópia em JSON antes de mexer — o banco não tem lixeira">💾 Cópia</button>
-    <button class="btn btn-outline" style="color:var(--red)" onclick="excluirEncerrado(_eeIdx)">🗑️ Excluir</button>
+    <button class="btn btn-outline" style="color:var(--red)" onclick="excluirEncerrado(_eeIdx)" title="Excluir de vez ou voltar para os Aluguéis Ativos">🗑️ Excluir / Reativar</button>
     <button class="btn btn-blue" style="flex:1" onclick="salvarEncerrado()">Salvar alterações</button>
   </div>
 </div></div>
@@ -1828,7 +1855,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v153-20261112-1020';
+var LOKA_BUILD = 'v154-20261112-1430';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -5538,16 +5565,233 @@ function _eeBaixarCopia(i) {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ENCERRAMENTO DESFEITO — a locação volta para os Aluguéis Ativos
+   ═══════════════════════════════════════════════════════════════
+   🔴 Encerrar por engano era irreversível: o único caminho no encerrado
+   era EXCLUIR, e o registro ia embora de vez. Agora o 🗑 pergunta
+   primeiro o que fazer.
+
+   🔴 E reativar NÃO é mover o registro de volta. A armadilha 5 do
+   sistema (locações encerradas ressuscitando) montou QUATRO defesas, e
+   o `aplicarEncerrados` consulta todas no carregamento:
+
+     1. loka_db/encerrados/<id>
+     2. o próprio db.historico (id no histórico = encerrado)
+     3. loka_encerrados/<id>            — lápide, FORA do loka_db
+     4. loka_encerrados/sig_<assinatura> — e a assinatura calculada do
+        histórico (cliente + placas + retirada + devolução)
+
+   Esquecer UMA delas faz o aluguel voltar e sumir no próximo F5 — e
+   isso se leria como "o sistema está bugado", não como defesa
+   funcionando. Por isso a reativação limpa as quatro, no banco E na
+   memória (`window._tombstones`, `window._encerradosRecentes`).
+
+   ⚠️ As lápides de OUTRAS locações não são tocadas: elas são o que
+   protege o resto da frota.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Os campos que o encerramento acrescenta. Reativando, eles saem — senão
+   a locação volta aos ativos carregando data de devolução real, valor
+   final e condição, que são fatos de um encerramento que foi desfeito. */
+var _eeRegAberto = null;
+var EE_CAMPOS_ENC = ['devolvido', 'kmDev', 'valorFinal', 'condicao', 'obs',
+                     'encLavagem', 'encAvaria', 'encOutros', 'encOutrosDesc',
+                     'encForma', 'encerradoEm', 'editadoEm', 'editadoPor',
+                     'ocorrencias'];
+
+/* O 🗑 não exclui mais direto: pergunta. */
 function excluirEncerrado(i) {
+  if (!_ehMasterAdmin()) {
+    toast('⚠️ Só master ou administrador mexe em aluguel encerrado', '#b45309'); return;
+  }
+  var h = _eeReg(i);
+  if (!h) { toast('⚠️ Registro não encontrado. Recarregue a página.', '#c0392b'); return; }
+  _eeIdx = i;
+  // 🔴 guarda a REFERENCIA do registro, nao so o indice: o modal fica
+  //    aberto, e nesse intervalo outra aba pode mexer na lista. Comparar
+  //    db.historico[i] com _eeReg(i) na mesma linha nunca dá diferente
+  //    (os dois são o mesmo objeto) — a guarda só vale contra o que ficou
+  //    guardado antes.
+  _eeRegAberto = h;
+  var d = _eeDependencias(h);
+  var conflito = _eeConflitoPlaca(h);
+
+  var cx = document.getElementById('eeDestinoInfo');
+  if (cx) {
+    cx.innerHTML = '<strong>' + _ocoEsc(h.clienteNome || '—') + '</strong>'
+      + '<br>' + _ocoEsc(h.veiculoNome || '—') + ' · ' + _ocoEsc(mltFmtPlaca(h.placa) || '—')
+      + '<br>Retirada ' + fmt(h.retirada) + ' · devolvido ' + fmt(h.devolvido || h.devolucao)
+      + '<br>Valor: <strong>' + _ocoEsc(h.valorFinal || '—') + '</strong>';
+  }
+
+  // o que a reativação encontra no caminho
+  var av = document.getElementById('eeDestinoAviso');
+  if (av) {
+    if (conflito) {
+      av.style.display = 'block';
+      av.innerHTML = '🔴 <strong>A placa ' + _ocoEsc(mltFmtPlaca(h.placa) || '')
+        + ' já está em outro aluguel ativo</strong> (' + _ocoEsc(conflito.clienteNome || '—')
+        + '). Voltar esta locação para os ativos deixaria o mesmo carro alugado duas vezes — '
+        + 'por isso a reativação está bloqueada. Encerre o outro aluguel primeiro.';
+    } else { av.style.display = 'none'; av.innerHTML = ''; }
+  }
+
+  var ex = document.getElementById('eeDestinoPerdas');
+  if (ex) {
+    var p = [];
+    if (d.multas)       p.push(d.multas + ' multa(s) ficam sem o vínculo desta locação');
+    if (d.prorrogacoes) p.push(d.prorrogacoes + ' prorrogação(ões) somem junto — a 2ª via desses termos deixa de existir');
+    ex.innerHTML = p.length
+      ? '<strong>Excluindo, você perde:</strong><ul style="margin:5px 0 0;padding-left:18px">'
+        + p.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>'
+      : '';
+  }
+
+  var btn = document.getElementById('btnEeReativar');
+  if (btn) btn.disabled = !!conflito;
+
+  openM('mEeDestino');
+}
+
+/* 🔴 O mesmo carro não pode estar alugado duas vezes. Compara por TODAS as
+   placas dos dois lados (contrato multi-veículo — armadilha 2). */
+function _eeConflitoPlaca(h) {
+  var minhas = {};
+  _placasDoAtivo(h).forEach(function (p) { var k = _normPlacaCmp(p); if (k) minhas[k] = 1; });
+  if (!Object.keys(minhas).length) return null;
+  var achou = null;
+  (db && db.ativos || []).forEach(function (a) {
+    if (!a || achou) return;
+    _placasDoAtivo(a).forEach(function (p) {
+      var k = _normPlacaCmp(p);
+      if (k && minhas[k]) achou = a;
+    });
+  });
+  return achou;
+}
+
+/* ── Voltar para os Aluguéis Ativos ─────────────────────────── */
+function reativarEncerrado() {
+  if (!_ehMasterAdmin()) {
+    toast('⚠️ Só master ou administrador reativa aluguel encerrado', '#b45309'); return;
+  }
+  var i = _eeIdx;
+  var h = _eeReg(i);
+  if (!h) { toast('⚠️ Registro não encontrado. Recarregue a página.', '#c0392b'); return; }
+
+  garantirArray('historico'); garantirArray('ativos'); garantirArray('veiculos');
+
+  // 🔴 o índice ainda tem de apontar para o registro que o modal abriu
+  if (!_eeRegAberto || db.historico[i] !== _eeRegAberto || h !== _eeRegAberto) {
+    toast('⚠️ A lista mudou enquanto você confirmava. Recarregue e tente de novo.', '#b45309');
+    closeM('mEeDestino'); renderHistorico(); return;
+  }
+  var conflito = _eeConflitoPlaca(h);
+  if (conflito) {
+    toast('⚠️ A placa já está em outro aluguel ativo (' + (conflito.clienteNome || '—')
+      + '). Encerre aquele antes.', '#c0392b');
+    return;
+  }
+
+  if (!confirm('Voltar esta locação para os Aluguéis Ativos?\n\n'
+      + (h.clienteNome || '—') + '\n' + (h.veiculoNome || '—') + ' · ' + (mltFmtPlaca(h.placa) || '—') + '\n'
+      + 'Retirada ' + fmt(h.retirada) + ' · devolução prevista ' + fmt(h.devolucao) + '\n\n'
+      + 'O encerramento é DESFEITO: a data de devolução real, o valor final, a condição '
+      + 'na devolução e as cobranças lançadas no encerramento são apagados.\n'
+      + 'O veículo volta a constar como alugado.')) return;
+
+  // monta o ativo de volta, sem os campos do encerramento
+  var ativo = Object.assign({}, h);
+  EE_CAMPOS_ENC.forEach(function (k) { delete ativo[k]; });
+  ativo.status = 'ativo';
+  var sess = {}; try { sess = JSON.parse(sessionStorage.getItem('loka_user') || '{}'); } catch (e) {}
+  ativo.reativadoEm = new Date().toISOString();
+  ativo.reativadoPor = sess.nome || sess.usuario || '';
+
+  var sig = _assinaturaAtivo(h);
+
+  db.historico.splice(i, 1);
+  db.ativos.push(ativo);
+
+  // o veículo volta a alugado
+  var _npl = function (p) { return String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+  var vIdx = db.veiculos.findIndex(function (v) { return v && ativo.veiculoId && v.id === ativo.veiculoId; });
+  if (vIdx < 0 && ativo.placa) {
+    vIdx = db.veiculos.findIndex(function (v) { return v && _npl(v.placa) === _npl(ativo.placa); });
+  }
+  if (vIdx >= 0) db.veiculos[vIdx].status = 'alugado';
+
+  // 🔴 as 4 defesas, em MEMÓRIA — sem isto o aplicarEncerrados remove o
+  //    aluguel outra vez já nesta sessão, sem recarregar nada.
+  try { if (db.encerrados) delete db.encerrados[ativo.id]; } catch (e) {}
+  try { if (window._encerradosRecentes) delete window._encerradosRecentes[ativo.id]; } catch (e) {}
+  try {
+    if (window._tombstones) {
+      delete window._tombstones[ativo.id];
+      if (sig) delete window._tombstones[sig];
+    }
+  } catch (e) {}
+
+  // ...e no BANCO. A lápide mora FORA do loka_db, então o saveDB não a
+  // alcança: é remoção por caminho, e se ela falhar o aluguel volta a
+  // sumir — por isso a falha é dita, não engolida.
+  // ⚠️ o aviso de falha vai DENTRO do catch: ele é assíncrono, e um
+  //    `falhou` lido logo abaixo estaria sempre vazio — a mensagem de
+  //    sucesso sairia antes de se saber da falha.
+  var _avisaFalha = function (oque) {
+    return function () {
+      toast('⚠️ A locação voltou, mas FALHOU limpar ' + oque
+        + ' — ela pode sumir dos ativos ao recarregar. Avise o responsável.', '#c0392b');
+    };
+  };
+  try {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      firebase.database().ref('loka_encerrados/' + ativo.id).remove()
+        .catch(_avisaFalha('a lápide do id'));
+      if (sig) {
+        firebase.database().ref('loka_encerrados/' + sig).remove()
+          .catch(_avisaFalha('a lápide da assinatura'));
+      }
+      firebase.database().ref('loka_db/encerrados/' + ativo.id).remove()
+        .catch(_avisaFalha('a lista de encerrados'));
+    } else {
+      toast('⚠️ Sem conexão com o banco: NÃO foi possível reativar.', '#c0392b');
+      // desfaz o que mexi em memória, para a tela não mentir
+      db.ativos.pop(); db.historico.splice(i, 0, h);
+      if (vIdx >= 0) db.veiculos[vIdx].status = 'disponivel';
+      return;
+    }
+  } catch (e) {
+    toast('⚠️ NÃO foi possível reativar: ' + (e && e.message || 'erro'), '#c0392b');
+    db.ativos.pop(); db.historico.splice(i, 0, h);
+    if (vIdx >= 0) db.veiculos[vIdx].status = 'disponivel';
+    return;
+  }
+
+  saveDB();
+  _eeRegAberto = null;
+  closeM('mEeDestino');
+  closeM('mEditarEncerrado');
+  renderHistorico();
+  if (typeof renderAtivos === 'function') renderAtivos();
+  if (typeof renderVeiculos === 'function') renderVeiculos();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  toast('✅ ' + (ativo.clienteNome || 'Locação') + ' voltou para os Aluguéis Ativos', '#0d7a3e');
+}
+
+/* ── Excluir de vez (o que o 🗑 fazia antes) ─────────────────── */
+function _eeExcluirDefinitivo() {
   if (!_ehMasterAdmin()) {
     toast('⚠️ Só master ou administrador exclui aluguel encerrado', '#b45309'); return;
   }
+  var i = _eeIdx;
   var h = _eeReg(i);
   if (!h) { toast('⚠️ Registro não encontrado. Recarregue a página.', '#c0392b'); return; }
   var d = _eeDependencias(h);
 
-  var msg = 'EXCLUIR o aluguel encerrado?\n\n'
-    + (h.clienteNome || '—') + '\n' + (h.veiculoNome || '—') + ' · ' + mltFmtPlaca(h.placa) + '\n'
+  var msg = 'EXCLUIR PERMANENTEMENTE o aluguel encerrado?\n\n'
+    + (h.clienteNome || '—') + '\n' + (h.veiculoNome || '—') + ' · ' + (mltFmtPlaca(h.placa) || '—') + '\n'
     + 'Retirada ' + fmt(h.retirada) + ' · devolvido ' + fmt(h.devolvido || h.devolucao) + '\n'
     + 'Valor: ' + (h.valorFinal || '—') + '\n\n';
   if (d.multas)       msg += '🔴 ' + d.multas + ' multa(s) estão vinculadas a esta locação e ficarão sem o vínculo.\n';
@@ -5560,9 +5804,9 @@ function excluirEncerrado(i) {
 
   garantirArray('historico');
   var atual = db.historico[i];
-  // 🔴 confere que o indice ainda aponta para o MESMO registro: entre abrir a
-  // tela e confirmar, outra aba pode ter mexido na lista.
-  if (!atual || atual !== h) {
+  // 🔴 confere que o indice ainda aponta para o registro que o modal abriu:
+  // entre abrir a tela e confirmar, outra aba pode ter mexido na lista.
+  if (!atual || atual !== h || (_eeRegAberto && atual !== _eeRegAberto)) {
     toast('⚠️ A lista mudou enquanto você confirmava. Recarregue e tente de novo.', '#b45309');
     renderHistorico(); return;
   }
@@ -5570,6 +5814,7 @@ function excluirEncerrado(i) {
   // ⚠️ A lápide em loka_encerrados FICA de propósito: ela é o que impede a
   // locação de ressuscitar nos ativos (armadilha 5). Apagá-la reabriria isso.
   saveDB();
+  closeM('mEeDestino');
   closeM('mEditarEncerrado');
   renderHistorico();
   if (typeof renderDashboard === 'function') renderDashboard();
@@ -12140,7 +12385,7 @@ function _histAcoes(i) {
   return '<button class="btn btn-outline" style="font-size:10px;padding:4px 7px" '
        + 'onclick="editarEncerrado(' + i + ')" title="Editar este encerramento">✏️</button> '
        + '<button class="btn btn-outline" style="font-size:10px;padding:4px 7px;color:var(--red)" '
-       + 'onclick="excluirEncerrado(' + i + ')" title="Excluir este encerramento">✕</button>';
+       + 'onclick="excluirEncerrado(' + i + ')" title="Excluir ou voltar para os ativos">✕</button>';
 }
 
 function renderHistorico() {
@@ -12906,7 +13151,8 @@ var OCO_CLAUSULAS = {
   custos_m: { ref: '12ª', titulo: 'Demais Custos', texto:
     'A manutenção preventiva do veículo será por conta do LOCADOR, mediante apresentação de orçamento '
     + 'prévio. O LOCATÁRIO terá direito a 01 jogo de pneus a cada 40.000 km. Defeitos provenientes de mau '
-    + 'uso ou avarias são de responsabilidade do LOCATÁRIO.' },
+    + 'uso ou avarias são de responsabilidade do LOCATÁRIO. Caso o veículo seja devolvido sujo, será '
+    + 'cobrada tarifa de lavagem simples de R$ 50,00 ou R$ 150,00 para lavagem severa.' },
   custos_d: { ref: '14ª', titulo: 'Demais Custos', texto:
     'Caso o veículo seja devolvido sujo, será cobrada tarifa de lavagem simples de R$ 50,00 ou R$ 150,00 para '
     + 'lavagem severa.' },
@@ -12938,8 +13184,11 @@ var OCO_CLAUSULAS = {
 var OCO_TIPOS = [
   { id: 'avaria',       rot: '🔧 Avaria / dano no veículo', cat: 'avaria',
     mensal: ['devolucao', 'seguro', 'custos_m'], diaria: ['devolucao', 'seguro'] },
+  // ⚠️ desde 12/11/2026 o contrato MENSAL também prevê lavagem (Cláusula 12ª,
+  //    mesma tarifa da diária). Antes disso ele não previa, e o comunicado
+  //    saía sem citação — contrato assinado ANTES desta data não tem a cláusula.
   { id: 'lavagem',      rot: '🧽 Devolvido sujo (lavagem)', cat: 'lavagem',
-    mensal: [], diaria: ['custos_d', 'sujo_d'] },
+    mensal: ['custos_m'], diaria: ['custos_d', 'sujo_d'] },
   { id: 'multa',        rot: '🚨 Multa de trânsito', cat: 'outros',
     mensal: ['multas'], diaria: ['multas'] },
   { id: 'km_excedido',  rot: '🛣️ KM acima da franquia contratada', cat: 'outros',
