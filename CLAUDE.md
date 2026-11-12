@@ -8475,3 +8475,221 @@ renderizou. Era o meu recorte, não o render: a grade tinha **90 KB, 21 `<tr>` e
 3. **O contrato 920312070 (BV)** tinha `amortizado` gravado R$ 5.383,56 acima da
    conta antes de hoje — vale dizer se houve **amortização antecipada** nele,
    porque aí a conta pela contagem de parcelas fica incompleta.
+
+---
+
+## ✅ Coluna "Previsão Reparos" na aba Veículos — 12/11/2026 (`2380f29`) · Auto Mais
+
+Pedido: *"na aba veiculos criar uma coluna 'Previsao para Reparos' que
+apresente a previsao de valor que pode ser gasto com o veiculo com eventual
+garantia. permitir que cliquemos no botao para inserir as informações de
+previsao e criar tambem um botao para darmos baixa se o servico de fato vier a
+ser realizado, lançando o gasto em despesas e manutenção"*.
+
+⚠️ **"Despesas" é menu da Auto Mais** (a LOKÁ tem "Contas a Pagar"), e garantia
+de veículo vendido é coisa de revenda — por isso o alvo é o `automaiscar`.
+Conferido antes de abrir arquivo.
+
+### 🔴 A medição mostrou que o pedido é maior do que parece
+Não existia **nada** de previsão de reparo: nem campo, nem coluna. A garantia
+só aparecia nos **contratos** (90 dias do CDC + Termo Uber). Mas:
+
+| | |
+|---|---|
+| veículos | 51 (17 disponíveis, **34 vendidos**) |
+| 🔴 **vendas com garantia de 90 dias VIGENTE hoje** | **23** (= 22 carros) |
+| 🔴 **manutenções em carro JÁ VENDIDO** | **16 de 22 · R$ 13.172,35** |
+
+**A loja já gasta isso com garantia e não havia previsão nenhuma.** Era o
+número que justificava o pedido, e ele só aparece cruzando manutenção com
+status do veículo.
+
+### 🔴 A baixa NÃO monta despesa por conta própria
+Ela cria a **manutenção**, e a cadeia que já existia gera a despesa sozinha
+(`_despesaDeManutencao`, de 19/09). Para isso as 4 peças saíram do
+`gestao.html` para o **`firebase-shared.js`**:
+`DESP_TIPO_MANUT` · `_gravarTudo` · `_despesaDaManutencao` · `_despesaDeManutencao`.
+
+⚠️ Em duas cópias, uma aprenderia regra nova e a outra não — foi exatamente o
+acidente da v119 da LOKÁ (duas `statusReal`, e o relatório impresso era o que
+errava). Há **teste e defeito injetado** exigindo que a despesa da baixa seja
+**campo por campo idêntica** à que a aba Manutenção geraria para a mesma
+manutenção.
+
+### 🔴 As duas cópias de `_gravarTudo` NÃO eram iguais
+| Onde | O que faz |
+|---|---|
+| `gestao.html` | trata `it.apagar` → chama **`fdel`** |
+| `contratos.html` | **só grava** — nunca apaga |
+
+Subiu a **completa**, a do gestao. A do `contratos.html` **ficou onde está**:
+não foi pedido, e conferido que ela **nunca recebe `apagar`** (0 ocorrências),
+então hoje é inofensiva. Fica registrado como dívida — se algum dia alguém
+passar `apagar:true` por aquele caminho, ela **gravaria em vez de apagar**, em
+silêncio. Há teste exigindo que a versão do shared continue tratando `apagar`.
+
+### Por que o previsto é uma LISTA, não um campo
+Um carro em garantia pode ter "revisão de freios" **e** "retífica" ao mesmo
+tempo, e se baixa um sem perder o outro. Com um campo único, baixa parcial
+viraria conta de cabeça. `v.reparos[]`, cada item com descrição, valor, marca
+de garantia, observação e status.
+
+### O que a coluna diz (e o que ela se recusa a dizer)
+Entrou **entre Preço e Status**; o `colspan` do estado vazio foi de 7 para 8 —
+esquecer isso é a família de defeito dos rodapés (v78/v119/v137).
+
+| Situação | O que aparece |
+|---|---|
+| com previsão | o total **em aberto** + quantos itens |
+| carro vendido, garantia vigente | *"garantia: faltam N dia(s)"* |
+| garantia vencida | *"garantia vencida"* |
+| já baixado | quantos e quanto |
+| 🔴 **sem previsão nenhuma** | **travessão, nunca R$ 0,00** |
+
+🔴 O último é o que mais importa: **zero previsto** ("avaliei, não há o que
+gastar") e **ausência de previsão** ("ninguém avaliou") são coisas diferentes.
+É o padrão da fatura sem lançamento (v143) e dos cartões do Contas a Receber
+(v120–v122). Há defeito injetado que troca o travessão por R$ 0,00.
+
+⚠️ **O que foi baixado sai do previsto** — ele já está em Despesas. Somar os
+dois faria a tela contar duas vezes o mesmo gasto.
+
+### 🔴 A garantia corre da venda MAIS RECENTE
+Medido: há carro vendido **duas vezes** nos dados reais (`SWI1J24`, 13/08 e
+20/10). Pegar a primeira venda diria que a garantia venceu quando ela está
+vigente. Por isso são **23 vendas** vigentes mas **22 carros** — e o teste
+compara a conta da tela com a conta feita por fora, nas duas.
+
+⚠️ `REP_GARANTIA_DIAS = 90` **não é número meu**: é o prazo que o próprio
+contrato de venda promete (*"garantia legal de 90 (noventa) dias"*). A borda é
+inclusiva — 90 dias exatos ainda é vigente — e há defeito injetado para ela.
+
+### A baixa: os três registros vão juntos
+`_gravarTudo([manutencoes, despesas, veiculos])` numa chamada só. Falhando
+**qualquer um**, nada muda na tela, o modal fica aberto e o aviso diz
+**"NÃO foi dada a baixa"**.
+
+| Cuidado | Por quê |
+|---|---|
+| o valor realizado é **editável** | o serviço custa o que custou, não o que foi previsto |
+| a tela mostra a **diferença** ao vivo | *"R$ 150,00 ACIMA do previsto"* — sem obrigar conta de cabeça |
+| 🔴 o **previsto original é preservado** no item | senão a comparação previsto × realizado se perderia |
+| o item vira `realizado`, **não é apagado** | é o histórico de que a garantia foi usada |
+| guarda `manutencao_id` | é por ele que se reencontra o que gerou o gasto |
+| `repBaixaDif` só **desenha** | se recalculasse, apagaria o valor ajustado à mão a cada tecla |
+| baixar duas vezes é **recusado**, e abrir a baixa de item já baixado também | |
+
+### As recusas (a lição do `repNum("abc") = 0`)
+| Entrada | O que acontece |
+|---|---|
+| valor **sem dígito** (`abc`) | recusa dizendo **"Informe o valor"** |
+| zero ou negativo | recusa dizendo **"maior que zero"** |
+| sem descrição / sem data | recusa |
+
+⚠️ A guarda de dígito **só muda a mensagem** (o `n<=0` barraria de todo jeito)
+— mas a mensagem é o que diz ao operador o que está errado. Por isso o teste
+exige a **mensagem específica de cada caso**, não só que recusou.
+
+🔴 **Prever não é gastar:** adicionar previsão grava **só o veículo** — nenhuma
+manutenção, nenhuma despesa. Há teste e defeito injetado que lança despesa na
+hora de prever.
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **33 testes de runtime** com o código real e os dados reais (51 veículos, 32
+  vendas, 22 manutenções, 102 despesas): `repNum` em 10 entradas, lista vindo
+  como objeto indexado, o previsto sem o baixado, a garantia nas 6 situações
+  (vigente, vencida, sem data, sem venda, 90 exatos, 91), a venda mais recente,
+  a célula nos 4 estados, as 8 colunas em toda linha renderizada, adicionar com
+  as 5 recusas, excluir, a baixa de ponta a ponta, **a invariante da despesa
+  idêntica**, falha em cada uma das 3 coleções, escape de HTML, e os 51
+  veículos reais produzindo célula válida
+- **49 defeitos injetados — todos acusados, nenhum cego**: entre eles o estado
+  antes do pedido (coluna, célula, botão, colspan), o previsto somando o
+  baixado, o travessão virando R$ 0,00, a garantia pegando a venda mais antiga,
+  a baixa não criando a despesa, a baixa **apagando** a previsão em vez de
+  marcar, a baixa montando a despesa por conta própria, a baixa usando o valor
+  previsto em vez do realizado, a cadeia voltando a ser duplicada na página, e
+  o `_gravarTudo` do shared voltando a não apagar
+
+### ⚠️ Seis defeitos passaram na primeira rodada — e os seis eram meus
+| O que passou | Por quê |
+|---|---|
+| a guarda `!s.data` da garantia | **inerte**: `new Date("T12:00")` é Invalid Date e o `isNaN` adiante já devolve `{semData:true}`. Depois de simplificar, o `!s` também virou redundante pelo mesmo motivo. **As duas saíram** em vez de ficarem como proteção que nenhum teste alcança |
+| a guarda de dígito, em dois lugares | só muda a mensagem — ver acima |
+| adicionar apagando as previsões anteriores | meu teste só adicionava a **primeira** previsão, e com lista vazia `[]` e `repLista(v).slice()` dão o mesmo. Entrou o caso da **segunda** |
+| abrir a baixa de item já baixado | 🔴 **asserção fraca**: eu lia o **último** aviso, e o aviso anterior já dizia "ja foi baixada". Agora o teste zera os avisos e exige que o modal **não troque** |
+| trocar o `_gravarTudo` por três `fsave` soltos | meu teste de falha derrubava **todas** as gravações, e aí os dois desenhos avisam erro. O que distingue é falhar em **uma** coleção: com `fsave` solto a manutenção falha em **silêncio** e a tela diz sucesso. Entrou `opts.falhaCol` |
+
+### 🔴 Quatro armadilhas do ambiente de teste, todas na mesma rodada
+1. **A sonda de carga estava errada:** `CSS_A4` é do `vendas.html`, não do
+   `veiculos.html`. Passou a ser o `let vTab` (242, e `let` **não é içada**) +
+   `REP_GARANTIA_DIAS` (316). ⚠️ Depois da 316 o arquivo só tem declarações de
+   função, que **são** içadas: a sonda alcança a linha 316, e isso fica **dito**
+   em vez de alegado como "rodou inteiro".
+2. 🔴 **O stub devolvia Promise de verdade, e microtask não drena dentro de
+   `vm.runInContext`** — o callback do `fsave` nunca rodava, e 3 testes mediam
+   o **silêncio do ambiente**. Virou **thenable sincrono**: o `.then()/.catch()`
+   do `fsave` real é exercitado e o callback roda na hora. ⚠️ Determinístico,
+   mas não prova ordem assíncrona.
+3. **O `materializar` pulava elemento que já existia**, então um `innerHTML`
+   novo não reconstruía o checkbox — ele guardava o `checked` da abertura
+   anterior. No navegador, trocar `innerHTML` **destrói e recria** tudo.
+4. **O recorte do `renderVeic` ia até `function renderPlaca`** — e eu inseri o
+   bloco dos reparos exatamente entre as duas, então o recorte engolia os
+   `<th>` dos modais e contava 14 colunas. Delimita pelo **fim da função**.
+
+⚠️ **E a minha própria conferência se contradisse:** eu exigia que
+`DESP_TIPO_MANUT` **não** sobrasse no `gestao.html` **e** que ele continuasse a
+chamá-la. Para uma constante, declarar e chamar são a **mesma string** — a
+asserção era impossível de satisfazer. A ausência se confere pela
+**declaração** (`var DESP_TIPO_MANUT =`). Ela parou o patch antes de eu seguir,
+que é o comportamento certo.
+
+⚠️ E o `node -e` comeu os escapes do caminho do Windows, igual ao heredoc —
+é a regra já registrada, cobrada de novo.
+
+### ⚠️ Achado de dado, não corrigido
+A placa **SWI1J24** aparece em **duas vendas** (13/08 e 20/10). Pode ser
+recompra/revenda legítima — mas ela é também uma das placas que já estavam
+registradas com **numeração de contrato torta** (19/09: dois contratos
+numerados com a placa, `SWI1J24` e `RPH2C27`). Vale o Rogel conferir se são
+duas vendas de verdade. **O código trata o caso de qualquer forma** (usa a mais
+recente), então nada depende dessa decisão.
+
+### Verificado no ar, no arquivo publicado, com os dados reais
+Sandbox com o `firebase` substituído **antes do eval** (a regra de 11/11) e os
+51 veículos, 32 vendas, 22 manutenções e 102 despesas reais:
+
+| | |
+|---|---|
+| a lista | **8 `<th>`**, **8 células em toda linha**, 20 travessões e **zero** `R$ 0,00` indevido |
+| garantias vigentes | **22 pela tela = 22 pela conta feita por fora** |
+| carro usado no teste | **FIAT ARGO · RNS8I00**, garantia real com **26 dias** restantes |
+| adicionar previsão | gravou **só `veiculos`** · a caixa de garantia veio marcada sozinha |
+| a célula depois | *R$ 800,00 · 1 previsto(s) · garantia: faltam 26 dia(s)* |
+| baixa com valor maior | aviso *R$ 150,25 ACIMA do previsto* |
+| a baixa | 3 coleções · manutenção `R$ 950,25` na JT CAR · item `realizado` com o previsto `800` preservado e `manutencao_id` 23 |
+| 🔴 **a despesa** | **idêntica, campo por campo**, à que `_despesaDeManutencao` geraria |
+
+**Nada foi gravado em produção** — 3 gravações interceptadas, e reconferido:
+51 veículos / 32 vendas / 22 manutenções / 102 despesas, **0** veículos com o
+campo `reparos`, e a manutenção 23 responde **404**.
+
+### 🔴 A conferência final quase registrou um número falso
+A primeira leitura do banco voltou **0 em todas as quatro coleções** — e eu
+estava a um passo de registrar aquilo. Zero nas quatro, minutos depois de ler
+51/32/22/102 da mesma origem, é **requisição falhando**, não banco vazio.
+
+A causa, provada: eu anexei um `&v=` de anti-cache à URL do Firestore, e ele
+responde **HTTP 400** — `Unknown name "v": Cannot bind query parameter`. O meu
+código lia `(j.documents || []).length` e **engolia o erro como zero**.
+
+⚠️ **A lição, que é a de 11/11 por outro ângulo:** contagem tem de carregar o
+**status HTTP** junto. `|| []` transforma falha em zero, e zero parece um
+resultado. *Zero só vale depois de provar que havia o que contar.*
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Veículos com **Ctrl+Shift+R**, clicar no 🔧 de
+um carro em garantia, lançar uma previsão e depois dar baixa — conferindo que a
+manutenção aparece na aba Manutenção e a despesa em Despesas. Eu não autentico.
