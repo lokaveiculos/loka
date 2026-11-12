@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v151-20261111-1710 -->
+<!-- LOKA deploy: v152-20261112-0845 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -875,7 +875,7 @@ tr:hover td{background:#f8f9fe;}
         <div class="toolbar" style="flex-wrap:wrap;gap:8px">
           <div class="search-box" style="flex:1;min-width:200px">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9099bf" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input class="filter-input" id="qAxMov" type="text" placeholder="Buscar peça, motivo, placa, responsável..." oninput="renderAlmoxMov()">
+            <input class="filter-input" id="qAxMov" type="text" placeholder="Buscar peça, motivo, placa, fornecedor, responsável..." oninput="renderAlmoxMov()">
           </div>
           <select class="filter-sel" id="fAxMovTipo" onchange="renderAlmoxMov()">
             <option value="">Entradas e saídas</option>
@@ -896,6 +896,7 @@ tr:hover td{background:#f8f9fe;}
               <th style="padding:9px 12px;text-align:left">Movimento</th>
               <th style="padding:9px 12px;text-align:right">Qtd</th>
               <th style="padding:9px 12px;text-align:left">Motivo / veículo</th>
+              <th style="padding:9px 12px;text-align:left">Comprado de</th>
               <th style="padding:9px 12px;text-align:left">Quem</th>
             </tr></thead>
             <tbody id="axMovTable"></tbody>
@@ -1353,6 +1354,9 @@ tr:hover td{background:#f8f9fe;}
       <div class="fg"><label class="fl">Quantidade *</label><input class="fi" id="axMovQtd" type="number" min="0" step="0.01" placeholder="0"></div>
       <div class="fg"><label class="fl">Data *</label><input class="fi" id="axMovData" type="date"></div>
     </div>
+    <div class="fg" id="axMovFornBox"><label class="fl">Comprado de (fornecedor)</label>
+      <input class="fi" id="axMovForn" list="axForns" maxlength="60" placeholder="Quem vendeu a pe&ccedil;a" oninput="_axMovFornMexido()">
+      <div id="axMovFornNota" style="display:none;font-size:10px;color:var(--muted);margin-top:4px"></div></div>
     <div class="fg" id="axMovCustoBox"><label class="fl">Custo unit&aacute;rio (R$)</label><input class="fi" id="axMovCusto" placeholder="0,00"></div>
     <div class="fg" id="axMovPlacaBox"><label class="fl">Ve&iacute;culo (opcional)</label>
       <input class="fi" id="axMovPlaca" list="axPlacas" maxlength="10" placeholder="Placa" style="text-transform:uppercase"><datalist id="axPlacas"></datalist></div>
@@ -1778,7 +1782,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v151-20261111-1710';
+var LOKA_BUILD = 'v152-20261112-0845';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -12926,6 +12930,9 @@ function axPreencherListas() {
     var fs = {};
     (db.fornecedores || []).forEach(function (f) { if (f && f.nome) fs[f.nome] = 1; });
     axItens().forEach(function (it) { if (it && it.fornecedor) fs[it.fornecedor] = 1; });
+    // quem ja vendeu peca entra na lista, mesmo sem ficha de fornecedor:
+    // assim a lista se padroniza com o uso, sem obrigar a cadastrar antes
+    axMovs().forEach(function (m) { if (m && m.fornecedor) fs[m.fornecedor] = 1; });
     df.innerHTML = Object.keys(fs).sort().map(function (n) { return '<option value="' + _axEsc(n) + '">'; }).join('');
   }
 
@@ -13123,6 +13130,10 @@ function axItemSalvar() {
         data: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
         custo: _axNum(get('axCustoIni')),
         placa: '',
+        // o fornecedor habitual que acabou de ser digitado nesta mesma tela —
+        // é a melhor informação disponível, e o motivo logo abaixo deixa claro
+        // que isto é saldo de prateleira, não uma compra datada
+        fornecedor: dados.fornecedor || '',
         motivo: 'Saldo inicial do cadastro',
         quem: sess.nome || sess.usuario || '',
         criadoEm: d.toISOString()
@@ -13182,12 +13193,35 @@ function axMovAbrir(idx, tipo) {
 
   var v = function (id, val) { var e = document.getElementById(id); if (e) e.value = val; };
   v('axMovQtd', ''); v('axMovCusto', ''); v('axMovPlaca', ''); v('axMovMotivo', '');
+  v('axMovForn', '');
   var d = new Date();
   v('axMovData', d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2));
 
   // custo só faz sentido na entrada; placa só na saída
   var bc = document.getElementById('axMovCustoBox'); if (bc) bc.style.display = (tipo === 'entrada') ? 'block' : 'none';
   var bp = document.getElementById('axMovPlacaBox'); if (bp) bp.style.display = (tipo === 'saida') ? 'block' : 'none';
+
+  // 🔴 Fornecedor só na ENTRADA: é a compra que tem de onde veio. Saída é
+  //    consumo — o destino já vai no motivo e o carro no campo do veículo — e
+  //    ajuste é correção de contagem. Nenhum dos dois compra nada, e gravar
+  //    origem neles encheria o extrato de uma compra que não houve.
+  var bf = document.getElementById('axMovFornBox');
+  if (bf) bf.style.display = (tipo === 'entrada') ? 'block' : 'none';
+  var nf = document.getElementById('axMovFornNota');
+  if (nf) { nf.style.display = 'none'; nf.innerHTML = ''; }
+  if (tipo === 'entrada' && it.fornecedor) {
+    // Sugere o fornecedor habitual da ficha: é a informação verdadeira mais
+    // provável, e fica à vista para ser trocada. A nota diz DE ONDE o valor
+    // veio — número (ou nome) que aparece sozinho no campo vira palpite sem
+    // procediência. ⚠️ Comprar de outro NÃO muda o habitual da peça: o
+    // cadastro é decisão de quem cadastra, não efeito colateral de um
+    // lançamento.
+    v('axMovForn', it.fornecedor);
+    if (nf) {
+      nf.style.display = 'block';
+      nf.innerHTML = 'Sugerido do cadastro da peça — troque se comprou de outro.';
+    }
+  }
 
   var av = document.getElementById('axMovAviso');
   if (av) {
@@ -13200,6 +13234,13 @@ function axMovAbrir(idx, tipo) {
   var b = document.getElementById('btnAxMovSalvar');
   if (b) { b.disabled = false; b.textContent = rot; }
   openM('mAxMov');
+}
+
+/* A nota explica de onde o nome veio. Editando, ela deixa de valer — some,
+   em vez de seguir afirmando uma procedência que já não é a da tela. */
+function _axMovFornMexido() {
+  var nf = document.getElementById('axMovFornNota');
+  if (nf) { nf.style.display = 'none'; nf.innerHTML = ''; }
 }
 
 function axMovSalvar() {
@@ -13236,6 +13277,9 @@ function axMovSalvar() {
     qtd: qtd,
     data: data,
     custo: (_axMovTipo === 'entrada') ? _axNum((document.getElementById('axMovCusto') || {}).value || '') : 0,
+    // 🔴 Só a entrada grava fornecedor — ver o comentário no axMovAbrir.
+    fornecedor: (_axMovTipo === 'entrada')
+      ? String((document.getElementById('axMovForn') || {}).value || '').trim() : '',
     placa: (_axMovTipo === 'saida')
       ? String((document.getElementById('axMovPlaca') || {}).value || '').toUpperCase().trim() : '',
     motivo: ((document.getElementById('axMovMotivo') || {}).value || '').trim(),
@@ -13281,7 +13325,7 @@ function renderAlmoxMov() {
     if (de  && m.data < de)  return false;
     if (ate && m.data > ate) return false;
     if (q) {
-      var alvo = semAcento([axNomeItem(m.itemId), m.motivo, m.placa, m.quem].filter(Boolean).join(' '));
+      var alvo = semAcento([axNomeItem(m.itemId), m.motivo, m.placa, m.quem, m.fornecedor].filter(Boolean).join(' '));
       if (alvo.indexOf(q) < 0) return false;
     }
     return true;
@@ -13296,7 +13340,7 @@ function renderAlmoxMov() {
   var tb = document.getElementById('axMovTable');
   if (!tb) return;
   if (!lista.length) {
-    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">'
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">'
       + (axMovs().length ? 'Nenhuma movimentação encontrada com esses filtros.' : 'Nenhuma movimentação registrada ainda.')
       + '</td></tr>';
     return;
@@ -13319,6 +13363,11 @@ function renderAlmoxMov() {
         + sinal + _axQtdTxt(Math.abs(_axNum(m.qtd))) + '</td>'
       + '<td style="padding:9px 12px;font-size:11px">' + _axEsc(m.motivo || '—')
         + (m.placa ? '<br><span style="font-size:10px;color:var(--muted)">🚗 ' + _axEsc(m.placa) + '</span>' : '') + '</td>'
+      // ⚠️ Movimentação de antes deste campo (e saida/ajuste) mostra travessão,
+      //    nunca em branco: célula vazia se leria como defeito da tela.
+      + '<td style="padding:9px 12px;font-size:11px">'
+        + (m.fornecedor ? _axEsc(m.fornecedor)
+                        : '<span style="color:var(--muted)">—</span>') + '</td>'
       + '<td style="padding:9px 12px;font-size:11px">' + _axEsc(m.quem || '—') + '</td>'
       + '</tr>';
   }).join('');
