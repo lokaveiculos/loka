@@ -51,12 +51,12 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v153-20261112-1020** |
+| `gestao.html` | **v155-20261112-1540** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
-| `contrato-mensal.html` | **mensal-v6-20261029-1420** |
+| `contrato-mensal.html` | **mensal-v7-20261112-1430** |
 | `contrato-diaria.html` | **diaria-v7-20261109-0930** |
 
 ## Modelo de dados — `loka_db`
@@ -9065,3 +9065,196 @@ nada** — entrou como caso próprio.
 ### ⏳ Falta o Rogel clicar
 A gravação é dele. Depois: **Ctrl+Shift+R** no Almoxarifado para a lista
 atualizar.
+
+---
+
+## ✅ Encerramento pode ser desfeito + lavagem no mensal — 12/11/2026 (`276f16f`, `e7f38ba`) · gestao v154 → v155 · mensal v7
+
+Três pedidos: *"ao excluir um aluguel encerrado perguntar se deve excluir
+permanentemente ou se deve voltar para aluguéis ativos"* · *"resgatar o aluguel
+do cliente Mario Cesar que foi excluído por engano"* · *"o contrato mensal deve
+prever lavagem também, assim como o por diária; mudar o valor da lavagem simples
+para 50,00"*.
+
+### 🔴 O aluguel do Mario Cesar NÃO foi excluído — foi ENCERRADO
+Achado comparando os meus backups do dia com o banco:
+
+| | 08:35 e 09:12 | 10:17 |
+|---|---|---|
+| ativos | 105 | **104** |
+| encerrados | 106 | **107** |
+| MARIO CESAR | em **ativos** | em **histórico** |
+
+`a1793453953590` · **RVC9A19 · GM ONIX PLUS LTZ** · retirada 31/10 · devolução
+prevista 10/11 · caução R$ 750 · pago R$ 1.800 via pix — **encerrado às 10:17**
+com devolvido 12/11 e valorFinal R$ 2.160,00.
+
+Então "excluído por engano" é **encerramento por engano**, e "voltar para
+ativos" é **desencerrar** — que o sistema não oferecia: no encerrado o único
+caminho era **excluir**, e o registro ia embora de vez.
+
+### 🔴 Reativar NÃO é mover o registro de volta — são QUATRO defesas
+A armadilha 5 (locações encerradas ressuscitando) montou quatro barreiras, e o
+`aplicarEncerrados` consulta **todas** no carregamento:
+
+| | fonte |
+|---|---|
+| 1 | `loka_db/encerrados/<chave>` |
+| 2 | o próprio `db.historico` — id no histórico = encerrado |
+| 3 | `loka_encerrados/<id>` — lápide, **fora** do `loka_db` |
+| 4 | `loka_encerrados/sig_…` **e** a assinatura calculada do histórico (`cliente+placas+retirada+devolução`) |
+
+Esquecer **uma** faz o aluguel voltar e sumir no próximo F5 — e isso se leria
+como *"o sistema está bugado"*, não como defesa funcionando. A reativação limpa
+as quatro, **no banco e na memória** (`window._tombstones`,
+`window._encerradosRecentes`, `db.encerrados`).
+
+⚠️ As lápides das **outras** locações não são tocadas: são elas que protegem o
+resto da frota. Há teste e defeito injetado para isso, incluindo o caso de
+apagar o **nó inteiro**.
+
+### 🔴 O defeito que SÓ a produção revelou (v155)
+A v154 passou nos 50 testes do Node e **falhou no navegador**: o aluguel voltava
+aos ativos e o `aplicarEncerrados` o removia de novo.
+
+**A causa:** `loka_db/encerrados` guarda **id E ASSINATURA** — medido no banco
+real: **220 chaves, 107 delas `sig_`**. Eu supunha que a assinatura morava só em
+`loka_encerrados`, então limpava apenas o id, e a FONTE 1 pegava a locação de
+volta pela assinatura.
+
+🔴 **O teste do Node não pegou porque o `db.encerrados` do meu ambiente era
+`{id: 1}` — dado que eu inventei.** Agora a suíte carrega o nó `encerrados` do
+banco, e a invariante roda sobre as 107 assinaturas de verdade. É a lição de
+sempre, no caso mais caro: *a entrada do teste sai dos dados, não da cabeça.*
+
+### O que a tela faz agora
+O ✕ (e o botão do modal de edição) **pergunta** em vez de excluir:
+
+| | |
+|---|---|
+| **↩ Voltar para Aluguéis Ativos** | desfaz o encerramento; o veículo volta a alugado |
+| **🗑 Excluir permanentemente** | o que o botão fazia antes, com o `confirm` de sempre |
+
+O modal mostra cliente, veículo, datas e valor; nomeia o que a **exclusão**
+faria perder (multas sem vínculo, prorrogações e a 2ª via dos termos); e explica
+que a **reativação** apaga a devolução real, o valor final, a condição e as
+cobranças do encerramento. 🔴 O que é do **contrato** (cliente, carro, retirada,
+devolução prevista, valor, caução, pagamento) é preservado.
+
+### 🔴 O mesmo carro não pode ficar alugado duas vezes
+`_eeConflitoPlaca` compara **todas** as placas dos dois lados (contrato
+multi-veículo — armadilha 2), ignorando hífen e caixa. Havendo conflito, o botão
+de reativar fica **travado** e o modal diz com quem o carro está; e a função
+recusa **mesmo chamada por fora**, porque esconder botão não é controle.
+
+### Outros cuidados
+- 🔴 **sem banco NÃO reativa**: desfaz o que mexeu em memória (ativos,
+  histórico e o status do veículo) para a tela não mentir
+- 🔴 **falha ao limpar a lápide é DITA**, com a consequência
+  (*"ela pode sumir dos ativos ao recarregar"*) — e **dentro do `catch`**: o
+  aviso é assíncrono, e um `falhou.length` lido abaixo estaria sempre vazio,
+  então a mensagem de sucesso saía antes de se saber da falha
+- `reativadoEm` / `reativadoPor` ficam registrados
+- 🔴 a guarda do registro compara com **o que o modal abriu** (`_eeRegAberto`):
+  `_eeReg(i)` é `db.historico[i]`, então comparar os dois na mesma linha nunca
+  dá diferente — a guarda era **inerte**, e um teste pegou
+- a **exclusão definitiva** continua igual, e a lápide dela **continua de pé**
+  (as duas coisas têm teste e defeito injetado)
+
+### Contrato mensal: a lavagem entrou (mensal v7)
+A Cláusula 12ª passou a trazer *"Caso o veículo seja devolvido sujo, será
+cobrada tarifa de lavagem simples de **R$ 50,00** ou **R$ 150,00** para lavagem
+severa"* — **texto idêntico** ao da diária (Cláusula 14ª). Antes não previa, e
+isso era deliberado (registrado em 09/11 como decisão dele).
+
+⚠️ **O valor já era R$ 50,00**: a diária foi alterada em 09/11, e não há
+**nenhum** R$ 40,00 no sistema — o campo de lavagem do encerramento é livre, sem
+valor sugerido. Os R$ 40 que aparecem são as **3 cobranças já lançadas** no
+histórico, dado de produção, não configuração.
+
+🔴 **O mapa de cláusulas das Ocorrências (v153) acompanhou:** lavagem no mensal
+passa a citar a **12ª**. Há comentário no código dizendo que contrato assinado
+**antes de 12/11/2026 não tem essa cláusula**.
+
+#### Cabe no A4 — medido nos arquivos reais das duas versões
+Buscando a v6 pelo raw do commit anterior e medindo as duas no mesmo instante,
+com o `@media print` extraído por balanceamento de chaves:
+
+| | altura do `.contract` | largura | cláusulas |
+|---|---|---|---|
+| mensal v6 | 924px | 726px | 13 |
+| **mensal v7** | **929px** (+5) | 726px | **13** |
+
+Continua em **uma folha**, sem transbordar (726px exatos), e **não virou
+cláusula nova**.
+
+⚠️ **O que vale aqui é o delta (+5px), não a sobra absoluta.** A medida de 924px
+para a v6 **não reproduz** os 960px registrados em 29/10 — método diferente
+(iframe na largura útil, `margin:0` no body). Pela regra de 19/10, medida que
+não reproduz a registrada não serve para afirmar folga; serve para comparar
+duas versões medidas do mesmo jeito, no mesmo instante.
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (gestao **875/875**, eram 865;
+  mensal **45/45**); os dois carimbos batendo
+- **52 testes** com o código real e os dados reais (107 encerrados, 104 ativos,
+  220 chaves em `encerrados`), inclusive **o caso do Mario** campo a campo: o
+  botão perguntando, as 4 marcas, a invariante do `aplicarEncerrados`, o
+  conflito de placa nas 4 formas, a permissão (inclusive **perdida com o modal
+  aberto**), banco fora do ar, erro de rede, falha de limpeza, `confirm`
+  recusado, lista mudando no meio, e os 107 encerrados abrindo a escolha
+- **41 defeitos injetados — todos acusados**, entre eles o **estado antes do
+  pedido** (o ✕ excluindo direto), reativar sem tirar do histórico, os campos do
+  encerramento voltando, o veículo ficando disponível, **cada uma das 4 defesas
+  não limpa**, apagar o nó inteiro das lápides, o mesmo carro alugado duas
+  vezes, a guarda voltando a ser inerte, a falha silenciosa, e a exclusão
+  definitiva passando a apagar a lápide
+- **No ar, no arquivo publicado, com o banco real** e `firebase`/`saveDB`
+  substituídos **antes do eval**:
+
+| | |
+|---|---|
+| o ✕ | abriu `mEeDestino`, **não** excluiu |
+| ativos · encerrados | 104 → **105** · 107 → **106** |
+| veículo RVC9A19 | `disponivel` → **`alugado`** |
+| marcas removidas | **as 4** (id e assinatura, nos dois nós) |
+| campos do encerramento sobrando | **nenhum** |
+| 🔴 **invariante** | sobreviveu a **dois** `aplicarEncerrados` |
+| registro | cliente, GM ONIX PLUS LTZ, 31/10→10/11, R$ 1.800, caução 750, pago 1.800 |
+
+  5 gravações interceptadas; reconferido no banco: **104 ativos, 107
+  encerrados, Mario ainda no histórico, 220 chaves, lápide de pé** — nada
+  gravado em produção.
+- Regressão **medida**: **56 suítes, 2.940 testes**, nenhuma falha
+
+### ⚠️ Três suítes tiveram asserções INVERTIDAS, por mudança de escopo
+Não foram defeitos: o pedido mudou o que era deliberado.
+
+| Suíte | O que travava |
+|---|---|
+| `t-clausulas` | *"o mensal continua SEM tarifa de lavagem"* → agora **tem, idêntica à diária**, dentro da 12ª e sem virar cláusula nova |
+| `t-oco` | 6 asserções de que lavagem no mensal **não** tinha amparo → agora citam a 12ª, e **a cobertura do caminho "sem cláusula" migrou para `combustivel`**, que continua sem amparo nos dois |
+| `t-v148` | 5 chamadas de `excluirEncerrado` (que agora pergunta) → reapontadas para `_eeExcluirDefinitivo`, e os 2 testes estruturais recortavam o fonte pelo **nome antigo** |
+
+🔴 O cuidado que importa: ao inverter, **não perder a cobertura do caminho
+oposto**. Se eu só tivesse trocado "não tem cláusula" por "tem", o caso de item
+**sem amparo** — que é o mais valioso do comunicado — ficaria sem teste.
+
+### ⚠️ Cinco tropeços meus, cada um com uma lição diferente
+| O que | A lição |
+|---|---|
+| a guarda do índice era **inerte** | `_eeReg(i)` é `db.historico[i]`: comparar os dois na mesma linha nunca dá diferente. O que vale é a referência guardada **ao abrir o modal** |
+| o aviso de falha **nunca aparecia** | `.catch` é assíncrono e o `toast` era síncrono: o sucesso saía antes. O aviso foi para dentro do `catch` |
+| 3 defeitos injetados **passaram** | `status='ativo'` parecia inerte (106 dos 107 encerrados já o têm — quem exercita é o **1 sem status**); a asserção do nó raiz procurava o id do vizinho, e o defeito apagava `loka_encerrados` **inteiro**; e `reativar` sem permissão era barrado por **outra** guarda — o caso que isola a permissão é *abre com ela, perde, clica* |
+| [B12] barrava pelo caminho errado | remover o item 0 jogava o índice **fora** do array; inserindo no início, o índice fica válido e aponta para outro objeto |
+| o **heredoc comeu os escapes** | pela enésima vez, ao tentar ajustar a suíte por script. Nada foi gravado, e o refazer foi pela ferramenta de escrita |
+
+### ⏳ O resgate do Mario Cesar — falta o clique dele
+A reativação está publicada e exercitada contra o banco real, mas **a gravação é
+dele**: eu não autentico. O caminho é:
+
+**Aluguéis Encerrados** → **Ctrl+Shift+R** → achar **MARIO CESAR GODINHO
+MENDES** (RVC9A19) → **✕** → **↩ Voltar para Aluguéis Ativos**.
+
+A locação volta com retirada 31/10, devolução prevista 10/11, R$ 1.800, caução
+R$ 750 e o pagamento de 03/11 intactos; o GM ONIX PLUS LTZ volta a alugado.
