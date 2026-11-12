@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v152-20261112-0845** |
+| `gestao.html` | **v153-20261112-1020** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -8827,3 +8827,241 @@ pedido. Juntar é lançar as movimentações numa só e zerar a outra.
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir o Almoxarifado com **Ctrl+Shift+R**, lançar uma
 entrada de verdade e conferir a coluna no extrato. Eu não autentico.
+
+---
+
+## ✅ Ocorrências no encerramento + comunicado de cobrança — 12/11/2026 (`c87df2c`) · gestao v153
+
+Pedido: *"ao encerrarmos um aluguel, criar um botão 'OCORRÊNCIAS?' para
+preenchermos em caso de haver avaria ou necessidade de averiguação posterior por
+multas e demais situações. permitir que preenchamos a ocorrência ou as
+ocorrências classificando por tipo. Criar um formulário de comunicado de cobrança
+para enviarmos para o cliente notificando da cobrança da ocorrência, citando as
+cláusulas do contrato a que se refere cada situação."*
+
+### 🔴 A CLÁUSULA DEPENDE DO TIPO DE CONTRATO — e isso foi o trabalho
+As duas cláusulas de "Demais Custos" têm o **mesmo nome e numeração diferente**:
+
+| Matéria | Mensal | Diária |
+|---|---|---|
+| Da Devolução | 3ª | 3ª |
+| Das Multas | 8ª | 8ª |
+| Da Caução | 10ª | 10ª (+ a frase do veículo sujo) |
+| Do Seguro | 11ª | 11ª |
+| **Demais Custos** | **12ª** | **14ª** |
+| Franquia de KM | 13ª | 15ª |
+| Uso em desacordo com o CTB | — | **12ª** |
+| Rastreador | — | **13ª** |
+
+🔴 **A 12ª da diária é outra matéria.** Citar "Cláusula 12ª" num comunicado de
+contrato por diária aponta o cliente para *uso indevido do veículo* em vez de
+*demais custos*. Num documento de cobrança isso é pior do que não citar.
+
+### 🔴 E onde NÃO HÁ cláusula, o sistema diz que não há
+Medido nos dois contratos publicados:
+
+| Tipo de ocorrência | Mensal | Diária |
+|---|---|---|
+| **Devolvido sujo (lavagem)** | 🔴 **nenhuma** | 14ª e 10ª |
+| **Combustível** | 🔴 nenhuma | 🔴 nenhuma |
+| Pneu além do direito | 12ª | 🔴 nenhuma |
+| Uso indevido · Rastreador | 🔴 nenhuma | 12ª · 13ª |
+
+⚠️ **E 98 dos 105 aluguéis ativos são MENSAIS** (os 106 encerrados são 93 diária
+/ 13 mensal — a frota virou). Ou seja: o caso que mais vai acontecer daqui para
+frente é justamente o que o contrato não prevê.
+
+Então: ao escolher o tipo, a tela **avisa antes**
+(*"O contrato mensal não prevê cobrança para este item… o comunicado sairá sem
+citação de cláusula — não inventamos amparo que o contrato não dá"*), o seletor
+marca as opções sem amparo, a linha do documento sai *"não prevista no
+contrato"* e há um aviso ao pé. Descobrir isso **depois** de o comunicado estar
+enviado já é tarde.
+
+### 🔴 A transcrição é a do contrato, não paráfrase minha
+O documento **transcreve** o texto de cada cláusula citada, recortado dos
+próprios `contrato-mensal.html` / `contrato-diaria.html`. Onde recorto (a 11ª
+começa com as franquias, que no formulário estão em branco), entra **`[...]`** à
+vista.
+
+⚠️ **Dois defeitos meus que o teste pegou:** eu havia abreviado a 8ª (cortei a
+procuração do meio) e escrito *"A restituição **da caução**"* na 10ª, onde o
+contrato diz *"A restituição"*. O teste compara **frase por frase, terminada em
+ponto, contra o contrato real do repo** — e acusou. Transcrição que não é
+transcrição vira discussão quando o cliente abre o contrato.
+
+🔴 E o teste exige **a frase inteira**: sem o ponto final, uma transcrição
+cortada no meio passava como prefixo válido. Foi um defeito injetado que mostrou.
+
+### As 4 situações
+| | |
+|---|---|
+| 💰 **A cobrar** | exige valor — "a cobrar" sem valor seria comunicado que cobra nada |
+| 🔎 **Em averiguação** | **sem valor ainda** — é o caso que o pedido nomeia: *multa que pode chegar depois* |
+| ✅ Já comunicada | cobrança viva, soma |
+| ⊘ Sem cobrança | só registro |
+
+🔴 **Só "a cobrar" e "já comunicada" entram no total.** Averiguação **com** valor
+também fica fora: é justamente o que ainda não se sabe. O documento traz um bloco
+separado dizendo *"não estão incluídas no total acima"*, e sem nada a cobrar o
+comunicado sai **sem total e sem a mora**.
+
+### Os valores são OFERECIDOS ao acerto, nunca aplicados
+O acerto da devolução (v147) abate da caução; a ocorrência pode ser cobrada por
+fora — e só **8 dos 105 ativos** têm caução registrada. Escrever sozinho nos
+campos criaria dois números para a mesma dívida e apagaria o que o operador
+digitou. Então o aviso mostra os dois lados e um botão
+*"usar R$ x / R$ y / R$ z"*. Mesma regra do *"usar as 18"* do Endividamento.
+
+### Outros cuidados
+- **O rascunho é cópia**: cancelar não deixa meia ocorrência no registro
+- No encerramento **não grava por fora** — o `confirmarEnc` leva o registro
+  inteiro para o histórico. No encerrado grava **só `loka_db/historico`**, por
+  caminho (armadilha 3), e **falha de gravação avisa** em vez de fechar o modal
+- 🔴 **selo na linha do histórico** (`📋 3 · R$ 400,00`): sem ele a ocorrência
+  ficaria invisível na lista — ninguém abre o que não sabe que tem
+- 🔴 **`z-index:600` no modal**: ele está **antes** do `mEncerramento` no
+  documento (linha ~1309), e com z-index igual quem fica na frente é o último —
+  sem isso abriria **atrás** do modal que o chamou. Há teste e defeito injetado
+- valor sem dígito recusa (`mltNum('abc')` = 0), negativo recusa, descrição
+  obrigatória (é o que o cliente lê), remover pede confirmação
+- `_ocoLista` normaliza a lista vinda como objeto do Firebase (armadilha 1)
+- a numeração do comunicado é **`CC-`**, para não se confundir com o recibo de
+  multa (`REC-`) nem o de pagamento (`RP-`)
+
+### O que os dados mostraram
+| | |
+|---|---|
+| encerrados | 106 — 97 "ok", **6 avaria leve, 1 grave, 2 sujo** |
+| 🔴 avarias com valor em `encAvaria` | **ZERO** |
+| lavagens cobradas | 3, todas R$ 40,00 e todas de contrato **diária** |
+
+🔴 **As 7 avarias foram cobradas À MÃO, no campo de observação, em prosa:**
+*"avarias no parachoque/farois **cobrado a parte R$ 3760,00**"*, *"Veículo
+entregue com pára-brisa quebrado. O cliente pagou R$…"*, *"AVARIA NO PARA CHOQUE
+T, CLIENTE JÁ EFETUOU O PAGAMENTO"*. O valor vivia no texto e **nunca entrou no
+sistema como número** — é exatamente o que o pedido vem resolver.
+
+⚠️ **As 3 lavagens estão a R$ 40,00**, e a tarifa da Cláusula 14ª passou para
+**R$ 50,00** em 09/11 — duas delas são de **11/11**, depois da alteração. Dado de
+produção, não corrigido.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**865/865**; eram 845); os dois
+  carimbos batendo
+- **84 testes** com o código real, **os contratos reais do repo** e os dados
+  reais (106 encerrados, 105 ativos): a transcrição conferida contra o contrato,
+  a numeração conferida **pela cláusula que precede o trecho no documento**, as
+  somas, as 6 recusas, o rascunho como cópia, a gravação por caminho, banco fora
+  do ar, a tela avisando, o documento inteiro nos dois tipos de contrato, escape,
+  pop-up bloqueado, o selo e os 105 ativos classificados
+- **53 defeitos injetados — todos acusados**, entre eles o **estado antes do
+  pedido**, a lavagem citando a 14ª no mensal, "Demais Custos" com a mesma
+  numeração nos dois, as cláusulas deixando de olhar o tipo do contrato, a
+  **transcrição parafraseada**, a averiguação entrando no total, o documento não
+  transcrevendo, o `loka_db` inteiro, a falha silenciosa, o selo saindo da linha
+  e o modal perdendo o z-index
+- **No ar, no arquivo publicado, com os dados reais** e `firebase`/`saveDB`
+  substituídos **antes do eval**:
+
+| | mensal (BRJ · SWH3A72) | diária (J. CLAUDEMIRO · SJA7D13) |
+|---|---|---|
+| aviso ao escolher lavagem | *"não prevê cobrança para este item"* | *"Será citada: Cláusula 14ª e 10ª"* |
+| cláusulas no documento | 3ª · 7ª · 8ª · 11ª · **12ª** | 3ª · 7ª · 8ª · 10ª · 11ª · **14ª** |
+| a do outro contrato | 14ª **ausente** | 12ª **ausente** |
+| *"não prevista no contrato"* | **sim** | não |
+| total | R$ 400,00 (50 + 350) | R$ 400,00 |
+| averiguação fora do total | sim, dito no documento | sim |
+
+  "A cobrar sem valor" **recusada** nos dois. **0 gravações em produção** —
+  reconferido: 105 ativos, 106 encerrados, **0 com ocorrências**.
+- Regressão **medida**: **54 suítes, 2.860 testes**, nenhuma falha
+
+### ⚠️ Quatro testes meus passaram com defeito vivo, e o quinto era do ambiente
+| O que passou | Por quê |
+|---|---|
+| o botão OCORRÊNCIAS não existir | nenhuma asserção olhava o HTML. Entrou o bloco Z (botão nos dois modais, o modal, os ids, as 4 situações) |
+| a 12ª voltar a cortar o "orçamento prévio" | o pedaço cortado **existe** no contrato como prefixo. Passou a exigir a frase terminada em ponto |
+| falha de gravação ficar silenciosa | eu só testava o caminho que grava. Entraram os casos sem banco e com erro |
+| a averiguação entrar no total | minha sonda tinha valor **zero** — somar ou não dava o mesmo número. Agora entra com R$ 1.000 |
+
+⚠️ **E no navegador:** meu `<select>` de situação estava **sem `<option>`**, então
+`.value = 'averiguar'` não definia nada, caía em "a cobrar" e era recusado — o
+cenário mediu 2 ocorrências onde eu lancei 3. É a armadilha já registrada em
+03/11: *num select não adianta atribuir o valor, é preciso existir a option.*
+
+### O que ficou de fora, de propósito
+- **Nenhum lançamento automático em Contas a Receber.** Pela mesma razão da
+  v147: a cobrança pode ser abatida da caução que a empresa já tem em mãos, e
+  criar "a receber" de dinheiro já retido duplicaria o saldo. O caminho é o
+  botão *"usar"* levando ao acerto, ou lançamento manual.
+- **Ligação com a aba Sinistros.** Ocorrência de devolução ("devolvido sujo",
+  "multa a averiguar") não é sinistro; aquela aba trata colisão/perda
+  total/roubo e já tem cobrança de franquia e de reparo (v133). Unificar
+  misturaria dois fluxos com públicos diferentes.
+- **Fotos.** O sistema não usa Firebase Storage — mesma decisão de v99 e v126.
+
+### ⏳ Não verificado · e duas decisões para o Rogel
+Falta **logado**: encerrar uma locação de verdade, clicar em **OCORRÊNCIAS?**,
+lançar uma avaria e uma multa em averiguação, e gerar o comunicado.
+
+1. 🔴 **O contrato mensal deve passar a prever lavagem?** Hoje não prevê, e 98
+   dos 105 ativos são mensais. Enquanto não previr, o comunicado de lavagem para
+   locatário mensal sai sem citação (e dizendo isso).
+2. ⚠️ **As 3 lavagens a R$ 40,00** — a tarifa é R$ 50,00 desde 09/11.
+
+---
+
+## ✅ Peça duplicada do Almoxarifado — página pronta, falta o clique — 12/11/2026
+
+Pedido: *"gentileza excluir a linha 'Pneu 205/60 R15 · Pneu · 0 un · — · R$ 0,00
+· 🔴 Sem estoque'"*.
+
+### 🔴 Há DUAS fichas com esse nome — a identidade foi provada por dois campos
+| | `ax1792238656606` (17/10) | **`ax1794483164035` (12/11)** |
+|---|---|---|
+| categoria | vazia → tela mostra **—** | **"Pneu"** |
+| mínimo | 2 | 0 → tela mostra **—** |
+| saldo | 13 un | **0 un** |
+| movimentações | **12** (saídas JT, ajustes do Daniel) | **2** (entrada 12 + saída 12, de hoje) |
+
+A linha que ele colou traz **"Pneu"** na categoria e **"—"** no mínimo: é a
+segunda. E é a **única** peça com categoria preenchida, o que fecha a
+identificação. A primeira guarda o histórico de verdade e **não é tocada**.
+
+### 🔴 O sistema barra excluir pela tela, de propósito
+A guarda da v126 recusa excluir peça com movimentação — deixaria histórico sem
+dono. Por isso a peça e as **2 movimentações dela** saem juntas: nada fica órfão.
+As duas são de hoje e se anulam (entrada 12, saída 12), então o saldo não muda.
+
+### A página
+`backups-loka\EXCLUIR-PECA-DUPLICADA.html` — **fora do repo, nunca publicada**.
+Duplo clique, confere, clica no vermelho.
+
+| Cuidado | Por quê |
+|---|---|
+| **REST** (`fetch` + GET/PUT) | funciona abrindo do disco. Conferido: com `Origin: null` o banco responde 200 e o preflight do PUT é aceito |
+| grava **só `almox` e `almox_mov`** | nunca o `loka_db` inteiro (armadilha 3) |
+| 🔴 **confere que a OUTRA ficha de mesmo nome existe** | se não existir, esta seria a única — e excluí-la apagaria a peça de vez. Recusa |
+| banco respondendo **vazio** não libera o botão | sem saber o que há, não dá para escolher o que apagar |
+| **relê** depois de gravar | só diz "Pronto" depois de ver gravado |
+| falha diz **"NÃO foi gravado"** | nunca finge sucesso |
+| rodar de novo não faz nada | idempotente |
+
+**Validado:** **22 testes** com os dados reais e o `fetch` substituído (identifica
+a certa, a outra intacta campo a campo, só os dois nós gravados, nenhuma
+movimentação órfã nem de outra peça, `confirm` recusado, banco vazio, sem rede,
+falha de gravação, e **gravação que responde OK sem mudar nada**) · **12 defeitos
+injetados, todos acusados** — inclusive *excluir a peça errada* e *deixar as
+movimentações órfãs*.
+
+⚠️ Um cego ensinou: meu teste media *"releu o banco"*, não *"conferiu o que
+releu"*. O caso que separa os dois é a gravação que responde **OK e não muda
+nada** — entrou como caso próprio.
+
+**Backup:** `backups-loka/almox-ANTES-excluir-duplicada-20261112.json` e
+`almox_mov-ANTES-...json`.
+
+### ⏳ Falta o Rogel clicar
+A gravação é dele. Depois: **Ctrl+Shift+R** no Almoxarifado para a lista
+atualizar.
