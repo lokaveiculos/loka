@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v151-20261111-1710** |
+| `gestao.html` | **v152-20261112-0845** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -8693,3 +8693,137 @@ resultado. *Zero só vale depois de provar que havia o que contar.*
 Falta **logado**: o Rogel abrir Veículos com **Ctrl+Shift+R**, clicar no 🔧 de
 um carro em garantia, lançar uma previsão e depois dar baixa — conferindo que a
 manutenção aparece na aba Manutenção e a despesa em Despesas. Eu não autentico.
+
+---
+
+## ✅ Almoxarifado: fornecedor na entrada — 12/11/2026 (`7aadd0e`) · gestao v152
+
+Pedido: *"no item almoxarifado, criar o campo fornecedor dentro do botão de
+entradas para identificarmos de onde foram comprados"*.
+
+### 🔴 A ficha já tinha fornecedor — o que faltava era a origem de CADA compra
+`axFornecedor` (fornecedor **habitual**) existe na peça desde a v126. Mas a
+movimentação não guardava nada: a mesma peça vem de fornecedores diferentes, a
+preços diferentes, e isso não era registrado em lugar nenhum. Medido nas **18
+movimentações reais**: `fornecedor` **em zero** delas — o dado começa agora.
+
+### O que os dados mostraram antes de eu escrever
+| | |
+|---|---|
+| peças | 5 (todas pneu) · **todas com habitual "Avannt Pneus Remold Ltda"** |
+| movimentações | 18 — 5 entradas, 11 saídas, 2 ajustes |
+| fornecedores cadastrados | 16 |
+
+🔴 **O campo Motivo das SAÍDAS já é usado para dizer PARA ONDE a peça foi**:
+"JT", "Tudo Pneus", "JT Pneus", "Reposição JT CAR" — e **"Tudo Pneus" e "JT Car
+Mecânica" são fornecedores cadastrados**. Então o pedido é sobre a **compra**, e
+o motivo da saída continua servindo ao destino. Não encostei nele; há teste
+exigindo que os motivos reais continuem na tela.
+
+### Só na ENTRADA
+Saída é **consumo** (o destino vai no motivo, o carro no campo do veículo) e
+ajuste é **correção de contagem**. Nenhum dos dois compra nada, e gravar origem
+neles encheria o extrato de uma compra que não houve. É a mesma regra que o
+**custo** já seguia desde a v126 (só entrada) e a **placa** (só saída).
+
+A guarda é no **salvar**, não só na visibilidade: o campo fica escondido, mas o
+DOM aceita valor por fora. Há teste que preenche o campo na saída e exige que o
+registro saia com `fornecedor: ''`.
+
+### A sugestão, e por que ela DIZ de onde veio
+A entrada já abre com o **fornecedor habitual** da peça — é a informação
+verdadeira mais provável — e abaixo do campo aparece *"Sugerido do cadastro da
+peça — troque se comprou de outro."* Editando, a nota **some**: ela explica uma
+procedência que já não é a da tela.
+
+🔴 **Comprar de outro NÃO muda o habitual da ficha.** O cadastro é decisão de
+quem cadastra, não efeito colateral de um lançamento — senão uma compra avulsa
+reescreveria em silêncio o fornecedor da peça. Há teste e defeito injetado.
+
+⚠️ Abrir o modal de novo **não herda** o que foi digitado antes: sem a limpeza,
+uma entrada de outra peça sairia no nome do fornecedor da anterior.
+
+### A entrada do saldo inicial leva o habitual
+O cadastro com quantidade (v127) cria uma entrada no extrato. Ela passa a levar
+o fornecedor que acabou de ser digitado na **mesma tela** — é a melhor
+informação disponível, e o motivo *"Saldo inicial do cadastro"* deixa claro que
+é saldo de prateleira, não uma compra datada de ninguém. Cadastro sem
+fornecedor **não inventa** origem.
+
+🔴 E a ficha continua **sem** campo de quantidade: o saldo segue sendo a soma
+das movimentações (v126). Há teste exigindo que `qtd`/`saldo`/`estoque` não
+apareçam no registro da peça.
+
+### No extrato: coluna própria, e a busca acha
+A coluna **"Comprado de"** entra entre *Motivo / veículo* e *Quem*, e a busca
+livre passa a varrer o fornecedor (com `semAcento` nos dois lados).
+
+⚠️ Movimentação de antes deste campo — e toda saída e ajuste — mostra
+**travessão**, nunca célula vazia: célula em branco se leria como defeito da
+tela.
+
+O `<datalist>` aprende de **quem já vendeu peça**, mesmo sem ficha de
+fornecedor: a lista se padroniza com o uso, sem obrigar a cadastrar antes.
+⚠️ `<datalist>`, não `<select>`: lista fechada obrigaria a migrar o que já foi
+digitado — a lição do fornecedor nas despesas da Auto Mais (26/09).
+
+### A coluna custa ZERO de largura — medido, não suposto
+Comparado com o arquivo **real da v151** (raw de `7aadd0e~1`), rodando o
+`renderAlmoxMov` **de cada versão** sobre as mesmas 18 movimentações:
+
+| | v151 (6 colunas) | v152 (7 colunas) |
+|---|---|---|
+| mínimo do conteúdo | 625px | **731px** (+106) |
+| piso (`min-width`) | 820px | 820px |
+| largura desenhada a 1024px | **820px** | **820px — igual** |
+| rolava a 1024px? | **sim, já rolava** | sim |
+
+🔴 **731 ainda cabe sob o piso de 820**, então a tabela é desenhada na mesma
+largura nas duas versões e a rolagem a 1024px **já existia na v151**. Há 89px de
+folga antes de a coluna passar a custar largura de verdade.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**845/845**; eram 843, +2 do campo
+  e da nota); os dois carimbos batendo
+- **60 testes** com o código real e os dados reais: o campo no HTML e dentro do
+  modal certo, visibilidade nos 3 tipos, a sugestão nas 5 peças reais, a nota
+  aparecendo e sumindo, o que fica gravado em cada tipo, trim, nome com aspa e
+  `&`, a ficha preservada, o saldo inicial, as validações de sempre, a coluna, o
+  escape, a busca com e sem acento, os filtros, o datalist, e lista vindo como
+  objeto do Firebase
+- **31 defeitos injetados — todos acusados**, entre eles o **estado antes do
+  pedido** (campo inexistente, nada gravado, coluna ausente), a saída gravando
+  origem, não sugerir o habitual, a sugestão virar imposição sobre a ficha, o
+  modal herdar o valor anterior, a célula sair das linhas, o nome ir cru para o
+  `innerHTML`, a busca parar de achar, e os carimbos deixarem de bater
+- **as duas suítes do almoxarifado continuam passando** — v126 (70 testes) e
+  v127 (53) —, o que prova que nem o saldo nem a quantidade inicial mudaram de
+  comportamento
+- **No ar, no arquivo publicado, com o banco real** e `firebase`/`saveDB`
+  substituídos **antes do eval**: sistema carregado inteiro (`MLT_GRAV`), 18
+  linhas com 7 células cada; abrir a entrada do **Pneu 175/65 R14** → caixa
+  visível, campo com **"Avannt Pneus Remold Ltda"**, a nota do cadastro, 16
+  sugestões no datalist; na saída → caixa `none` e campo vazio; editar → a nota
+  some; salvar com **"Gomma Pneus"** → saldo **12 → 16**, extrato mostrando
+  `12/11/2026 | Pneu 175/65 R14 | ⬇ Entrada | +4 | — | Gomma Pneus | —`, e **a
+  ficha ainda em "Avannt"**. 1 gravação interceptada; reconferido no banco: 5
+  peças, 18 movimentações, **0 com fornecedor**, nenhuma "Gomma".
+- Regressão **medida**: **53 suítes, 2.776 testes**, nenhuma falha
+
+### ⚠️ Dois ramos inertes, e isto está dito
+Na injeção, dois trechos não mudaram resultado: a limpeza preventiva do campo
+antes da sugestão é redundante com o `else` que já o esvazia, e o `|| ''` do
+habitual nunca é alcançado com `it.fornecedor` truthy. Ficaram no código (custam
+nada e dizem a intenção), **mas sem cobertura própria**.
+
+### 🔴 Achado de dado, não corrigido
+Há **duas peças com o mesmo nome**: "Pneu 205/60 R15" aparece em
+`ax1792238656606` (17/10) e `ax1794483164035` (12/11), as duas **sem código** e
+as duas hoje com saldo **zero**. A guarda contra duplicata é sobre o **código**,
+e nas 5 peças ele está vazio — então nome repetido passa, e o saldo da mesma
+peça se divide em duas fichas. Não corrigido: é dado de produção e não foi
+pedido. Juntar é lançar as movimentações numa só e zerar a outra.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o Almoxarifado com **Ctrl+Shift+R**, lançar uma
+entrada de verdade e conferir a coluna no extrato. Eu não autentico.
