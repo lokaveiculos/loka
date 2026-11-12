@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v154-20261112-1430 -->
+<!-- LOKA deploy: v155-20261112-1540 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1855,7 +1855,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v154-20261112-1430';
+var LOKA_BUILD = 'v155-20261112-1540';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -5724,7 +5724,15 @@ function reativarEncerrado() {
 
   // 🔴 as 4 defesas, em MEMÓRIA — sem isto o aplicarEncerrados remove o
   //    aluguel outra vez já nesta sessão, sem recarregar nada.
-  try { if (db.encerrados) delete db.encerrados[ativo.id]; } catch (e) {}
+  // 🔴 loka_db/encerrados guarda ID **e ASSINATURA** — medido: 107 chaves
+  //    sig_ no banco real. Limpar só o id deixava a FONTE 1 pegar a
+  //    locação de novo pela assinatura, e ela sumia dos ativos.
+  try {
+    if (db.encerrados) {
+      delete db.encerrados[ativo.id];
+      if (sig) delete db.encerrados[sig];
+    }
+  } catch (e) {}
   try { if (window._encerradosRecentes) delete window._encerradosRecentes[ativo.id]; } catch (e) {}
   try {
     if (window._tombstones) {
@@ -5755,6 +5763,10 @@ function reativarEncerrado() {
       }
       firebase.database().ref('loka_db/encerrados/' + ativo.id).remove()
         .catch(_avisaFalha('a lista de encerrados'));
+      if (sig) {
+        firebase.database().ref('loka_db/encerrados/' + sig).remove()
+          .catch(_avisaFalha('a assinatura na lista de encerrados'));
+      }
     } else {
       toast('⚠️ Sem conexão com o banco: NÃO foi possível reativar.', '#c0392b');
       // desfaz o que mexi em memória, para a tela não mentir
