@@ -56,8 +56,8 @@ DNS via Cloudflare.
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
-| `contrato-mensal.html` | **mensal-v7-20261112-1430** |
-| `contrato-diaria.html` | **diaria-v7-20261109-0930** |
+| `contrato-mensal.html` | **mensal-v8-20261113-0920** |
+| `contrato-diaria.html` | **diaria-v8-20261113-0920** |
 
 ## Modelo de dados — `loka_db`
 
@@ -9258,3 +9258,140 @@ MENDES** (RVC9A19) → **✕** → **↩ Voltar para Aluguéis Ativos**.
 
 A locação volta com retirada 31/10, devolução prevista 10/11, R$ 1.800, caução
 R$ 750 e o pagamento de 03/11 intactos; o GM ONIX PLUS LTZ volta a alugado.
+
+---
+
+## ✅ Avaria mecânica não é coberta pelo seguro — 13/11/2026 (`cfd233a`) · mensal v8 · diária v8
+
+Pedido: *"acrescentar aos contratos mensal e por diária uma cláusula informando
+que avarias mecânicas não serão cobertas por seguro e serão cobradas do cliente.
+Veja se é melhor uma nova cláusula ou se pode acrescentar na cláusula 11"* — e,
+depois da análise, a decisão dele: **complementar a 11ª**.
+
+### Por que a 11ª, e não cláusula nova
+| | |
+|---|---|
+| a 11ª é **"Do Seguro"** | dizer o que o seguro **não** cobre é exatamente a matéria dela |
+| ela **já recebeu o caso parente** em 20/10 | reparo abaixo da franquia cobrado do locatário — o acréscimo continua o mesmo raciocínio: *o seguro não resolve → a conta vai para o locatário* |
+| cláusula nova **renumeraria os dois** | e com número **diferente** em cada um (14ª no mensal, 16ª na diária), quando a 11ª é idêntica nos dois |
+
+### O texto (idêntico nos dois contratos)
+> As avarias mecânicas não são cobertas pelo seguro contratado, que ampara
+> exclusivamente os eventos de sinistro acima descritos. O reparo de avaria
+> mecânica será realizado em oficina credenciada e cobrado do LOCATÁRIO,
+> incluindo o valor referente às diárias em que o veículo necessitar permanecer
+> parado, **não se considerando avaria mecânica a manutenção preventiva de
+> rotina — troca de óleo, filtros e revisão programada por quilometragem —, que
+> permanece por conta do LOCADOR.**
+
+### 🔴 A ressalva delimitada por CONTEÚDO não é capricho — é uma medição
+Medido nas **816 manutenções** do banco em 13/11:
+
+| | |
+|---|---|
+| manutenções com termo mecânico | **425** · R$ 307.862,54 |
+| 🔴 **delas, classificadas como "preventiva"** | **371 · R$ 232.376,79** |
+| entre elas | **TROCA DE MOTOR R$ 6.070** · **RETÍFICA DO CABEÇOTE R$ 4.180** · *"motor e regravacao"* R$ 6.300 |
+
+E a **Cláusula 12ª do contrato mensal** diz: *"A manutenção preventiva do veículo
+será por conta do LOCADOR"*.
+
+🔴 **Se a ressalva fosse só a palavra "preventiva", o locatário apontaria a
+própria ficha da locadora** — *"a sua manutenção chama isso de preventiva, logo é
+sua"* — e a cláusula nasceria vazia justamente nos casos caros, R$ 232 mil deles.
+Por isso ela **define** o que é preventiva de rotina (óleo, filtros, revisão por
+quilometragem): retífica e troca de motor não são, independentemente de como
+alguém classificou no sistema.
+
+⚠️ **Isso é mudança de substância, não de redação:** a 12ª deixava "preventiva"
+sem definir, e o acréscimo a define. Fica registrado para o advogado dele olhar;
+tirar a delimitação é uma linha.
+
+### 🔴 Já havia TRÊS lugares falando de avaria — e eles convivem
+| Onde | Mensal | Diária | O que diz |
+|---|---|---|---|
+| **Cláusula 3ª** | ✅ | ✅ | *"inclusive avarias mecânicas decorrentes de **mau uso, imprudência ou imperícia**"* |
+| **Cláusula 11ª** | ✅ | ✅ | franquias + reparo abaixo da franquia (20/10) + **o acréscimo de hoje** |
+| **Cláusula 12ª** | ✅ só mensal | — | *"Defeitos provenientes de mau uso ou avarias são de responsabilidade do LOCATÁRIO"* |
+
+⚠️ A 3ª **condiciona** a mau uso; o acréscimo de hoje é mais amplo (toda avaria
+mecânica, porque o seguro não cobre nenhuma). As duas **não** se substituem — há
+teste exigindo que a 3ª continue intacta nos dois, e defeito injetado que a
+apaga.
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (mensal **45/45**, diária
+  **48/48** — iguais ao registro da v124); os **três** carimbos de cada arquivo
+  batendo entre si
+- **138 testes** na suíte das cláusulas (eram 112 + 14 novos + 12 reorganizados):
+  o trecho **literal** na 11ª, que o seguro não cobre, de quem é a cobrança, as
+  diárias do carro parado, a delimitação da preventiva **com as três coisas
+  nomeadas**, não ter virado cláusula nova (13 e 15), aparecer uma vez só, **todas
+  as ocorrências na 11ª**, as 4 franquias e os 4 campos, o acréscimo de 20/10, o
+  texto **idêntico nos dois** (comparação de string), a Cláusula 3ª intacta e a
+  12ª do mensal intacta
+- **26 defeitos injetados — todos acusados**, entre eles o **estado antes do
+  pedido** nos dois arquivos, inverter o sentido (*"o seguro cobre"*), a cobrança
+  ir para o **LOCADOR**, perder as diárias, a ressalva voltar a ser só a palavra
+  *preventiva*, perder a revisão por quilometragem, a preventiva cair no
+  LOCATÁRIO (contradizendo a 12ª), o trecho **vazar para a 12ª**, entrar duas
+  vezes, **divergir entre os dois contratos por uma palavra**, e apagar o
+  acréscimo de 20/10
+- **No ar, nos dois arquivos publicados**, parseados pelo navegador: trecho
+  literal na 11ª, **1 ocorrência** em cada, 4 franquias intactas, o reparo abaixo
+  da franquia presente, a 3ª intacta nos dois, a 12ª do mensal intacta, 13 e 15
+  cláusulas, e os dois textos **idênticos**
+- Regressão **medida**: **56 suítes, 2.964 testes**, nenhuma falha
+
+#### Cabe no A4 — medido nos arquivos reais das duas versões
+Buscando a v7 pelo raw de `cfd233a~1` e medindo as duas no **mesmo instante**,
+com o `@media print` extraído por balanceamento de chaves e o iframe na largura
+útil (726px):
+
+| | v7 | **v8** | delta | sobra na 1ª folha |
+|---|---|---|---|---|
+| mensal | 929px | **945px** | **+16** | 125px |
+| diária | 938px | **953px** | **+15** | 117px |
+
+Os dois continuam em **uma folha** (0,88 e 0,89), sem transbordar a largura
+(726px exatos). O acréscimo tem 476 caracteres e custa ~15px porque entra num
+parágrafo que já existia.
+
+⚠️ **Vale o delta, não a sobra absoluta:** a diária v7 mediu 938px aqui, e o
+registro de 29/10 anotou 995px para a diária **v5** — versões e métodos
+diferentes. O número confiável é a comparação das duas, medidas do mesmo jeito.
+
+### ⚠️ Três achados do processo
+1. **Um teste de 20/10 falhou sem haver defeito** — *"o acréscimo termina em
+   ponto"* exigia que a 11ª **terminasse** com *"realização dos serviços."*, ou
+   seja, que o acréscimo daquele dia fosse o **último**. É a armadilha do teste
+   estrutural ancorado no vizinho, **pela sexta vez**. Passou a exigir o que
+   promete: que a frase de 20/10 termine em ponto **e** que a cláusula termine em
+   ponto, sem exigir ordem.
+2. 🔴 **Um defeito injetado ficou OBSOLETO** — *"a tarifa é inventada no mensal"*
+   era válido até 12/11, quando o mensal passou a prever lavagem por pedido dele
+   (v155). Hoje aquilo é o estado **certo**. O defeito **inverteu**: agora é a
+   tarifa **sair** do mensal.
+3. 🔴 **Um teste meu era fraco e deixou passar o vazamento** — *"não vazou para
+   outra cláusula"* usava `indexOf`, que pega a **primeira** ocorrência: com o
+   trecho duplicado na 12ª, a primeira continua na 11ª e o defeito passava.
+   Passou a varrer **todas** as ocorrências.
+
+⚠️ E o defeito dos carimbos travava o **número** da versão da diária (`v7`), dando
+*ERRO DE MONTAGEM* quando ela virou v8. A âncora passou a ser recortada **do
+próprio arquivo**.
+
+### ⚠️ Detalhe dos contratos: o carimbo NÃO está na linha 4
+`sed -n '4p'` nesses dois arquivos devolve `<head>` — o carimbo fica mais abaixo.
+Conferir o carimbo deles com `grep`, não por número de linha. (Os testes já
+comparam **os três carimbos entre si**, que é a regra que importa.)
+
+### 🔴 Achado de dado, não corrigido
+**371 manutenções mecânicas estão classificadas como "preventiva"**, incluindo
+retífica de cabeçote e troca de motor. Isso não atrapalha só o contrato: qualquer
+relatório que separe custo preventivo de corretivo está torto nesses R$ 232 mil.
+Reclassificar são 371 registros de produção e não foi pedido — fica registrado.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel gerar um contrato de cada tipo e ler a Cláusula 11ª no
+documento impresso.
