@@ -9587,3 +9587,203 @@ valores vêm com vírgula), mas um valor colado de outra tela leria diferente al
 ### ⏳ Não verificado
 Falta **logado**: o Rogel abrir Formulários → **Anexo I**, clicar em
 **Com Cliente** com a RSC e imprimir. Eu não autentico.
+
+---
+
+## ✅ Contas a Receber: linha nova no topo + cliente por seleção — 18/11/2026 · gestao v157
+
+Pedido: *"na aba contas a receber, inserir a opção de organizar por vencimento
+mais antigo ou mais novo. além disso, quando inserirmos uma linha nova que esta
+linha fique sempre na parte superior. no campo cliente, ao invés de digitarmos o
+nome, abrir seleção do cliente que vamos adicionar, conforme cadastro"*.
+
+### 🔴 A ordenação por vencimento JÁ EXISTIA
+`recOrdenar` oferece **"Vencimento (antigo→novo)"** e **"(novo→antigo)"** desde
+antes — exatamente as duas direções pedidas. O problema era **achar**: eram a 4ª
+e a 5ª opção de uma lista encabeçada por *"Ordenar por..."*, numa barra com oito
+controles.
+
+As duas passaram a ser as **primeiras** da lista, e o placeholder virou
+**"Ordem: como foi lançado"** — diz o estado atual em vez de parecer um convite
+vazio. ⚠️ **Não mudei o padrão:** quem não escolher nada continua vendo a ordem
+de lançamento, como sempre.
+
+E a ordenação ganhou teste: as duas direções conferidas contra uma ordenação
+feita por fora, o vencimento vazio indo para o fim, e a invariante de que
+ordenar **não perde nem duplica** lançamento.
+
+⚠️ **Achado, não corrigido:** o **relatório** de Contas a Receber agrupa por
+**tipo** e não segue a ordenação da tela — dentro de cada grupo ele lista na
+ordem em que está gravado. É anterior e deliberado (o relatório é por tipo, não
+um espelho da lista), mas vale saber que escolher "Vencimento (antigo→novo)"
+**não** muda o PDF.
+
+### 🔴 Por que a linha nova no topo era necessária de verdade
+`finAddLinha` faz `push` — a linha ia para o **fim** de 117 contas. E pior,
+justamente com a ordenação que ele pediu: linha nova tem **vencimento vazio**,
+que o código manda para o fim (`a.r.vencimento || '9999'`). Ou seja, **escolher
+"Vencimento (antigo→novo)" escondia a linha recém-criada no fim da lista.**
+
+Agora ela vai para o topo **depois** da ordenação, com selo **NOVA**.
+
+| Decisão | Por quê |
+|---|---|
+| a fixação é por **REFERÊNCIA ao objeto**, não por índice | a lista é reordenada e linhas são excluídas; um índice guardado passaria a apontar para outra conta |
+| **particiona** em vez de ordenar | não depende de o `sort` ser estável |
+| nada disso vai para o **banco** | é estado de tela; no recarregamento a linha toma o lugar natural dela |
+| vale **só** para o Contas a Receber | as outras abas não foram pedidas |
+| fica fixada por toda a sessão | soltá-la quando ficasse "preenchida" faria a linha **saltar enquanto se digita** — é a família do defeito do `comFoco` |
+
+### 🔴 A medição que decidiu o campo de cliente — e evitou um estrago
+Medido nos **117 lançamentos reais**:
+
+| | |
+|---|---|
+| cliente **bate** com o cadastro | **30** |
+| 🔴 **não bate** | **87 (74%)** |
+| os maiores | "RSC" 33x · "G7" 15x · "Transsouza" 10x · "ISS" 8x · "BRJ" 2x |
+
+São **apelidos** — o mesmo padrão que em 13/10 quase me fez criar uma dívida
+duplicada de R$ 46.150 porque "G7" não casava com a razão social.
+
+⚠️ **Um `<select>` de lista FECHADA apagaria o cliente de 87 lançamentos.** Sem
+opção correspondente o navegador fica com a primeira, e salvar grava **outro
+cliente, em silêncio** — é o defeito do select de **Fonte do CRM** (15/09), que
+gravava "Outro" por cima do canal real.
+
+Por isso o valor gravado **sempre** ganha opção com a grafia exata dele,
+rotulada *"(fora do cadastro)"* só quando realmente não está lá. Duas
+invariantes travam isso, **nos dois momentos** (antes e depois de tocar no
+seletor):
+
+- 🔴 nos **117** lançamentos, o valor **gravado é sempre o selecionado**;
+- 🔴 cada célula tem **uma** opção marcada, nunca duas.
+
+### 🔴 O seletor é LEVE: a lista entra no primeiro toque
+Primeira versão: `<select>` com os 146 clientes em cada linha. Medido antes de
+publicar, contra o arquivo real da v156:
+
+| | HTML da grade | `<option>` | desenho |
+|---|---|---|---|
+| v156 (campo de texto) | 376 KB | 936 | **12,7ms** |
+| 🔴 1ª versão (lista em cada linha) | **1.690 KB** | **18.220** | 264,8ms |
+| **v157 (seletor leve)** | **428 KB** | 1.053 | **17,8ms** |
+
+Então o `<select>` nasce com **uma** opção (o valor gravado) e a lista do
+cadastro entra no `onmousedown`/`onfocus`. O dropdown continua sendo a lista do
+cadastro; o que mudou é **quando** ela é montada. Custo final: **+52 KB e
++4,6ms** numa tela que redesenha a cada filtro.
+
+🔴 **E o peso não era só o HTML.** A 1ª versão levava 264,8ms com o HTML
+crescendo apenas 14% sobre a final — o custo estava em **`_recCadastrado`
+reordenar os 146 clientes uma vez por LINHA**, 117 vezes, com `localeCompare`.
+Entrou uma **memória de um desenho** (`_recCliCache`), zerada no início do
+`finRenderReceber` e por quem roda fora de um render (abrir o dropdown, gravar a
+escolha) — assim um cadastro novo aparece no desenho seguinte, sem cache velho.
+
+⚠️ **Trocar o `innerHTML` de um `<select>` ZERA o value** (medido em 03/11). O
+preenchimento repõe o valor, e é por isso que a opção com a **grafia exata** tem
+de existir: sem ela, repor um valor sem opção **desmarca tudo** e o campo fica
+vazio. Medido: **0 lançamentos** hoje casam com o cadastro só ignorando a caixa,
+então esse caso é **latente** — mas fechado.
+
+### O que a seleção grava
+Nome **e `clienteId`**, numa gravação só. ⚠️ O id é o que vai permitir cruzar sem
+depender do apelido digitado — o problema que deixou 87 lançamentos sem ligação
+com o cadastro. Voltar para *"— selecione —"* **apaga** o id, para não ficar o id
+de outro cliente colado.
+
+### 🔴 O ✎ existe porque a tela não pode virar um beco
+Um botão **✎** troca a célula para digitação, e **↩** volta ao seletor. Sem ele,
+lançar para quem **ainda não está no cadastro** (reserva, pré-cadastro) seria
+impossível. ⚠️ É acréscimo meu ao pedido literal — registrado para ser revertido
+se ele não quiser.
+
+E ele usa **o mesmo escritor** do seletor (`_recClienteSel`), não o `finEdit`:
+dois escritores para o mesmo campo foi o acidente da v119, e aqui produziria
+algo concreto — escolher um cliente e digitar outro nome por cima deixaria o
+**`clienteId` do primeiro** colado na linha.
+
+### 🔴 Defeito meu, pego pela invariante: 4 clientes cadastrados em DUPLICIDADE
+A invariante *"uma opção marcada"* falhou no lançamento 63 ("Novo Começo Ltda").
+A causa é dado: **4 nomes estão cadastrados duas vezes**, o mesmo cliente em
+dois registros, um com CPF pontuado e outro sem:
+
+| Nome | ids |
+|---|---|
+| DANIEL MERCES SILVA | `c8` (042027745-58) · `c1782734400103` (042.027.745-58) |
+| JOSE PINTO DO CARMO | `c21` · `c1791571913986` |
+| **NOVO COMEÇO LTDA** | `c40` · `c1780916789846` |
+| ROGERIO LIMA CUNHA | `c50` · `c1788002151627` |
+
+Meu código marcava **as duas** opções — HTML inválido, e o navegador fica com a
+**última**, que pode não ser o registro que o `_recClienteSel` encontra. Agora só
+a primeira é marcada, e há teste exigindo que o id gravado seja o do registro
+**que a tela mostra**.
+
+⚠️ **Os 4 pares não foram corrigidos** — é dado de produção e não foi pedido.
+Vale juntar: a fatura do lançamento 63 aponta para `c40`, então é esse o id em
+uso.
+
+### ⚠️ Três tropeços de verificação, cada um com uma lição
+1. **Um teste meu media efeito colateral de outra funcionalidade:** `[a fixação
+   não vai para o banco]` acusou o campo `recebimentos`, que **não é meu** — o
+   `_finBaixas` (v108) normaliza esse array **em cima da linha** ao desenhar.
+   Pré-existente, e está dito aqui em vez de contado como defeito.
+2. 🔴 **Meu stub de `<select>` não decodificava entidades.** O navegador
+   **decodifica** ao parsear: o atributo sai como `ISS TRANSPORTES &amp;
+   LOGISTICA` e o `.value` devolve `ISS TRANSPORTES & LOGISTICA`. São **4
+   lançamentos reais** com `&` no nome, então o caso é vivo. É a lição do
+   `&bull;` (28/10) por outro ângulo.
+3. ⚠️ **Uma injeção minha era INERTE:** o defeito "o modo digitar passa a ser por
+   índice" mantinha a comparação por referência num OR — não mudava
+   comportamento nenhum. Não era teste fraco; era injeção que não injetava.
+
+E **um teste cego**: o defeito *"o botão de digitar desaparece"* passou, porque
+eu exercitava `_recDigitarCliente` **direto** e nunca conferia que o botão está
+na célula. Sem ele a tela vira um beco, e nada acusava.
+
+⚠️ **O `| grep` mascarou o código de saída do injetor** na primeira rodada: o
+status de um pipeline é o do **último** comando, então ele voltou 0 com 3
+defeitos passando. É o mesmo descuido que o contador de regressão já teve em
+29/10.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**883/883**); os dois carimbos
+  batendo
+- **47 testes** com o código real e os **117 lançamentos reais**, incluindo um
+  stub de `<select>` **fiel ao navegador**: o `value` vem da opção marcada,
+  trocar o `innerHTML` destrói as opções, repor um valor sem opção deixa o
+  campo vazio, e as **entidades são decodificadas**
+- **45 defeitos injetados — todos acusados**, entre eles o estado antes do
+  pedido nos três itens, a lista fechada apagando os 87 apelidos, a lista
+  inteira voltando para cada linha, a memória virando permanente, a memória
+  saindo (21× mais lento), a fixação por índice, a fixação indo para o banco, e
+  a ordenação por vencimento invertida
+- Regressão **medida**: **58 suítes, 3.106 testes**, nenhuma falha
+
+### 🔴 Uma linha minha mascarava QUATRO defeitos
+`sel.value = atual` depois do `innerHTML` era rede de segurança — e virou
+**redundante** quando o preenchimento passou a garantir exatamente uma opção com
+`selected`. Pior: no navegador, atribuir `value` **desmarca as outras opções**,
+e por isso ela compensava quatro defeitos injetados, que passaram sem serem
+acusados: a opção do valor gravado entrar sem `selected`, duas opções marcadas,
+nome repetido marcando as duas, e o próprio "não repõe o valor".
+
+**A linha saiu.** Quem carrega a seleção é o `selected` do HTML, que a invariante
+[C3] vigia. E ao sair, ela revelou um caso real: **2 lançamentos têm cliente
+vazio** e nenhuma opção ficava marcada — o navegador cairia na primeira (certa),
+mas confiar nisso quebra a invariante, então o `— selecione —` passou a nascer
+marcado.
+
+⚠️ **Três injeções foram removidas, com o motivo dito** em vez de ficarem como
+número: uma ficou obsoleta (a linha não existe mais) e **duas eram inertes** — o
+`jaMarcou = !exato` é redundante com o próprio `exato`, e os 4 nomes duplicados
+do cadastro têm **grafias diferentes** ("Novo Começo Ltda" × "NOVO COMEÇO
+LTDA"), então a comparação exata nunca casa com os dois. Não há como exercitar
+com o dado real.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o Contas a Receber com **Ctrl+Shift+R**, clicar
+em **+ Nova Conta** (a linha tem de aparecer no topo, com o selo NOVA), escolher
+o cliente no seletor e conferir a ordenação por vencimento. Eu não autentico.

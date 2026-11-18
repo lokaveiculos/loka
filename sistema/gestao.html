@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v156-20261118-1530 -->
+<!-- LOKA deploy: v157-20261118-1620 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -992,11 +992,14 @@ tr:hover td{background:#f8f9fe;}
             <option value="Outros">📌 Outros</option>
           </select>
           <select class="filter-sel" id="recOrdenar" onchange="finRenderReceber()">
-            <option value="">Ordenar por...</option>
+            <!-- ⚠️ As duas de vencimento vem PRIMEIRO: e a ordem que a
+                 cobrança usa, e com elas no meio da lista a opção passava
+                 desapercebida. O placeholder diz o estado, não um convite. -->
+            <option value="">Ordem: como foi lan&ccedil;ado</option>
+            <option value="venc">⬇ Vencimento (antigo→novo)</option>
+            <option value="venc_desc">⬆ Vencimento (novo→antigo)</option>
             <option value="cliente">Cliente (A-Z)</option>
             <option value="cliente_desc">Cliente (Z-A)</option>
-            <option value="venc">Vencimento (antigo→novo)</option>
-            <option value="venc_desc">Vencimento (novo→antigo)</option>
             <option value="valor">Maior valor</option>
           </select>
           <button class="btn" id="btnRenegociar" onclick="renClicarBotao()" style="background:#9d174d;color:#fff;white-space:nowrap">🤝 Renegociar</button>
@@ -1857,7 +1860,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v156-20261118-1530';
+var LOKA_BUILD = 'v157-20261118-1620';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -11039,9 +11042,15 @@ function finAddLinha(aba) {
     : aba==='pagar' ? {vencimento:'',fornecedor:'',placa:'',valor:0,descricao:'',status:'pendente',pagoEm:''}
     : {banco:'',contrato:'',principal:0,liberacao:'',primParcela:'',ultParcela:'',pago:0,totParcelas:0,cet:0,sistema:'Price',valorParcela:0,amortizado:0,garantia:'',receita:0};
   db.financeiro[aba].push(nova);
+  // 🔴 A linha nova fica no TOPO do Contas a Receber qualquer que seja a
+  //    ordenação: com "Vencimento (antigo→novo)" ela tem vencimento vazio
+  //    e cairia no FIM da lista, escondida entre mais de 100 contas.
+  if (aba === 'receber') _recNovas.push(nova);
   saveDB();
   finRender(aba);
-  toast('✅ Linha adicionada','#0d7a3e');
+  toast(aba === 'receber'
+    ? '✅ Linha adicionada no topo da lista'
+    : '✅ Linha adicionada', '#0d7a3e');
 }
 function finDel(aba, idx) {
   if (!confirm('Excluir esta linha?')) return;
@@ -11058,6 +11067,167 @@ function finLimparDataReceber() {
   var f=document.getElementById('recDataFim'); if(f)f.value='';
   finRenderReceber();
 }
+/* 🔴 Linhas criadas NESTA SESSAO, por REFERENCIA ao objeto — nunca por
+   indice: a lista e reordenada e linhas sao excluidas, e um indice guardado
+   passaria a apontar para outra conta. Nada disto vai para o banco: e
+   estado de tela, e no recarregamento a linha toma o lugar natural dela. */
+var _recNovas = [];
+var _recDigitando = [];   // linhas em que o operador pediu para digitar o nome
+
+/* 🔴 Memoria de UM render. Medido em 18/11/2026: sem ela o Contas a
+   Receber passou de 12,7ms para 264,8ms (21x) com o HTML crescendo apenas
+   14% -- o custo era ordenar 146 clientes com localeCompare uma vez por
+   LINHA, 117 vezes. Zerado no inicio de cada desenho, entao o desenho
+   seguinte ja ve qualquer mudanca no cadastro. */
+var _recCliCache = null;
+
+function _recClientesOrdenados() {
+  if (_recCliCache) return _recCliCache.lista;
+  var lista = cleanArr(db && db.clients).filter(function (c) {
+    return c && String(c.nome || '').trim() !== '';
+  }).slice().sort(function (a, b) {
+    return semAcento(a.nome).localeCompare(semAcento(b.nome), 'pt-BR');
+  });
+  var nomes = {};
+  lista.forEach(function (c) { nomes[String(c.nome).trim().toUpperCase()] = 1; });
+  _recCliCache = { lista: lista, nomes: nomes };
+  return lista;
+}
+
+/* 🔴 A celula do cliente e um SELETOR do cadastro — mas o valor que ja
+   esta gravado NUNCA e descartado. Medido em 18/11/2026: 87 dos 117
+   lancamentos tem apelido que nao existe no cadastro ("RSC" 33x, "G7" 15x,
+   "Transsouza" 10x, "ISS" 8x). Numa lista FECHADA, o navegador cai na
+   primeira opcao e salvar trocaria o cliente de 87 contas em silencio — e
+   exatamente o defeito do select de Fonte do CRM (15/09). */
+/* A opcao que o <select> ja traz desenhado: o valor GRAVADO, marcado. Assim
+   o campo mostra o cliente certo sem a lista inteira, e salvar sem abrir o
+   dropdown nao muda nada. */
+function _recClienteOpcaoAtual(atual) {
+  atual = String(atual == null ? '' : atual);
+  if (atual === '') return '<option value="" selected>— selecione —</option>';
+  return '<option value="' + _mltEsc(atual) + '" selected>' + _mltEsc(atual)
+       + (_recCadastrado(atual) ? '' : ' (fora do cadastro)') + '</option>';
+}
+
+function _recCadastrado(nome) {
+  var alvo = String(nome == null ? '' : nome).trim().toUpperCase();
+  if (alvo === '') return false;
+  _recClientesOrdenados();                 // garante o cache
+  return !!(_recCliCache && _recCliCache.nomes[alvo]);
+}
+
+/* Preenche a lista do cadastro no primeiro toque no seletor. */
+function _recClienteLista(sel) {
+  if (!sel || sel.getAttribute('data-cheio') === '1') return;
+  sel.setAttribute('data-cheio', '1');
+  _recCliCache = null;      // abrir o dropdown le o cadastro fresco
+  var atual = String(sel.value == null ? '' : sel.value);
+  var lista = _recClientesOrdenados();
+  var alvo = atual.trim().toUpperCase();
+  var cadastrado = _recCadastrado(atual);
+  // o "— selecione —" nasce MARCADO quando nao ha cliente: deixar a
+  // marcacao por conta do navegador (que cai na primeira opcao) quebraria a
+  // invariante de UMA opcao marcada, e invariante frouxa esconde defeito.
+  var h = '<option value=""' + (atual === '' ? ' selected' : '')
+        + '>— selecione —</option>';
+  // 🔴 O valor gravado SEMPRE ganha opcao com a grafia exata dele. Medido
+  //    em 18/11/2026: 87 dos 117 lancamentos tem apelido fora do cadastro
+  //    ("RSC" 33x, "G7" 15x). E sem opcao EXATA, repor o valor adiante
+  //    desmarca tudo no navegador e o campo fica vazio -- o que aconteceria
+  //    com um nome que casa com o cadastro so ignorando a caixa.
+  //    O rotulo "fora do cadastro" sai so quando realmente nao esta la.
+  var exato = lista.some(function (c) { return String(c.nome) === atual; });
+  if (atual !== '' && !exato) {
+    h += '<option value="' + _mltEsc(atual) + '" selected>' + _mltEsc(atual)
+       + (cadastrado ? '' : ' (fora do cadastro)') + '</option>';
+  }
+  // 🔴 Nome repetido no cadastro: so a PRIMEIRA opcao que casa fica
+  //    marcada. Medido: 4 nomes estao cadastrados duas vezes (o mesmo cliente
+  //    em dois registros, um com CPF pontuado e outro sem).
+  // se o valor gravado ja virou opcao propria acima, nenhuma do cadastro e
+  // marcada: a marca tem de ficar na grafia que esta gravada
+  var jaMarcou = !exato;
+  lista.forEach(function (c) {
+    var n = String(c.nome);
+    var casa = !jaMarcou && n === atual;
+    if (casa) jaMarcou = true;
+    h += '<option value="' + _mltEsc(n) + '"' + (casa ? ' selected' : '')
+       + '>' + _mltEsc(n) + '</option>';
+  });
+  // ⚠️ Trocar o innerHTML de um <select> ZERA o value (medido em 03/11/2026).
+  //    Quem carrega a selecao e o atributo `selected` do HTML acima, e acima
+  //    ha SEMPRE exatamente uma opcao marcada: a do valor gravado (grafia
+  //    exata) ou, quando ele e vazio, a primeira -- o "— selecione —".
+  //    🔴 Nao reponha o value aqui: atribuir value DESMARCA as outras opcoes
+  //    e mascarava quatro defeitos de marcacao (18/11/2026).
+  sel.innerHTML = h;
+}
+
+function _recClienteCel(r, i) {
+  var atual = String(r && r.cliente != null ? r.cliente : '');
+  var est = 'border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;'
+          + 'width:100%;max-width:168px;color:#0E1B4D;background:#fff';
+
+  if (r && _recDigitando.indexOf(r) >= 0) {
+    // escape para quem ainda nao esta no cadastro (reserva, pre-cadastro)
+    return '<div style="display:flex;gap:3px;align-items:center">'
+      + '<input type="text" value="' + _mltEsc(atual) + '" '
+      // 🔴 o MESMO escritor do seletor: o finEdit nao mexe no clienteId,
+      //    e um nome digitado por cima de um cliente escolhido deixaria o id
+      //    do anterior colado na linha (a licao da v119: dois escritores).
+      + 'onchange="_recClienteSel(' + i + ',this.value)" '
+      + 'style="' + est + '" placeholder="Nome do cliente">'
+      + '<button onclick="_recDigitarCliente(' + i + ',false)" title="Voltar a escolher do cadastro" '
+      + 'style="border:none;background:#EEF1FD;color:#2B4BF2;border-radius:4px;'
+      + 'padding:3px 5px;cursor:pointer;font-weight:700;font-size:10px">↩</button></div>';
+  }
+
+  // 🔴 MEDIDO em 18/11/2026: com a lista inteira em cada linha a grade
+  //    pesava 1.690 KB e 18.220 <option> (146 clientes x 117 linhas), contra
+  //    376 KB e 936 da versao com campo de texto -- 4,5x o peso e 8x o tempo.
+  //    E esta tela redesenha a cada filtro. Entao o <select> nasce com UMA
+  //    opcao (o valor atual) e a lista do cadastro entra no primeiro toque.
+  var opts = _recClienteOpcaoAtual(atual);
+  return '<div style="display:flex;gap:3px;align-items:center">'
+    + '<select onmousedown="_recClienteLista(this)" onfocus="_recClienteLista(this)" '
+    + 'onchange="_recClienteSel(' + i + ',this.value)" style="' + est + '" '
+    + 'title="' + _mltEsc(atual || 'Escolha o cliente do cadastro') + '">' + opts + '</select>'
+    + '<button onclick="_recDigitarCliente(' + i + ',true)" title="Digitar um nome que não está no cadastro" '
+    + 'style="border:none;background:#f3f4f6;color:#5a607a;border-radius:4px;'
+    + 'padding:3px 5px;cursor:pointer;font-weight:700;font-size:10px">✎</button></div>';
+}
+
+function _recDigitarCliente(i, ligar) {
+  finInit();
+  var r = db.financeiro.receber[i];
+  if (!r) return;
+  var k = _recDigitando.indexOf(r);
+  if (ligar && k < 0) _recDigitando.push(r);
+  if (!ligar && k >= 0) _recDigitando.splice(k, 1);
+  finRenderReceber();
+}
+
+/* Escolher do cadastro grava o nome E o id do cliente numa gravacao so.
+   ⚠️ O id e o que vai permitir cruzar sem depender do apelido digitado —
+   e o problema que deixou 87 lancamentos sem ligacao com o cadastro. */
+function _recClienteSel(i, valor) {
+  finInit();
+  var r = db.financeiro.receber[i];
+  if (!r) return;
+  _recCliCache = null;      // gravar confere contra o cadastro fresco
+  var nome = String(valor == null ? '' : valor);
+  r.cliente = nome;
+  var alvo = nome.trim().toUpperCase();
+  var c = _recClientesOrdenados().filter(function (x) {
+    return String(x.nome).trim().toUpperCase() === alvo;
+  })[0];
+  if (c && c.id) r.clienteId = c.id;
+  else if (r.clienteId) delete r.clienteId;   // nao deixa id de outro cliente colado
+  saveDB();
+  finRenderReceber();
+}
+
 var REC_TIPOS = ['Fatura','Multas','Avarias','Seguro','Peças','Pneus','Renegociação','Outros'];
 var REC_TIPO_COR = {Fatura:'#2B4BF2',Multas:'#c0392b',Avarias:'#b45309',Seguro:'#0e7490','Peças':'#7c3aed',Pneus:'#0d7a3e','Renegociação':'#9d174d',Outros:'#5a607a'};
 
@@ -11291,6 +11461,7 @@ function finRenderReceber() {
   var grid = document.getElementById('finGridReceber');
   if (!grid) return;
   finInit();
+  _recCliCache = null;      // um desenho, uma montagem da lista de clientes
   var rows = db.financeiro.receber;
   var q = semAcento((document.getElementById('qReceber')&&document.getElementById('qReceber').value||''));
   var di = (document.getElementById('recDataIni')||{}).value||'';
@@ -11344,6 +11515,20 @@ function finRenderReceber() {
   else if (ordem==='venc') visiveis.sort(function(a,b){ return (a.r.vencimento||'9999').localeCompare(b.r.vencimento||'9999'); });
   else if (ordem==='venc_desc') visiveis.sort(function(a,b){ return (b.r.vencimento||'').localeCompare(a.r.vencimento||''); });
   else if (ordem==='valor') visiveis.sort(function(a,b){ return (Number(b.r.valor)||0)-(Number(a.r.valor)||0); });
+
+  // 🔴 As linhas criadas nesta sessão vão para o topo DEPOIS da ordenação,
+  //    senão a ordem escolhida as jogaria para o fim. Particiona em vez de
+  //    ordenar: não depende de o sort ser estável.
+  if (_recNovas.length) {
+    var _nv = [], _rst = [];
+    visiveis.forEach(function (o) {
+      (_recNovas.indexOf(o.r) >= 0 ? _nv : _rst).push(o);
+    });
+    _nv.sort(function (a, b) {   // a mais recente primeiro
+      return _recNovas.indexOf(b.r) - _recNovas.indexOf(a.r);
+    });
+    visiveis = _nv.concat(_rst);
+  }
 
   // Stats
   var stats = document.getElementById('receberStats');
@@ -11408,7 +11593,12 @@ function finRenderReceber() {
     var podeRen = (st==='pendente' || st==='parcial');
     html += '<tr style="border-bottom:1px solid #f0f2f8;'+bg+'">'
       + '<td style="padding:4px 6px;text-align:center">'+(podeRen ? '<input type="checkbox" class="ren-sel" data-idx="'+i+'" onchange="renAtualizarBotao()">' : '')+'</td>'
-      + '<td style="padding:4px 6px">'+inp('cliente','120px')+'</td>'
+      + '<td style="padding:4px 6px">'+_recClienteCel(r,i)
+        + (_recNovas.indexOf(r) >= 0
+            ? '<div style="margin-top:3px"><span style="background:#e8f5ef;color:#0d7a3e;'
+              + 'padding:1px 6px;border-radius:20px;font-size:9px;font-weight:700">NOVA</span></div>'
+            : '')
+        +'</td>'
       + '<td style="padding:4px 6px">'+tipoSelect(r,i)+'</td>'
       + '<td style="padding:4px 6px">'+inp('valor','95px','text-align:right;font-weight:700')+'</td>'
       + '<td style="padding:4px 6px">'+inp('recebido','95px','text-align:right;color:#0d7a3e;font-weight:700')
