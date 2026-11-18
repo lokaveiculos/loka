@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v157-20261118-1620 -->
+<!-- LOKA deploy: v158-20261118-1810 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -487,6 +487,9 @@ tr:hover td{background:#f8f9fe;}
           <input class="filter-input" id="fFatDe" type="date" onchange="renderFaturas()" style="width:135px;padding:5px" title="Data inicial">
           <span style="font-size:10px;color:var(--muted)">at&eacute;</span>
           <input class="filter-input" id="fFatAte" type="date" onchange="renderFaturas()" style="width:135px;padding:5px" title="Data final">
+          <!-- O mesmo extrato do Contas a Receber: quem registra o recebimento
+               de uma fatura e o lancamento ligado a ela, entao a fonte e uma. -->
+          <button class="btn btn-outline" onclick="finExtratoAbrir()" style="font-size:11px;white-space:nowrap" title="Cada pagamento parcial das faturas e das contas a receber">&#128203; Extrato de recebimentos</button>
           <button onclick="limparFiltroDataFaturas()" title="Limpar o per&iacute;odo" style="border:none;background:none;color:#c0392b;cursor:pointer;font-weight:700">&#10005;</button>
         </div>
         <button class="btn btn-blue" onclick="window.open('fatura.html?v='+Date.now(),'_blank')" style="white-space:nowrap">+ Nova Fatura</button>
@@ -1005,6 +1008,7 @@ tr:hover td{background:#f8f9fe;}
           <button class="btn" id="btnRenegociar" onclick="renClicarBotao()" style="background:#9d174d;color:#fff;white-space:nowrap">🤝 Renegociar</button>
           <button class="btn btn-outline" onclick="finRestaurarSeed('receber')" style="font-size:11px" title="Recarregar dados originais">🔄 Restaurar</button>
           <button class="btn" style="background:#0d7a3e;color:#fff;font-size:11px;white-space:nowrap" onclick="relatorioReceber()" title="Gerar relatório para imprimir ou PDF">📄 Relatório</button>
+          <button class="btn btn-outline" onclick="finExtratoAbrir()" style="font-size:11px;white-space:nowrap" title="Cada pagamento parcial, de todas as contas, num só lugar">&#128203; Extrato de recebimentos</button>
           <button class="btn btn-green" onclick="finAddLinha('receber')">+ Nova Conta</button>
         </div>
         <div class="stats" id="receberStats" style="margin-bottom:12px"></div>
@@ -1860,7 +1864,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v157-20261118-1620';
+var LOKA_BUILD = 'v158-20261118-1810';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -11978,6 +11982,351 @@ function finExcluirBaixa(idx, id){
   finVerBaixas(idx);
   _sincFaturaDoRecebimento(idx);
   toast('🗑 Baixa de '+brl(b.valor)+' excluída','#c0392b');
+}
+
+// ── EXTRATO DE RECEBIMENTOS (18/11/2026) ─────────────────────
+/* 🔴 O histórico de UMA conta já existia (v108) e o painel Faturas já o abre
+   (v143). O que NÃO existia era ver os recebimentos JUNTOS: com 119
+   lançamentos, responder "quanto entrou em outubro?" ou "todos os pagamentos
+   da RSC" exigia abrir conta por conta.
+
+   Este extrato lê os MESMOS dados pelos MESMOS helpers (_finBaixas,
+   _finAnteriorAoHistorico) — nenhuma leitura própria. Duas fontes para a mesma
+   conta foi o acidente da v119. */
+
+var _extOrdem = 'desc';   // mais recente primeiro: é o que se procura
+
+/* Uma linha por baixa, de todos os lançamentos. O índice do lançamento vai
+   junto para o 📋 reabrir o histórico daquela conta. */
+function _extLinhas() {
+  finInit();
+  var out = [];
+  (db.financeiro.receber || []).forEach(function (r, idx) {
+    if (!r) return;
+    _finBaixas(r).forEach(function (b) {
+      if (!b) return;
+      out.push({
+        idx: idx, cliente: r.cliente || '', tipo: r.tipo || 'Outros',
+        histLanc: r.historico || '', faturaKey: r.faturaKey || '',
+        origem: r.origem || '', statusLanc: r.status || '',
+        data: b.data || '', valor: Number(b.valor) || 0,
+        obs: b.obs || '', por: b.por || '', quando: b.quando || '', id: b.id || ''
+      });
+    });
+  });
+  return out;
+}
+
+/* 🔴 Quanto do dinheiro recebido NÃO tem detalhamento. Medido em 18/11/2026:
+   28 lançamentos, R$ 1.018.770,41 — são anteriores à v108. Sem dizer isso, o
+   extrato pareceria ser todo o dinheiro que entrou, e é um terço.
+   É o padrão dos cartões do Contas a Receber (v120–v122). */
+function _extSemDetalhe() {
+  finInit();
+  var n = 0, v = 0;
+  (db.financeiro.receber || []).forEach(function (r) {
+    if (!r) return;
+    var a = _finAnteriorAoHistorico(r);
+    if (a) { n++; v += a; }
+  });
+  return { contas: n, valor: Math.round(v * 100) / 100 };
+}
+
+/* O número da fatura sai da própria faturaKey (cliente_numero_periodo), não da
+   lista de faturas: ⚠️ _todasFaturas só é preenchido quando o painel Faturas é
+   aberto (a armadilha da v143), e quem abre o extrato pelo Contas a Receber
+   pode nunca ter entrado lá. */
+function _extFatura(l) {
+  if (!l || !l.faturaKey) return '';
+  var p = String(l.faturaKey).split('_');
+  if (p.length < 3) return '';
+  var num = p[p.length - 2], per = p[p.length - 1];
+  return num ? ('Fatura ' + num + (per ? ' · ' + per : '')) : '';
+}
+
+function _extFiltrar(linhas) {
+  var g = function (id) { return (document.getElementById(id) || {}).value || ''; };
+  var q = semAcento(g('extBusca'));
+  var di = g('extDe'), df = g('extAte');
+  var fcli = g('extCliente'), ftipo = g('extTipo');
+  var fora = 0;
+  var r = linhas.filter(function (l) {
+    if (fcli && l.cliente !== fcli) return false;
+    if (ftipo && l.tipo !== ftipo) return false;
+    if (q && semAcento(l.cliente + ' ' + l.obs + ' ' + l.por + ' ' + l.histLanc).indexOf(q) < 0) return false;
+    // ⚠️ Baixa sem data sai do resultado quando há período: não dá para
+    //    afirmar que ela cai no intervalo pedido (padrão dos Aluguéis Ativos).
+    if (di || df) {
+      if (!l.data) { fora++; return false; }
+      if (di && l.data < di) return false;
+      if (df && l.data > df) return false;
+    }
+    return true;
+  });
+  r.sort(function (a, b) {
+    var c = String(a.data || '').localeCompare(String(b.data || ''))
+         || String(a.quando || '').localeCompare(String(b.quando || ''));
+    return _extOrdem === 'desc' ? -c : c;
+  });
+  r._semData = fora;
+  return r;
+}
+
+function _extClientesComRecebimento(linhas) {
+  var vis = {}, out = [];
+  linhas.forEach(function (l) {
+    if (l.cliente && !vis[l.cliente]) { vis[l.cliente] = 1; out.push(l.cliente); }
+  });
+  return out.sort(function (a, b) {
+    return semAcento(a).localeCompare(semAcento(b), 'pt-BR');
+  });
+}
+
+function finExtratoAbrir() {
+  finInit();
+  var ex = document.getElementById('mExtrato');
+  if (ex) ex.remove();
+  var p = document.createElement('div');
+  p.id = 'mExtrato';
+  // z-index ABAIXO do histórico de uma conta (9999): o 📋 de cada linha abre
+  // aquela janela por cima desta, e fechá-la volta para o extrato.
+  p.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;'
+    + 'display:flex;align-items:center;justify-content:center;padding:16px';
+  var todas = _extLinhas();
+  var clis = _extClientesComRecebimento(todas);
+  var tipos = {};
+  todas.forEach(function (l) { tipos[l.tipo] = 1; });
+  p.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:1120px;width:100%;'
+    + 'max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    + '<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;'
+      + 'justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'
+      + '<div><div style="font-weight:800;color:var(--dark);font-size:15px">'
+        + '📋 Extrato de recebimentos</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px">'
+        + 'Cada pagamento parcial das contas a receber e das faturas, um por linha</div></div>'
+      + '<button onclick="document.getElementById(\'mExtrato\').remove()" '
+        + 'style="border:none;background:#f3f4f6;border-radius:8px;padding:7px 12px;'
+        + 'cursor:pointer;font-weight:700;color:var(--muted)">Fechar</button>'
+    + '</div>'
+    + '<div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;'
+      + 'gap:8px;flex-wrap:wrap;align-items:center">'
+      + '<input id="extBusca" class="filter-input" type="text" placeholder="Buscar cliente, obs ou quem lançou..." '
+        + 'oninput="finExtratoRender()" style="min-width:210px;padding:6px;font-size:11px">'
+      + '<select id="extCliente" class="filter-sel" onchange="finExtratoRender()" '
+        + 'style="font-size:11px;padding:6px;max-width:190px">'
+        + '<option value="">Todos os clientes</option>'
+        + clis.map(function (c) {
+            return '<option value="' + _mltEsc(c) + '">' + _mltEsc(c) + '</option>';
+          }).join('')
+      + '</select>'
+      + '<select id="extTipo" class="filter-sel" onchange="finExtratoRender()" style="font-size:11px;padding:6px">'
+        + '<option value="">Todos os tipos</option>'
+        + Object.keys(tipos).sort().map(function (t) {
+            return '<option value="' + _mltEsc(t) + '">' + _mltEsc(t) + '</option>';
+          }).join('')
+      + '</select>'
+      + '<input id="extDe" class="filter-input" type="date" onchange="finExtratoRender()" '
+        + 'style="width:132px;padding:6px;font-size:11px" title="Recebido a partir de">'
+      + '<span style="font-size:11px;color:var(--muted)">a</span>'
+      + '<input id="extAte" class="filter-input" type="date" onchange="finExtratoRender()" '
+        + 'style="width:132px;padding:6px;font-size:11px" title="Recebido até">'
+      + '<button class="btn btn-outline" onclick="finExtratoOrdem()" id="extBtnOrdem" '
+        + 'style="font-size:11px;padding:6px 10px" title="Inverter a ordem">⬇ Mais recente</button>'
+      + '<button class="btn btn-outline" onclick="finExtratoLimpar()" style="font-size:11px;padding:6px 10px">Limpar</button>'
+      + '<button class="btn" onclick="finExtratoRelatorio()" '
+        + 'style="background:#0d7a3e;color:#fff;font-size:11px;padding:6px 10px">📄 Relatório</button>'
+    + '</div>'
+    + '<div id="extCorpo" style="padding:14px 20px;overflow:auto"></div>'
+    + '</div>';
+  document.body.appendChild(p);
+  finExtratoRender();
+}
+
+function finExtratoOrdem() {
+  _extOrdem = (_extOrdem === 'desc') ? 'asc' : 'desc';
+  var b = document.getElementById('extBtnOrdem');
+  if (b) b.innerHTML = (_extOrdem === 'desc') ? '⬇ Mais recente' : '⬆ Mais antigo';
+  finExtratoRender();
+}
+
+function finExtratoLimpar() {
+  ['extBusca', 'extCliente', 'extTipo', 'extDe', 'extAte'].forEach(function (id) {
+    var e = document.getElementById(id); if (e) e.value = '';
+  });
+  finExtratoRender();
+}
+
+function finExtratoRender() {
+  var el = document.getElementById('extCorpo');
+  if (!el) return;
+  var todas = _extLinhas();
+  var lista = _extFiltrar(todas);
+  var sem = _extSemDetalhe();
+
+  var total = 0, contas = {}, pessoas = {}, estornos = 0;
+  lista.forEach(function (l) {
+    total += l.valor;
+    contas[l.idx] = 1;
+    if (l.cliente) pessoas[l.cliente] = 1;
+    if (l.valor < 0) estornos++;
+  });
+  total = Math.round(total * 100) / 100;
+
+  var cartoes = '<div class="stats" style="margin-bottom:12px">'
+    + '<div class="stat" style="border-left-color:var(--green)"><div class="stat-value" style="font-size:15px">'
+      + brl(total) + '</div><div class="stat-label">Recebido no filtro'
+      + (estornos ? '<br><span style="color:#c0392b;font-weight:700">inclui ' + estornos
+          + ' estorno(s), que subtraem</span>' : '')
+      + '</div></div>'
+    + '<div class="stat" style="border-left-color:#2B4BF2"><div class="stat-value" style="font-size:15px">'
+      + lista.length + '</div><div class="stat-label">Pagamento(s) · '
+      + Object.keys(contas).length + ' conta(s) · ' + Object.keys(pessoas).length + ' cliente(s)</div></div>'
+    // 🔴 O que o extrato NÃO mostra, dito em vez de escondido.
+    + (sem.contas
+        ? '<div class="stat" style="border-left-color:#b45309"><div class="stat-value" style="font-size:15px">'
+          + brl(sem.valor) + '</div><div class="stat-label">⚠ em ' + sem.contas
+          + ' conta(s) SEM detalhamento<br><span style="color:var(--muted)">'
+          + 'recebimento anterior ao histórico: o sistema sabe o total, não as parcelas</span>'
+          + '</div></div>'
+        : '')
+    + '</div>';
+
+  var aviso = lista._semData
+    ? '<div style="background:#fef3cd;border:1px solid #f0d58c;border-radius:8px;padding:8px 12px;'
+      + 'font-size:11px;color:#b45309;margin-bottom:10px">⚠ ' + lista._semData
+      + ' pagamento(s) sem data ficaram de fora do período filtrado.</div>'
+    : '';
+
+  if (!todas.length) {
+    el.innerHTML = cartoes
+      + '<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px">'
+      + 'Nenhum pagamento detalhado registrado ainda.<br>'
+      + 'O histórico começa a ser gravado a cada baixa feita pelo 💵 Receber.</div>';
+    return;
+  }
+  if (!lista.length) {
+    el.innerHTML = cartoes + aviso
+      + '<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px">'
+      + 'Nenhum pagamento encontrado com estes filtros.</div>';
+    return;
+  }
+
+  var corrido = 0;
+  var linhas = lista.map(function (l) {
+    corrido += l.valor;
+    var fat = _extFatura(l);
+    var neg = l.valor < 0;
+    return '<tr style="border-bottom:1px solid #f0f2f8' + (neg ? ';background:#fdf5f5' : '') + '">'
+      + '<td style="padding:6px 9px;font-size:11px;white-space:nowrap">'
+        + (l.data ? mltBR(l.data) : '<span style="color:var(--muted)">sem data</span>') + '</td>'
+      + '<td style="padding:6px 9px;font-size:11px"><strong>' + _mltEsc(l.cliente || '—') + '</strong>'
+        + (fat ? '<br><span style="font-size:9.5px;color:#2B4BF2">📄 ' + _mltEsc(fat) + '</span>'
+               : (l.histLanc ? '<br><span style="font-size:9.5px;color:var(--muted)">'
+                   + _mltEsc(String(l.histLanc).slice(0, 48)) + '</span>' : ''))
+        + '</td>'
+      + '<td style="padding:6px 9px;font-size:10px">' + _mltEsc(l.tipo) + '</td>'
+      + '<td style="padding:6px 9px;text-align:right;font-weight:700;font-size:11px;'
+        + 'color:' + (neg ? '#c0392b' : '#0d7a3e') + '">' + brl(l.valor)
+        + (neg ? '<br><span style="font-size:9px;font-weight:700">estorno</span>' : '') + '</td>'
+      + '<td style="padding:6px 9px;text-align:right;font-size:10px;color:var(--muted);'
+        + 'font-family:monospace">' + brl(corrido) + '</td>'
+      + '<td style="padding:6px 9px;font-size:10px;color:var(--muted)">' + _mltEsc(l.obs || '—') + '</td>'
+      + '<td style="padding:6px 9px;font-size:10px;color:var(--muted)">' + _mltEsc(l.por || '—') + '</td>'
+      + '<td style="padding:6px 9px;text-align:center">'
+        + '<button onclick="finVerBaixas(' + l.idx + ')" title="Ver o histórico desta conta" '
+        + 'style="background:#eef7ff;color:#0e7490;border:none;border-radius:4px;padding:3px 7px;'
+        + 'cursor:pointer;font-weight:700;font-size:9px">📋 conta</button></td>'
+      + '</tr>';
+  }).join('');
+
+  el.innerHTML = cartoes + aviso
+    + '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)">'
+    + '<table style="width:100%;border-collapse:collapse;min-width:860px">'
+    + '<thead><tr style="background:var(--light-blue)">'
+    + ['Data', 'Cliente / origem', 'Tipo', 'Valor', 'Acumulado', 'Observação', 'Quem lançou', '']
+        .map(function (h) {
+          return '<th style="padding:7px 9px;font-size:9px;font-weight:800;text-transform:uppercase;'
+            + 'color:#111827;text-align:' + (h === 'Valor' || h === 'Acumulado' ? 'right' : 'left') + '">'
+            + h + '</th>';
+        }).join('')
+    + '</tr></thead><tbody>' + linhas + '</tbody>'
+    + '<tfoot><tr style="background:#EEF1FD;font-weight:800;color:#0E1B4D">'
+    + '<td colspan="3" style="padding:8px 9px;font-size:11px">TOTAL DO FILTRO ('
+      + lista.length + ' pagamento(s))</td>'
+    + '<td style="padding:8px 9px;text-align:right;font-size:11px">' + brl(total) + '</td>'
+    + '<td colspan="4"></td>'
+    + '</tr></tfoot></table></div>';
+}
+
+function finExtratoRelatorio() {
+  var lista = _extFiltrar(_extLinhas());
+  if (!lista.length) { toast('Nenhum pagamento com os filtros atuais', '#b45309'); return; }
+  var sem = _extSemDetalhe();
+  var g = function (id) { return (document.getElementById(id) || {}).value || ''; };
+  var di = g('extDe'), df = g('extAte'), fcli = g('extCliente'), ftipo = g('extTipo');
+
+  var total = 0, corrido = 0, contas = {};
+  lista.forEach(function (l) { total += l.valor; contas[l.idx] = 1; });
+  total = Math.round(total * 100) / 100;
+
+  var filtros = [];
+  if (di || df) filtros.push('Período: ' + (di ? mltBR(di) : 'início') + ' a ' + (df ? mltBR(df) : 'hoje'));
+  if (fcli) filtros.push('Cliente: ' + fcli);
+  if (ftipo) filtros.push('Tipo: ' + ftipo);
+
+  var rows = lista.map(function (l) {
+    corrido += l.valor;
+    var fat = _extFatura(l);
+    return '<tr>'
+      + '<td>' + (l.data ? mltBR(l.data) : '—') + '</td>'
+      + '<td>' + _mltEsc(l.cliente || '—') + (fat ? '<br><small>' + _mltEsc(fat) + '</small>' : '') + '</td>'
+      + '<td>' + _mltEsc(l.tipo) + '</td>'
+      + '<td class="r">' + brl(l.valor) + (l.valor < 0 ? ' <small>(estorno)</small>' : '') + '</td>'
+      + '<td class="r">' + brl(corrido) + '</td>'
+      + '<td>' + _mltEsc(l.obs || '—') + '</td>'
+      + '<td>' + _mltEsc(l.por || '—') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var w = window.open('', '_blank');
+  if (!w) { toast('O navegador bloqueou a janela do relatório', '#c0392b'); return; }
+  w.document.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">'
+    + '<title>Extrato de recebimentos</title><style>'
+    + '@page{size:A4 portrait;margin:12mm}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:0;margin:0}'
+    + 'h1{font-size:15px;margin:0 0 2px}'
+    + '.sub{font-size:10px;color:#555;margin-bottom:10px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:9.5px}'
+    + 'th{background:#0E1B4D;color:#fff;padding:4px 5px;text-align:left;font-size:8.5px;'
+      + 'text-transform:uppercase}'
+    + 'td{border-bottom:.5px solid #ddd;padding:3px 5px;vertical-align:top}'
+    + '.r{text-align:right}small{font-size:8px;color:#666}'
+    + 'tfoot td{background:#EEF1FD;font-weight:800;border-top:1px solid #0E1B4D}'
+    + '.nota{font-size:9px;color:#555;margin-top:10px;line-height:1.5;'
+      + 'border-top:.5px solid #ccc;padding-top:6px}'
+    + 'thead{display:table-header-group}tr{break-inside:avoid}'
+    + '</style></head><body>'
+    + '<h1>LOKÁ — Extrato de recebimentos</h1>'
+    + '<div class="sub">' + (filtros.length ? _mltEsc(filtros.join(' · ')) : 'Todos os pagamentos registrados')
+      + ' &middot; emitido em ' + new Date().toLocaleString('pt-BR') + '</div>'
+    + '<table><thead><tr><th>Data</th><th>Cliente / origem</th><th>Tipo</th>'
+      + '<th class="r">Valor</th><th class="r">Acumulado</th><th>Observação</th><th>Quem lançou</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '<tfoot><tr><td colspan="3">TOTAL (' + lista.length + ' pagamento(s) em '
+      + Object.keys(contas).length + ' conta(s))</td>'
+      + '<td class="r">' + brl(total) + '</td><td colspan="3"></td></tr></tfoot></table>'
+    // 🔴 O documento diz o que NÃO está nele. Um extrato que se apresenta como
+    //    "o dinheiro que entrou" sendo um terço dele seria pior que não existir.
+    + '<div class="nota"><strong>Como ler:</strong> cada linha é um pagamento '
+      + 'registrado no histórico da conta. O acumulado corre na ordem em que as '
+      + 'linhas estão impressas.'
+      + (sem.contas ? ' <strong>⚠ ' + brl(sem.valor) + ' em ' + sem.contas
+          + ' conta(s) não aparecem aqui:</strong> são recebimentos anteriores ao '
+          + 'histórico detalhado — o sistema sabe o total recebido, mas não em '
+          + 'quantas vezes foi pago.' : '')
+      + '</div>'
+    + '</body></html>');
+  w.document.close();
 }
 
 // ── RECEBIMENTO PARCIAL ──────────────────────────────────────

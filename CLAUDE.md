@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v157-20261118-1620** |
+| `gestao.html` | **v158-20261118-1810** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -9787,3 +9787,84 @@ com o dado real.
 Falta **logado**: o Rogel abrir o Contas a Receber com **Ctrl+Shift+R**, clicar
 em **+ Nova Conta** (a linha tem de aparecer no topo, com o selo NOVA), escolher
 o cliente no seletor e conferir a ordenação por vencimento. Eu não autentico.
+
+---
+
+## ✅ Extrato de recebimentos — 18/11/2026 · gestao v158
+
+Pedido: *"preciso ter acesso ao histórico detalhado de pagamentos parciais das
+faturas e contas a receber"*.
+
+### 🔴 O histórico de UMA conta já existia — faltava ver tudo JUNTO
+| | |
+|---|---|
+| histórico por conta (📋 na coluna Recebido) | ✅ **v108**, 13/10/2026 |
+| o painel Faturas abrindo o mesmo histórico | ✅ **v143**, 03/11/2026 |
+| 🔴 ver os recebimentos de **todas** as contas juntos | **não existia** |
+
+Com **119 lançamentos**, responder *"quanto entrou em outubro?"* ou *"todos os
+pagamentos da RSC"* exigia abrir conta por conta, uma a uma. É isso que o
+extrato resolve.
+
+### 🔴 O número que obriga o aviso a existir
+Medido em 18/11/2026, conferido por fora com a mesma definição do código:
+
+| | |
+|---|---|
+| total recebido no sistema | **R$ 1.605.834,53** |
+| **no extrato** (24 baixas detalhadas, 17 contas) | **R$ 528.914,12** |
+| 🔴 **sem detalhamento** | **R$ 1.076.920,41** em **30 contas** |
+| **proporção que o extrato cobre** | 🔴 **32,9%** |
+
+As 30 são recebimentos **anteriores à v108**: o sistema sabe o total recebido,
+não em quantas vezes foi pago. ⚠️ **Um extrato que se apresentasse como "o
+dinheiro que entrou" sendo um terço dele seria pior do que não existir** — então
+tanto a tela quanto o relatório impresso **dizem** o que não está ali, com o
+valor. É o padrão dos cartões do Contas a Receber (v120–v122).
+
+🔴 **A invariante que mantém isso honesto:** extrato + sem detalhamento = total
+recebido. Fecha ao centavo nos 119 lançamentos, e é teste.
+
+⚠️ Minha primeira medição disse **28 contas / R$ 1.018.770,41** — contei só as
+que **não têm baixa nenhuma**. São **30 / R$ 1.076.920,41**: duas contas são
+**mistas**, têm baixas detalhadas **mais** um resto anterior. O número do
+registro é o que a conta do código produz, conferida por fora com a **mesma
+definição** — não a primeira aproximação.
+
+### Onde está, e por que nos dois lugares
+Botão **📋 Extrato de recebimentos** na barra do **Contas a Receber** e na do
+painel **Faturas** — ele pediu os dois, e o extrato serve aos dois porque
+**quem registra o recebimento de uma fatura é o lançamento ligado a ela**.
+Fonte única; nenhuma leitura nova.
+
+🔴 Lê pelos **mesmos helpers** (`_finBaixas`, `_finAnteriorAoHistorico`). Duas
+fontes para a mesma conta foi o acidente da v119 — e aqui o risco era concreto:
+o cartão do Contas a Receber, a janela de uma conta e o extrato teriam de
+concordar sobre o mesmo dinheiro.
+
+### A janela
+Filtros: **busca livre** (cliente, observação, quem lançou), **cliente**,
+**tipo**, **período** e **Limpar**. Ordem **mais recente primeiro**, com botão
+para inverter. Colunas: Data · Cliente/origem · Tipo · Valor · **Acumulado** ·
+Observação · Quem lançou · 📋 (abre a conta).
+
+| Cuidado | Por quê |
+|---|---|
+| **estorno** aparece marcado e **subtrai** | são 2 reais no banco; esconder faria o total não fechar com o `recebido` |
+| baixa **sem data** sai do período, e a tela **diz quantas** | não dá para afirmar que cai no intervalo (padrão dos Aluguéis Ativos) |
+| o nº da fatura sai do **`faturaKey`**, não da lista de faturas | ⚠️ `_todasFaturas` só é preenchido quando o painel Faturas abre (a armadilha da v143), e quem abre o extrato pelo Contas a Receber pode nunca ter entrado lá |
+| "nada registrado" ≠ "nada com estes filtros" | some a dúvida de "sumiu tudo?" |
+| z-index **9998**, abaixo do histórico de uma conta (9999) | o 📋 de cada linha abre aquela janela **por cima** desta, e fechá-la volta ao extrato |
+| nome e observação **escapados** | há cliente com `&` no nome |
+
+### O relatório
+A4 em pé, cabeçalho de tabela repetido entre folhas, linhas não partidas, o
+acumulado correndo na ordem impressa, e a nota **"Como ler"** dizendo de onde
+vêm os números **e o que não está ali**. Imprime **o que está no filtro**, não a
+lista inteira.
+
+### ⚠️ Quase sobrescrevi uma suíte — de novo
+Fui dar à suíte o nome `t-extrato.js`, que **já era** o do parser do extrato do
+DETRAN-BA (51 testes, v115). A ferramenta de escrita recusou porque o arquivo
+não havia sido lido, e aí a regra de 17/10 (*conferir `ls t-*.js` antes de criar
+suíte*) cobrou o preço certo. A nova é **`t-recebimentos.js`**.
