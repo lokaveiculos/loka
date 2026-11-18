@@ -10069,3 +10069,35 @@ documenta a intenção, mas está **sem cobertura**. Mesmo achado de 17/10 sobre
 ⚠️ E uma asserção minha contou a **declaração** da função junto com as chamadas
 (esperava 4 `_finEhMoeda`, há 5 com a declaração) — o mesmo deslize de 06/11. O
 patch já havia sido aplicado; a asserção é que estava errada.
+
+### Verificado no ar, no arquivo publicado
+Com o banco real e o `firebase`/`saveDB` substituídos **antes** do eval —
+**0 gravações em produção**, reconferido: nenhum nome de cliente foi alterado.
+
+| Coluna | Antes | Agora |
+|---|---|---|
+| 🔴 **Cliente** | **63px** | **225px** |
+| Histórico | 272px | **182px** |
+| o `<select>` em si | **28px** | **190px** |
+
+Os valores saem **`6.492,47` · `730,00` · `2.950,00` · `18.196,00` · `5.173,00`**
+— nenhum cru na grade inteira.
+
+E o endpoint aceita **PATCH** com `Origin: null` (preflight devolve
+`Allow-Methods: ...PATCH` e `Allow-Origin: *`), então a página de correção
+funciona abrindo do disco, por duplo clique.
+
+⚠️ `loka_db/clients` é **array**, não objeto indexado por id: `clients/c40.json`
+responde `null`. A página acha o cliente por `filter(c => c.id === ...)`, que não
+depende da chave — mas vale saber antes de montar caminho REST para um cliente.
+
+### ⏳ Falta o Rogel
+1. Abrir `backups-loka\CORRIGIR-NOMES-CLIENTES.html`, clicar em **Ler o banco e
+   conferir**, olhar os três grupos e, se concordar, **Corrigir os 60**.
+2. Abrir o Contas a Receber com **Ctrl+Shift+R** e ver a coluna Cliente larga e
+   os valores em formato moeda.
+3. 🔴 Decidir os **13 que a página não corrige**: 11 não existem no cadastro
+   (precisam ser cadastrados ou renomeados à mão) e 2 são ambíguos — um deles é
+   "Novocomeço", que casa com os **dois cadastros duplicados** de NOVO COMEÇO
+   LTDA (`c40` e `c1780916789846`).
+4. Decidir os **3 valores com centavo fracionado** da ISS.
