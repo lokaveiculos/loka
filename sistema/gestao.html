@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v155-20261112-1540 -->
+<!-- LOKA deploy: v156-20261118-1530 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1059,12 +1059,14 @@ tr:hover td{background:#f8f9fe;}
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#e6f5ec"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div><div class="form-card-title">Recibo de Pagamento</div><div class="form-card-sub">Com a origem do valor recebido</div></div></div><div class="form-card-body">Recibo para entregar ao cliente, discriminando <strong>de onde vem cada valor</strong> &mdash; aluguel, multa, avaria, franquia, cau&ccedil;&atilde;o, pneus. O total &eacute; a soma das linhas e sai tamb&eacute;m por extenso.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="abrirReciboPagamento(false)">Abrir Recibo</button><button class="btn btn-outline" onclick="abrirReciboPagamento(true)">Com Cliente</button></div></div>
 
         <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#fef3cd"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#b45309" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14l3 3-3 3"/></svg></div><div><div class="form-card-title">Termo de Prorroga&ccedil;&atilde;o</div><div class="form-card-sub">Locação estendida</div></div></div><div class="form-card-body">A <strong>2&ordf; via</strong> reimprime um termo j&aacute; emitido, inclusive de loca&ccedil;&atilde;o encerrada, e <strong>n&atilde;o altera nada</strong>. Prorrogar de novo leva ao fluxo dos Alugu&eacute;is Ativos &mdash; esse <strong>muda a data de devolu&ccedil;&atilde;o</strong>.</div><div class="form-card-foot"><button class="btn btn-blue" onclick="prorReimpAbrir()">🖨 2ª via do termo</button><button class="btn btn-outline" onclick="prorNovaAbrir()">Prorrogar locação</button></div></div>
+
+        <div class="form-card"><div class="form-card-head"><div class="form-card-icon" style="background:#e8f5ef"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d7a3e" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></div><div><div class="form-card-title">Anexo I &ndash; Rela&ccedil;&atilde;o de Ve&iacute;culos</div><div class="form-card-sub">V&aacute;rios carros num s&oacute; contrato</div></div></div><div class="form-card-body">Anexo do <strong>contrato mensal</strong> para quando a loca&ccedil;&atilde;o tem v&aacute;rios ve&iacute;culos: lista cada carro com placa, ano, cor, RENAVAM, <strong>KM na entrega</strong>, KM livre/m&ecirc;s e <strong>valor mensal</strong>, mais os dados do locat&aacute;rio e do seguro. O total &eacute; a soma da coluna de valores. <strong>Com Cliente</strong> j&aacute; traz os carros dos alugu&eacute;is ativos dele.</div><div class="form-card-foot"><button class="btn" style="background:#0d7a3e;color:#fff" onclick="abrirAnexoMensal(false)">Abrir Anexo</button><button class="btn btn-outline" onclick="abrirAnexoMensal(true)">Com Cliente</button></div></div>
       </div>
       <div style="margin-top:20px;background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
         <div class="sec-label" style="margin-top:0">Gerar com Cliente</div>
         <div class="g2" style="margin-top:10px;">
           <div class="fg"><label class="fl">Cliente</label><select class="fs" id="fCliSel"><option value="">— Selecione —</option></select></div>
-          <div class="fg"><label class="fl">Tipo</label><select class="fs" id="fTipoSel"><option value="diaria">Contrato Diária</option><option value="mensal">Contrato Mensal</option><option value="reserva">Recibo de Reserva</option><option value="recibo">Recibo de Pagamento</option><option value="checklist">Checklist</option></select></div>
+          <div class="fg"><label class="fl">Tipo</label><select class="fs" id="fTipoSel"><option value="diaria">Contrato Diária</option><option value="mensal">Contrato Mensal</option><option value="reserva">Recibo de Reserva</option><option value="recibo">Recibo de Pagamento</option><option value="anexo">Anexo I – Relação de Veículos</option><option value="checklist">Checklist</option></select></div>
         </div>
         <button class="btn btn-blue" style="margin-top:12px" onclick="gerarFormSelecionado()">Gerar Formulário</button>
       </div>
@@ -1855,7 +1857,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v155-20261112-1540';
+var LOKA_BUILD = 'v156-20261118-1530';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -4956,6 +4958,98 @@ function abrirReciboPagamento(comCliente) {
     try { localStorage.setItem('loka_contrato_client', JSON.stringify(dados)); } catch (e) {}
   }
   window.open('recibo.html', '_blank');
+}
+
+/* Anexo I — Relação de Veículos (página avulsa, como o recibo de pagamento).
+   NÃO registra em db.contratos: anexo não é contrato, e o ✏️ da v124 não tem
+   página para abrir num tipo 'anexo'. Mesma decisão do recibo. */
+function abrirAnexoMensal(comCliente) {
+  if (comCliente) {
+    if (_curCli < 0) { toast('Selecione um cliente primeiro', '#b45309'); return; }
+    var cl = (db.clients || [])[_curCli] || {};
+    var d = _anexoDadosDoCliente(cl);
+    try { localStorage.setItem('loka_anexo_mensal', JSON.stringify(d)); } catch (e) {}
+    if (!d.veiculos.length) {
+      // 🔴 Diz que vai abrir em branco em vez de o operador descobrir na
+      //    página: cliente sem aluguel ativo não tem o que relacionar.
+      toast('Este cliente não tem aluguel ativo — o anexo abre em branco', '#b45309');
+    }
+  }
+  window.open('anexo-mensal.html', '_blank');
+}
+
+/* 🔴 A relação sai dos ALUGUÉIS ATIVOS do cliente, varrendo TODOS eles —
+   não um só, e não a frota inteira. Medido em 18/11/2026: só 4 aluguéis são
+   multi-veículo, mas a RSC tem 52 carros espalhados em 50 aluguéis separados,
+   a TRANSSOUZA 17 em 16 e a G7 13 em 12. É justamente essa dispersão que o
+   anexo vem resolver. */
+function _anexoDadosDoCliente(cl) {
+  cl = cl || {};
+  var alvoId = cl.id || '';
+  var alvoNome = semAcento(cl.nome || '');
+  var ativos = cleanArr(db && db.ativos).filter(function (a) {
+    if (!a) return false;
+    if (alvoId && a.clienteId === alvoId) return true;
+    return !!alvoNome && semAcento(a.clienteNome || '') === alvoNome;
+  });
+  var frota = cleanArr(db && db.veiculos);
+  var veics = [], vistas = {}, repetidas = [];
+  ativos.forEach(function (a) {
+    var pls = _encPlacasUnicas(a);
+    // 🔴 O valor gravado só vale POR CARRO quando o aluguel tem UM carro: em
+    //    contrato multi-veículo `a.valor` é o total do contrato, e rateá-lo
+    //    seria invencao (a lição do cálculo do encerramento, v148). Nesse
+    //    caso a célula vem vazia e a página avisa quantas vieram assim.
+    var umSo = pls.length === 1;
+    var val = (umSo && mltNum(a.valor) > 0)
+      ? brl(mltNum(a.valor)).replace('R$ ', '') : '';
+    pls.forEach(function (k) {
+      if (!k) return;
+      // 🔴 O mesmo carro nao pode ser listado duas vezes na relacao. Mas
+      //    aparecer em dois alugueis ativos e sinal de problema no cadastro
+      //    (ou de carro alugado em dobro), entao a pagina avisa em vez de
+      //    descartar calado. Medido em 18/11/2026: 2 placas nessa situacao,
+      //    uma delas (SIL2E59) em nome de DOIS clientes diferentes.
+      if (vistas[k]) {
+        if (repetidas.indexOf(k) < 0) repetidas.push(k);
+        return;
+      }
+      vistas[k] = 1;
+      var v = frota.filter(function (x) {
+        return x && _normPlacaCmp(x.placa) === k;
+      })[0] || {};
+      veics.push({
+        placa:   v.placa || k,
+        veiculo: String((v.marca || '') + ' ' + (v.modelo || '')).trim(),
+        ano:     v.anoMod || v.ano || '',
+        cor:     v.cor || '',
+        doc:     v.renavam || v.chassi || '',
+        km:      a.kmEntrega || '',
+        kmLivre: (v.mensal_km_livre || v.mensal_km_livre === 0)
+                   ? String(v.mensal_km_livre) : '',
+        valor:   val,
+        apolice: ''
+      });
+    });
+  });
+  // uma relação de 52 carros só é consultável em ordem de placa
+  veics.sort(function (x, y) {
+    return String(x.placa).localeCompare(String(y.placa), 'pt-BR');
+  });
+  // ⚠️ O contrato não é pré-preenchido de propósito: o anexo pertence ao
+  //    contrato NOVO que vai ser assinado, cujo número ainda não existe no
+  //    sistema. Datar pelo aluguel mais antigo diria uma data que não é a do
+  //    contrato.
+  return {
+    cliente: {
+      nome: cl.nome || '', doc: cl.cpf || '', tel: cl.telefone || '',
+      email: cl.email || '', end: cl.endereco || '', bairro: cl.bairro || '',
+      cidade: cl.cidade || '', uf: cl.uf || '', cep: cl.cep || ''
+    },
+    contrato: { numero: '', data: '', vigencia: '' },
+    veiculos: veics,
+    repetidas: repetidas
+  };
 }
 
 // ── VALOR DA LOCAÇÃO NO ENCERRAMENTO ─────────────────────────
@@ -12240,6 +12334,12 @@ function gerarFormSelecionado() {
   if (tipo === 'recibo') {
     if (!isNaN(idx) && idx >= 0) { _curCli = idx; abrirReciboPagamento(true); }
     else abrirReciboPagamento(false);
+    return;
+  }
+  // o anexo segue o recibo: página avulsa, sem registro em db.contratos
+  if (tipo === 'anexo') {
+    if (!isNaN(idx) && idx >= 0) { _curCli = idx; abrirAnexoMensal(true); }
+    else abrirAnexoMensal(false);
     return;
   }
   if (!isNaN(idx)&&idx>=0) { _curCli=idx; abrirContrato(tipo); }
