@@ -51,7 +51,7 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v158-20261118-1810** |
+| `gestao.html` | **v159-20261118-1920** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
@@ -9923,3 +9923,149 @@ pelo select (ele recusa valor que não é opção): foi exercitada pelo campo de
 - O aviso das **baixas sem data** não foi exercitado no ar: **não há nenhuma no
   banco** (0 de 24). Está coberto no Node com caso sintético, e fica dito.
 
+
+---
+
+## ✅ Nomes dos clientes, largura das colunas e formato moeda — 18/11/2026 · gestao v159
+
+Pedido: *"gentileza gerar o arquivo para correção dos nomes dos clientes no contas
+a receber. reorganizar a largura das colunas, principalmente a coluna onde tem o
+nome do cliente. todas as colunas que permitem inserção de valor só devem
+permitir o formato moeda"*.
+
+### 🔴 1. A correção dos nomes: só 60 dos 73 dão para corrigir
+Medido nos 119 lançamentos contra os 147 clientes do cadastro:
+
+| | |
+|---|---|
+| nome **já exato** no cadastro | 46 |
+| 🔴 **não bate** | **73** |
+| dos quais com `clienteId`/`faturaKey` (**sem adivinhação**) | 2 |
+
+Dos 71 restantes, a ambiguidade de cada apelido decide:
+
+| Apelido | Lançamentos | Candidatos no cadastro |
+|---|---|---|
+| RSC · G7 · ISS · BRJ · Jose Claudemiro | **60** | ✅ **1 cada** |
+| **Novocomeço** | 1 | 🔴 **2** — são os cadastros duplicados |
+| Amon | 1 | 🟡 casa só no meio do nome |
+| DANILO SANTOS SILVADanilo Butan · Premium Club · Rodrigo Gesso · Darlan · Rodrigo Benção · Diversos · Pericles · Elsinho Venc 08 | **11** | 🔴 **nenhum** |
+
+🔴 **A página corrige só os 60 com um único candidato.** Os 13 restantes são
+**listados e não tocados** — adivinhar o cliente de um lançamento financeiro é
+pior do que deixar o apelido. Os 11 sem candidato nem existem no cadastro.
+
+⚠️ O casamento aceita apelido de **2 letras**: em 13/10 uma trava de 3
+caracteres escondeu o match de "G7" e quase me fez criar uma dívida duplicada de
+R$ 46.150.
+
+**Arquivo:** `backups-loka\CORRIGIR-NOMES-CLIENTES.html` — fora do repo (nunca
+publicado), duplo clique, confere, clica no verde.
+
+| Cuidado | Por quê |
+|---|---|
+| grava **campo por campo**, por caminho | nunca o `loka_db` (armadilha 3) e nunca o lançamento inteiro: nenhum outro campo pode ser perdido |
+| grava **`cliente` e `clienteId`** | o id é o que permite cruzar sem depender do nome digitado |
+| **relê** e confere campo a campo | só diz "pronto" depois de ver gravado |
+| **confere que nada mais mudou** nos lançamentos tocados | e diz isso no log |
+| banco respondendo **vazio** não libera | sem saber o que há, não há o que trocar |
+| falha diz **"NÃO foi gravado"** | nunca finge sucesso |
+| rodar duas vezes **não faz nada** | idempotente |
+| botão de **baixar a cópia** antes | o banco não tem lixeira |
+
+**Backup:** `backups-loka/receber-ANTES-nomes-20261118.json`
+
+### 🔴 2. A coluna Cliente tinha 63px — a segunda menor da tabela
+Medido no ar, no arquivo publicado, com o painel na largura real (1114px):
+
+| Coluna | Antes |
+|---|---|
+| 🤝 | 29px |
+| 🔴 **Cliente** | **63px** — menor que "Tipo" |
+| Tipo | 102px |
+| Valor · Recebido | 107px cada |
+| **Histórico** | **272px** |
+| Vencimento · Recebido em | 142px cada |
+
+**A causa:** o seletor leve da v157 nasce com **uma** opção curta, e
+`width:100%` num campo dentro de `<td>` sem largura **vem do conteúdo** — o
+`<select>` ocupava **28px**. O `max-width` limitava o teto e nada reservava o
+piso.
+
+Conserto: **`min-width:190px`** no seletor (min = max, para a largura ser
+previsível), e o **Histórico cedeu de 260 para 170px** — é campo de texto, o
+conteúdo continua rolando dentro dele.
+
+### 🔴 3. O formato moeda: o `maskBRL` da casa NÃO servia
+Medido antes de escrever:
+
+| entrada | `maskBRL` dá | problema |
+|---|---|---|
+| `-110000` | `1.100,00` | 🔴 **come o sinal** |
+| `110000` | `1.100,00` | 🔴 **trata como centavos** |
+
+E a coluna Valor mostrava **`6492.47` cru**, com ponto decimal.
+
+São **duas coisas diferentes**, e misturá-las foi o que quase me fez usar a
+função errada:
+- **`_finMoedaTexto(v)`** — exibe o valor **gravado**: `110000` → `110.000,00`
+- **`_finMoedaInput(el)`** — máscara **ao digitar**, dígitos correndo como
+  centavos: `350000` → `3.500,00`
+
+🔴 **O sinal negativo sobrevive nas duas.** Há 1 lançamento de **−R$ 110.000**
+(o crédito da TRANSSOUZA que o Rogel confirmou em 14/10), e a aba **Acertos usa
+o sinal por desenho** (negativo = Saída). O `maskBRL` o destruiria.
+
+🔴 **A ida e volta é testada nos 119 lançamentos:** o que a tela mostra, o
+`finParse` lê de volta igual.
+
+#### A lista nomeada do que é dinheiro
+`FIN_CAMPOS_MOEDA = ['valor','recebido','principal','valorParcela','receita']`,
+consultada pelos **quatro** renders (receber, pagar, bens, dívida) e pelo campo
+dos **acertos**. Uma lista só, em vez de cinco lugares decidindo — é como as
+regras envelhecem em ritmos diferentes (v119).
+
+⚠️ **O que NÃO entra, e o motivo:** `cet` é percentual (1,48), `totParcelas` é
+contagem (48), e `pago` é a contagem de parcelas pagas da v149, com máscara
+própria. Formatá-los como reais seria errado, e há teste e defeito injetado para
+cada um.
+
+### 🔴 ACHADO: 3 lançamentos com centavo fracionado
+O teste da ida e volta descobriu **3 valores com TRÊS casas decimais** no banco,
+todos da **ISS TRANSPORTES**:
+
+| | |
+|---|---|
+| [71] | 5460.767 |
+| [76] | 4892.194 |
+| [106] | 7287.245 |
+
+Formato moeda tem 2 casas — foi o pedido —, então a tela **arredonda ao exibir**.
+⚠️ **Só exibir não grava nada**: o arredondamento de meio centavo acontece
+apenas se alguém abrir e salvar aquele campo. **Não corrigi** (é dado de produção
+e não foi pedido), e o teste passou a **nomear os três e falhar se aparecer um
+quarto** — o achado virou vigilância.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**883/883**); os dois carimbos
+  batendo
+- **48 testes** de moeda/largura + **33 testes** da página de correção, com o
+  código real e os dados reais (119 lançamentos, 147 clientes)
+- **33 defeitos injetados — todos acusados**: entre eles o valor voltando a sair
+  cru, a máscara comendo o sinal, exibir tratando como centavos, `cet` /
+  `totParcelas` / `pago` entrando na lista de dinheiro, o `min-width` saindo (a
+  coluna volta a 63px), o Histórico voltando a 260px, a página **aceitando
+  apelido ambíguo**, gravando o lançamento inteiro, usando PUT, não relendo, não
+  conferindo, o banco vazio liberando, o `confirm` recusado gravando e a falha
+  fingindo sucesso
+- Regressão **medida**: **61 suítes, 3.235 testes**, nenhuma falha
+
+⚠️ **Uma injeção removida com o motivo dito:** tirar o `maximumFractionDigits: 2`
+**não muda resultado** — o `Math.round(n * 100) / 100` da linha anterior já
+deixa o número com 2 casas, então a opção é **inerte**. Fica no código porque
+documenta a intenção, mas está **sem cobertura**. Mesmo achado de 17/10 sobre o
+`brl()`.
+
+⚠️ E uma asserção minha contou a **declaração** da função junto com as chamadas
+(esperava 4 `_finEhMoeda`, há 5 com a declaração) — o mesmo deslize de 06/11. O
+patch já havia sido aplicado; a asserção é que estava errada.

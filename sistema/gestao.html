@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v158-20261118-1810 -->
+<!-- LOKA deploy: v159-20261118-1920 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1864,7 +1864,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v158-20261118-1810';
+var LOKA_BUILD = 'v159-20261118-1920';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -10339,6 +10339,56 @@ function finMostrarAba(aba) {
 }
 
 function brl(v){ return 'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+// ── CAMPOS DE DINHEIRO EM FORMATO MOEDA (18/11/2026) ─────────
+/* 🔴 Lista NOMEADA dos campos que são dinheiro. Os quatro renders do
+   Financeiro consultam esta lista — em vez de cada um decidir por conta
+   própria, que é como as regras envelhecem em ritmos diferentes (v119).
+
+   ⚠️ O que NÃO entra, e o motivo:
+     cet          → percentual (1,48), não reais
+     totParcelas  → contagem (48 parcelas)
+     pago         → contagem de parcelas pagas, com máscara própria (v149)
+     ano          → ano do bem */
+var FIN_CAMPOS_MOEDA = ['valor', 'recebido', 'principal', 'valorParcela', 'receita'];
+
+function _finEhMoeda(campo) { return FIN_CAMPOS_MOEDA.indexOf(String(campo)) >= 0; }
+
+/* Como o valor GRAVADO aparece no campo: 6492.47 → "6.492,47".
+   ⚠️ Não dá para usar o maskBRL para isto: ele trata os dígitos como
+   centavos, então 110000 (cento e dez mil) viraria "1.100,00". Aquele é o
+   comportamento de DIGITAÇÃO, não de exibição. */
+function _finMoedaTexto(v) {
+  if (v === '' || v === null || v === undefined) v = 0;
+  var n = Number(v);
+  if (isNaN(n)) return '';
+  n = Math.round(n * 100) / 100;
+  // maximumFractionDigits explícito: sem ele o toLocaleString deixa passar
+  // 3 casas em valor que vem de divisão (a lição da v110/v150)
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* Máscara enquanto digita: os dígitos correm da direita, como centavos.
+   🔴 O SINAL NEGATIVO sobrevive. O maskBRL da casa faz
+   `replace(/\D/g,'')`, que come o "-": editar o crédito de -110.000,00 da
+   TRANSSOUZA o transformaria em 1.100,00. E a aba Acertos usa o sinal POR
+   DESENHO (negativo = Saída). */
+function _finMoedaInput(el) {
+  if (!el) return;
+  var s = String(el.value == null ? '' : el.value);
+  var neg = s.indexOf('-') >= 0;
+  var d = s.replace(/\D/g, '');
+  if (!d) { el.value = neg ? '-' : ''; return; }
+  var n = parseInt(d, 10) / 100;
+  el.value = (neg ? '-' : '')
+    + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/* Os atributos que um campo de dinheiro ganha. inputmode decimal abre o
+   teclado numérico no celular. */
+function _finMoedaAttrs() {
+  return ' inputmode="decimal" oninput="_finMoedaInput(this)"';
+}
+
 function finParse(s){ if(typeof s==='number')return s; if(!s)return 0; return parseFloat(String(s).replace(/[R$\s.]/g,'').replace(',','.'))||0; }
 
 // Cabeçalho com texto BRANCO explícito (corrige fonte invisível)
@@ -10367,7 +10417,7 @@ function finRenderAcertos() {
     var pos = (Number(r.valor)||0)>=0;
     html += '<tr style="border-bottom:1px solid #f0f2f8">'
       + '<td style="padding:4px 6px"><input type="date" id="acData-'+i+'" value="'+(r.data||'')+'" onblur="_finDataSalvar(this,\'acertos\','+i+',\'data\',false)" onkeydown="if(event.key===\'Enter\')_finDataSalvar(this,\'acertos\','+i+',\'data\',true)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:130px;color:#0E1B4D"></td>'
-      + '<td style="padding:4px 6px"><input type="text" value="'+(r.valor||0)+'" onchange="finEdit(\'acertos\','+i+',\'valor\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:110px;text-align:right;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700"></td>'
+      + '<td style="padding:4px 6px"><input type="text"'+_finMoedaAttrs()+' value="'+_finMoedaTexto(r.valor)+'" onchange="finEdit(\'acertos\','+i+',\'valor\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:110px;text-align:right;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700"></td>'
       + '<td style="padding:4px 6px"><input type="text" value="'+(r.banco||'').replace(/"/g,'&quot;')+'" onchange="finEdit(\'acertos\','+i+',\'banco\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:5px;font-size:11px;width:100%;color:#0E1B4D"></td>'
       + '<td style="padding:4px 6px;font-size:10px;color:'+(pos?'#0d7a3e':'#c0392b')+';font-weight:700">'+(pos?'Entrada':'Saída')+'</td>'
       + '<td style="padding:4px 6px;text-align:center"><button onclick="finDel(\'acertos\','+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:5px;padding:4px 8px;cursor:pointer;font-weight:700">🗑</button></td>'
@@ -10420,7 +10470,15 @@ function finRenderBens() {
     + '</tr></thead><tbody>';
   visiveis.forEach(function(o){
     var r = o.r, i = o.i;
-    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'bens\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
+    // campo de dinheiro sai FORMATADO e com mascara ao digitar
+    function inp(campo,w,extra){
+      var _m = _finEhMoeda(campo);
+      var _v = _m ? _finMoedaTexto(r[campo])
+        : String(r[campo]==null?'':r[campo]);
+      return '<input type="text"' + (_m ? _finMoedaAttrs() : '')
+        + ' value="'+_v.replace(/"/g,'&quot;')
+        +'" onchange="finEdit(\'bens\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'
+        +w+';color:#0E1B4D;'+(extra||'')+'">'; }
     html += '<tr style="border-bottom:1px solid #f0f2f8">'
       + '<td style="padding:3px 5px">'+inp('contrato','90px')+'</td>'
       + '<td style="padding:3px 5px">'+inp('banco','70px')+'</td>'
@@ -10640,7 +10698,15 @@ function finRenderDivida() {
   if (!grid) return;
   var rows = db.financeiro.divida;
   var tPrinc=0, tPago=0, tParcela=0, tEncargos=0, tBase=0, tAmort=0, tSaldo=0, tReceita=0;
-  function inp(i,campo,w,extra){ var r=rows[i]; return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'divida\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
+  // ⚠️ cet, totParcelas e pago NAO sao dinheiro: ficam fora da lista
+  function inp(i,campo,w,extra){
+    var r=rows[i];
+    var _m = _finEhMoeda(campo);
+    var _v = _m ? _finMoedaTexto(r[campo]) : String(r[campo]==null?'':r[campo]);
+    return '<input type="text"' + (_m ? _finMoedaAttrs() : '')
+      + ' value="'+_v.replace(/"/g,'&quot;')
+      +'" onchange="finEdit(\'divida\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:10px;width:'
+      +w+';color:#0E1B4D;'+(extra||'')+'">'; }
   var cols = ['Banco','Contrato','Valor Principal','Data Liberação','1ª Parcela','Parcela Final','Parcelas Pagas','Nº Parcelas','CET','Sist. Amort.','Valor Parcela','Vlr Encargos','Parcela Base','Já Amortizado','Saldo Devedor','Garantia','Receita',''];
   var html = '<div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"><table style="width:100%;border-collapse:collapse;font-size:10px;min-width:1700px">'
     + '<thead><tr>' + cols.map(finTH).join('') + '</tr></thead><tbody>';
@@ -11170,8 +11236,13 @@ function _recClienteLista(sel) {
 
 function _recClienteCel(r, i) {
   var atual = String(r && r.cliente != null ? r.cliente : '');
+  // 🔴 MEDIDO no ar em 18/11/2026: a coluna Cliente tinha 63px, a SEGUNDA
+  //    MENOR da tabela (menor que "Tipo"), e o <select> ocupava 28px. O
+  //    seletor leve nasce com UMA opcao curta, e `width:100%` num campo
+  //    dentro de <td> sem largura vem do CONTEUDO. O min-width e o que
+  //    reserva a coluna; o nome inteiro fica no title.
   var est = 'border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;'
-          + 'width:100%;max-width:168px;color:#0E1B4D;background:#fff';
+          + 'width:100%;min-width:190px;max-width:190px;color:#0E1B4D;background:#fff';
 
   if (r && _recDigitando.indexOf(r) >= 0) {
     // escape para quem ainda nao esta no cadastro (reserva, pre-cadastro)
@@ -11588,7 +11659,15 @@ function finRenderReceber() {
     // nesta tabela. Somar as duas pontas cobra a mesma dívida duas vezes.
     if (st === 'renegociado') nRenegVis++;
     else { totalVis += val; recebVis += rec; }
-    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'receber\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'">'; }
+    // campo de dinheiro sai FORMATADO e com mascara ao digitar
+    function inp(campo,w,extra){
+      var _m = _finEhMoeda(campo);
+      var _v = _m ? _finMoedaTexto(r[campo])
+        : String(r[campo]==null?'':r[campo]);
+      return '<input type="text"' + (_m ? _finMoedaAttrs() : '')
+        + ' value="'+_v.replace(/"/g,'&quot;')
+        +'" onchange="finEdit(\'receber\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'
+        +w+';color:#0E1B4D;'+(extra||'')+'">'; }
     var stBadge = st==='recebido' ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">✅ Recebido</span>'
       : st==='parcial' ? '<span style="background:#dbeafe;color:#1e40af;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">◑ Parcial</span>'
       : st==='renegociado' ? '<span style="background:#fce7f3;color:#9d174d;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">🤝 Renegociada</span>'
@@ -11614,7 +11693,9 @@ function finRenderReceber() {
         + '</td>'
       + '<td style="padding:4px 6px;text-align:right;font-family:monospace;font-weight:700;color:'+(saldo<=0?'#0d7a3e':'#c0392b')+'">'+brl(saldo)+'</td>'
       + '<td style="padding:4px 6px"><input type="date" id="recVenc-'+i+'" value="'+(r.vencimento||'')+'" onblur="_finDataSalvar(this,\'receber\','+i+',\'vencimento\',false)" onkeydown="if(event.key===\'Enter\')_finDataSalvar(this,\'receber\','+i+',\'vencimento\',true)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0E1B4D"></td>'
-      + '<td style="padding:4px 6px">'+inp('historico','260px')+'</td>'
+      // o Historico tinha 272px medidos e cede para o Cliente; e campo de
+      // texto, entao o conteudo continua rolando dentro dele
+      + '<td style="padding:4px 6px">'+inp('historico','170px')+'</td>'
       + '<td style="padding:4px 6px">'+stBadge+'</td>'
       + '<td style="padding:4px 6px">'+(st!=='pendente'
           ? '<input type="date" id="recRecEm-'+i+'" value="'+(r.recebidoEm||'')+'" onblur="_finDataSalvar(this,\'receber\','+i+',\'recebidoEm\',false)" onkeydown="if(event.key===\'Enter\')_finDataSalvar(this,\'receber\','+i+',\'recebidoEm\',true)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:130px;color:#0d7a3e">'
@@ -12539,7 +12620,15 @@ function finRenderPagar() {
   visiveis.forEach(function(o){
     var r=o.r, i=o.idx, st=o.st, np=o.np;
     totalVis += Number(r.valor)||0;
-    function inp(campo,w,extra){ return '<input type="text" value="'+String(r[campo]==null?'':r[campo]).replace(/"/g,'&quot;')+'" onchange="finEdit(\'pagar\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'+w+';color:#0E1B4D;'+(extra||'')+'"><\/input>'; }
+    // campo de dinheiro sai FORMATADO e com mascara ao digitar
+    function inp(campo,w,extra){
+      var _m = _finEhMoeda(campo);
+      var _v = _m ? _finMoedaTexto(r[campo])
+        : String(r[campo]==null?'':r[campo]);
+      return '<input type="text"' + (_m ? _finMoedaAttrs() : '')
+        + ' value="'+_v.replace(/"/g,'&quot;')
+        +'" onchange="finEdit(\'pagar\','+i+',\''+campo+'\',this.value)" style="border:1px solid #e2e5f0;border-radius:5px;padding:4px;font-size:11px;width:'
+        +w+';color:#0E1B4D;'+(extra||'')+'"><\/input>'; }
 
     var stBadge = st==='pago' ? '<span style="background:#e8f5ef;color:#0d7a3e;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">✅ Pago</span>'
       : st==='vencido' ? '<span style="background:#fde2e2;color:#7c2d12;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700">❌ Vencida</span>'
