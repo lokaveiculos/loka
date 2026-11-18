@@ -9868,3 +9868,58 @@ Fui dar à suíte o nome `t-extrato.js`, que **já era** o do parser do extrato 
 DETRAN-BA (51 testes, v115). A ferramenta de escrita recusou porque o arquivo
 não havia sido lido, e aí a regra de 17/10 (*conferir `ls t-*.js` antes de criar
 suíte*) cobrou o preço certo. A nova é **`t-recebimentos.js`**.
+
+### Validado
+- `node --check`; `<div>` do HTML balanceadas (**883/883**); os dois carimbos
+  batendo
+- **48 testes** com o código real e os dados reais (119 lançamentos, 24 baixas)
+- **34 defeitos injetados — todos acusados**: entre eles o estado antes do
+  pedido nas duas barras, ler `r.recebimentos` direto (objeto do Firebase
+  quebra), o aviso do que falta sair da tela **e** do relatório, o estorno
+  escondido ou somado em módulo, a ponta do período deixar de ser inclusiva,
+  baixa sem data entrar no período, o acumulado parar de correr (na tela **e**
+  no papel), o botão da linha abrir a conta errada, nome e observação indo crus,
+  o relatório ignorar o filtro, o pop-up bloqueado fingir sucesso, e o extrato
+  ficar por cima do histórico
+- Regressão **medida**: **59 suítes, 3.154 testes**, nenhuma falha
+- **No ar, no arquivo publicado, com o banco real** (`firebase` e `saveDB`
+  substituídos **antes** do eval — **0 gravações em produção**, reconferido: o
+  banco está byte a byte igual, `_writerBuild` ainda v157):
+
+| | |
+|---|---|
+| linhas · células | 24 · **8 em toda linha** |
+| soma da coluna Valor, lida **da tela** | R$ 528.914,12 |
+| 🔴 **a invariante** | 528.914,12 + 1.076.920,41 = **1.605.834,53** ✓ |
+| o acumulado | fecha com o total e **cresce** |
+| valores com 3 casas | **0** |
+| filtro **RSC** | 4 linhas = as 4 medidas por fora |
+| filtro **tipo Fatura** | 22 = as 22 medidas |
+| **outubro/2026** | 12 linhas · R$ 159.289,12 |
+| busca "danilo" | 9 (os dois Danilos) |
+| ordem | 18/11 ⇄ 20/06 ao inverter |
+| "nada com estes filtros" | mensagem própria, sem confundir |
+| relatório | A4, cabeçalho repetido, diz o que falta, 0 valores com 3 casas |
+
+Largura do modal medida em 1366 / 1024 / 900 / 420px: **ou cabe, ou a tabela
+rola**, e a página nunca transborda.
+
+### ⚠️ A mesma armadilha do `<select>`, pela TERCEIRA vez
+Meu palco de teste no navegador tinha `<select id="extCliente">` **sem
+`<option>`**, e atribuir `.value` ali **não define nada** — os filtros pareciam
+não funcionar (24 linhas em tudo) e eu quase registrei isso como defeito. É a
+lição de 03/11 e 12/11. O palco passou a ser o modal que o **próprio sistema
+cria**, com os selects preenchidos — o que de quebra exercita o
+`finExtratoAbrir` de ponta a ponta.
+
+Do mesmo jeito, a mensagem de "nada com estes filtros" **não pode** ser testada
+pelo select (ele recusa valor que não é opção): foi exercitada pelo campo de
+**busca**, que é texto livre.
+
+### ⏳ Não verificado
+- Falta **logado**: o Rogel abrir o Contas a Receber (ou o painel Faturas) com
+  **Ctrl+Shift+R**, clicar em **📋 Extrato de recebimentos** e imprimir o
+  relatório. Eu não autentico.
+- O aviso das **baixas sem data** não foi exercitado no ar: **não há nenhuma no
+  banco** (0 de 24). Está coberto no Node com caso sintético, e fica dito.
+
