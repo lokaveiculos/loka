@@ -51,13 +51,14 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v155-20261112-1540** |
+| `gestao.html` | **v157-20261118-1620** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
-| `contrato-mensal.html` | **mensal-v8-20261113-0920** |
-| `contrato-diaria.html` | **diaria-v8-20261113-0920** |
+| `anexo-mensal.html` | **anexo-v1-20261118-1530** (Anexo I — Relação de Veículos) |
+| `contrato-mensal.html` | **mensal-v9-20261118-1446** |
+| `contrato-diaria.html` | **diaria-v9-20261118-1446** |
 
 ## Modelo de dados — `loka_db`
 
@@ -9395,3 +9396,194 @@ Reclassificar são 371 registros de produção e não foi pedido — fica regist
 ### ⏳ Não verificado
 Falta **logado**: o Rogel gerar um contrato de cada tipo e ler a Cláusula 11ª no
 documento impresso.
+
+---
+
+## ✅ Franquias para R$ 6.000 e R$ 8.000, sem o "/PT" — 18/11/2026 (`d885104`) · mensal v9 · diária v9
+
+Pedido: *"alterar os valores de franquia constantes nos contratos mensal e por
+diária, incluindo os formulários para preenchimento manual, alterando a Franquia
+por danos ao carro para R$ 6.000,00 e a franquia de roubo/perda total para
+R$ 8.000,00. onde o texto fala 'por danos ao carro/PT' excluir 'PT'"*.
+
+| Franquia | Antes | Agora |
+|---|---|---|
+| danos ao carro | 5.000,00 | **6.000,00** |
+| perda total ou roubo | 5.000,00 | **8.000,00** |
+| para-brisa | 800,00 | **800,00** (intacta) |
+| faróis e lanternas | 600,00 | **600,00** (intacta) |
+
+O valor alterado é o **atributo `value=` de cada campo** — que é exatamente o
+"formulário para preenchimento manual" do pedido: é o que a tela mostra e o que
+sai impresso quando ninguém digita nada.
+
+### Conferido antes de mexer
+As franquias **em reais existem só nestes dois arquivos**. O campo `franquia` do
+cadastro de veículo é a franquia de **km/dia** (100 em 109 dos 119) — outra
+coisa —, e o valor de franquia da aba Sinistros é digitado pelo operador, sem
+constante. ⚠️ Um `sed` em "5.000" sem olhar isso não teria errado hoje, mas a
+confusão de nomes está ali.
+
+### 🔴 Os VALORES nunca estavam sob teste
+A suíte das cláusulas conferia que os **4 campos existiam** (`c11Danos`,
+`c11PerdaTotal`, `c11Parabrisa`, `c11Farois`) e que os rótulos estavam no texto
+— **nunca quanto cada um cobra**. Dava para trocar uma franquia de contrato por
+engano, ou mexer no para-brisa pensando estar no de danos, sem nenhum teste
+acusar.
+
+Entrou o bloco **`[franquia]`**: os quatro valores, o formato de moeda, a
+igualdade entre os dois contratos e a relação **roubo > danos** (8.000 > 6.000 —
+não é regra de lei, é a relação que o Rogel definiu, e um erro de dígito a
+inverteria sem ninguém notar).
+
+### ⚠️ O teste do "/PT" foi INVERTIDO
+`[as 4 franquias continuam no texto]` exigia literalmente `danos ao carro/PT` —
+era deliberado até hoje. Ao inverter, **a cobertura não se perdeu**: a ausência
+do "/PT" ganhou teste próprio, mais o caso da **barra solta** (`por danos ao
+carro/;`), que é o erro natural de quem apaga só as duas letras.
+
+### A4: não precisou medir, e isso é um resultado
+Os arquivos ficaram **3 bytes MENORES** cada (exatamente o `/PT`), e
+`5.000,00` → `6.000,00` / `8.000,00` têm o **mesmo número de caracteres**. Então
+o layout impresso não pode ter crescido — medir seria teatro.
+
+### Validado
+- `node --check` nos dois; `<div>` 45/45 e 48/48; os três carimbos de cada
+  arquivo batendo entre si
+- **158 testes** na suíte das cláusulas (eram 138)
+- **40 defeitos injetados — todos acusados** (eram 26): o estado antes do pedido
+  nos dois arquivos, os dois valores **trocados de lugar**, o "/PT" de volta, a
+  barra solta, o para-brisa e os faróis alterados por engano, o valor sem
+  separador de milhar, sem centavos, e a franquia divergindo entre os contratos
+- **No ar, nos dois arquivos publicados**, parseados pelo navegador: carimbos v9,
+  6.000,00 / 8.000,00 / 800,00 / 600,00, `/PT` **ausente**, a frase terminando em
+  *"por danos ao carro;"* e nenhum `value="5.000,00"` sobrando
+
+### ⚠️ Contrato já salvo guarda a franquia ANTIGA — e está certo
+**3 dos 161 contratos** em `loka_db/contratos` têm os campos completos (os
+salvos pela v124+), e os três guardam `5.000,00 / 5.000,00`. Reabrir pelo ✏️
+traz aqueles valores de volta: **o contrato foi assinado assim**. Quem nasce
+daqui para frente nasce com os novos.
+
+---
+
+## ✅ Anexo I — Relação de Veículos — 18/11/2026 (`c1ffcc0`) · anexo-v1 · gestao v156
+
+Pedido: *"criar um anexo ao contrato de locação mensal para usarmos nos casos de
+contratação de diversos veículos num só contrato, onde estejam os dados do
+locatário, dados do veículo, valor, km, seguro e etc"*.
+
+### 🔴 A medição que definiu o desenho
+O contrato mensal **já tem tabela de vários veículos** com "+ Adicionar
+Veículo". Então o que o anexo resolve é outra coisa, e os dados dizem qual:
+
+| | aluguéis | carros distintos |
+|---|---|---|
+| ativos **multi-veículo** | **4** (2 carros cada) | — |
+| **RSC TRANSPORTE** | **50 contratos** | **51** |
+| TRANSSOUZA | 16 | 17 |
+| G7 COMPANY | 12 | 13 |
+| BRJ EXPRESSO | 12 | 12 |
+
+**A frota NÃO está "num só contrato": está espalhada em um aluguel por carro.**
+É isso que o anexo vem resolver — um contrato só, com a relação anexa. Por isso
+*"Com Cliente"* varre **todos** os aluguéis ativos do cliente, não um.
+
+### De onde vem cada dado (medido, nunca suposto)
+| Campo | Fonte | Observação |
+|---|---|---|
+| marca, modelo, ano, cor | cadastro do veículo | 119/119 preenchidos |
+| RENAVAM / Chassi | cadastro | 🔴 **só 22 dos 119 têm** — a maioria vem em branco, e isso é a verdade, não falha |
+| KM na entrega | **aluguel** (`a.kmEntrega`) | 44 dos 103; é o mesmo rótulo da Frota Ativa |
+| KM livre/mês | cadastro (`mensal_km_livre`) | variação real: 2.700 a 12.000 |
+| valor mensal | **contrato** (`a.valor`) | só quando o aluguel tem **um** carro |
+| nº e data do contrato | **em branco** | de propósito — ver abaixo |
+
+🔴 **O valor só vale por carro quando o aluguel tem um carro.** Em contrato
+multi-veículo `a.valor` é o **total do contrato**, e rateá-lo seria invenção — é
+a lição do cálculo do encerramento (v148), em que o valor vinha da tabela do
+veículo e 40 de 105 aluguéis fechavam pelo número errado. Nesse caso a célula vem
+**vazia** e a página **diz quantas vieram assim**.
+
+⚠️ **O contrato não é pré-preenchido** porque o anexo pertence ao contrato
+**novo**, que ainda vai ser assinado e cujo número não existe no sistema. Datar
+pelo aluguel mais antigo diria uma data que não é a do contrato.
+
+### 🔴 O total é derivado, e as franquias NÃO são repetidas
+Não existe campo de total: ele é a **soma da coluna de valores**. Campo editável
+criaria dois números para a mesma conta (regra do saldo do Almoxarifado e do
+total do recibo).
+
+E o anexo **cita a Cláusula 11ª** em vez de reescrever as franquias. Duas fontes
+para o mesmo número foi o acidente da **v119** — e as franquias acabaram de
+mudar hoje, o que torna o risco concreto: um anexo com "5.000,00" impresso ao
+lado de um contrato que diz "6.000,00" seria um problema de verdade.
+
+### Impressão em A4 **deitado** — medido com os 51 carros da RSC
+| | |
+|---|---|
+| área útil (A4 deitado, margem 8mm 10mm) | **1047 × 733px** |
+| tabela desenhada | 1023px · **mínimo do conteúdo 683px** |
+| documento com 51 carros | 1295px = **1,77 → 2 folhas** |
+| cabeçalho repetido nas folhas | ✅ `table-header-group` |
+| linha de veículo partida / assinatura órfã | ✅ `break-inside: avoid` nos dois |
+| transborda de lado | **não** |
+
+⚠️ **Correção do que eu escrevi no commit:** a mensagem diz *"A RSC ocupa 3
+folhas"*. **Medido, são 2.** Era chute meu — e é exatamente a regra que eu
+mesmo registrei: número que vai para o registro é medido, não estimado.
+
+Em pé as 10 colunas não cabem; daí o deitado. A 375px vira uma coluna, sem
+rolagem lateral da página.
+
+### Não registra em `db.contratos`
+Anexo não é contrato — mesma decisão do recibo de pagamento (v128), e o ✏️ da
+v124 não tem página para abrir num tipo `'anexo'`.
+⚠️ `abrirContrato` **não faz nada** para tipo fora do mapa `files` (falha em
+silêncio), então o anexo tem desvio próprio no `gerarFormSelecionado`.
+
+### 🔴 ACHADO DE DADO: 2 placas em mais de um aluguel ativo
+Descoberto porque minha contagem esperada (52) não bateu com a do sistema (51):
+
+| Placa | Situação |
+|---|---|
+| **RTE3J75** | **dois aluguéis da RSC**, ambos com retirada 03/07/2026, valores diferentes (R$ 3.200 e R$ 3.350) e devoluções diferentes (2028 e 2027) |
+| 🔴 **SIL2E59** | alugada a **DOIS CLIENTES ao mesmo tempo** — Wilson Da Silva Miranda (19/09→18/11) e MARCOS FORTUNA PINTO (30/10→09/12). **19 dias de sobreposição, as duas vivas hoje** |
+
+O anexo lista o carro **uma vez** (um carro não pode aparecer duas vezes numa
+relação contratual) e **avisa**, nomeando a placa, em vez de descartar o outro
+aluguel calado. **Não corrigi** — é dado de produção e não foi pedido.
+
+⚠️ A expectativa de 52 saiu de uma medição minha que somava placa por aluguel
+**sem deduplicar entre aluguéis**. "A sonda de teste é medida", pela enésima vez.
+
+### Alinhamento de leitura de moeda
+`anxNum` passou a ler como o **`mltNum`** do sistema: o ponto é separador de
+milhar **sempre**. Antes `"12.500"` dava 12,5 — hoje não muda resultado (os
+valores vêm com vírgula), mas um valor colado de outra tela leria diferente ali.
+
+### Validado
+- `node --check` nos dois; `<div>` **883/883** no gestao (eram 875 + 8 do cartão)
+  e **60/60** no anexo; os três carimbos do anexo batendo
+- **75 testes** com o código real das duas páginas e os dados reais
+- **43 defeitos injetados — todos acusados**: ler só o primeiro aluguel, ler a
+  frota inteira, não deduplicar, ratear o valor do multi-veículo, o valor vir da
+  tabela, chutar o número do contrato, o total pegar o primeiro valor, campo
+  editável de total, **a linha com uma célula menos que o cabeçalho**, imprimir em
+  pé, o cabeçalho não se repetir, e o anexo repetir as franquias
+- **No ar, na página publicada, com os 51 carros reais da RSC**: 51 linhas de 11
+  células, numeração 1–51, total **R$ 144.100,00** batendo com a soma feita por
+  fora, zero valores com 3 casas, locatário/documento/endereço/cidade
+  preenchidos, contrato em branco, acento intacto, e o aviso dizendo **as duas
+  coisas** (a placa repetida e os 5 sem valor)
+
+### ⚠️ Três asserções minhas passaram com defeito vivo
+| O que passou | Por quê |
+|---|---|
+| o nome do veículo indo **cru** para o atributo | eu testava o `anxEsc` **direto** e nunca uma **linha montada** com nome que tem aspa. O defeito é esquecer de chamá-lo ali |
+| "parte integrante" apagada da cláusula | a frase também está no **timbre** e no rodapé: o teste passava pelo papel de carta. Agora olha dentro de *Das Condições* |
+| o **guard de autenticação** desligado | `/lokaAuthGuard/` é substring: renomear a função e não chamá-la continuava casando. Agora exige a função auto-invocada **e** o redirecionamento |
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Formulários → **Anexo I**, clicar em
+**Com Cliente** com a RSC e imprimir. Eu não autentico.
