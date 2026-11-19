@@ -10101,3 +10101,232 @@ depende da chave — mas vale saber antes de montar caminho REST para um cliente
    "Novocomeço", que casa com os **dois cadastros duplicados** de NOVO COMEÇO
    LTDA (`c40` e `c1780916789846`).
 4. Decidir os **3 valores com centavo fracionado** da ISS.
+
+---
+
+## ✅ Busca de veículo por placa ou modelo + aba Vendidos — 19/11/2026 (`71f8ac9`) · Auto Mais
+
+Pedido: *"preciso melhorar a forma como pesquisamos os veiculos no sistema
+quando vamos fazer algum lançamento. gentileza inserir a opcao de pesquisar por
+placa ou por modelo em todos os campos possiveis do sistema. Preciso tambem que
+na aba veiculos, os veiculos já vendidos sejam relaciona em separado pois esta
+tudo junto e dificulta a procura"*.
+
+### 🔴 A medição decidiu o desenho: FILTRAR, não só tentar acertar
+A caixa de **06/11** no contrato só sabia *"um casou → seleciona / vários →
+avisa"*, e não encurtava a lista. Medido nos 53 veículos (54 ao fim do dia —
+ele cadastrou um enquanto eu trabalhava):
+
+| | |
+|---|---|
+| 🔴 **modelos com mais de um carro** | **11 de 32** (RENEGADE 5, ONIX 4, HB20 3, ARGO 3…) |
+| placas gravadas **com** hífen | 27 · **sem**: 26 |
+| placas repetidas | nenhuma |
+
+⚠️ **Com modelo, "vários" é o caso COMUM** — aquela caixa seria inútil aqui.
+Então a nova **filtra o seletor**: digitar `RENEGADE` deixa os 5 na lista e a
+pessoa escolhe; digitar a placa inteira sobra 1 e ele é selecionado sozinho.
+
+### Uma implementação para os CINCO seletores
+`veicNormBusca` · `veicBuscaHtml` · `veicBuscaTodas` · `veicBuscaFiltrar` ·
+`veicBuscaLimpar`, no **`firebase-shared.js`**.
+
+| Tela | select | `value` | texto da option |
+|---|---|---|---|
+| `contratos.html` | `ctv` | id | marca modelo placa |
+| `vendas.html` | `vdveic` | id | marca modelo placa − R$preço |
+| `despesas.html` | `dveic` | **placa** | placa − marca modelo (ano) |
+| `despesa_form.html` | `dveic` | **placa** | placa − marca modelo (ano) |
+| `gestao.html` | `mv` | id | marca modelo − placa |
+
+⚠️ Em cinco cópias, uma aprenderia regra nova e as outras não — é o acidente da
+**v119** da LOKÁ. E o texto da option de cada uma já é diferente, o que seria
+cinco variações da mesma leitura.
+
+🔴 **Lê o TEXTO das opções do próprio seletor, nunca uma lista paralela**
+(regra de 06/11): buscando em `DB.veiculos` direto, uma placa visível na lista
+poderia "não existir" na busca — ou o contrário — e ninguém entenderia.
+
+🔴 **O `<select>` continua sendo a fonte da verdade.** Nenhuma gravação mudou
+em tela nenhuma; a caixa só filtra.
+
+### 🔴 O conserto que o injetor achou: `sel.value` depois do `innerHTML` MASCARA
+A primeira versão fazia `sel.innerHTML = html` e depois `sel.value =
+achados[0].v`. Com o value da option indo **cru**, a aspa quebra a option e o
+navegador lê outro valor — mas a atribuição logo depois punha o valor certo de
+volta, e **nenhum teste conseguia ver**. É literalmente a lição da **v157** da
+LOKÁ, no mesmo lugar: `sel.value = atual` depois do `innerHTML` escondeu quatro
+defeitos de uma vez.
+
+Agora a escolha é decidida **antes** de montar o HTML, e quem carrega a seleção
+é o atributo **`selected`**. Há asserção estrutural exigindo que não volte a
+existir atribuição a `sel.value` depois do `innerHTML`.
+
+### Os cuidados que não podem sair
+| | Por quê |
+|---|---|
+| 🔴 a opção **ESCOLHIDA** nunca sai da lista | um caractere errado no meio da digitação apagaria o veículo que a pessoa já tinha selecionado |
+| a opção **VAZIA** nunca sai | senão não há como desmarcar |
+| o `onchange` da tela só dispara quando o veículo **mudou** | a cada tecla com um só resultado, disparar chamaria `autoPreco`/`autoPlaca`/`selVeic` de novo sobre a mesma escolha (família do "gravar sem ter mudado" da v157) |
+| 🔴 **trava de reentrância** (`_vbFiltrando`) | o `ctv` tem `onchange="veicBuscaLimpar('ctv')"`, e o filtro CHAMA o `onchange` — sem a trava, escolher apagaria o que a pessoa acabou de digitar |
+| a lista completa mora **no próprio `<select>`** (`sel._veicTodas`) | o `om()` recria o modal e a propriedade morre junto: não há cache velho para invalidar |
+| ela **se refaz quando o seletor ganha opções** | a `despesa_form.html` acrescenta os veículos por JS **depois** do load; quem digitasse antes teria guardado uma lista de uma opção |
+| ignora hífen, caixa e acento nos **dois** lados | 27 das 53 placas têm hífen e 26 não — comparar o texto cru deixaria metade da frota inalcançável |
+| `min-width:0` nos 5 seletores | flex item não encolhe abaixo do conteúdo (lição de 02/10), e as opções são longas |
+| o aviso tem **altura fixa** (18px) | senão a linha pula a cada mensagem enquanto se digita (lição de `4bdd596`) |
+
+### 🔴 `var(--ok)` e `var(--t3)` NÃO EXISTEM nas páginas do ds.css
+Medido em `sistema/`: **só o `despesa_form.html`** declara `--ok`/`--err`/
+`--t3`/`--accent` (ele tem style próprio); o **`ds.css`** declara
+`--success`/`--danger`/`--text-muted`. As duas famílias **não se cruzam**, e a
+função roda nas seis páginas — não há um nome que sirva aos dois lados. Então
+vai o **fallback do próprio CSS**: `var(--danger, #dc2626)`.
+
+⚠️ **Não é defeito meu, e o sistema já convive com isso:** o `veiculos.html`
+usa `var(--t3)` **23 vezes** e `var(--accent)` sem declarar nenhuma das duas —
+aquelas cores **não pintam nada hoje**. Não mexi (não foi pedido), mas não
+podia acrescentar mais uma variável quebrada.
+
+### A caixa de 06/11 saiu inteira do contrato
+`ctvPorPlaca`, `ctvPlacaLimpar`, `_ctvNorm`, `_ctvOpcoes`, `_ctvAvisar` e o
+`ctvAviso` foram removidos: viraram código morto, e **duas buscas no mesmo
+campo** é exatamente como as regras envelhecem em ritmos diferentes. Há teste
+exigindo que nenhuma sobra tenha ficado, e defeito injetado que as traz de volta.
+
+---
+
+## ✅ Aba Vendidos em separado — mesmo commit · `veiculos.html`
+
+### 🔴 36 dos 53 veículos estavam vendidos — 68% da lista era carro que já saiu
+A aba segue o padrão que **a própria página já usava** ("Estoque" / "Placa de
+Venda"), em vez de inventar linguagem nova:
+
+```
+🚗 Em estoque (18)   💰 Vendidos (36)   ⎤ Placa de Venda
+```
+
+🔴 **A partição é por status: vendido de um lado, TODO O RESTO do outro.**
+Carro **sem status** cai em Estoque — que é a verdade (não foi vendido) — e a
+soma das duas abas é sempre a frota inteira. É invariante, com teste e defeito
+injetado: *nenhum carro se perde nem aparece nas duas*.
+
+### Uma fonte para a tela e para o relatório
+`veicDaAba()` → `veicFiltrados()`, e **o relatório exporta a MESMA lista da
+tela** (aba + busca + filtro).
+
+🔴 Sem isso, exportar da aba Vendidos sairia com os 54. E segue a decisão dele
+de **19/09** nos filtros de Vendas: *"Exportar CSV exporta o que está na tela —
+mandar a lista inteira surpreenderia quem acabou de recortar um período"*.
+
+⚠️ **Mudança além do pedido literal:** antes o relatório seguia só o `vFilt` e
+**ignorava a busca** da tela. Agora segue as três coisas. Fica registrado para
+ser revertido se ele não quiser.
+
+### O seletor de status por aba
+| | |
+|---|---|
+| aba Estoque | não oferece mais **"vendido"** (ele vive na outra aba, e filtrar por ele daria lista vazia) |
+| aba Vendidos | **não desenha o seletor** — são todos o mesmo status |
+| 🔴 o `vFilt` **não é aplicado** na aba Vendidos | um filtro deixado em "disponivel" na outra aba esvaziaria a lista **sem nada na tela explicando** |
+| voltar para Estoque | o filtro dele é **preservado**: nada muda em silêncio |
+
+O título diz qual aba, o subtítulo mostra **"X de Y"** quando a busca recorta, e
+*"Nenhum veículo em estoque"* deixou de se confundir com *"Nenhum veículo
+encontrado com esta busca"*.
+
+⚠️ **O que o pedido 1 NÃO era:** a busca da própria aba Veículos (`vSrch`) **já**
+procurava placa, marca e modelo desde antes. O que faltava era nos **seletores
+de lançamento** — e é lá que a caixa entrou.
+
+### Validado
+- `node --check` no shared e nas **10 páginas**
+- **93 testes de runtime** com o código real das 6 páginas e os dados reais do
+  Firestore: a normalização em 4 formas, **as 53 placas uma a uma**, modelo
+  repetido × único, marca, acento, a opção escolhida e a vazia, a lista
+  guardada (inclusive o caso da `despesa_form`), o `onchange` nos 4 formatos de
+  option, a trava de reentrância, o aviso nos 3 estados, escape de `<` e `&`, a
+  partição das abas com a invariante, os filtros, o render e o relatório
+- **68 defeitos injetados — todos acusados, nenhum cego**: entre eles o estado
+  antes do pedido nas 6 páginas, a caixa que só avisa, o filtro apagando a
+  escolha, a opção sem `selected`, o `sel.value` mascarador, a trava presa, a
+  partição invertida, o `vFilt` esvaziando a aba Vendidos, e o relatório
+  voltando a exportar a frota inteira
+- **No navegador, contra os arquivos PUBLICADOS e com os 54 veículos reais**
+  (`firebase` substituído **antes** do eval): as **54 placas selecionam o carro
+  certo, 0 erradas**; `RENEGADE` filtra para 6 opções, **não escolhe sozinho** e
+  avisa *"5 de 54 — escolha na lista"*; placa com hífen acha quem está sem e
+  vice-versa; a escolha **sobrevive** a `ZZZZZZZZZ`; os 4 formatos de option
+  (id/placa) com `autoPlaca`, `autoPreco` e `selVeic(this)` rodando e **sem
+  repetir** o evento; as abas 18/36 com a **invariante fechando**, 1 aba ativa,
+  8 células em toda linha, 0 carros de estoque vazando, e o CSV com
+  `vendidos-automais-….csv` (36) × `estoque-automais-….csv` (18)
+
+**Nada foi gravado em produção** — 0 gravações interceptadas, e as 8 coleções
+reconferidas com o **status HTTP junto** (54 / 34 / 21 / 35 / 34 / 47 / 127 / 3,
+HTTP 200 em todas).
+
+### Largura: medida, não suposta
+A caixa custa **150px fixos** ao lado do seletor. Medido no arquivo publicado,
+com o `ds.css` real, dentro de `.fr > .fg.full`:
+
+| Janela | Seletor | Estoura de lado? |
+|---|---|---|
+| 1366px | 1172px | não |
+| 1024px | 830px | não |
+| 768px | 574px | não |
+| 420px | 226px | não |
+| **375px** | **181px** | **não** |
+
+Em nenhuma largura a página transborda, e o seletor nunca fica abaixo de 100px.
+
+### ⚠️ Cinco testes meus passaram com defeito vivo
+| O que passou | Por quê |
+|---|---|
+| a opção **vazia** sair da lista | sem nada selecionado `sel.value` **já é `""`** — "a vazia fica" e "a escolhida fica" viram a MESMA condição. O caso que as separa é com um veículo escolhido |
+| a **trava** ficar presa para sempre | o palco não punha `onchange` no seletor, e é ele que LIGA a trava — as cinco telas reais têm |
+| texto e value da option indo **crus** | o stub **decodifica** as entidades ao parsear (como o navegador) **e** o `sel.value` era reposto por atribuição: as duas coisas escondiam. O que se confere é o `innerHTML` cru |
+| o `vFilt` deixar de valer na aba Estoque | 🔴 **os 53 reais têm só dois status** (vendido/disponivel): na aba Estoque todos são `disponivel`, e aplicar ou não o filtro dá o **mesmo número**. O dado não distingue — entrou um veículo em manutenção de propósito |
+| a aba ativa ficar sempre no Estoque | eu olhava **cada aba por si**, e o defeito não tira o `active` da outra. Virou *"há EXATAMENTE uma aba ativa"* |
+
+### ⚠️ Duas injeções removidas, com o motivo dito
+Uma era **inerte** (acrescentava linha vazia) e a outra também: um `sel.value =
+novo` a mais depois do `innerHTML` **não muda nada enquanto o HTML está certo**
+— ele só **mascara** outros defeitos. Saiu da lista de defeitos e virou
+**asserção estrutural**, que é o que de fato protege.
+
+### 🔴 O injetor estourou com EBUSY — e estourou DENTRO do restaurar()
+A pasta é dentro do **OneDrive**, e o sincronizador tranca o arquivo no meio das
+gravações rápidas (7 arquivos × 68 defeitos). Pior que falhar: ele falhou
+**restaurando**, e um arquivo de produção podia ter ficado com o defeito dentro.
+
+Conferido na hora que os 7 estavam íntegros (git diff + a suíte passando), e o
+injetor passou a **gravar com retentativa** (EBUSY/EPERM/EACCES) e a restaurar
+**só o arquivo mexido** logo depois de cada defeito.
+
+⚠️ **E 21 âncoras de várias linhas não casaram**: os arquivos estão em **CRLF** e
+as âncoras são escritas com `\n`. O injetor passou a normalizar ao ler e devolver
+CRLF ao gravar, como os scripts de patch já fazem. *Âncora que não casa é defeito
+que nunca foi testado* — e ele diz isso em vez de passar.
+
+### 🔴 Armadilha nova do ambiente: `let` de topo em eval INDIRETO
+As páginas declaram `let vTab, vSrch, vFilt`. No `vm` do Node, `let` de topo vai
+para o **escopo léxico global** e um `runInContext` seguinte o alcança — então
+`ctx.vTab = …` **não** troca o que o código lê, mas `vm.runInContext("vTab=…")`
+troca. **No navegador é diferente:** `w.eval(src)` é eval **indireto**, e o `let`
+fica no escopo **daquele eval** — invisível para o eval seguinte. Lá o jeito é
+definir o ferramental **dentro do mesmo eval**, fechando sobre o mesmo escopo.
+
+(As `function` vão para o objeto global nos dois casos, o que faz o ambiente
+parecer carregado enquanto as variáveis não existem — a armadilha do ambiente
+meio carregado, por um ângulo novo.)
+
+⚠️ O ambiente também precisou de `window.addEventListener` e dos ids `#modal`,
+`#mdc`, `#main` **antes** do script: as páginas fazem
+`document.getElementById("modal").addEventListener(...)` no topo, e em `null`
+aquilo estoura e **todo `let` depois nunca nasce**. O primeiro teste de cada
+bloco exige que o script tenha rodado inteiro (`REP_GARANTIA_DIAS` = 90).
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir o sistema com **Ctrl+Shift+R**, digitar uma
+placa ou um modelo nos campos de Contrato / Venda / Despesa / Manutenção, e ver
+a aba **Vendidos** separada em Veículos. Eu não autentico.
