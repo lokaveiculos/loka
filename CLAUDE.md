@@ -10330,3 +10330,192 @@ bloco exige que o script tenha rodado inteiro (`REP_GARANTIA_DIAS` = 90).
 Falta **logado**: o Rogel abrir o sistema com **Ctrl+Shift+R**, digitar uma
 placa ou um modelo nos campos de Contrato / Venda / Despesa / Manutenção, e ver
 a aba **Vendidos** separada em Veículos. Eu não autentico.
+
+---
+
+## ✅ Aba "Em serviço" — veículos fora, com local e data — 24/11/2026 (`a4d145f`) · Auto Mais
+
+Pedido: *"preciso de um painel em que fiquem listados os veiculos que estao em
+serviço, contendo placa, veiculo, local e data. disponibilizar para todos os
+usuarios"*.
+
+⚠️ **Eu construí a coisa inteira no sistema errado primeiro.** Fiz na LOKÁ
+(`gestao.html`, painel registrado em `PANELS`, 119 testes) e ele corrigiu: *"estou
+me referindo ao sistema Auto Mais"*. Revertido com `git checkout` e conferido
+íntegro — nada foi publicado. **O campo "local" não existia em nenhum dos dois
+bancos**, e foi isso que me fez perguntar de onde vinham os dados; a resposta
+("lançamento próprio") não dizia qual empresa, e eu assumi.
+
+### 🔴 O dado vive DENTRO do veículo — porque coleção nova é recusada
+Medido em 24/11, antes de desenhar:
+
+| Coleção | |
+|---|---|
+| `veiculos`, `manutencoes`, `config`, `leads`… | HTTP **200** |
+| 🔴 **`emservico`**, **`servico`**, **`em_servico`** | HTTP **403** |
+
+As regras do Firestore são **coleção por coleção** e não listam nenhuma das três
+— o mesmo que aconteceu com `leads` (15/09) e com `perfis` (06/11). Coleção nova
+daria *"NÃO foi salvo"* e exigiria o Rogel no console.
+
+Então: `v.servico` (o registro aberto) e `v.servicoHist[]` (os retornos),
+seguindo o precedente do `v.reparos[]` (12/11).
+
+🔴 **De quebra, "o mesmo carro em dois lugares" fica impossível por construção:**
+o veículo tem **um** `v.servico`. E o seletor só oferece carros livres — mais o
+que está sendo editado, senão não haveria como editar.
+
+### "Para todos os usuários" saiu de graça
+| | |
+|---|---|
+| perfis da Auto Mais | **admin** e **atendimento** — e os **dois já veem as 8 telas** |
+| perfil externo tipo Oficina/Clientes da LOKÁ | **não existe** |
+
+A aba mora **dentro da tela Veículos**, que os dois alcançam. Sem item de menu
+novo, sem mexer nas 8 páginas e sem tela nova no `AM_TELA_LABEL` — e há teste
+exigindo que ela **não** tenha virado tela própria.
+
+### O botão "✔ Voltou" é o que impede o painel de apodrecer
+A LOKÁ tem **5 manutenções abertas há ~160 dias com data de retorno no passado**
+— painel sem fechamento fácil acaba exatamente assim. Aqui um clique manda o
+registro para o histórico com a data do retorno, e o carro volta a ficar livre.
+
+| Caminho | O que faz |
+|---|---|
+| **✔ Voltou** | vai para `servicoHist` com `retorno`, `obsRetorno`, `retornoPor` |
+| **Cancelar** | apaga **sem** histórico — é para lançamento feito por engano, e o `confirm` diz isso com todas as letras |
+| **Apagar do histórico** | avisa que **o banco não tem lixeira** |
+
+### As recusas
+| Entrada | O que acontece |
+|---|---|
+| **sem local** (ou só espaço) | recusa — é a coluna que o painel promete, e registro sem local **não conta** como veículo em serviço |
+| sem veículo, sem data | recusa |
+| **previsão anterior à saída** | recusa |
+| **retorno anterior à saída** | recusa, nomeando as duas datas |
+| retorno no mesmo dia | **aceita** — sai e volta no mesmo dia acontece |
+
+A data usa hora **local** (`getFullYear/getMonth/getDate`): com `toISOString()` um
+lançamento depois das 21h cairia no dia seguinte. ⚠️ O teste disso só vale com
+**relógio fixado às 22h30** — de manhã UTC e local batem e o defeito passa.
+
+### A lista de locais é datalist, e aprende
+Aprende do próprio serviço, do histórico, das **oficinas das manutenções** e dos
+**fornecedores** — 30 locais com os dados reais. `<datalist>`, não `<select>`:
+lista fechada obrigaria a migrar o que já foi digitado (lição do fornecedor nas
+despesas, 26/09).
+
+⚠️ **7 dos 21 fornecedores têm o mesmo nome normalizado de uma oficina**, e a
+dedup mantém a **primeira grafia vista**. Foi o que fez a minha sonda falhar: eu
+escolhi o *primeiro* fornecedor da lista ("Autorama"), que é justamente um dos
+que colidem. A sonda passou a ser achada **por código**.
+
+### 🔴 Defeito real, achado pelo teste de CSS: `--t3`, `--ok` e `--err` não existem
+O meu bloco usava `var(--t3)` (4x), `var(--ok)` e `var(--err)`. Medido:
+
+| | |
+|---|---|
+| quem declara as três | **só o `despesa_form.html`**, que tem `:root` próprio |
+| o `ds.css` declara | `--text-muted`, `--success`, `--danger` |
+| 🔴 usos de `--t3` espalhados pelas 8 páginas que carregam o `ds.css` | **45** (23 só no `veiculos.html`) · `--ok`: **10** |
+
+Ou seja: **naquelas 45 chamadas a cor não pinta nada hoje.** Troquei as minhas 6
+pelas do `ds.css`, que são temáticas (claro/escuro). ⚠️ **As 45 pré-existentes
+não foram tocadas** (regra 3) — fica registrado.
+
+O bloco `[O]` da suíte varre **toda classe e toda variável CSS** que a mudança
+introduziu e exige que exista. Ele nasceu porque na LOKÁ eu inventei
+`.stat-card`/`.btn-sm`/`.table-wrap` e **106 testes de lógica não pegaram**; aqui
+inventei `.cards`/`.cl`/`.cv` e a conferência veio **antes** de publicar.
+
+### 🔴 O callback do `_gravarTudo` recebe o ARRAY de erros
+`cb(erros)` (firebase-shared.js:390). O padrão da casa está no `veiculos.html:622`.
+Com `function(ok){ if(!ok) }` a falha **nunca** seria vista: array vazio e array
+com erro são os dois truthy. Corrigido nos **4** caminhos de escrita antes de
+aplicar, e há defeito injetado que traz o booleano de volta.
+
+Falhando a gravação, os quatro **desfazem** o que mexeram em memória e avisam
+começando por **"NAO foi…"**.
+
+### Validado
+- `node --check` no shared e nas **10 páginas**; CRLF preservado
+- **95 testes** com o código real e os veículos reais do Firestore: o despachante
+  de aba, a partição, `svcLista` com **objeto indexado**, a data local com relógio
+  fixo, as recusas, os 4 caminhos de escrita com o desfazer, trocar de veículo
+  liberando o antigo, os filtros, as 6 células por linha, o datalist e o bloco de
+  CSS
+- **65 defeitos injetados — todos acusados, nenhum cego**: entre eles o estado
+  antes do pedido, coleção nova, `svcHoje` em UTC, o seletor oferecendo carro que
+  já está fora, o retorno não limpando o serviço, cancelar indo para o histórico,
+  as 3 classes inventadas e as 3 variáveis inexistentes
+- **a suíte da busca de veículo (93 testes, 19/11) continua passando**
+- **No ar, no arquivo publicado, com os 54 veículos reais** e o `firebase`
+  substituído **antes do eval**: ciclo completo na **FIAT STRADA RTE-6C08** —
+  lançada em "Oficina JT Car", 1 linha com 6 células, acento intacto, cartão e
+  contador da aba em 1, o carro **saindo do seletor**; as 4 recusas; retorno
+  gravando o histórico com local e data e **limpando** o `v.servico`; o botão
+  Voltou só nos que estão fora; busca sem acento achando "Lavagem São José";
+  período e o aviso dos sem data; previsão estourada marcada; local com `<b>` e
+  `"` **escapado**. **Nada gravado em produção** — reconferido com o status HTTP
+  junto: 54 veículos, **0 com `servico`**, **0 com `servicoHist`**, e as 8
+  coleções em HTTP 200 (o zero só vale depois de provar que havia o que contar)
+
+### A largura, medida
+| Janela | Wrapper | Tabela | Rola? | Transborda? |
+|---|---|---|---|---|
+| 1024px | 969px | 617px | não | não |
+| 900px | 845px | 682px | não | não |
+| 420px | 420px | 420px | não (adapta) | não |
+
+A 900px as colunas ficam `50 / 155 / 202 / 88 / 101 / 73`.
+
+### ⚠️ Dois defeitos passaram na primeira rodada — os dois eram sonda minha
+| O que passou | Por quê |
+|---|---|
+| `svcFora` sem a guarda do **local** | nenhum teste criava veículo com `v.servico` **sem** local — e é esse o estado que a guarda separa |
+| **apagar o item errado** do histórico | eu apagava o índice **0**, e `splice(0,1)` faz exatamente isso. A sonda passou a apagar o **índice 1** |
+
+### ⚠️ Cinco armadilhas de ferramenta, todas já registradas e todas cobradas de novo
+1. 🔴 **`\b` virou um BACKSPACE literal** no regex do teste. O mecanismo exato:
+   `\s` **não é escape válido em Python** e sobrevive ao heredoc; `\b` **é**, e foi
+   consumido. Trocado por `\s` como fronteira de atributo.
+2. O heredoc comeu os escapes **duas vezes** e, numa delas, deixou o **injetor com
+   erro de sintaxe**. Refeito pela ferramenta de escrita — a regra, de novo.
+3. **33 âncoras do injetor não casaram**: o arquivo é **CRLF** e as âncoras de
+   várias linhas são escritas com `\n`. O injetor passou a **normalizar ao ler e
+   devolver CRLF ao gravar**, e ganhou um **modo `--seco`** que confere as 65
+   âncoras de uma vez, sem rodar a suíte 65 vezes. As outras 25 eram código que eu
+   **transcrevi de memória** em vez de recortar do arquivo.
+4. **`om()` faz `mdc.innerHTML = h`**, e no navegador isso **cria** o
+   `<select id="svcVeic">` com as suas options. No harness o elemento é pré-criado
+   vazio, então `sel.options` ficava em **0** e três testes falhavam **por defeito
+   do ambiente**. Entrou um materializador — só dos `<select>`, porque nos
+   `<input>` o código atribui `.value` depois do `om()`.
+5. **A entidade HTML não existe no DOM** (terceira vez): procurei
+   `Em servi&ccedil;o (1)` e achei `undefined` — o navegador já converteu para
+   `Em serviço (1)`. Conferido com o caractere **e com contraprova** de que a
+   entidade não está lá.
+
+⚠️ E uma asserção minha mediu **no lugar errado**: *"a de setembro saiu do
+período"* procurava o nome no `main.innerHTML` inteiro — e ele continua lá, no
+**seletor de locais**, de propósito. A conferência é dentro do `<tbody>`.
+
+### ⚠️ Dois ramos inertes, e isto está dito
+O `if(!t) return ""` do `svcEsc` e a guarda `!s` do caminho de edição não mudam
+resultado nenhum ao serem removidos. Ficaram no código (custam nada e dizem a
+intenção), **mas sem cobertura própria**.
+
+### O que ficou de fora, de propósito
+- **Fotos e anexos** — o sistema não usa Storage. Mesma decisão de v99/v126.
+- **Ligação automática com Manutenção/Despesas.** A aba registra *onde o carro
+  está*, não o custo — quem lança custo é a Manutenção, que **já gera despesa**
+  sozinha (19/09). Vincular os dois mundos exige regra de edição e exclusão nos
+  dois lados, como a Manutenção→Despesa ensinou.
+- **A aba na LOKÁ.** O painel que eu havia construído lá foi **revertido**; se ele
+  quiser o mesmo na LOKÁ, o desenho está pronto, mas lá há os perfis Oficina e
+  Clientes a decidir.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir Veículos com **Ctrl+Shift+R**, clicar em
+**🔧 Em serviço**, enviar um carro de verdade para a oficina e, quando ele voltar,
+usar o **✔ Voltou**. Eu não autentico.
