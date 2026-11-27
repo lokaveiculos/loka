@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<!-- LOKA deploy: v159-20261118-1920 -->
+<!-- LOKA deploy: v160-20261127-1030 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <meta name="theme-color" content="#0E1B4D">
@@ -1864,7 +1864,7 @@ tr:hover td{background:#f8f9fe;}
 </div></div>
 
 <script>
-var LOKA_BUILD = 'v159-20261118-1920';
+var LOKA_BUILD = 'v160-20261127-1030';
 try { console.log('%cLOKÁ Sistema — build ' + LOKA_BUILD, 'background:#0E1B4D;color:#fff;padding:4px 10px;border-radius:4px;font-weight:700'); } catch(e){}
 (function(){
   // Atualiza o rodapé JÁ (o script está no fim do HTML, o elemento já existe).
@@ -6027,7 +6027,12 @@ function renderReservas() {
   var stCls  = {pendente:'ba', confirmado:'bg', cancelado:'br'};
   var stLbl  = {pendente:'⏳ Pendente', confirmado:'✅ Confirmado', cancelado:'❌ Cancelado'};
 
-  tbody.innerHTML = list.map(function(r, n) {
+  tbody.innerHTML = list.map(function(r) {
+    // O indice tem de ser o do CACHE, nao o da lista filtrada: as acoes
+    // abaixo leem _reservasCache[i]. Com filtro ou busca ativos, o indice
+    // da linha aponta para OUTRA reserva - confirmar, editar ou excluir
+    // agiria na errada.
+    var i = _reservasCache.indexOf(r);
     var st = r.status || 'pendente';
     var dt = r.criadoEm ? new Date(r.criadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
     var rid = encodeURIComponent(JSON.stringify(r));
@@ -6042,12 +6047,12 @@ function renderReservas() {
       '<td style="font-size:11px;font-weight:700;color:var(--green)">'+(r.valor||'—')+'</td>'+
       '<td><span class="badge '+(stCls[st]||'bm')+'">'+( stLbl[st]||st)+'</span></td>'+
       '<td><div class="td-actions">'+
-        '<button class="icon-btn" title="Ver Recibo" onclick="abrirReciboReserva('+n+')">🧾</button>'+
-        (st!=='confirmado' ? '<button class="icon-btn" title="Confirmar" onclick="setStatusReserva('+n+',\'confirmado\')" style="border-color:var(--green);color:var(--green)">✅</button>' : '')+
-        (st!=='cancelado'  ? '<button class="icon-btn" title="Cancelar" onclick="setStatusReserva('+n+',\'cancelado\')" style="border-color:var(--red);color:var(--red)">✕</button>'  : '')+
-        '<button class="icon-btn" title="WhatsApp" onclick="abrirWhatsAppReserva('+n+')">💬</button>'+
-        '<button class="icon-btn" title="Criar/Vincular Cliente" onclick="criarClienteDeReserva('+n+')" style="border-color:var(--blue);color:var(--blue)">👤+</button>'+
-        '<button class="icon-btn" title="Editar Reserva" onclick="abrirEditarReserva('+n+')" style="border-color:#f59e0b;color:#f59e0b">✏️</button>'+
+        '<button class="icon-btn" title="Ver Recibo" onclick="abrirReciboReserva('+i+')">🧾</button>'+
+        (st!=='confirmado' ? '<button class="icon-btn" title="Confirmar" onclick="setStatusReserva('+i+',\'confirmado\')" style="border-color:var(--green);color:var(--green)">✅</button>' : '')+
+        (st!=='cancelado'  ? '<button class="icon-btn" title="Cancelar" onclick="setStatusReserva('+i+',\'cancelado\')" style="border-color:var(--red);color:var(--red)">✕</button>'  : '')+
+        '<button class="icon-btn" title="WhatsApp" onclick="abrirWhatsAppReserva('+i+')">💬</button>'+
+        '<button class="icon-btn" title="Criar/Vincular Cliente" onclick="criarClienteDeReserva('+i+')" style="border-color:var(--blue);color:var(--blue)">👤+</button>'+
+        '<button class="icon-btn" title="Editar Reserva" onclick="abrirEditarReserva('+i+')" style="border-color:#f59e0b;color:#f59e0b">✏️</button>'+
       '</div></td></tr>';
   }).join('');
 }

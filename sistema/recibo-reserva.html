@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<!-- LOKA deploy: reserva-v1-20261127-1030 -->
   <!-- Sem auth guard — página pública -->
   <script>
   // Tenta identificar usuário logado (opcional)
@@ -303,14 +304,14 @@
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#3D5AFE" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Data de Retirada
           </span>
-          <input type="datetime-local" id="dtRetirada">
+          <input type="date" id="dtRetirada">
         </div>
         <div class="reserva-item">
           <span class="reserva-item-label">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#3D5AFE" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Data de Devolução
           </span>
-          <input type="datetime-local" id="dtDevolucao">
+          <input type="date" id="dtDevolucao">
         </div>
         <div class="reserva-item">
           <span class="reserva-item-label">
@@ -710,6 +711,9 @@ if (document.readyState === 'loading') {
     window.location.replace('index.html');
   }
   
+var LOKA_BUILD = 'reserva-v1-20261127-1030';
+try { console.log('LOKÁ Recibo de Reserva — build ' + LOKA_BUILD); } catch(e){}
+
 // ── DADOS DA RESERVA DO PAINEL ────────────────────────────────────────────
 var _reservaFromPanel = null;
 
@@ -745,7 +749,8 @@ function registrarReserva() {
 
   // Helper para ler campo pelo id
   function campo(id) { var e=document.getElementById(id); return e?e.value.trim():''; }
-  // Extrai só a data de um datetime-local (2024-06-15T10:30 → 2024-06-15)
+  // Guarda-costas: com type="date" o value ja vem AAAA-MM-DD, entao o split
+  // so protege caso o campo volte a ser datetime-local algum dia.
   function soData(v) { return v?v.split('T')[0]:''; }
 
   var nome      = campo('locatarioNome');
