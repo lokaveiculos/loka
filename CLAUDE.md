@@ -51,12 +51,13 @@ DNS via Cloudflare.
 
 | Arquivo | Build |
 |---|---|
-| `gestao.html` | **v159-20261118-1920** |
+| `gestao.html` | **v160-20261127-1030** |
 | `fatura.html` | **v83-20261103-1700** |
 | `multas.html` | **v15-20261019-1030** |
 | `sinistro-colaborador.html` | **v1-20261014-1150** (formulário do colaborador) |
 | `recibo.html` | **recibo-v2-20261017-1210** (recibo de pagamento) |
 | `anexo-mensal.html` | **anexo-v1-20261118-1530** (Anexo I — Relação de Veículos) |
+| `recibo-reserva.html` | **reserva-v1-20261127-1030** (formulário público de reserva) |
 | `contrato-mensal.html` | **mensal-v9-20261118-1446** |
 | `contrato-diaria.html` | **diaria-v9-20261118-1446** |
 
@@ -10519,3 +10520,153 @@ intenção), **mas sem cobertura própria**.
 Falta **logado**: o Rogel abrir Veículos com **Ctrl+Shift+R**, clicar em
 **🔧 Em serviço**, enviar um carro de verdade para a oficina e, quando ele voltar,
 usar o **✔ Voltou**. Eu não autentico.
+
+---
+
+## 🔴 A data de retirada da reserva nunca era gravada — 27/11/2026 (`7534c2a`) · gestao v160 · recibo-reserva v1
+
+Relato: *"na aba reservas, verificar o porque a data prevista da retirada nao
+esta ficando salva"*. Estava certo, e eram **dois** defeitos somados.
+
+### 🔴 A prova veio do banco antes de vir da tela
+| | |
+|---|---|
+| reservas | 12 |
+| 🔴 **com `retirada` VAZIA** | **10** |
+| com retirada | 2 — e as duas são explicáveis (ver abaixo) |
+
+### Defeito 1 — o campo era `datetime-local`, e ele não tem "só a data"
+```html
+<input type="datetime-local" id="dtRetirada">   <!-- o rótulo diz "Data de Retirada" -->
+```
+
+Medido no Chrome, **com teclas de verdade**, com o foco comprovado no campo:
+
+| campo | digitei `20122026` | `.value` |
+|---|---|---|
+| `datetime-local` (o do formulário) | mostra 20/12/2026 na tela | 🔴 **(VAZIO)** |
+| `date` | mostra 20/12/2026 na tela | **2026-12-20** |
+
+E a prova determinística, que não depende de teclado nenhum:
+
+```js
+a.value = '2026-12-20';        // datetime-local -> vira ''   🔴
+a.value = '2026-12-20T10:30';  // datetime-local -> aceita
+b.value = '2026-12-20';        // date           -> aceita
+```
+
+🔴 **E `validity.valid` continua `true`** — o navegador **não acusa nada**.
+A pessoa digita a data, **vê a data na tela**, clica em Registrar, e o sistema
+grava string vazia com um ✅ verde.
+
+Só gravava quem preenchesse **também a hora** — ou quem usasse o **ícone de
+calendário**, que preenche os dois segmentos de uma vez. Daí o ar de
+intermitência: pelo teclado some, pelo calendário funciona.
+
+E as duas reservas que têm retirada confirmam a leitura: a da **AMANDA** tem
+`editadoEm` (foi corrigida pelo painel, cujo modal já usa `type="date"`), e a do
+**SILVANO** veio do formulário — com os dois segmentos preenchidos.
+
+**Conserto:** `type="date"` nos dois campos. O `soData()` **já descartava a
+hora** (`v.split('T')[0]`), então pedir hora era pedir trabalho que o sistema
+jogava fora. Ele ficou como guarda-costas, com o comentário refeito.
+
+### 🔴 Defeito 2 — as ações da lista agiam na reserva ERRADA
+```js
+tbody.innerHTML = list.map(function(r, n) {   // n = indice da lista FILTRADA
+  ... onclick="abrirEditarReserva('+n+')"     // mas a acao le _reservasCache[n]
+```
+
+Medido nas 12 reservas reais:
+
+| Filtro | Linhas | 🔴 Agem na reserva ERRADA |
+|---|---|---|
+| (todos) | 12 | 0 |
+| Pendente | 4 | **0 — por acaso** |
+| **Confirmado** | 7 | 🔴 **7 de 7** |
+| Cancelado | 1 | 🔴 **1 de 1** |
+
+⚠️ **O "Pendente" acertar é coincidência, não desenho:** as 4 pendentes são
+justamente as 4 mais recentes, e o cache vem ordenado do mais novo para o mais
+velho — elas ocupam os índices 0–3. Por isso o defeito parecia intermitente.
+
+São **6 ações** nessa linha (ver recibo, confirmar, cancelar, WhatsApp, criar
+cliente, editar) **mais a exclusão** dentro do modal. Com o filtro "Confirmado"
+ativo, clicar em ✕ na primeira linha **cancelava a reserva de outra pessoa**.
+
+**Conserto:** `var i = _reservasCache.indexOf(r);`. É o padrão que o
+`renderAtivos` já usa (`db.ativos.indexOf(a)`) e a mesma lição da v103 —
+*o índice da página não serve*.
+
+⚠️ **Conferido que não há o mesmo defeito nos Contratos**, que é o outro
+`map(function(x, n))` do arquivo: lá as ações **remontam a mesma lista**
+(`db.contratos.slice().reverse()`) e indexam nela, e aquela lista não é
+filtrada. O índice bate.
+
+### De quebra: o `recibo-reserva.html` não tinha carimbo nenhum
+Nem na linha 4, nem `LOKA_BUILD`. Ganhou os dois (`reserva-v1-...`), para a
+regra 4 valer nele também.
+
+### Validado
+- `node --check` nos dois; `<div>` balanceadas (gestao **883/883**, recibo **70/70**)
+- **43 testes** com o código real das duas páginas e as **12 reservas reais**:
+  o ciclo do formulário, o campo vazio não inventando data, o guarda-costas do
+  `soData`, a invariante do índice em **cada filtro e na busca livre**, as 6
+  ações apontando para o mesmo índice, nenhum índice fora do array, `fmtRes` nos
+  dois formatos, o modal de edição de ponta a ponta e os carimbos
+- **27 defeitos injetados — todos acusados**, entre eles **o estado antes do
+  pedido nos dois arquivos**, o índice vindo da lista filtrada, **uma só** das
+  seis ações voltando ao índice errado, `soData` pegando a hora em vez da data,
+  a reserva nascendo com data inventada, e o modal gravando por cima de outra
+- **No ar, nas duas páginas publicadas**: o formulário preenchido e o botão
+  **Registrar** clicado de verdade, com o `firebase` interceptado —
+  **`retirada: "2026-12-20"`** chegou à gravação (antes seria `""`); e o
+  `renderReservas` publicado, com as 12 reservas reais, deu **0 linhas agindo na
+  reserva errada** em todos os filtros, com os índices do "Confirmado" saindo
+  `4,5,7,8,9,10,11` — e não `0..6`, que é o que o defeito produzia.
+  **Nada foi gravado em produção** — reconferido: 12 reservas, nenhuma de teste.
+
+### ⚠️ Duas armadilhas de medição, as duas minhas
+1. 🔴 **O `sed | cat -A` do Git Bash MENTE sobre o final de linha.** Ele mostrou
+   `$` sem `^M` e eu concluí que o `gestao.html` era LF — ele é **CRLF**. Quem
+   me salvou foi o script de patch, que **mede** a quebra do próprio arquivo em
+   vez de supor; o injetor, que eu escrevi supondo, teve uma âncora recusada.
+   Para final de linha, medir em Node/Python (`/\r\n/.test(...)`), nunca pelo
+   `cat -A` depois de um `sed`.
+2. **O teclado emulado do navegador parou de entregar as teclas no meio da
+   verificação** — e o sinal foi o campo `date` do meu próprio laboratório, que
+   funcionara minutos antes, passar a sair vazio também. *Medida que não
+   distingue não está medindo*: foi isso que impediu de registrar "o conserto
+   não funcionou". A verificação no ar seguiu pelo botão **Registrar** real.
+
+⚠️ E um clique meu caiu no campo **Veículo** em vez do de data, porque calculei
+a coordenada antes de a página terminar de rolar. O zoom mostrou o texto no
+campo errado e o resultado foi descartado.
+
+### ⚠️ O stub de DOM precisou modelar o navegador
+Sem isso, o teste do campo não valeria nada: o `elem()` da suíte passou a
+devolver **`''` quando o `type` é `datetime-local` e o valor não tem hora**, e a
+suíte lê o **`type` do arquivo publicado**, não de parâmetro. É o que faz o
+primeiro defeito injetado (voltar o `datetime-local`) ser acusado pelo teste de
+gravação, e não só pelo estrutural.
+
+⚠️ Um defeito passou na primeira rodada — *"salvar grava por cima de outra
+reserva"* — porque meu ciclo de edição tinha **uma só reserva** no cache: ali
+"gravar na própria" e "gravar na primeira" são a mesma coisa. O ciclo passou a
+usar as 12 reais, editando a de índice 3.
+
+⚠️ **O scratchpad foi limpo entre sessões outra vez**: `ext.js`, `divs.js` e as
+suítes anteriores não existiam mais. Os dois utilitários foram refeitos — sem
+eles o `node --check` teria dado **OK falso**. **Não houve regressão a rodar**
+além da suíte desta entrega, e isso está dito aqui em vez de eu alegar um número.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir a aba **Reservas** com **Ctrl+Shift+R**, abrir o
+formulário, preencher a data de retirada e conferir que ela aparece na lista.
+Eu não autentico.
+
+### ⚠️ As 10 reservas antigas continuam sem data
+O conserto vale **daqui para frente**. As 10 que estão com `retirada` vazia
+continuam assim — o sistema não sabe que data era. Dá para preencher uma a uma
+pelo ✏️ **Editar** da própria aba, que sempre funcionou.
+
