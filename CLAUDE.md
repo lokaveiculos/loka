@@ -10670,3 +10670,255 @@ O conserto vale **daqui para frente**. As 10 que estão com `retirada` vazia
 continuam assim — o sistema não sabe que data era. Dá para preencher uma a uma
 pelo ✏️ **Editar** da própria aba, que sempre funcionou.
 
+---
+
+## ✅ Recibo de pagamento da venda — 28/11/2026 (`453150b`, `e2e7735`) · Auto Mais
+
+Pedido: *"gerar um formulario de recibo para darmos aos nossos clientes quando
+pagarem valores referentes a vendas dos veiculos"*.
+
+⚠️ **Venda de veículo é Auto Mais** — a LOKÁ aluga. Conferido antes de abrir
+arquivo: não existia **nada** de recibo no sistema, só o item de checklist
+*"Nota fiscal / Recibo assinado"* no `vendas.html`.
+
+### 🔴 O número que define o trabalho: o sistema NÃO sabia quanto cada venda
+### já havia recebido
+Medido nas **38 vendas** e nos **39 contratos**: **zero** campos com
+`pago`/`recebido`/`baixa`/`quitado`/`recibo`. A venda registrava o valor e a
+**forma do negócio** (A vista 17 · Financiamento 12 · Consorcio 6 · Entrada +
+Parcelas 3); o dinheiro que entrou, não.
+
+E **20 dos 38 contratos têm entrada parcial** — pagamento em partes é o caso
+comum, não a exceção. Então o recibo não podia ser só um papel: ele passa a ser
+o registro do que entrou.
+
+### 🔴 Grava DENTRO da venda — porque coleção nova é recusada
+`v.recibos[]`, seguindo o precedente que a casa já tem duas vezes:
+`v.reparos[]` (12/11) e `v.servico` (24/11). Coleção nova no Firestore responde
+**403** — medido com `emservico`/`servico`/`em_servico` em 24/11 e com `perfis`
+em 06/11. Uma coleção `recibos` daria *"NÃO foi salvo"* e exigiria o Rogel no
+console.
+
+### O vocabulário saiu dos dados, não da minha cabeça
+As **9 referências** vieram dos `obs` reais das 38 vendas: **transferência**
+aparece **46 vezes**, **emplacamento 20**, mais entrada, parcela/boleto, troco,
+IPVA e multa. Exemplos literais do banco:
+
+```
+"transferencia e emplacamento pago ( 2755,00 )"
+"TRANSFERENCIA PAGA R$ 1025,00 // MANUAL E CHAVE RESERVA ENTREGUES."
+"Entrada de R$ 65000,00 + 06 boletos no valor R$ 1700,00"
+```
+
+⚠️ **As 10 formas de pagamento do recibo NÃO são a lista do `pagamento` da
+venda.** Aquela diz como o **negócio** foi estruturado (A vista, Financiamento,
+Consorcio, Troca por outro veiculo); esta diz como o **dinheiro chegou** (PIX,
+dinheiro, transferência, cartão, cheque, crédito de financiamento, carta de
+crédito). Misturar as duas foi o que quase me fez usar a lista errada.
+
+### 🔴 Valor acima do saldo é ACEITO — e isso é medição, não descuido
+Transferência, emplacamento e IPVA são cobrados **além** do valor do veículo em
+boa parte das vendas (as 46 e 20 menções acima). Então o sistema **avisa** que
+passou, diz quanto, explica por quê — e deixa emitir. Travar faria o operador
+não conseguir dar recibo do que ele de fato recebeu.
+
+O documento também **diz o saldo**: *"Saldo remanescente desta venda nesta data:
+R$ X"*, ou *"Valor do veículo integralmente recebido"*, ou *"Recebido além do
+valor do veículo: R$ Y (valores cobrados à parte…)"*. É o padrão dos cartões do
+Contas a Receber (v120–v122): quando o número embute algo que o olho não vê, a
+tela **diz**.
+
+### 🔴 A quitação é RESSALVADA
+O texto dá quitação *"exclusivamente quanto ao valor e à finalidade acima
+discriminados, permanecendo inalteradas as demais obrigações contratuais"*.
+Um recibo que desse quitação geral da venda ao receber **uma parcela** seria um
+problema jurídico, não um detalhe de redação — mesma decisão do recibo de
+pagamento da LOKÁ (v128).
+
+### 🔴 Cópia CONGELADA do cliente e do veículo
+Cada recibo guarda nome, documento, endereço, veículo, placa, ano, valor da
+venda e **quanto já havia sido pago**. Se o cadastro mudar amanhã, a 2ª via
+**não pode** sair diferente do papel que o cliente tem na mão — regra do recibo
+de multa da LOKÁ (08/10). Há teste que edita o cliente depois e exige que o
+recibo não mude, e defeito injetado que faz a 2ª via ler o cadastro de hoje.
+
+### 🔴 ACHADO: o número do recibo herdava a duplicidade do número da venda
+A suíte pegou. Medido: **3 números de venda aparecem duas vezes cada** no banco
+(`VD-2026-007`/`008`/`009` — achado já registrado em 19/09), e são vendas de
+**clientes e carros diferentes**:
+
+| | |
+|---|---|
+| `VD-2026-008` | id 10 (Mateus, SHP2B83, R$ 61.500) e id 12 (Danilo, RDM0A94, R$ 80.000) |
+| `VD-2026-009` | id 13 (Jackson, PLQ9E46) e id 14 (José, SCZ4A24) |
+| `VD-2026-007` | id 7 (Jaqueline, JQY4018) e id 8 (Nelson, GTN9F56) |
+
+Sem conserto, **os dois recibos sairiam como `RV-2026-008/1`**. Agora, quando o
+número da venda está repetido, o id entra: `RV-2026-008-10/1`. Fica feio só nos
+3 casos tortos, e o campo continua editável.
+
+⚠️ A numeração **não é sequencial global** de propósito: sequencial exigiria
+varrer as vendas e colidiria se duas pessoas emitissem ao mesmo tempo. Derivar
+do número da venda nunca colide e já diz de que venda é.
+
+### 🔴 Defeito que a medição do A4 achou: os centavos comiam o "e"
+| valor | antes | agora |
+|---|---|---|
+| 1500 | "mil **e** quinhentos reais" | igual |
+| **1500,55** | 🔴 "mil quinhentos reais e…" | "mil **e** quinhentos reais e…" |
+| **119900,55** | 🔴 "cento e dezenove mil novecentos…" | "…mil **e** novecentos…" |
+
+O separador da última parte era decidido por `Math.round(n) % 1000`, e o `n` ali
+é o valor **com centavos**: 1500,55 arredonda para 1501, o resto vira **501** —
+nem menor que 100 nem múltiplo de 100 — e o `" e "` não entra. A função interna
+lia o `n` do escopo de fora em vez do próprio argumento.
+
+🔴 **ACHADO REGISTRADO: o `_mltExtenso` da LOKÁ tem o MESMO código e o mesmo
+defeito.** Os 11 casos de teste de lá (08/10) não o pegaram porque nenhum
+juntava centavos com uma parte de milhar **redonda** — e os meus 12 casos
+também não, pela mesma razão. **Não mexi na LOKÁ**: outro sistema, não foi
+pedido, e o recibo de multa está em uso. Se for corrigido lá, a sonda é
+`1500,55`.
+
+### As recusas
+| Entrada | O que acontece |
+|---|---|
+| valor **sem dígito** (`abc`) | recusa — `rvNum('abc')` devolve 0, e 0 passaria calado |
+| **`1.200.00`** (ponto no lugar da vírgula) | 🔴 recusa — ver abaixo |
+| zero ou negativo | recusa |
+| sem data, ou data mal formada | recusa |
+
+🔴 **O `1.200.00` é o caso que mais importa, e eu quase o deixei passar.** O
+defeito injetado *"o rvNum devolve NaN em vez de 0"* **passou** na primeira
+rodada, porque a minha sonda era `'abc'` — e para `'abc'` o caminho sem a
+guarda também dá 0 (`Number('')` é 0). Quem distingue é valor com **dois
+pontos**, erro de digitação realista. E o estrago seria sério: `NaN <= 0` é
+**false**, então o valor passaria a validação e o recibo seria gravado com valor
+**NaN**. O `rvTemDigito` também deixa passar, porque há dígito.
+
+### ⚠️ Uma guarda minha era INERTE, e saiu
+`if (!/\d/.test(s)) return 0;` dentro do `rvNum`: medido em 8 entradas (`abc`,
+`''`, `a-b`, `a.b`, `-`, `.`, `xyz!@#`, `R$`) que com e sem ela o resultado é 0
+nas oito. Quem faz o trabalho de verdade é o `rvTemDigito`, que **é** testado e
+acusado. A linha **saiu**, em vez de ficar como proteção que nenhum teste
+alcança (decisão de 12/11).
+
+### O que mais o recibo cuida
+- **registra ANTES de imprimir** — não se entrega ao cliente um recibo que o
+  sistema não conhece (regra do recibo de multa, v106); há defeito injetado
+- falha de gravação **desfaz**, avisa começando por **"NAO foi salvo"** e deixa o
+  modal aberto; o callback do `_gravarTudo` lê o **array de erros**, nunca um
+  booleano (`cb(erros)`, shared:390)
+- 1 ou 2 vias (padrão 2: cliente e loja), com rótulo em cada
+- **2ª via** reimprime da cópia, com carimbo, e **não grava nada**
+- excluir avisa que **o valor deixa de contar** e que **o banco não tem lixeira**
+- o contador vai no próprio botão (`🧾²`) e o `title` diz o recebido — 🔴 **sem
+  acrescentar coluna**, que mexeria no `colspan` do estado vazio (família de
+  defeito dos rodapés, v78/v119/v137)
+
+### Validado
+- `node --check` no shared e nas **10 páginas**; CRLF preservado
+- **101 testes** com o código real e as **38 vendas reais**: a leitura de valor no
+  formato da Auto Mais, o extenso em 12 + 10 casos, a data local com relógio fixo,
+  `rvLista` com objeto indexado do Firestore, pago/saldo, a numeração e a
+  desambiguação, emitir nas 38 vendas, as 6 recusas, 2ª via, excluir, o documento
+  inteiro e o fonte
+- **68 defeitos injetados — todos acusados, nenhum cego**
+- **as suítes de 19/11 (93 testes) e 24/11 (95) continuam passando**
+- Regressão **medida**: **3 suítes, 289 testes**, nenhuma falha
+
+### Verificado no ar, no arquivo publicado, com as 38 vendas reais
+`firebase` substituído **antes do eval** (regra de 11/11). Ciclo completo na
+venda real **VD-2026-008 · Mateus · SHP2B83 · R$ 61.500** — justamente uma das
+duplicadas:
+
+| | |
+|---|---|
+| número sugerido | **`RV-2026-008-10/1`** — a desambiguação pelo id, no ar |
+| aviso ao vivo | *"faltariam R$ 41.500,00"* · *"a venda fica quitada"* · *"R$ 2.755,00 acima…"* |
+| 1º recibo (R$ 20.000, PIX) | gravado em `vendas`, pago/saldo **20.000 / 41.500** |
+| o documento | 2 vias rotuladas, valor e extenso, **saldo de R$ 41.500,00 dito**, quitação ressalvada, timbre + CNPJ + quem emitiu, observação **escapada**, 0 valores com 3 casas |
+| 2º recibo (R$ 41.500) | 1 via sem rótulo, **"integralmente recebido"**, `pagoAntes` 20.000 |
+| o `title` do botão | *"2 recibo(s) · recebido R$ 61.500,00 · quitado"* |
+| **2ª via** | nome **original** mesmo depois de eu trocar o cadastro; carimbo; **0 gravações** |
+| as 4 recusas | `abc`, `0`, `-500` e **`1.200.00`** — todas com a mensagem certa |
+
+**Nada foi gravado em produção** — reconferido com o status HTTP junto: 38
+vendas / **0 com `recibos`**, e HTTP 200 nas 8 coleções (38/38/55/39/54/134/5/3).
+O zero só vale depois de provar que havia o que contar.
+
+### Cabe no A4 — medido com o pior caso dos dados reais
+| | |
+|---|---|
+| área útil (A4, margem 12mm 18mm do `@page`) | **658 × 1032px** |
+| o documento no pior caso | **658 × 638px** |
+| cabe em 1 folha? | **sim, sobram 394px** |
+| transborda de lado? | **não** |
+
+O pior caso saiu dos dados: maior nome de cliente (36 car.), maior endereço (79),
+maior nome de veículo (36), valor de R$ 119.900,55 e observação longa.
+
+### ⚠️ Sete defeitos passaram na primeira rodada — e os sete ensinaram
+| O que passou | Por quê |
+|---|---|
+| o `rvNum` devolver **NaN** | sonda `'abc'` não distingue; ver acima |
+| `rvSaldo` não arredondar | a minha sonda (`[10.05, 10.15]` sobre 100) dava **79.8 nos dois casos**. As que distinguem foram achadas medindo: `61500-[20000.1,20000.2]` dá `21499.699999999997` |
+| o documento perder o **extenso** | ele sai **2 vezes por via**; procurar uma vez não pega a perda de uma delas |
+| a **observação** ir crua | eu testava o escape do **nome**, nunca da observação |
+| o valor com **3 casas** | `10,05` sai igual com e sem `maximumFractionDigits`; quem distingue é um valor com 3 decimais (`10,055`) |
+| o modal perder as **10 formas** | 🔴 o teste era **CIRCULAR**: comparava `options.length` com `RV_FORMAS.length`, e encurtar a lista encurta os dois. Agora o número e os nomes vão fixos |
+| a lista **ganhar coluna** | contar `<th>` antes/depois não pega um `<td>` a mais sem `<th>`: cabeçalho e colspan ficam iguais |
+
+⚠️ E duas asserções minhas estavam **erradas**, não fracas: eu esperava
+*"dois mil**,** setecentos…"* com vírgula (a forma sem vírgula é a gramaticalmente
+certa), e contei o `<td colspan="7">` do **estado vazio** como célula de linha —
+medido contra o HEAD: 7 `<th>` e 8 `<td` nas **duas** versões, ou seja, nada
+mudou com a minha alteração.
+
+### ⚠️ A armadilha dos escapes, três vezes na mesma entrega
+🔴 **A ferramenta de escrita resolve `\uXXXX` ao gravar.** Os meus `'\u2014'`
+chegaram ao `vendas.html` como o caractere **— literal** (medido: 18 literais, 0
+sequências), e os `\\ud83d\\udd34` das âncoras do injetor chegaram como o emoji
+🔴 literal. Resultado: **7 âncoras não casaram**. O injetor ganhou **marcadores
+ASCII** (`TRAVESSAO`, `CEDILHA`, `AGRAVE`…) que viram o caractere na hora de
+aplicar — âncora de patch é **ASCII puro**, sempre.
+
+🔴 **E pior: eu escrevi `\u0327` e `\u0303`** — cedilha e til **combinantes**.
+"quitação" foi para o arquivo como `quita` + `c`+U+0327 + `a`+U+0303 + `o`:
+visualmente igual, bytes diferentes, e nenhuma busca pela forma pré-composta
+acha. É a armadilha de 28/09, agora **dentro de um arquivo publicado**.
+Normalizei as 4 ocorrências para NFC — e foi a âncora que não casava que
+denunciou.
+
+⚠️ E uma conferência minha por regex **engoliu código**: tentei tirar as strings
+para não contar comentário nem texto, mas o bloco tem `/'/g` num regex literal,
+e aspa solta quebra qualquer parse desse tipo — daí `function rvSalvar` "não
+existir". A conferência passou a ser **explícita**: os nomes `rv*` por um lado e
+os 14 helpers externos numa **lista nomeada**, um por um. Quem prova o resto é a
+suíte, que carrega o arquivo de verdade.
+
+⚠️ **E eu quase apliquei o patch chamando uma função que não escrevi:** o botão
+da linha chama `rvTituloBotao(v)`, que não existia no bloco. A conferência do
+próprio script de aplicação pegou — é o defeito que deixou o `crm.html` em
+branco em agosto.
+
+### ⚠️ A suíte `t-emservico` saiu da regressão
+Ela testa o painel que eu construí na LOKÁ e que **foi revertido em 24/11** (0
+ocorrências no `gestao.html`). Dava 112 falhas por testar código que não existe
+mais. Renomeada para `.DESCARTADA-painel-revertido-24-11` — em vez de contar um
+número falso de regressão.
+
+### O que ficou de fora, de propósito
+- **Não é documento fiscal**, e o próprio recibo diz isso no pé. Nota fiscal
+  continua sendo o levantamento de 26/09 (depende do contador e de servidor).
+- **Nenhum lançamento automático em Despesas/Financeiro.** O recibo registra
+  **entrada** de dinheiro da venda; a Auto Mais não tem contas a receber, e
+  amarrar os dois mundos exige regra de edição e exclusão nos dois lados — foi o
+  que a Manutenção→Despesa (19/09) ensinou.
+- **O campo `saldo` do contrato não é atualizado** pelo recibo. Só 3 dos 38
+  contratos têm esse campo preenchido, e mexer nele mudaria a tela de Contratos,
+  que não foi pedida. Quem responde pelo recebido é o `v.recibos[]`.
+
+### ⏳ Não verificado
+Falta **logado**: o Rogel abrir **Vendas** com **Ctrl+Shift+R**, clicar no 🧾 de
+uma venda real, lançar o que o cliente pagou e imprimir. Eu não autentico.
